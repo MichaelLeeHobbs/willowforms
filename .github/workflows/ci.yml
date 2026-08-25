@@ -49,6 +49,24 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Only chromium, and only its own dependencies: the suite covers behaviour
+      # this project owns, not rendering differences between engines.
+      - name: Install the browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end
+        run: pnpm e2e
+
+      - name: Keep the trace from a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
       # dist is what consumers actually get, so prove it exists and carries types.
       - name: Check build output
         run: |

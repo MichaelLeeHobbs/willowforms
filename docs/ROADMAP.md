@@ -47,6 +47,9 @@ product.
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
   covers the test files, and CI running all of it on every PR. **345 tests.**
+- End-to-end coverage in a real browser: drop geometry, selection frames, keyboard operation, the rules
+  and localization round trips, the JSON gate against malformed input, and one document rendered through
+  both kits. **40 tests.**
 
 ### What "verified" means here
 
@@ -90,9 +93,10 @@ authored earlier through to the export.
 
 The gap between this and a product, roughly in the order it matters:
 
-**Tests for anything React.** 152 of the 345 tests are pure functions. Component tests cover canvas
+**Tests for anything React.** 152 of the 345 unit tests are pure functions. Component tests cover canvas
 selection, the drag wiring, the rules editor, the inspector tabs, the JSON dialog, the binding editors,
-and form settings. The palette and tree rendering are still untested, and there is no end-to-end setup. jsdom has no layout engine, so
+and form settings; 40 end-to-end tests cover the rest in a real browser. The palette's own rendering and
+the tree's grouping semantics are still the thinnest areas. jsdom has no layout engine, so
 geometry stays a browser check no matter how far the component tests grow.
 
 ## Sequence
@@ -100,7 +104,7 @@ geometry stays a browser check no matter how far the component tests grow.
 1. ~~Canvas selection plus a selection overlay.~~ Done.
 2. ~~Drag and drop from palette to canvas, and reordering in the tree.~~ Done.
 3. ~~The Rules tab.~~ Done.
-4. Component tests for the remaining panels. The setup landed with canvas selection; coverage is partial.
+4. ~~Component tests for the remaining panels, and end-to-end coverage.~~ Done, apart from the palette.
 5. ~~Import, export, JSON editing, JSON Schema.~~ Done.
 6. ~~Binding editors: expressions, then localization.~~ Done.
 7. ~~Accessibility pass, against the gap list in `docs/prior-art`.~~ Done. Remaining

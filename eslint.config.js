@@ -154,9 +154,23 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
 
+  /*
+   * End-to-end specs. They are tests, but not vitest ones: the vitest plugin's
+   * rules would flag Playwright's own expect and test helpers as misuse.
+   */
+  {
+    files: ['e2e/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
+
   // Tests.
   {
     files: ['**/*.test.ts', '**/*.test.tsx', 'test/**/*.ts'],
+    ignores: ['e2e/**'],
     plugins: { vitest },
     rules: {
       ...vitest.configs.recommended.rules,
