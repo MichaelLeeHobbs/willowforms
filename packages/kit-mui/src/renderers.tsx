@@ -9,7 +9,9 @@
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
+import FormControl from '@mui/material/FormControl'
 import FormControlLabel from '@mui/material/FormControlLabel'
+import FormHelperText from '@mui/material/FormHelperText'
 import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
@@ -92,14 +94,18 @@ function NumberFieldNode({
   )
 }
 
-function CheckboxNode({ props, nodeProps, value, onChange }: NodeRendererProps): ReactNode {
+function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+  // Every other field in this kit shows its error. This one used to drop it on
+  // the floor, so a required checkbox failed a submit while saying nothing. The
+  // kit contract test caught it.
   return (
-    <FormControlLabel
-      {...nodeProps}
-      label={str(props['label'])}
-      disabled={bool(props['disabled'])}
-      control={<Checkbox checked={bool(value)} onChange={(e) => onChange(e.target.checked)} />}
-    />
+    <FormControl {...nodeProps} error={Boolean(error)} disabled={bool(props['disabled'])}>
+      <FormControlLabel
+        label={str(props['label'])}
+        control={<Checkbox checked={bool(value)} onChange={(e) => onChange(e.target.checked)} />}
+      />
+      {error && <FormHelperText>{error}</FormHelperText>}
+    </FormControl>
   )
 }
 

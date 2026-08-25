@@ -21,5 +21,10 @@ export const formsmithAliases = [
   { find: /^@formsmith\/core$/, replacement: at('./packages/core/src/index.ts') },
   { find: /^@formsmith\/renderer$/, replacement: at('./packages/renderer/src/index.tsx') },
   { find: /^@formsmith\/kit-mui$/, replacement: at('./packages/kit-mui/src/index.ts') },
+  {
+    find: '@formsmith/kit-html/styles.css',
+    replacement: at('./packages/kit-html/src/kit-html.css'),
+  },
+  { find: /^@formsmith\/kit-html$/, replacement: at('./packages/kit-html/src/index.ts') },
   { find: /^@formsmith\/designer$/, replacement: at('./packages/designer/src/index.ts') },
 ]

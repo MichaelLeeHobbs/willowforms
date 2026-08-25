@@ -1,0 +1,178 @@
+/*
+ * The HTML kit's stylesheet.
+ *
+ * Every value is a custom property on `.fsh-screen`, so a host restyles the
+ * whole kit by overriding tokens rather than fighting specificity. Nothing here
+ * is scoped above `.fsh-`, so dropping this file into a page cannot reach the
+ * host's own markup, and the designer's chrome cannot reach in here either.
+ *
+ * Contrast targets AA. `--fsh-muted` on `--fsh-surface` and the solid button's
+ * text on `--fsh-accent` both clear 4.5:1 in the light palette, and the dark
+ * swap below keeps them there.
+ */
+
+.fsh-screen {
+  --fsh-text: #16181d;
+  --fsh-muted: #565e6b;
+  --fsh-surface: #ffffff;
+  --fsh-field: #ffffff;
+  --fsh-border: #6b7280;
+  --fsh-accent: #0f5c8c;
+  --fsh-accent-text: #ffffff;
+  --fsh-danger: #a4121a;
+  --fsh-radius: 6px;
+  --fsh-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  margin-inline: auto;
+  padding: 16px;
+  font-family: var(--fsh-font);
+  font-size: 16px;
+  color: var(--fsh-text);
+  background: var(--fsh-surface);
+}
+
+@media (prefers-color-scheme: dark) {
+  .fsh-screen:not([data-fsh-theme='light']) {
+    --fsh-text: #eef0f4;
+    --fsh-muted: #a9b1bd;
+    --fsh-surface: #16181d;
+    --fsh-field: #1e2127;
+    --fsh-border: #79828f;
+    --fsh-accent: #5fb3e6;
+    --fsh-accent-text: #0a1017;
+    --fsh-danger: #ff9a90;
+  }
+}
+
+.fsh-screen[data-fsh-theme='dark'] {
+  --fsh-text: #eef0f4;
+  --fsh-muted: #a9b1bd;
+  --fsh-surface: #16181d;
+  --fsh-field: #1e2127;
+  --fsh-border: #79828f;
+  --fsh-accent: #5fb3e6;
+  --fsh-accent-text: #0a1017;
+  --fsh-danger: #ff9a90;
+}
+
+.fsh-stack {
+  display: flex;
+  min-width: 0;
+}
+
+.fsh-heading {
+  margin: 0;
+  line-height: 1.25;
+}
+
+.fsh-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fsh-field--inline {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.fsh-field--inline .fsh-field__message {
+  grid-column: 2;
+}
+
+.fsh-field__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fsh-input {
+  font: inherit;
+  width: 100%;
+  color: var(--fsh-text);
+  padding: 8px 10px;
+  background: var(--fsh-field);
+  border: 1px solid var(--fsh-border);
+  border-radius: var(--fsh-radius);
+}
+
+.fsh-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fsh-field.is-invalid .fsh-input {
+  border-color: var(--fsh-danger);
+}
+
+/*
+ * Always present so `aria-describedby` never points at a missing element, but it
+ * takes no space until it has something to say.
+ */
+.fsh-field__message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fsh-muted);
+}
+
+.fsh-field__message:empty {
+  display: none;
+}
+
+.fsh-field__message.is-error {
+  color: var(--fsh-danger);
+}
+
+.fsh-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--fsh-accent);
+}
+
+.fsh-button {
+  font: inherit;
+  font-weight: 600;
+  align-self: flex-start;
+  padding: 9px 16px;
+  border-radius: var(--fsh-radius);
+  cursor: pointer;
+}
+
+.fsh-button--solid {
+  color: var(--fsh-accent-text);
+  background: var(--fsh-accent);
+  border: 1px solid var(--fsh-accent);
+}
+
+.fsh-button--outline {
+  color: var(--fsh-accent);
+  background: transparent;
+  border: 1px solid var(--fsh-accent);
+}
+
+.fsh-button--plain {
+  color: var(--fsh-accent);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.fsh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/*
+ * A visible focus ring on every interactive element. Its absence is the single
+ * most common keyboard-accessibility failure, and it costs three lines.
+ */
+.fsh-input:focus-visible,
+.fsh-checkbox:focus-visible,
+.fsh-button:focus-visible {
+  outline: 2px solid var(--fsh-accent);
+  outline-offset: 2px;
+}
