@@ -1,11 +1,12 @@
-import { useCallback, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import type { FormData, JsonValue } from '@formsmith/core'
 import { validateForm } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 
 import type { DesignerApi } from '../store.js'
+import { SelectionLayer, keyFromEventTarget } from './SelectionLayer.js'
 
 export interface CanvasProps {
   api: DesignerApi
@@ -16,17 +17,40 @@ export interface CanvasProps {
  * The canvas renders the real runtime renderer, not a design-time approximation.
  * What you see is literally what ships, which is the only way a WYSIWYG builder
  * stays honest as the kit evolves.
+ *
+ * While editing, a click is a selection gesture rather than an interaction, so
+ * pointer events are swallowed in the capture phase before the kit's components
+ * see them. Preview mode hands the form back its own events untouched.
  */
 export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
+  const [hoverKey, setHoverKey] = useState<string | undefined>(undefined)
 
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const errors = validated ? validateForm(api.document.root, data) : {}
 
   const onChange = useCallback((key: string, value: JsonValue) => {
     setData((d) => ({ ...d, [key]: value }))
   }, [])
+
+  const { select } = api
+
+  // Capture-phase mousedown is what actually stops a click from focusing a text
+  // field, toggling a checkbox, or opening a select. Cancelling only the click
+  // is too late for all three.
+  const onMouseDownCapture = useCallback((event: MouseEvent) => {
+    event.preventDefault()
+  }, [])
+
+  const onClickCapture = useCallback(
+    (event: MouseEvent) => {
+      event.stopPropagation()
+      select(keyFromEventTarget(event.target))
+    },
+    [select],
+  )
 
   return (
     <div className="fs-canvas__inner">
@@ -36,6 +60,7 @@ export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
           onClick={() => {
             setPreview((p) => !p)
             setValidated(false)
+            setHoverKey(undefined)
           }}
           aria-pressed={preview}
         >
@@ -61,8 +86,16 @@ export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
       </div>
 
       <div
+        ref={surfaceRef}
         className={'fs-canvas__surface' + (preview ? ' is-preview' : '')}
-        onClick={preview ? undefined : () => api.select(undefined)}
+        {...(preview
+          ? {}
+          : {
+              onMouseDownCapture,
+              onClickCapture,
+              onPointerOver: (event: MouseEvent) => setHoverKey(keyFromEventTarget(event.target)),
+              onPointerLeave: () => setHoverKey(undefined),
+            })}
       >
         <FormRenderer
           document={api.document}
@@ -71,6 +104,16 @@ export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
           errors={errors}
           onChange={onChange}
         />
+
+        {!preview && (
+          <SelectionLayer
+            surfaceRef={surfaceRef}
+            document={api.document}
+            selectedKey={api.selectedKey}
+            selectedType={api.selectedNode?.type}
+            hoverKey={hoverKey}
+          />
+        )}
       </div>
 
       {preview && (

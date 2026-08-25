@@ -8,6 +8,10 @@ product.
 - `@formsmith/core`: document model, immutable tree operations, structural document validation, the
   runtime rule engine. **45 tests.**
 - `@formsmith/designer` history: undo/redo with a capped stack. **7 tests.**
+- Canvas selection: click a component on the canvas to select it, a solid frame with a type label on the
+  selection, a dashed outline on hover, Escape to clear, and tree selection scrolling the canvas to
+  match. Design-mode clicks are cancelled in the capture phase, so selecting a field never focuses it,
+  toggles a checkbox, or opens a select. **9 component tests.**
 - `@formsmith/renderer`: walks a document, resolves static/computed/i18n bindings, renders through a
   kit, honours `renderWhen`, and shows a visible fallback for an unknown component type.
 - `@formsmith/kit-mui`: 8 components (Screen, Stack, Heading, TextField, NumberField, Checkbox, Select,
@@ -21,16 +25,18 @@ Confirmed by driving the playground in a browser: palette renders grouped, tree 
 properties panel with the correct per-type schema, preview validates, and a `url`-only field correctly
 stays valid when blank while `required` fields fail.
 
+Canvas selection was confirmed the same way, because jsdom cannot check it. Selection and hover frames
+sat on their targets to the pixel, held position after the canvas scrolled, survived a disabled control,
+and clicking the Select field selected it without opening its dropdown. Preview mode still focuses
+fields and records typed values.
+
 ## Not built yet
 
 The gap between this and a product, roughly in the order it matters:
 
 **Drag and drop.** The palette adds to the current selection via click. No dragging, no drop indicators,
-no reordering in the tree. `moveNode` exists and is tested; nothing calls it yet.
-
-**Canvas selection.** You select from the tree only. Clicking a component on the canvas does not select
-it, and there is no selection frame or hover outline. This needs an overlay layer that maps DOM nodes
-back to component keys.
+no reordering in the tree. `moveNode` exists and is tested; nothing calls it yet. Canvas selection is in
+place now, so the drop target and the selection can share the same hit-testing.
 
 **The Rules tab.** Validation rules exist in the model and run correctly, but there is no UI to add or
 edit them. Right now you author them in the document by hand.
@@ -48,14 +54,16 @@ save, load, import, or export.
 names and focus rings. Not done: roving tabindex on the tree, arrow-key navigation, focus trapping,
 `aria-live` announcements for selection and mode changes, and a real audit.
 
-**Tests for anything React.** All 52 tests are pure functions. No component tests, no e2e. That is the
-biggest quality gap and should be closed before the surface grows much further.
+**Tests for anything React.** 52 of the 61 tests are pure functions. Component tests now exist for canvas
+selection only; every other panel is untested, and there is no end-to-end setup. jsdom has no layout
+engine, so geometry stays a browser check no matter how far the component tests grow. Closing this gap
+matters more than any feature below it.
 
 ## Sequence
 
-1. Canvas selection plus a selection overlay. Everything below is worse without it.
+1. ~~Canvas selection plus a selection overlay.~~ Done.
 2. Drag and drop from palette to canvas, and reordering in the tree.
-3. Component test setup, then tests for the panels as they land.
+3. Component tests for the remaining panels. The setup landed with canvas selection; the coverage did not.
 4. The Rules tab.
 5. Save/load/export, JSON editing.
 6. Binding editors: expressions, then localization.
