@@ -56,6 +56,8 @@ plain string alias also rewrites `@formsmith/designer/styles.css` and breaks the
 
 - Node 22+, pnpm 10, React 19, TypeScript strict with `exactOptionalPropertyTypes` and
   `noUncheckedIndexedAccess`. Both are on deliberately; do not relax them to make a type fit.
-- Tests live beside the source as `*.test.ts`. Everything currently tested is a pure function; there is
-  no component-test setup yet.
+- Tests live beside the source as `*.test.ts`, or `*.test.tsx` for component tests. Node is the default
+  vitest environment, deliberately, so core keeps proving it runs without a DOM; a component test opts
+  into jsdom with an `@vitest-environment jsdom` docblock. jsdom has no layout engine, so anything
+  measuring geometry has to be checked in a real browser instead.
 - This is a public MIT repo. No proprietary references, no employer material.

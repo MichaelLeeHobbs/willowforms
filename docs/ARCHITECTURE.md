@@ -15,6 +15,19 @@ rendering half ->  RendererKit  from @formsmith/renderer   React components
 metadata half. It builds the palette from `ComponentDef[]` and the properties panel from `PropSchema[]`.
 It never imports a component library.
 
+The rendering half carries one obligation. Every renderer spreads `nodeProps` onto its outermost DOM
+element, which puts `data-fs-key` and `data-fs-type` in the output. That is the only thing tying a
+rendered element back to a document node, and the canvas selection overlay is built on it: the designer
+hit-tests with `closest('[data-fs-key]')` and measures the element it finds. A kit that drops
+`nodeProps` still renders correctly, but its components cannot be selected on the canvas.
+
+The alternative was for the renderer to wrap every node in a `display: contents` span it controls, which
+needs no cooperation from the kit. Rejected because such a span generates no box, so the overlay would
+have to infer geometry from a Range over the element's contents rather than read it from a real
+`getBoundingClientRect`. One line per renderer buys exact frames. The attributes ship at runtime too,
+not only in the designer, which gives anyone writing an end-to-end test against a live form a stable
+selector for free.
+
 Three things fall out of that:
 
 - **Adding a kit is a new package.** `@formsmith/kit-shadcn` implements the same two exports. No change
@@ -96,6 +109,18 @@ This is not stylistic fussiness. The first build used `.fs-shell input { padding
 reached straight into the MUI components on the canvas, overrode their padding, and broke the notched
 outline so every field label sat on top of its own border. The canvas hosts the kit's components and
 must inherit nothing from the builder.
+
+There is exactly one deliberate exception, and it sets no visual property:
+
+```css
+.fs-canvas__surface:not(.is-preview) [data-fs-key] { pointer-events: auto; }
+```
+
+MUI sets `pointer-events: none` on a disabled Button, and a kit is free to do the same on any disabled
+control. Without this rule that component cannot be clicked on the canvas, and the click silently
+selects its parent instead, which is worse than doing nothing. Restoring hit-testing cannot make the
+control interactive, because the canvas cancels every pointer event in the capture phase while editing.
+Any future exception has to clear the same bar: interaction only, never appearance.
 
 Theming is custom properties on `.fs-shell`, so a host restyles the builder by overriding tokens rather
 than fighting specificity. Light is the base; dark is a token swap under both `prefers-color-scheme` and

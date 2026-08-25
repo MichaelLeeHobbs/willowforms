@@ -269,9 +269,63 @@
 }
 
 .fs-canvas__surface {
+  position: relative;
   flex: 1;
   overflow: auto;
   padding: 24px;
+}
+
+/*
+ * Selection overlay.
+ *
+ * These rules style only the designer's own frame divs. Nothing here is a
+ * descendant selector over the surface, because the surface hosts the kit's
+ * components and a rule like `.fs-canvas__surface input` would reach straight
+ * into them. See the CSS isolation note in ARCHITECTURE.md.
+ */
+/*
+ * The one rule here that touches a kit component, and it is deliberate. A kit
+ * may set `pointer-events: none` on a disabled control; MUI does on Button. That
+ * makes the component impossible to click on the canvas and, worse, silently
+ * selects its parent instead. This restores hit-testing on elements the designer
+ * itself marked, while editing only, and cannot make a control interactive
+ * because the canvas cancels every pointer event in the capture phase. It sets
+ * no visual property, which is the part invariant 3 exists to protect.
+ */
+.fs-canvas__surface:not(.is-preview) [data-fs-key] {
+  pointer-events: auto;
+}
+
+.fs-selection {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 3px;
+  z-index: 2;
+}
+
+.fs-selection--hover {
+  outline: 1px dashed var(--fs-primary);
+  outline-offset: 2px;
+  opacity: 0.7;
+}
+
+.fs-selection--active {
+  outline: 2px solid var(--fs-primary);
+  outline-offset: 2px;
+}
+
+.fs-selection__label {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: -2px;
+  margin-block-end: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--fs-primary-text);
+  background: var(--fs-primary);
 }
 
 .fs-canvas__data {

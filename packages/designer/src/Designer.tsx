@@ -90,7 +90,7 @@ function Toolbar({ api }: { api: DesignerApi }): ReactNode {
  * label does not undo the document.
  */
 function useKeyboardShortcuts(api: DesignerApi): void {
-  const { undo, redo, removeComponent, selectedKey } = api
+  const { undo, redo, removeComponent, select, selectedKey } = api
 
   const onKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -116,9 +116,14 @@ function useKeyboardShortcuts(api: DesignerApi): void {
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedKey) {
         event.preventDefault()
         removeComponent(selectedKey)
+        return
+      }
+      if (event.key === 'Escape' && selectedKey) {
+        event.preventDefault()
+        select(undefined)
       }
     },
-    [undo, redo, removeComponent, selectedKey],
+    [undo, redo, removeComponent, select, selectedKey],
   )
 
   useEffect(() => {
