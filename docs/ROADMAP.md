@@ -40,9 +40,13 @@ product.
   edited per language inline, keyed by the documented `component_prop` convention. A Form tab manages
   the form's name, its languages, the default language, and each language's writing direction.
   **20 tests.**
+- Accessibility: full keyboard operation of the structure tree, including moving components without a
+  pointer; a polite live region for the changes that move no focus; a roving tabindex; and an audit
+  recorded in `docs/accessibility.md`. Contrast is computed from the stylesheets and axe-core runs over
+  the designer in six states, so both fail CI rather than a review. **59 tests.**
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
-  covers the test files, and CI running all of it on every PR. **197 tests.**
+  covers the test files, and CI running all of it on every PR. **278 tests.**
 
 ### What "verified" means here
 
@@ -61,6 +65,10 @@ untouched, and a plain click still selecting rather than being swallowed by the 
 The Rules tab, end to end: a `minLength` rule authored in the panel with a custom message landed in the
 document with the right shape, then failed a short value in preview with exactly that message, while the
 `email` rule on the same field passed.
+
+Keyboard operation was driven in a browser: one tab stop for the tree, arrows walking the flattened
+order and stepping into containers, Alt with arrows moving a component into and back out of a container,
+refusals announced rather than silently ignored, and the live region carrying each result.
 
 The second kit was driven in a browser on the same document as the first: canvas selection, a palette
 drag landing where aimed, and preview validation reporting the same errors through entirely different
@@ -82,12 +90,7 @@ authored earlier through to the export.
 
 The gap between this and a product, roughly in the order it matters:
 
-**Accessibility work.** The tree has `role="tree"` and `aria-level`, chrome controls have accessible
-names and focus rings, and the inspector is a real tablist with a roving tabindex and arrow keys. Not
-done: the same keyboard treatment for the tree, focus trapping, `aria-live` announcements for selection
-and mode changes, a keyboard path for drag and drop, and a real audit.
-
-**Tests for anything React.** 97 of the 197 tests are pure functions. Component tests cover canvas
+**Tests for anything React.** 118 of the 278 tests are pure functions. Component tests cover canvas
 selection, the drag wiring, the rules editor, the inspector tabs, the JSON dialog, the binding editors,
 and form settings. The palette and tree rendering are still untested, and there is no end-to-end setup. jsdom has no layout engine, so
 geometry stays a browser check no matter how far the component tests grow.
@@ -100,7 +103,8 @@ geometry stays a browser check no matter how far the component tests grow.
 4. Component tests for the remaining panels. The setup landed with canvas selection; coverage is partial.
 5. ~~Import, export, JSON editing, JSON Schema.~~ Done.
 6. ~~Binding editors: expressions, then localization.~~ Done.
-7. Accessibility pass with an audit against the checklist in the prior-art teardown.
+7. ~~Accessibility pass with an audit against the checklist in the prior-art teardown.~~ Done. Remaining
+   gaps are listed honestly in `docs/accessibility.md`.
 8. ~~A second kit, to prove the seam holds.~~ Done.
 
 ## Non-goals

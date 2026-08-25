@@ -7,7 +7,7 @@
  * component library in play is whichever kit renders the canvas.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormDocument, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
@@ -46,16 +46,53 @@ export function Designer({
 
   useKeyboardShortcuts(api)
 
+  const [jsonOpen, setJsonOpen] = useState(false)
+
+  /*
+   * A polite live region.
+   *
+   * Selecting, moving, adding, and removing all change the document without
+   * changing what has focus, so a screen reader is told nothing unless the
+   * change is announced. Polite rather than assertive: none of it is urgent
+   * enough to interrupt whatever is being read.
+   */
+  const [announcement, setAnnouncement] = useState('')
+  const announce = useCallback((message: string) => {
+    // The zero-width space forces a change even when the same message repeats,
+    // so moving a component twice is announced twice.
+    setAnnouncement((previous) => (previous === message ? message + '​' : message))
+  }, [])
+
   const commitDrop = useCallback(
     (source: DragSource, target: DropCommit) => {
-      if (source.kind === 'new') api.addComponent(source.def, target.parentKey, target.index)
-      else api.moveComponent(source.key, target.parentKey, target.index)
+      if (source.kind === 'new') {
+        api.addComponent(source.def, target.parentKey, target.index)
+        announce(source.def.label + ' added to ' + target.parentKey + '.')
+      } else {
+        api.moveComponent(source.key, target.parentKey, target.index)
+        announce(source.key + ' moved into ' + target.parentKey + '.')
+      }
     },
-    [api],
+    [api, announce],
   )
 
+  /*
+   * Selecting on the canvas moves nothing into focus, so without this the
+   * properties panel quietly changes to describe a different component and a
+   * screen reader is told nothing at all. Tree navigation needs no equivalent:
+   * focus lands on the row, which is read on arrival.
+   */
+  const selectFromCanvas = useCallback(
+    (key: string | undefined) => {
+      api.select(key)
+      announce(key ? key + ' selected.' : 'Selection cleared.')
+    },
+    [api, announce],
+  )
+
+  const canvasApi = useMemo(() => ({ ...api, select: selectFromCanvas }), [api, selectFromCanvas])
+
   const drag = useDrag(commitDrop)
-  const [jsonOpen, setJsonOpen] = useState(false)
 
   return (
     <div className="fs-shell" data-testid="formsmith-designer">
@@ -64,7 +101,10 @@ export function Designer({
         <aside className="fs-panel fs-panel--left" aria-label="Components and structure">
           <Palette
             kit={kit}
-            onAdd={(def) => api.addComponent(def, api.selectedKey)}
+            onAdd={(def) => {
+              api.addComponent(def, api.selectedKey)
+              announce(def.label + ' added.')
+            }}
             onDragStart={(def, event) => drag.begin({ kind: 'new', def }, event)}
           />
           <Tree
@@ -73,17 +113,23 @@ export function Designer({
             selectedKey={api.selectedKey}
             onSelect={api.select}
             onRemove={api.removeComponent}
+            onMove={api.moveComponent}
+            announce={announce}
             drag={drag}
           />
         </aside>
 
         <main className="fs-canvas" aria-label="Form canvas">
-          <Canvas api={api} kit={kit} rendererKit={rendererKit} drag={drag} />
+          <Canvas api={canvasApi} kit={kit} rendererKit={rendererKit} drag={drag} />
         </main>
 
         <aside className="fs-panel fs-panel--right" aria-label="Component properties">
           <Inspector api={api} kit={kit} />
         </aside>
+      </div>
+
+      <div className="fs-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
       </div>
 
       <DocumentDialog

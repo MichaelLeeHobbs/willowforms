@@ -270,7 +270,11 @@ describe('the JSON dialog', () => {
     await open()
     await user.click(screen.getByRole('button', { name: 'Copy' }))
 
-    expect(await screen.findByRole('status')).toHaveProperty(
+    // Scoped to the dialog: the designer shell also has a live region with
+    // role="status", which is a different thing entirely.
+    const dialog = document.querySelector('dialog')
+    if (!dialog) throw new Error('no dialog')
+    expect(await within(dialog).findByRole('status')).toHaveProperty(
       'textContent',
       expect.stringContaining('refused clipboard access'),
     )
