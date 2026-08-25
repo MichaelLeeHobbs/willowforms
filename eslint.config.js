@@ -1,6 +1,13 @@
 /**
  * Flat config.
  *
+ * Pinned to eslint 9. Version 9.x is out of support, and 10 was tried: it breaks
+ * eslint-plugin-react outright ('contextOrFilename.getFilename is not a
+ * function') and eslint-plugin-jsx-a11y does not claim support either. Losing
+ * React and accessibility linting costs more than running a lint tool one major
+ * behind, especially with an accessibility pass still on the roadmap. Revisit
+ * once both plugins ship eslint 10 support.
+ *
  * The interesting part is not the rule presets, it is the `no-restricted-imports`
  * blocks near the bottom. Invariants 1 and 2 in CLAUDE.md are the two rules that
  * decide whether this project can ever ship a second kit, and a rule that lives
