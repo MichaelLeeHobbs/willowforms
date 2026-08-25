@@ -100,11 +100,20 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
     [measureNow],
   )
 
-  // Capture-phase mousedown is what actually stops a click from focusing a text
-  // field, toggling a checkbox, or opening a select. Cancelling only the click
-  // is too late for all three.
+  /*
+   * Capture-phase mousedown is what stops a click from focusing a text field,
+   * toggling a checkbox, or opening a select.
+   *
+   * Both calls are needed and they do different jobs. `preventDefault` cancels
+   * the browser's own action, which is what stops focus. `stopPropagation` keeps
+   * the event from reaching the kit's own handlers, which is what stops MUI's
+   * Select from opening: it opens from an onMouseDown on an element inside the
+   * one carrying data-fs-key, and cancelling the default does nothing to a
+   * React handler that has already been given the event.
+   */
   const onMouseDownCapture = useCallback((event: MouseEvent) => {
     event.preventDefault()
+    event.stopPropagation()
   }, [])
 
   const onPointerDownCapture = useCallback(

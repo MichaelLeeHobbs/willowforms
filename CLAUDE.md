@@ -55,10 +55,14 @@ pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
 pnpm build         # tsc --build, then copies designer.css
+pnpm e2e           # playwright, 40 tests in a real browser
 ```
 
 CI runs exactly these, in that order, plus a check that every package emitted `dist/index.js` and
-`dist/index.d.ts`. `pnpm typecheck` is two passes on purpose: the per-package configs exclude tests so
+`dist/index.d.ts`. The end-to-end suite runs last, after the build, against the playground on port 5180
+with `--strictPort`, so a busy port fails loudly rather than serving from somewhere else. Anything
+positional belongs there: jsdom has no layout engine, so drop geometry, selection frames, and focus
+order cannot be checked anywhere else. `pnpm typecheck` is two passes on purpose: the per-package configs exclude tests so
 they stay out of `dist`, which left every test file unchecked until `tsconfig.eslint.json` picked them
 up. It found a type error in the first test file it ever saw.
 

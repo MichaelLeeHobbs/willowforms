@@ -33,10 +33,12 @@
     "packages/*/src/**/*",
     "apps/*/src/**/*",
     "test/**/*",
+    "e2e/**/*",
     "scripts/**/*",
     "aliases.ts",
     "apps/*/vite.config.ts",
     "eslint.config.js",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "playwright.config.ts"
   ]
 }

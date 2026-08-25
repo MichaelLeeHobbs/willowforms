@@ -16,6 +16,9 @@ export default defineConfig({
       'test/**/*.test.ts',
       'test/**/*.test.tsx',
     ],
+    // Playwright owns e2e/. Vitest would load those specs and fail on an import
+    // it cannot resolve, which reads as a broken suite rather than a mistake.
+    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
     // Node by default, because core must keep proving it runs without a DOM.
     // Component tests opt in per file with an `@vitest-environment jsdom` docblock.
     environment: 'node',
