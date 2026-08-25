@@ -26,9 +26,12 @@ product.
 - The Rules tab: add, edit, and remove validation rules per field, with the parameter each rule's type
   demands, a custom message, and the field's data type. The inspector is a real tablist with a roving
   tabindex and arrow-key navigation. **15 tests.**
+- Import, export, and raw JSON editing, in a native `<dialog>`: edit the document as JSON with the
+  parse and structural errors reported rather than swallowed, import a file, copy or download the
+  document, and copy or download a JSON Schema projection of it. **25 tests.**
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
-  covers the test files, and CI running all of it on every PR. **112 tests.**
+  covers the test files, and CI running all of it on every PR. **137 tests.**
 
 ### What "verified" means here
 
@@ -48,6 +51,11 @@ The Rules tab, end to end: a `minLength` rule authored in the panel with a custo
 document with the right shape, then failed a short value in preview with exactly that message, while the
 `email` rule on the same field passed.
 
+The JSON dialog is genuinely modal, confirmed with `:modal` and by focus landing inside it. A document
+missing three required fields was refused with all three named and the form left alone. The schema view
+listed only the data-bound components, lifted `required` onto the object, and carried the `minLength`
+authored earlier through to the export.
+
 ## Not built yet
 
 The gap between this and a product, roughly in the order it matters:
@@ -56,19 +64,14 @@ The gap between this and a product, roughly in the order it matters:
 displays them read-only, but there is no editor to create one. That means no expression editor and no
 localization panel.
 
-**Persistence in the designer.** The playground writes to `localStorage`; the designer itself has no
-save, load, import, or export.
-
-**JSON editing and JSON Schema export.** Both are in the model's remit, neither is written.
-
 **Accessibility work.** The tree has `role="tree"` and `aria-level`, chrome controls have accessible
 names and focus rings, and the inspector is a real tablist with a roving tabindex and arrow keys. Not
 done: the same keyboard treatment for the tree, focus trapping, `aria-live` announcements for selection
 and mode changes, a keyboard path for drag and drop, and a real audit.
 
-**Tests for anything React.** 80 of the 112 tests are pure functions. Component tests cover canvas
-selection, the drag wiring, the rules editor, and the inspector tabs; the palette, the properties panel,
-and tree rendering are untested, and there is no end-to-end setup. jsdom has no layout engine, so
+**Tests for anything React.** 93 of the 137 tests are pure functions. Component tests cover canvas
+selection, the drag wiring, the rules editor, the inspector tabs, and the JSON dialog; the palette, the
+properties panel, and tree rendering are untested, and there is no end-to-end setup. jsdom has no layout engine, so
 geometry stays a browser check no matter how far the component tests grow.
 
 ## Sequence
@@ -77,7 +80,7 @@ geometry stays a browser check no matter how far the component tests grow.
 2. ~~Drag and drop from palette to canvas, and reordering in the tree.~~ Done.
 3. ~~The Rules tab.~~ Done.
 4. Component tests for the remaining panels. The setup landed with canvas selection; coverage is partial.
-5. Save/load/export, JSON editing.
+5. ~~Import, export, JSON editing, JSON Schema.~~ Done.
 6. Binding editors: expressions, then localization.
 7. Accessibility pass with an audit against the checklist in the prior-art teardown.
 8. A second kit, to prove the seam holds. Until a second kit exists, the abstraction is a claim.

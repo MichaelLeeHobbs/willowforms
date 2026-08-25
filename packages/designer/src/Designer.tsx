@@ -7,7 +7,7 @@
  * component library in play is whichever kit renders the canvas.
  */
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormDocument, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
@@ -15,6 +15,7 @@ import type { RendererKit } from '@formsmith/renderer'
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
 import { Canvas } from './panels/Canvas.js'
+import { DocumentDialog } from './panels/DocumentDialog.js'
 import { Inspector } from './panels/Inspector.js'
 import { Palette } from './panels/Palette.js'
 import { Tree } from './panels/Tree.js'
@@ -54,10 +55,11 @@ export function Designer({
   )
 
   const drag = useDrag(commitDrop)
+  const [jsonOpen, setJsonOpen] = useState(false)
 
   return (
     <div className="fs-shell" data-testid="formsmith-designer">
-      <Toolbar api={api} />
+      <Toolbar api={api} onOpenJson={() => setJsonOpen(true)} />
       <div className="fs-body">
         <aside className="fs-panel fs-panel--left" aria-label="Components and structure">
           <Palette
@@ -84,6 +86,13 @@ export function Designer({
         </aside>
       </div>
 
+      <DocumentDialog
+        open={jsonOpen}
+        document={api.document}
+        onClose={() => setJsonOpen(false)}
+        onReplace={api.replaceDocument}
+      />
+
       {drag.state && (
         <div
           className="fs-drag-label"
@@ -97,7 +106,7 @@ export function Designer({
   )
 }
 
-function Toolbar({ api }: { api: DesignerApi }): ReactNode {
+function Toolbar({ api, onOpenJson }: { api: DesignerApi; onOpenJson: () => void }): ReactNode {
   return (
     <header className="fs-toolbar">
       <h1 className="fs-toolbar__title">{api.document.name}</h1>
@@ -107,6 +116,9 @@ function Toolbar({ api }: { api: DesignerApi }): ReactNode {
         </button>
         <button type="button" onClick={api.redo} disabled={!api.canRedo} aria-label="Redo">
           Redo
+        </button>
+        <button type="button" onClick={onOpenJson}>
+          JSON
         </button>
       </div>
     </header>

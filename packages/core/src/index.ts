@@ -21,6 +21,9 @@ export { groupKit, indexKit } from './kit.js'
 
 export { jsonToString } from './json.js'
 
+export type { JsonSchema, JsonSchemaProperty } from './schema.js'
+export { toJsonSchema, unexportableRules } from './schema.js'
+
 export type { StructuralError } from './tree.js'
 export {
   collectKeys,
