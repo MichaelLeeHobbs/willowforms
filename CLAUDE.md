@@ -12,7 +12,8 @@ renderer, because every competitor paywalls exactly that piece.
   before changing anything in `core`.
 - `docs/ROADMAP.md` — honest status. Most of the designer is not built. Check here before assuming a
   feature exists.
-- `docs/prior-art/README.md` — the FormEngine teardown and the rules for using it.
+- `docs/prior-art/README.md` — what the competitor study found, the gaps it set as targets, and the
+  ground rules for using any of it.
 - `docs/accessibility.md` — what is checked, how, and what is still missing. Several of those checks
   fail the build, so read it before changing a colour token or a keyboard handler.
 

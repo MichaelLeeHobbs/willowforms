@@ -376,7 +376,7 @@ describe('landmarks and names', () => {
       return name.trim() === ''
     })
 
-    // The teardown in docs/prior-art counted 30 unnamed buttons in the product
+    // The study in docs/prior-art counted 30 unnamed buttons in the product
     // this project studied. Zero is the bar.
     expect(unnamed.map((b) => b.outerHTML)).toEqual([])
   })

@@ -1,47 +1,61 @@
 # Prior art
 
-## What is here
+Formsmith was not designed in a vacuum. Before any of it was written, the leading commercial React form
+builder was studied by driving its public demo in a browser and recording what it does: a black-box UX
+study, no source, no decompilation, no code taken.
 
-`formengine-teardown.md` is a black-box UX study of the FormEngine public demo
-(`formbuilder.formengine.io`, v10.2.0), produced by driving the page in a browser and recording what it
-does. It is the reason this project exists and it doubles as a feature checklist.
+That study is what produced the feature list this project set out to match and the gap list it set out
+to beat. It is summarised here in our own words. The detailed capture is not checked in, because a
+document that reproduces another product's exact design tokens, measured metrics, and interface copy is
+not something this repository should be publishing, whatever its research value was.
 
-Read it for two things:
+## What a serious form designer has to do
 
-1. **The feature surface.** What a top-tier form designer is expected to do: the palette, the structure
-   tree, per-type property schemas, computed values, localization, validation rules, viewport simulation,
-   preview with live data and errors.
-2. **The gap list.** Its sections 6, 8, 9 and 12 record where that product falls short, and those are the
-   things worth beating rather than copying:
-   - Empty-name submits are blocked silently with no error copy.
-   - No confirmation on any destructive action: clear, remove component, delete form.
-   - 30 buttons with no accessible name; no `role="tablist"` wrappers; no landmarks; no headings.
-   - Primary button label at 3.03:1 contrast, failing WCAG AA.
-   - A field declaring only a `url` rule still reports "Required" when blank.
-   - No loading or network-error state anywhere; a failed fetch leaves selects silently empty.
+The capability bar, which is now roughly where Formsmith sits:
 
-The last one already has a test named after it in `packages/core/src/validation.test.ts`.
+- A searchable, grouped palette of components
+- A structure tree showing nesting, with selection shared between tree and canvas
+- Per-component-type property panels driven by metadata rather than hand-written forms
+- Property values that can be a literal, a computed expression, or a translation key
+- Localization with multiple languages and a default
+- A validation rule set richer than "required", authored in the UI
+- A preview mode with live data and real errors
+- Import and export of the underlying document
+- More than one component library behind the same builder
 
-## Ground rules for using it
+## The gaps worth beating
 
-**Use it for behaviour and capability. Do not clone its look or its copy.**
+The interesting output of studying a mature competitor is not its feature list, which is easy to copy,
+but the places where it falls short. These were the targets, and each one is now something this
+repository enforces rather than aspires to.
 
-Reimplementing a feature set from a black-box study is ordinary competitive engineering, and no code
-from that product is in this repo. But the teardown also records its exact colour palette, its measured
-pixel metrics, and its verbatim UI strings. Reproducing those wholesale would move the work from
-"same capability" toward copying a product's distinctive appearance, which is a different and worse
-argument to have.
+| What was observed                                  | What Formsmith does                                                                           |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Submits blocked with no error                      | Every refusal names its reason. The JSON dialog reports every problem at once, not the first. |
+| Buttons with no accessible name                    | Zero, enforced by a test that walks the shell.                                                |
+| Tab strips with no `role="tablist"`                | Real tablists with roving tabindex, arrow keys, and panels linked both ways.                  |
+| No landmarks                                       | `header`, `main`, and named `aside` regions, checked by test.                                 |
+| A primary button at 3.03:1                         | Contrast computed from the stylesheets in CI. That label sits at 5.49:1 light, 6.39:1 dark.   |
+| A `url`-only field reporting "Required" when blank | Only `required` fails on an empty value. There is a test named after this bug.                |
+| No confirmation on destructive actions             | Undo and redo cover every operation, which beats a dialog nobody reads.                       |
 
-So:
+The last two are worth dwelling on. The validation bug is the clearest sign that requiredness had been
+folded into every rule rather than being one rule's job, which is a modelling mistake, not a slip; core
+was built the other way round from the start. And the accessibility findings were not marginal. They are
+the kind of thing that gets a product rejected by a public-sector buyer, which is a strange place for a
+mature commercial tool to be.
 
-- Do not lift the hex values in section 10. Formsmith has its own tokens in `designer.css`.
-- Do not lift verbatim UI strings. Write our own copy, and write it better where section 6 shows theirs
-  is missing.
-- Feature ideas, information architecture, and the data-model shape are fair game and are why this
-  document is checked in.
+## Ground rules
 
-## Refreshing it
+Reimplementing a feature set from a black-box study is ordinary competitive engineering. Copying a
+product's distinctive appearance or its interface copy is a different thing and a worse argument to have.
 
-The teardown was captured 2026-08-24 against v10.2.0. Re-running it means driving the public demo in a
-browser and recording what it does, section by section, against the same outline: layout, component
-inventory, interactions, validation, data model, content states, accessibility, and theme.
+- Formsmith has its own design tokens, in `designer.css` and `kit-html.css`, and its own copy.
+- Feature ideas, information architecture, and the shape of the data model are fair game.
+- No code from any competitor is in this repository, and none was ever read.
+
+## Refreshing this
+
+Studying it again means driving the public demo in a browser and recording what it does, section by
+section: layout, component inventory, interactions, validation, data model, content states,
+accessibility, and theme. Keep the result out of the repository and bring back the conclusions.
