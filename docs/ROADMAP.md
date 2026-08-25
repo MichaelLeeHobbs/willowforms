@@ -29,9 +29,14 @@ product.
 - Import, export, and raw JSON editing, in a native `<dialog>`: edit the document as JSON with the
   parse and structural errors reported rather than swallowed, import a file, copy or download the
   document, and copy or download a JSON Schema projection of it. **25 tests.**
+- Binding editors: any property can be a literal, a computed expression, or a translation key, chosen
+  with one control per property and offered only where the `PropSchema` allows it. Translations are
+  edited per language inline, keyed by the documented `component_prop` convention. A Form tab manages
+  the form's name, its languages, the default language, and each language's writing direction.
+  **20 tests.**
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
-  covers the test files, and CI running all of it on every PR. **137 tests.**
+  covers the test files, and CI running all of it on every PR. **157 tests.**
 
 ### What "verified" means here
 
@@ -51,6 +56,11 @@ The Rules tab, end to end: a `minLength` rule authored in the panel with a custo
 document with the right shape, then failed a short value in preview with exactly that message, while the
 `email` rule on the same field passed.
 
+Localization end to end: a language added on the Form tab, the email field's label switched to a
+translation binding and auto-keyed `email_label`, both translations stored, and the canvas rendering the
+default-language text. A computed `helperText` stored its expression and resolved to nothing without an
+evaluator injected, leaving the field rendering rather than throwing.
+
 The JSON dialog is genuinely modal, confirmed with `:modal` and by focus landing inside it. A document
 missing three required fields was refused with all three named and the form left alone. The schema view
 listed only the data-bound components, lifted `required` onto the object, and carried the `minLength`
@@ -60,18 +70,14 @@ authored earlier through to the export.
 
 The gap between this and a product, roughly in the order it matters:
 
-**Property binding UI.** `computed` and `i18n` bindings render correctly and the properties panel
-displays them read-only, but there is no editor to create one. That means no expression editor and no
-localization panel.
-
 **Accessibility work.** The tree has `role="tree"` and `aria-level`, chrome controls have accessible
 names and focus rings, and the inspector is a real tablist with a roving tabindex and arrow keys. Not
 done: the same keyboard treatment for the tree, focus trapping, `aria-live` announcements for selection
 and mode changes, a keyboard path for drag and drop, and a real audit.
 
-**Tests for anything React.** 93 of the 137 tests are pure functions. Component tests cover canvas
-selection, the drag wiring, the rules editor, the inspector tabs, and the JSON dialog; the palette, the
-properties panel, and tree rendering are untested, and there is no end-to-end setup. jsdom has no layout engine, so
+**Tests for anything React.** 97 of the 157 tests are pure functions. Component tests cover canvas
+selection, the drag wiring, the rules editor, the inspector tabs, the JSON dialog, the binding editors,
+and form settings. The palette and tree rendering are still untested, and there is no end-to-end setup. jsdom has no layout engine, so
 geometry stays a browser check no matter how far the component tests grow.
 
 ## Sequence
@@ -81,7 +87,7 @@ geometry stays a browser check no matter how far the component tests grow.
 3. ~~The Rules tab.~~ Done.
 4. Component tests for the remaining panels. The setup landed with canvas selection; coverage is partial.
 5. ~~Import, export, JSON editing, JSON Schema.~~ Done.
-6. Binding editors: expressions, then localization.
+6. ~~Binding editors: expressions, then localization.~~ Done.
 7. Accessibility pass with an audit against the checklist in the prior-art teardown.
 8. A second kit, to prove the seam holds. Until a second kit exists, the abstraction is a claim.
 

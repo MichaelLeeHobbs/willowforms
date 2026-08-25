@@ -442,6 +442,119 @@
   outline-offset: 2px;
 }
 
+/* Binding editors: expressions and translations. */
+.fs-prop-row.is-binding {
+  padding: 8px;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  background: var(--fs-bg-well);
+}
+
+.fs-binding__modes {
+  margin-block-end: 6px;
+}
+
+.fs-binding__mode {
+  font-size: 12px;
+}
+
+.fs-binding__expression,
+.fs-binding__key {
+  display: block;
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.fs-binding__languages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fs-binding__languages label {
+  display: block;
+  font-size: 11px;
+  color: var(--fs-text-muted);
+}
+
+.fs-binding__languages input {
+  width: 100%;
+}
+
+.fs-binding__language-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.fs-binding__default {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fs-accent);
+}
+
+/* Form settings: name and languages. */
+.fs-languages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fs-languages__item {
+  padding: 8px;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  background: var(--fs-bg-well);
+}
+
+.fs-languages__name code {
+  font-size: 11px;
+  color: var(--fs-text-muted);
+}
+
+.fs-languages__controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-block-start: 6px;
+  font-size: 12px;
+}
+
+.fs-languages__controls label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fs-text-muted);
+}
+
+.fs-languages__add {
+  margin-block-start: 12px;
+}
+
+.fs-languages__add button {
+  font: inherit;
+  color: inherit;
+  padding: 5px 10px;
+  background: var(--fs-bg-panel);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  cursor: pointer;
+}
+
+.fs-languages__error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--fs-danger);
+}
+
 /* Validation rules. */
 .fs-rules__heading {
   display: flex;
