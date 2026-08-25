@@ -15,8 +15,8 @@ import type { RendererKit } from '@formsmith/renderer'
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
 import { Canvas } from './panels/Canvas.js'
+import { Inspector } from './panels/Inspector.js'
 import { Palette } from './panels/Palette.js'
-import { Properties } from './panels/Properties.js'
 import { Tree } from './panels/Tree.js'
 import { useDesigner } from './store.js'
 import type { DesignerApi } from './store.js'
@@ -80,7 +80,7 @@ export function Designer({
         </main>
 
         <aside className="fs-panel fs-panel--right" aria-label="Component properties">
-          <Properties api={api} kit={kit} />
+          <Inspector api={api} kit={kit} />
         </aside>
       </div>
 
