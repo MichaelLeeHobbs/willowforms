@@ -11,25 +11,11 @@
 import type { EventName, FieldSchema, JsonValue } from './types.js'
 
 export type PaletteGroup =
-  | 'inputs'
-  | 'selection'
-  | 'layout'
-  | 'display'
-  | 'feedback'
-  | 'navigation'
-  | 'custom'
+  'inputs' | 'selection' | 'layout' | 'display' | 'feedback' | 'navigation' | 'custom'
 
 /** Which editor the properties panel renders for a prop. */
 export type PropEditor =
-  | 'string'
-  | 'multiline'
-  | 'number'
-  | 'boolean'
-  | 'select'
-  | 'color'
-  | 'icon'
-  | 'code'
-  | 'json'
+  'string' | 'multiline' | 'number' | 'boolean' | 'select' | 'color' | 'icon' | 'code' | 'json'
 
 export interface PropOption {
   label: string

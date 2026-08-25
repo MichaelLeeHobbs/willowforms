@@ -6,10 +6,45 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
-  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc --build",
     "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "form",
+    "form-builder",
+    "form-designer",
+    "react",
+    "json-schema",
+    "low-code",
+    "drag-and-drop",
+    "validation"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MichaelLeeHobbs/formsmith.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/MichaelLeeHobbs/formsmith/issues"
+  },
+  "homepage": "https://github.com/MichaelLeeHobbs/formsmith/tree/main/packages/core#readme",
+  "author": "Michael Hobbs",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

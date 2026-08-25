@@ -1,0 +1,41 @@
+/*
+ * Everything the build tsconfigs leave out.
+ *
+ * The per-package configs exclude tests on purpose, because tests must not ship
+ * in dist. The side effect was that `tsc --build` never typechecked a single
+ * test file. This config picks up the tests, the root config files, and the
+ * scripts, emits nothing, and is what both eslint's project service and
+ * `pnpm typecheck` use for that half of the repo.
+ *
+ * Paths point at src rather than dist so tests typecheck against the same source
+ * that `aliases.ts` makes vitest run.
+ */
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": false,
+    "baseUrl": ".",
+    "paths": {
+      "@formsmith/core": ["./packages/core/src/index.ts"],
+      "@formsmith/renderer": ["./packages/renderer/src/index.tsx"],
+      "@formsmith/kit-mui": ["./packages/kit-mui/src/index.ts"],
+      "@formsmith/designer": ["./packages/designer/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "apps/*/src/**/*",
+    "test/**/*",
+    "scripts/**/*",
+    "aliases.ts",
+    "apps/*/vite.config.ts",
+    "eslint.config.js",
+    "vitest.config.ts"
+  ]
+}

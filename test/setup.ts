@@ -26,5 +26,9 @@ if (typeof document !== 'undefined') {
       disconnect(): void {}
     }
   }
-  Element.prototype.scrollIntoView ??= function scrollIntoView(): void {}
+  // jsdom really does not implement scrollIntoView, and the selection layer calls
+  // it whenever the tree moves the selection. Widened to an optional property so
+  // assigning it is neither an unbound-method read nor a narrowing to `never`.
+  const elementProto = Element.prototype as { scrollIntoView?: Element['scrollIntoView'] }
+  elementProto.scrollIntoView ??= function scrollIntoView(): void {}
 }

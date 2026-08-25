@@ -65,6 +65,15 @@ interface RenderContext {
 
 const Ctx = createContext<RenderContext | null>(null)
 
+/*
+ * Shared empty objects, so an absent `errors` prop or a language with no
+ * translations does not allocate a fresh literal on every render. A new object
+ * identity there would change the context value every render and make the
+ * useMemo below do nothing at all, re-rendering every node in the form.
+ */
+const NO_ERRORS: FormErrors = Object.freeze({})
+const NO_TRANSLATIONS: Record<string, string> = Object.freeze({})
+
 function useRenderContext(): RenderContext {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error('Formsmith renderer components must be used inside <FormRenderer>.')
@@ -172,12 +181,15 @@ export function FormRenderer({
   document,
   kit,
   data,
-  errors = {},
+  errors = NO_ERRORS,
   language,
   evaluate,
   onChange,
 }: FormRendererProps): ReactNode {
-  const translations = document.translations[language ?? document.defaultLanguage] ?? {}
+  const translations = useMemo(
+    () => document.translations[language ?? document.defaultLanguage] ?? NO_TRANSLATIONS,
+    [document.translations, document.defaultLanguage, language],
+  )
 
   const ctx = useMemo<RenderContext>(
     () => ({ kit, data, errors, translations, evaluate, onChange }),

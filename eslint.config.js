@@ -1,0 +1,176 @@
+/**
+ * Flat config.
+ *
+ * The interesting part is not the rule presets, it is the `no-restricted-imports`
+ * blocks near the bottom. Invariants 1 and 2 in CLAUDE.md are the two rules that
+ * decide whether this project can ever ship a second kit, and a rule that lives
+ * only in a markdown file gets broken by the first person who has not read it.
+ * Here they fail the build instead.
+ */
+
+import js from '@eslint/js'
+import tseslint from 'typescript-eslint'
+import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
+import vitest from '@vitest/eslint-plugin'
+import prettier from 'eslint-config-prettier'
+import globals from 'globals'
+
+/** Packages that must never reach a component library. */
+const COMPONENT_LIBRARIES = [
+  { group: ['@mui/*', '@emotion/*'], message: '' },
+  { group: ['antd', 'antd/*', '@chakra-ui/*', '@radix-ui/*'], message: '' },
+]
+
+const noComponentLibrary = (why) => COMPONENT_LIBRARIES.map((entry) => ({ ...entry, message: why }))
+
+export default tseslint.config(
+  {
+    ignores: ['**/dist/**', '**/node_modules/**', '**/*.tsbuildinfo', 'docs/**'],
+  },
+
+  js.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
+
+  {
+    languageOptions: {
+      parserOptions: {
+        // tsconfig.eslint.json is the only config that sees test files; the
+        // per-package build configs exclude them so they stay out of dist.
+        project: ['./tsconfig.eslint.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      globals: { ...globals.browser, ...globals.node },
+    },
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      // The codebase leans on explicit return types; keep it that way.
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        { allowExpressions: true, allowTypedFunctionExpressions: true },
+      ],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
+      ],
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+    },
+  },
+
+  // React packages.
+  {
+    files: ['packages/*/src/**/*.tsx', 'apps/playground/src/**/*.tsx'],
+    ...react.configs.flat.recommended,
+    settings: { react: { version: 'detect' } },
+    plugins: { react, 'react-hooks': reactHooks, 'jsx-a11y': jsxA11y },
+    rules: {
+      ...react.configs.flat.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      ...jsxA11y.flatConfigs.recommended.rules,
+      // The new JSX transform is on, so React need not be in scope.
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
+    },
+  },
+
+  /*
+   * Invariant 1. Core must run in Node for server-side validation, so it takes
+   * no React and no component library. Breaking this is not caught by tsc: core
+   * would keep compiling and only fail the day someone imports it on a server.
+   */
+  {
+    files: ['packages/core/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message:
+                'Invariant 1: @formsmith/core runs in Node. Server-side validation depends on it staying React-free.',
+            },
+            {
+              name: 'react-dom',
+              message: 'Invariant 1: @formsmith/core runs in Node and imports no React.',
+            },
+          ],
+          patterns: noComponentLibrary(
+            'Invariant 1: @formsmith/core imports no component library.',
+          ),
+        },
+      ],
+    },
+  },
+
+  /*
+   * Invariant 2. The designer consumes ComponentDef metadata only. The moment it
+   * imports a component library, the kit abstraction has leaked and the second
+   * kit becomes a rewrite rather than a new package.
+   */
+  {
+    files: ['packages/designer/src/**/*.ts', 'packages/designer/src/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            ...noComponentLibrary(
+              'Invariant 2: @formsmith/designer consumes ComponentDef metadata only. Importing a component library here leaks the kit abstraction.',
+            ),
+            {
+              group: ['@formsmith/kit-*'],
+              message:
+                'Invariant 2: the designer must not depend on a specific kit. Take a Kit and a RendererKit as props instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // Build scripts report to stdout; that is their only output channel.
+  {
+    files: ['scripts/**/*.mjs', 'scripts/**/*.js'],
+    rules: { 'no-console': 'off' },
+  },
+
+  // The demo server is a CLI process; a startup line on stdout is the point.
+  {
+    files: ['apps/demo-server/src/**/*.ts'],
+    rules: { 'no-console': 'off' },
+  },
+
+  // Tests.
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx', 'test/**/*.ts'],
+    plugins: { vitest },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
+
+  // Plain JavaScript cannot carry a return type annotation, so the rule that
+  // demands one has nothing to ask for here.
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
+  },
+
+  // Config and script files run outside the type-checked project graph.
+  {
+    files: ['*.config.js', 'scripts/**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+  },
+
+  prettier,
+)
