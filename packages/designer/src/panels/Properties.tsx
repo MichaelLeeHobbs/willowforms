@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
 import { indexKit, jsonToString } from '@formsmith/core'
 
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
-import type { DesignerApi } from '../store.js'
+import type { DesignerApi, RenameResult } from '../store.js'
 
 export interface PropertiesProps {
   api: DesignerApi
@@ -28,21 +29,21 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
     <section className="fs-properties">
       <h2 className="fs-panel__heading">{def?.label ?? node.type}</h2>
 
-      <div className="fs-prop-row">
-        <label htmlFor="fs-prop-key">Key</label>
-        <input
-          id="fs-prop-key"
-          type="text"
-          value={node.key}
-          onChange={(e) => api.renameKey(node.key, e.target.value)}
-        />
-      </div>
+      <KeyField
+        key={node.key}
+        value={node.key}
+        onRename={(next) => api.renameKey(node.key, next)}
+      />
 
       {!def && <p className="fs-empty">Type {node.type} is not in the active kit.</p>}
 
       {def?.props.map((schema) => (
         <PropRow
-          key={schema.name}
+          // Keyed by component as well as property. Keyed by property alone,
+          // two components of the same type shared one instance, so an
+          // uncontrolled editor kept the previous component's value and could
+          // write it onto the new one.
+          key={node.key + ':' + schema.name}
           schema={schema}
           value={node.props[schema.name]}
           componentKey={node.key}
@@ -54,6 +55,67 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
         />
       ))}
     </section>
+  )
+}
+
+/**
+ * The component key, committed on blur or Enter rather than on every keystroke.
+ *
+ * Renaming per character made every intermediate prefix a real document key with
+ * its own undo entry, and made the field impossible to clear: the store refuses
+ * an empty key, so the controlled input snapped straight back and you could
+ * never backspace far enough to retype. A refusal now says why instead of
+ * silently reverting.
+ */
+function KeyField({
+  value,
+  onRename,
+}: {
+  value: string
+  onRename: (next: string) => RenameResult
+}): ReactNode {
+  const [draft, setDraft] = useState(value)
+  const [error, setError] = useState('')
+
+  const commit = (): void => {
+    if (draft === value) return
+    const result = onRename(draft)
+    if (result.ok) {
+      setError('')
+      return
+    }
+    setError(result.reason)
+    setDraft(value)
+  }
+
+  return (
+    <div className="fs-prop-row">
+      <label htmlFor="fs-prop-key">Key</label>
+      <input
+        id="fs-prop-key"
+        type="text"
+        value={draft}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? 'fs-prop-key-error' : undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          }
+          if (e.key === 'Escape') {
+            setDraft(value)
+            setError('')
+          }
+        }}
+      />
+      {error && (
+        <p id="fs-prop-key-error" className="fs-prop-row__error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -175,7 +237,7 @@ function PropRow({
           ))}
         </select>
       ) : schema.editor === 'json' ? (
-        <JsonEditor id={id} value={raw} onChange={set} />
+        <JsonEditor id={id} value={raw} onChange={set} onClear={() => onChange(undefined)} />
       ) : (
         <input
           id={id}
@@ -204,32 +266,68 @@ function ClearButton({ label, onClear }: { label: string; onClear: () => void })
   )
 }
 
-/** Only commits when the text parses, so a half-typed object cannot corrupt the document. */
+/**
+ * A JSON property, committed on blur when it parses.
+ *
+ * Controlled rather than uncontrolled: reading the value once at mount meant the
+ * textarea showed whatever was there before, so undo, an applied JSON import,
+ * and switching between two components of the same type all left stale text on
+ * screen that a blur would then write back.
+ */
 function JsonEditor({
   id,
   value,
   onChange,
+  onClear,
 }: {
   id: string
   value: JsonValue | undefined
   onChange: (value: JsonValue) => void
+  onClear: () => void
 }): ReactNode {
+  const serialised = value === undefined ? '' : JSON.stringify(value, null, 2)
+  const [draft, setDraft] = useState(serialised)
+  const [committed, setCommitted] = useState(serialised)
+  const [error, setError] = useState('')
+
+  // Re-sync when the document changes underneath, without losing an in-progress
+  // edit: only the version this editor last saw is replaced.
+  if (serialised !== committed) {
+    setCommitted(serialised)
+    setDraft(serialised)
+    if (error) setError('')
+  }
+
   return (
-    <textarea
-      id={id}
-      rows={4}
-      defaultValue={value === undefined ? '' : JSON.stringify(value, null, 2)}
-      onBlur={(e) => {
-        const text = e.target.value.trim()
-        if (!text) return
-        try {
-          onChange(JSON.parse(text) as JsonValue)
-          e.target.setCustomValidity('')
-        } catch {
-          e.target.setCustomValidity('Invalid JSON')
-          e.target.reportValidity()
-        }
-      }}
-    />
+    <>
+      <textarea
+        id={id}
+        rows={4}
+        spellCheck={false}
+        value={draft}
+        aria-invalid={error ? true : undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const text = draft.trim()
+          if (!text) {
+            // Clearing the box clears the property, rather than doing nothing.
+            setError('')
+            onClear()
+            return
+          }
+          try {
+            onChange(JSON.parse(text) as JsonValue)
+            setError('')
+          } catch (problem) {
+            setError(problem instanceof Error ? problem.message : 'That is not valid JSON.')
+          }
+        }}
+      />
+      {error && (
+        <p className="fs-prop-row__error" role="alert">
+          {error}
+        </p>
+      )}
+    </>
   )
 }

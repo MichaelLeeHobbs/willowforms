@@ -46,7 +46,7 @@ product.
   the designer in six states, so both fail CI rather than a review. **59 tests.**
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
-  covers the test files, and CI running all of it on every PR. **290 tests.**
+  covers the test files, and CI running all of it on every PR. **345 tests.**
 
 ### What "verified" means here
 
@@ -90,7 +90,7 @@ authored earlier through to the export.
 
 The gap between this and a product, roughly in the order it matters:
 
-**Tests for anything React.** 118 of the 290 tests are pure functions. Component tests cover canvas
+**Tests for anything React.** 152 of the 345 tests are pure functions. Component tests cover canvas
 selection, the drag wiring, the rules editor, the inspector tabs, the JSON dialog, the binding editors,
 and form settings. The palette and tree rendering are still untested, and there is no end-to-end setup. jsdom has no layout engine, so
 geometry stays a browser check no matter how far the component tests grow.

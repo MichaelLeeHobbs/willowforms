@@ -276,9 +276,20 @@ export function resolveTreeDrop(
   }
 
   const after = offset > 0.5
+
+  /*
+   * `moveNode` removes the node before inserting it, so the index has to be
+   * measured against the siblings that remain. Measuring it against the list
+   * that still contains the dragged node put a downward reorder one place too
+   * far: dragging the first of [a, b, c] below b produced [b, c, a].
+   */
+  const siblings = rows.filter((r) => r.parentKey === row.parentKey && r.key !== draggedKey)
+  const anchor = siblings.findIndex((r) => r.key === row.key)
+  const slot = anchor === -1 ? row.index : anchor + (after ? 1 : 0)
+
   return {
     parentKey: row.parentKey,
-    index: after ? row.index + 1 : row.index,
+    index: slot,
     mode: after ? 'after' : 'before',
     rowKey: row.key,
   }

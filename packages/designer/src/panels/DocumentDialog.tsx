@@ -104,8 +104,17 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
     const link = window.document.createElement('a')
     link.href = url
     link.download = filename
+
+    /*
+     * Attached before the click and revoked on a later task. A detached anchor
+     * and a URL revoked in the same tick are both long-standing ways to get a
+     * download that silently never starts in Firefox and Safari.
+     */
+    link.style.display = 'none'
+    window.document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(url)
+    window.document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   }, [])
 
   const onFile = useCallback((file: File | undefined) => {

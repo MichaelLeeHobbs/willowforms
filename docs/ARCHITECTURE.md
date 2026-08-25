@@ -102,7 +102,11 @@ Two behavioural rules, both learned from the prior-art study in `docs/prior-art`
 1. **Every rule except `required` passes on an empty value.** Requiredness is one rule's job. A field
    declaring only `url` must not report "Required" when blank; that was a real bug in the demo we studied
    and there is a test named after it.
-2. **Missing sandbox degrades permissively.** Expression-backed rules and `when` guards need a JS
+2. **Validation and rendering agree about what is visible.** `isVisible` in core decides, and both the
+   renderer and `validateForm` call it. They used to disagree: the renderer honoured `renderWhen` while
+   validation walked every node regardless, so a required field hidden by a condition failed a submit
+   with an error nobody could see or fix. Hiding a container hides everything under it.
+3. **Missing sandbox degrades permissively.** Expression-backed rules and `when` guards need a JS
    evaluator, which core does not provide. With no evaluator injected, guarded rules are skipped and
    `custom` rules pass. A missing sandbox must not throw and must not silently fail a user's form.
 
@@ -110,7 +114,12 @@ Two behavioural rules, both learned from the prior-art study in `docs/prior-art`
 
 Every operation in `core/tree.ts` returns a new tree and shares structure with the old one. Editing a
 leaf allocates only that node's ancestors; untouched subtrees keep referential identity, which is what
-`React.memo` needs to skip them.
+`React.memo` needs to skip them. An operation that changes nothing returns the very same tree.
+
+That was a claim this file made and the code did not honour. `updateNode` and `removeNode` mapped over
+their children unconditionally, so every node in the tree came back new on every edit, no subtree could
+ever be skipped, and an operation that matched nothing still produced a fresh document that the undo
+stack recorded as a version. `tree.test.ts` now asserts the identities directly.
 
 The designer's history is a past/present/future triple over whole documents. Snapshots are cheap for the
 reason above. The stack is capped at `MAX_HISTORY` (100), because an uncapped undo history is a slow leak

@@ -185,6 +185,10 @@ export function Tree({
 
       if ((event.key === 'Delete' || event.key === 'Backspace') && node.key !== root.key) {
         event.preventDefault()
+        // The shell also listens for Delete on the window. Without this the same
+        // keypress removed the component twice, pushing two undo entries and
+        // needing two undos to get it back.
+        event.stopPropagation()
         onRemove(node.key)
         announce(node.key + ' removed.')
       }
@@ -218,7 +222,7 @@ export function Tree({
    * quick release would otherwise be silently dropped.
    */
   const resolveRelease = useCallback(
-    (clientX: number, clientY: number) => {
+    (clientX: number, clientY: number, draggedKey: string | undefined) => {
       const snap = measureNow(0)
       if (!snap) return undefined
 
@@ -226,11 +230,10 @@ export function Tree({
       const width = snap.rows[0]?.rect.width ?? 0
       if (x < 0 || x > width) return undefined
 
-      const dragged = dragState?.source.kind === 'move' ? dragState.source.key : undefined
-      const resolved = resolveTreeDrop(snap.rows, clientY - snap.origin.y, dragged)
+      const resolved = resolveTreeDrop(snap.rows, clientY - snap.origin.y, draggedKey)
       return resolved ? { parentKey: resolved.parentKey, index: resolved.index } : undefined
     },
-    [dragState, measureNow],
+    [measureNow],
   )
 
   useEffect(() => registerZone('tree', resolveRelease), [registerZone, resolveRelease])

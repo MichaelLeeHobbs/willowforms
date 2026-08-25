@@ -9,6 +9,7 @@
 
 import { createContext, useCallback, useContext, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
+import { isVisible } from '@formsmith/core'
 import type {
   ComponentNode,
   Evaluator,
@@ -142,10 +143,9 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     [node.key, node.type],
   )
 
-  if (node.renderWhen) {
-    const visible = resolveProp(node.renderWhen, translations, data, evaluate)
-    if (!visible) return null
-  }
+  // Shared with validateForm, so a hidden field is never validated behind the
+  // user's back.
+  if (!isVisible(node, data, evaluate)) return null
 
   const Component = kit.renderers[node.type] ?? kit.fallback ?? MissingType
 

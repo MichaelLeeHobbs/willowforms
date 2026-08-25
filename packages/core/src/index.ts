@@ -21,6 +21,10 @@ export { groupKit, indexKit } from './kit.js'
 
 export { jsonToString } from './json.js'
 
+export { isVisible } from './visibility.js'
+
+export { findLanguage, languageTag } from './language.js'
+
 export type { JsonSchema, JsonSchemaProperty } from './schema.js'
 export { toJsonSchema, unexportableRules } from './schema.js'
 

@@ -12,6 +12,7 @@
  */
 
 import { jsonToString } from './json.js'
+import { isVisible } from './visibility.js'
 import type {
   ComponentNode,
   FormData,
@@ -20,7 +21,6 @@ import type {
   PropValue,
   ValidationRule,
 } from './types.js'
-import { walk } from './tree.js'
 
 /** Evaluates a JS expression against the current form data. Host-supplied. */
 export type Evaluator = (expression: string, data: FormData) => JsonValue
@@ -36,6 +36,23 @@ export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
   url: 'Enter a valid URL.',
   uuid: 'Enter a valid UUID.',
   custom: 'Invalid value.',
+}
+
+/**
+ * A pattern rule, compiled defensively.
+ *
+ * The expression is authored one character at a time in the Rules tab, so it is
+ * a syntax error for most of the time it is being typed. An uncaught throw here
+ * took Preview down in the browser and surfaced as an unhandled 500 on the
+ * server. An unfinished pattern matches nothing, which is the same answer the
+ * rule would give once the author closes the bracket.
+ */
+function matchesPattern(pattern: string, value: string): boolean {
+  try {
+    return new RegExp(pattern).test(value)
+  } catch {
+    return false
+  }
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -100,7 +117,7 @@ export function applyRule(
     case 'max':
       return asNumber(value) > rule.value ? fail() : undefined
     case 'pattern':
-      return new RegExp(rule.value).test(asString(value)) ? undefined : fail()
+      return matchesPattern(rule.value, asString(value)) ? undefined : fail()
     case 'email':
       return EMAIL.test(asString(value)) ? undefined : fail()
     case 'url':
@@ -128,15 +145,30 @@ export function validateField(
 }
 
 /** Validate every data-bound node in the tree. Empty object means the form is valid. */
+/**
+ * Validate every visible field.
+ *
+ * Hidden components are skipped, and so is everything beneath them: hiding a
+ * container hides its children, and a required field the user cannot see must
+ * never block a submit. `isVisible` is shared with the renderer so the two
+ * cannot disagree about what "hidden" means.
+ */
 export function validateForm(
   root: ComponentNode,
   data: FormData,
   evaluate?: Evaluator,
 ): FormErrors {
   const errors: FormErrors = {}
-  walk(root, (node) => {
+
+  const visit = (node: ComponentNode): void => {
+    if (!isVisible(node, data, evaluate)) return
+
     const error = validateField(node, data, evaluate)
     if (error) errors[node.key] = error
-  })
+
+    for (const child of node.children ?? []) visit(child)
+  }
+
+  visit(root)
   return errors
 }

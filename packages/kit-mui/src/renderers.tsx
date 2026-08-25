@@ -19,6 +19,7 @@ import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
 
 import { jsonToString } from '@formsmith/core'
+import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
@@ -125,10 +126,13 @@ function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
       onChange={(e) => onChange(e.target.value)}
     >
       {options.map((option, i) => {
-        const o = option as { label?: unknown; value?: unknown }
-        const v = str(o.value, String(i))
+        const o = option as { label?: unknown; value?: JsonValue }
+        // jsonToString, not a fallback to the array index: a numeric option
+        // value used to become its own position, so the first option submitted
+        // "0" whatever it said.
+        const v = o.value === undefined ? String(i) : jsonToString(o.value)
         return (
-          <MenuItem key={v} value={v}>
+          <MenuItem key={v || String(i)} value={v}>
             {str(o.label, v)}
           </MenuItem>
         )
