@@ -104,6 +104,8 @@ interface Harness {
   node: (key: string) => HTMLElement
   frame: () => HTMLElement | null
   hoverFrame: () => HTMLElement | null
+  /** Keys of the root's children, in document order. */
+  keys: () => string[]
 }
 
 function setup(): Harness {
@@ -118,7 +120,11 @@ function setup(): Harness {
   }
   const frame = (): HTMLElement | null => view.container.querySelector('.fs-selection--active')
   const hoverFrame = (): HTMLElement | null => view.container.querySelector('.fs-selection--hover')
-  return { user, view, node, frame, hoverFrame }
+  const keys = (): string[] =>
+    Array.from(view.container.querySelectorAll('[data-fs-row]'))
+      .map((el) => (el as HTMLElement).dataset['fsRow'])
+      .filter((key): key is string => Boolean(key) && key !== 'root')
+  return { user, view, node, frame, hoverFrame, keys }
 }
 
 describe('canvas selection', () => {
@@ -223,5 +229,138 @@ describe('canvas selection', () => {
     // No overlay and no selection gesture while previewing.
     expect(frame()).toBeNull()
     expect(view.container.querySelector('.fs-selection')).toBeNull()
+  })
+})
+
+/**
+ * Drag and drop, as far as jsdom can go.
+ *
+ * The arithmetic that decides where a drop lands is covered in dnd.test.ts, on
+ * measured rectangles jsdom cannot produce. What is worth checking here is the
+ * wiring around it: that a press below the threshold is still a click, that one
+ * above it is not, and that a drag which lands nowhere changes no document.
+ */
+describe('drag and drop wiring', () => {
+  it('treats a press without movement as a click, not a drag', async () => {
+    const { user, node, frame } = setup()
+
+    await user.click(node('second'))
+
+    // Selection happened, so the click was not swallowed by the drag controller.
+    expect(frame()).not.toBeNull()
+    expect(screen.getByDisplayValue('Second')).toBeTruthy()
+  })
+
+  it('swallows the click that ends a real drag', async () => {
+    const { user, node, frame, keys } = setup()
+
+    const from = node('first')
+    await user.pointer([
+      { target: from, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } },
+      { target: from, coords: { clientX: 90, clientY: 200 } },
+      { target: from, keys: '[/MouseLeft]', coords: { clientX: 90, clientY: 200 } },
+    ])
+
+    // Every rect is zero in jsdom, so no drop resolves and nothing moves. The
+    // point is that the release did not fall through and select instead.
+    expect(frame()).toBeNull()
+    expect(keys()).toEqual(['first', 'second', 'quiet'])
+  })
+
+  it('leaves the document alone when a drag lands nowhere', async () => {
+    const { user, view, keys } = setup()
+
+    const paletteItem = screen.getByTitle('Add Field, or drag it onto the canvas')
+    await user.pointer([
+      { target: paletteItem, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } },
+      { target: view.container, coords: { clientX: 500, clientY: 500 } },
+      { target: view.container, keys: '[/MouseLeft]', coords: { clientX: 500, clientY: 500 } },
+    ])
+
+    expect(keys()).toEqual(['first', 'second', 'quiet'])
+  })
+
+  it('still adds from the palette on a plain click', async () => {
+    const { user, keys } = setup()
+
+    await user.click(screen.getByTitle('Add Field, or drag it onto the canvas'))
+
+    expect(keys()).toHaveLength(4)
+  })
+
+  it('shows a label that follows the pointer while dragging', async () => {
+    const { user, view, node } = setup()
+
+    expect(view.container.querySelector('.fs-drag-label')).toBeNull()
+
+    const from = node('first')
+    await user.pointer([
+      { target: from, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } },
+      { target: from, coords: { clientX: 90, clientY: 200 } },
+    ])
+
+    expect(view.container.querySelector('.fs-drag-label')?.textContent).toBe('first')
+
+    await user.pointer([{ target: from, keys: '[/MouseLeft]' }])
+    expect(view.container.querySelector('.fs-drag-label')).toBeNull()
+  })
+
+  it('abandons a drag on Escape', async () => {
+    const { user, view, node, keys } = setup()
+
+    const from = node('first')
+    await user.pointer([
+      { target: from, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } },
+      { target: from, coords: { clientX: 90, clientY: 200 } },
+    ])
+    expect(view.container.querySelector('.fs-drag-label')).not.toBeNull()
+
+    await user.keyboard('{Escape}')
+
+    expect(view.container.querySelector('.fs-drag-label')).toBeNull()
+    expect(keys()).toEqual(['first', 'second', 'quiet'])
+  })
+})
+
+/**
+ * The release path.
+ *
+ * jsdom has no layout, so no drop can actually resolve here and the assertions
+ * are about the wiring rather than the geometry. The case worth pinning is a
+ * release that arrives immediately after the drag starts: the drop indicator is
+ * drawn from a snapshot taken by a React pointer handler, which always runs
+ * before the window listener that records the drag and is therefore one event
+ * behind. An earlier version published the target from an effect, so a quick
+ * release saw nothing and silently dropped the component on the floor. The
+ * controller now asks each zone to resolve the release itself, measuring afresh.
+ */
+describe('release handling', () => {
+  it('does not throw when a release arrives before any indicator is drawn', async () => {
+    const { user, node, keys } = setup()
+
+    const from = node('first')
+    // Down, one move past the threshold, straight up. No frame in between.
+    await user.pointer([
+      { target: from, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } },
+      { target: from, coords: { clientX: 40, clientY: 40 } },
+      { target: from, keys: '[/MouseLeft]', coords: { clientX: 40, clientY: 40 } },
+    ])
+
+    expect(keys()).toEqual(['first', 'second', 'quiet'])
+  })
+
+  it('keeps working across consecutive drags', async () => {
+    const { user, view, node } = setup()
+
+    for (const key of ['first', 'second']) {
+      const from = node(key)
+      await user.pointer([
+        { target: from, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } },
+        { target: from, coords: { clientX: 60, clientY: 120 } },
+      ])
+      expect(view.container.querySelector('.fs-drag-label')?.textContent).toBe(key)
+      await user.pointer([{ target: from, keys: '[/MouseLeft]' }])
+      expect(view.container.querySelector('.fs-drag-label')).toBeNull()
+    }
   })
 })

@@ -56,10 +56,10 @@ save, load, import, or export.
 names and focus rings. Not done: roving tabindex on the tree, arrow-key navigation, focus trapping,
 `aria-live` announcements for selection and mode changes, and a real audit.
 
-**Tests for anything React.** 56 of the 65 tests are pure functions. Component tests now exist for canvas
-selection only; every other panel is untested, and there is no end-to-end setup. jsdom has no layout
-engine, so geometry stays a browser check no matter how far the component tests grow. Closing this gap
-matters more than any feature below it.
+**Tests for anything React.** 80 of the 97 tests are pure functions. Component tests cover canvas
+selection and the drag wiring; the palette, properties panel, and tree rendering are untested, and there
+is no end-to-end setup. jsdom has no layout engine, so geometry stays a browser check no matter how far
+the component tests grow. Closing this gap matters more than any feature below it.
 
 ## Sequence
 
