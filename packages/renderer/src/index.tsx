@@ -23,12 +23,25 @@ export interface NodeRendererProps {
   node: ComponentNode
   /** Property values with bindings already resolved to plain JSON. */
   props: Record<string, JsonValue>
+  /**
+   * Attributes the kit must spread onto its outermost DOM element. This is how
+   * a rendered element maps back to a document node: the designer hit-tests the
+   * canvas with `closest('[data-fs-key]')`, and there is nothing else in the DOM
+   * that identifies a node. A kit that drops these still renders, but its
+   * components cannot be selected on the canvas.
+   */
+  nodeProps: NodeAttributes
   /** Current value for data-bound components. */
   value: JsonValue | undefined
   /** Validation message for this node, if any. */
   error: string | undefined
   onChange: (value: JsonValue) => void
   children?: ReactNode
+}
+
+export interface NodeAttributes {
+  'data-fs-key': string
+  'data-fs-type': string
 }
 
 export type NodeRenderer = ComponentType<NodeRendererProps>
@@ -89,9 +102,13 @@ function resolveProps(
   return out
 }
 
-function MissingType({ node }: NodeRendererProps): ReactNode {
+function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
   return (
-    <div role="alert" style={{ padding: 8, border: '1px dashed currentColor', opacity: 0.7 }}>
+    <div
+      {...nodeProps}
+      role="alert"
+      style={{ padding: 8, border: '1px dashed currentColor', opacity: 0.7 }}
+    >
       No renderer for component type <code>{node.type}</code> (key <code>{node.key}</code>).
     </div>
   )
@@ -111,6 +128,11 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     [onChange, node.key],
   )
 
+  const nodeProps = useMemo<NodeAttributes>(
+    () => ({ 'data-fs-key': node.key, 'data-fs-type': node.type }),
+    [node.key, node.type],
+  )
+
   if (node.renderWhen) {
     const visible = resolveProp(node.renderWhen, translations, data, evaluate)
     if (!visible) return null
@@ -124,6 +146,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     <Component
       node={node}
       props={props}
+      nodeProps={nodeProps}
       value={data[node.key]}
       error={errors[node.key]}
       onChange={handleChange}

@@ -24,33 +24,38 @@ const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : 
 const bool = (v: unknown): boolean => v === true
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback)
 
-function Screen({ props, children }: NodeRendererProps): ReactNode {
+function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // Children need spacing of their own: MUI's outlined label sits on the border
   // and collides with the next field when siblings are flush against each other.
   return (
-    <Box sx={{ maxWidth: num(props['maxWidth'], 640), mx: 'auto', p: 2 }}>
+    <Box {...nodeProps} sx={{ maxWidth: num(props['maxWidth'], 640), mx: 'auto', p: 2 }}>
       <Stack gap={num(props['gap'], 2)}>{children}</Stack>
     </Box>
   )
 }
 
-function StackNode({ props, children }: NodeRendererProps): ReactNode {
+function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   const direction = props['direction'] === 'row' ? 'row' : 'column'
   return (
-    <Stack direction={direction} gap={num(props['gap'], 2)}>
+    <Stack {...nodeProps} direction={direction} gap={num(props['gap'], 2)}>
       {children}
     </Stack>
   )
 }
 
-function Heading({ props }: NodeRendererProps): ReactNode {
+function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
   const level = str(props['level'], 'h5') as Variant
-  return <Typography variant={level}>{str(props['text'])}</Typography>
+  return (
+    <Typography {...nodeProps} variant={level}>
+      {str(props['text'])}
+    </Typography>
+  )
 }
 
-function TextFieldNode({ props, value, error, onChange }: NodeRendererProps): ReactNode {
+function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
   return (
     <TextField
+      {...nodeProps}
       fullWidth
       label={str(props['label'])}
       placeholder={str(props['placeholder'])}
@@ -64,9 +69,16 @@ function TextFieldNode({ props, value, error, onChange }: NodeRendererProps): Re
   )
 }
 
-function NumberFieldNode({ props, value, error, onChange }: NodeRendererProps): ReactNode {
+function NumberFieldNode({
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   return (
     <TextField
+      {...nodeProps}
       fullWidth
       type="number"
       label={str(props['label'])}
@@ -79,9 +91,10 @@ function NumberFieldNode({ props, value, error, onChange }: NodeRendererProps): 
   )
 }
 
-function CheckboxNode({ props, value, onChange }: NodeRendererProps): ReactNode {
+function CheckboxNode({ props, nodeProps, value, onChange }: NodeRendererProps): ReactNode {
   return (
     <FormControlLabel
+      {...nodeProps}
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
       control={<Checkbox checked={bool(value)} onChange={(e) => onChange(e.target.checked)} />}
@@ -89,11 +102,12 @@ function CheckboxNode({ props, value, onChange }: NodeRendererProps): ReactNode 
   )
 }
 
-function SelectNode({ props, value, error, onChange }: NodeRendererProps): ReactNode {
+function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
   const raw = props['options']
   const options = Array.isArray(raw) ? raw : []
   return (
     <TextField
+      {...nodeProps}
       select
       fullWidth
       label={str(props['label'])}
@@ -116,11 +130,11 @@ function SelectNode({ props, value, error, onChange }: NodeRendererProps): React
   )
 }
 
-function ButtonNode({ props }: NodeRendererProps): ReactNode {
+function ButtonNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const variant = str(props['variant'], 'contained')
   const safe = variant === 'outlined' || variant === 'text' ? variant : 'contained'
   return (
-    <Button variant={safe} disabled={bool(props['disabled'])}>
+    <Button {...nodeProps} variant={safe} disabled={bool(props['disabled'])}>
       {str(props['text'], 'Button')}
     </Button>
   )
