@@ -284,6 +284,131 @@
  * into them. See the CSS isolation note in ARCHITECTURE.md.
  */
 /*
+ * Inspector tabs. A real tablist, so the roving tabindex and arrow keys in
+ * Inspector.tsx have something to move between.
+ */
+.fs-inspector {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fs-tabs {
+  display: flex;
+  gap: 2px;
+  border-block-end: 1px solid var(--fs-border);
+}
+
+.fs-tabs__tab {
+  font: inherit;
+  color: var(--fs-text-muted);
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+}
+
+.fs-tabs__tab:hover {
+  color: var(--fs-text);
+}
+
+.fs-tabs__tab.is-active {
+  color: var(--fs-text);
+  border-block-end-color: var(--fs-primary);
+}
+
+.fs-tabs__panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-block-start: 12px;
+}
+
+.fs-tabs__panel:focus-visible,
+.fs-tabs__tab:focus-visible {
+  outline: 2px solid var(--fs-primary);
+  outline-offset: -2px;
+}
+
+/* Validation rules. */
+.fs-rules__heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fs-text-muted);
+}
+
+.fs-rules__count {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--fs-primary-text);
+  background: var(--fs-primary);
+}
+
+.fs-rules__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fs-rule {
+  padding: 8px;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  background: var(--fs-bg-well);
+}
+
+.fs-rule__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: 6px;
+}
+
+.fs-rule__name {
+  font-weight: 600;
+}
+
+.fs-rule__remove {
+  font: inherit;
+  line-height: 1;
+  color: var(--fs-text-muted);
+  padding: 2px 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--fs-radius);
+  cursor: pointer;
+}
+
+.fs-rule__remove:hover {
+  color: var(--fs-danger);
+  border-color: var(--fs-border);
+}
+
+.fs-rule__note,
+.fs-rules__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fs-text-muted);
+}
+
+.fs-rules__add {
+  margin-block-start: 12px;
+}
+
+/*
  * Drop indicators and the label that follows a drag.
  *
  * Same discipline as the selection frames: absolutely positioned siblings that

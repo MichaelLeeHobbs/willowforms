@@ -7,41 +7,50 @@ product.
 
 - `@formsmith/core`: document model, immutable tree operations, structural document validation, the
   runtime rule engine. **45 tests.**
-- `@formsmith/designer` history: undo/redo with a capped stack. **7 tests.**
-- Canvas selection: click a component on the canvas to select it, a solid frame with a type label on the
-  selection, a dashed outline on hover, Escape to clear, and tree selection scrolling the canvas to
-  match. Design-mode clicks are cancelled in the capture phase, so selecting a field never focuses it,
-  toggles a checkbox, or opens a select. **9 component tests.**
 - `@formsmith/renderer`: walks a document, resolves static/computed/i18n bindings, renders through a
   kit, honours `renderWhen`, and shows a visible fallback for an unknown component type.
 - `@formsmith/kit-mui`: 8 components (Screen, Stack, Heading, TextField, NumberField, Checkbox, Select,
   Button) with metadata and renderers.
+- `@formsmith/designer` history: undo/redo with a capped stack. **7 tests.**
 - Designer shell: palette with search and grouping, structure tree, properties panel driven by per-type
   `PropSchema`, canvas rendering the real runtime renderer, preview mode with live data and errors,
   keyboard undo/redo/delete.
+- Canvas selection: click a component on the canvas to select it, a solid frame with a type label on the
+  selection, a dashed outline on hover, Escape to clear, and tree selection scrolling the canvas to
+  match. Design-mode clicks are cancelled in the capture phase, so selecting a field never focuses it,
+  toggles a checkbox, or opens a select. **9 tests.**
+- Drag and drop: palette to canvas, palette to tree, moving a component on the canvas, and reordering or
+  reparenting in the structure tree. Insertion bar between siblings, outline for an empty container,
+  before/after/inside feedback on tree rows, Escape to abandon. Pointer events throughout, so it works
+  on touch and adds no dependency. **24 tests on the drop arithmetic, 8 on the wiring.**
+- The Rules tab: add, edit, and remove validation rules per field, with the parameter each rule's type
+  demands, a custom message, and the field's data type. The inspector is a real tablist with a roving
+  tabindex and arrow-key navigation. **15 tests.**
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
-  covers the test files, and CI running all of it on every PR. **65 tests.**
+  covers the test files, and CI running all of it on every PR. **112 tests.**
 
-Confirmed by driving the playground in a browser: palette renders grouped, tree selection populates the
-properties panel with the correct per-type schema, preview validates, and a `url`-only field correctly
-stays valid when blank while `required` fields fail.
+### What "verified" means here
 
-Canvas selection was confirmed the same way, because jsdom cannot check it. Selection and hover frames
-sat on their targets to the pixel, held position after the canvas scrolled, survived a disabled control,
-and clicking the Select field selected it without opening its dropdown. Preview mode still focuses
-fields and records typed values.
+jsdom has no layout engine, so anything positional is checked in a real browser instead.
+
+Palette renders grouped, tree selection populates the properties panel with the correct per-type schema,
+preview validates, and a `url`-only field correctly stays valid when blank while `required` fields fail.
+
+Selection and hover frames sat on their targets to the pixel, held position after the canvas scrolled,
+survived a disabled control, and clicking the Select field selected it without opening its dropdown.
+
+Drag and drop: palette to canvas, moving a component, dropping into a row-laid-out container with the
+horizontal axis inferred correctly, tree reordering, tree drop-inside, Escape leaving the document
+untouched, and a plain click still selecting rather than being swallowed by the drag controller.
+
+The Rules tab, end to end: a `minLength` rule authored in the panel with a custom message landed in the
+document with the right shape, then failed a short value in preview with exactly that message, while the
+`email` rule on the same field passed.
 
 ## Not built yet
 
 The gap between this and a product, roughly in the order it matters:
-
-**Drag and drop.** The palette adds to the current selection via click. No dragging, no drop indicators,
-no reordering in the tree. `moveNode` exists and is tested; nothing calls it yet. Canvas selection is in
-place now, so the drop target and the selection can share the same hit-testing.
-
-**The Rules tab.** Validation rules exist in the model and run correctly, but there is no UI to add or
-edit them. Right now you author them in the document by hand.
 
 **Property binding UI.** `computed` and `i18n` bindings render correctly and the properties panel
 displays them read-only, but there is no editor to create one. That means no expression editor and no
@@ -52,21 +61,22 @@ save, load, import, or export.
 
 **JSON editing and JSON Schema export.** Both are in the model's remit, neither is written.
 
-**Accessibility work.** The tree has `role="tree"` and `aria-level`, and chrome controls have accessible
-names and focus rings. Not done: roving tabindex on the tree, arrow-key navigation, focus trapping,
-`aria-live` announcements for selection and mode changes, and a real audit.
+**Accessibility work.** The tree has `role="tree"` and `aria-level`, chrome controls have accessible
+names and focus rings, and the inspector is a real tablist with a roving tabindex and arrow keys. Not
+done: the same keyboard treatment for the tree, focus trapping, `aria-live` announcements for selection
+and mode changes, a keyboard path for drag and drop, and a real audit.
 
-**Tests for anything React.** 80 of the 97 tests are pure functions. Component tests cover canvas
-selection and the drag wiring; the palette, properties panel, and tree rendering are untested, and there
-is no end-to-end setup. jsdom has no layout engine, so geometry stays a browser check no matter how far
-the component tests grow. Closing this gap matters more than any feature below it.
+**Tests for anything React.** 80 of the 112 tests are pure functions. Component tests cover canvas
+selection, the drag wiring, the rules editor, and the inspector tabs; the palette, the properties panel,
+and tree rendering are untested, and there is no end-to-end setup. jsdom has no layout engine, so
+geometry stays a browser check no matter how far the component tests grow.
 
 ## Sequence
 
 1. ~~Canvas selection plus a selection overlay.~~ Done.
-2. Drag and drop from palette to canvas, and reordering in the tree.
-3. Component tests for the remaining panels. The setup landed with canvas selection; the coverage did not.
-4. The Rules tab.
+2. ~~Drag and drop from palette to canvas, and reordering in the tree.~~ Done.
+3. ~~The Rules tab.~~ Done.
+4. Component tests for the remaining panels. The setup landed with canvas selection; coverage is partial.
 5. Save/load/export, JSON editing.
 6. Binding editors: expressions, then localization.
 7. Accessibility pass with an audit against the checklist in the prior-art teardown.
