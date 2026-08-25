@@ -122,7 +122,7 @@ describe('inspector tabs', () => {
 
     const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
     const tabs = within(tablist).getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Rules'])
+    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Rules', 'Form'])
 
     const selected = tabs.find((t) => t.getAttribute('aria-selected') === 'true')
     expect(selected?.textContent).toBe('Properties')
@@ -136,7 +136,7 @@ describe('inspector tabs', () => {
   it('keeps exactly one tab in the tab order', () => {
     setup()
     const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')
-    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1'])
+    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
   })
 
   it('moves between tabs with the arrow keys', async () => {
@@ -149,14 +149,19 @@ describe('inspector tabs', () => {
     expect(focused()).toBe('Rules')
     expect(screen.getByRole('tab', { name: 'Rules' }).getAttribute('aria-selected')).toBe('true')
 
+    await user.keyboard('{ArrowRight}')
+    expect(focused()).toBe('Form')
+
     // Wraps around rather than stopping at the end.
     await user.keyboard('{ArrowRight}')
     expect(focused()).toBe('Properties')
+    await user.keyboard('{ArrowLeft}')
+    expect(focused()).toBe('Form')
 
-    await user.keyboard('{End}')
-    expect(focused()).toBe('Rules')
     await user.keyboard('{Home}')
     expect(focused()).toBe('Properties')
+    await user.keyboard('{End}')
+    expect(focused()).toBe('Form')
   })
 })
 

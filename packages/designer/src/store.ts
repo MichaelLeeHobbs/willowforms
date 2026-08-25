@@ -14,6 +14,7 @@ import type {
   ComponentNode,
   FieldSchema,
   FormDocument,
+  Language,
   PropValue,
 } from '@formsmith/core'
 import {
@@ -80,6 +81,19 @@ export interface DesignerApi {
    * component that carries no form data should have.
    */
   setFieldSchema: (key: string, schema: FieldSchema | undefined) => void
+  /** Rename the form itself. */
+  renameDocument: (name: string) => void
+  /**
+   * Write one translation. An empty string removes the entry, so an untranslated
+   * key falls back to showing the key rather than an empty label.
+   */
+  setTranslation: (language: string, key: string, text: string) => void
+  /**
+   * Replace the language list. The default language follows if the current
+   * default is no longer in it, because a document pointing at a language it
+   * does not have renders every translation as its raw key.
+   */
+  setLanguages: (languages: Language[], defaultLanguage?: string) => void
   renameKey: (key: string, nextKey: string) => void
   moveComponent: (key: string, parentKey: string, index?: number) => void
   removeComponent: (key: string) => void
@@ -142,6 +156,43 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply],
   )
 
+  const renameDocument = useCallback(
+    (name: string) => {
+      apply((doc) => (doc.name === name ? doc : { ...doc, name }))
+    },
+    [apply],
+  )
+
+  const setTranslation = useCallback(
+    (language: string, key: string, text: string) => {
+      apply((doc) => {
+        const bundle = { ...(doc.translations[language] ?? {}) }
+        if (text) bundle[key] = text
+        else delete bundle[key]
+        return { ...doc, translations: { ...doc.translations, [language]: bundle } }
+      })
+    },
+    [apply],
+  )
+
+  const setLanguages = useCallback(
+    (languages: Language[], defaultLanguage?: string) => {
+      apply((doc) => {
+        if (languages.length === 0) return doc
+        const codes = languages.map((l) => l.code)
+        const preferred = defaultLanguage ?? doc.defaultLanguage
+        const first = languages[0]
+        if (!first) return doc
+        return {
+          ...doc,
+          languages,
+          defaultLanguage: codes.includes(preferred) ? preferred : first.code,
+        }
+      })
+    },
+    [apply],
+  )
+
   const renameKey = useCallback(
     (key: string, nextKey: string) => {
       const trimmed = nextKey.trim()
@@ -191,6 +242,9 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     addComponent,
     setProp,
     setFieldSchema,
+    renameDocument,
+    setTranslation,
+    setLanguages,
     renameKey,
     moveComponent,
     removeComponent,

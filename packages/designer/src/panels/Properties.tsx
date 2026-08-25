@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import type { JsonValue, Kit, PropSchema, PropValue } from '@formsmith/core'
+import type { JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
 import { indexKit, jsonToString } from '@formsmith/core'
 
+import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
 import type { DesignerApi } from '../store.js'
 
 export interface PropertiesProps {
@@ -44,7 +45,12 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
           key={schema.name}
           schema={schema}
           value={node.props[schema.name]}
+          componentKey={node.key}
+          languages={api.document.languages}
+          defaultLanguage={api.document.defaultLanguage}
+          translations={api.document.translations}
           onChange={(next) => api.setProp(node.key, schema.name, next)}
+          onTranslate={api.setTranslation}
         />
       ))}
     </section>
@@ -54,22 +60,65 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
 interface PropRowProps {
   schema: PropSchema
   value: PropValue | undefined
+  componentKey: string
+  languages: Language[]
+  defaultLanguage: string
+  translations: Record<string, Record<string, string>>
   onChange: (value: PropValue | undefined) => void
+  onTranslate: (language: string, key: string, text: string) => void
 }
 
-function PropRow({ schema, value, onChange }: PropRowProps): ReactNode {
+function PropRow({
+  schema,
+  value,
+  componentKey,
+  languages,
+  defaultLanguage,
+  translations,
+  onChange,
+  onTranslate,
+}: PropRowProps): ReactNode {
   const id = 'fs-prop-' + schema.name
   const isSet = value !== undefined
   const set = (v: JsonValue): void => onChange({ kind: 'static', value: v })
 
-  // Bindings need their own editor; showing a text box would silently flatten them.
-  if (value && value.kind !== 'static') {
+  const mode = (
+    <BindingMode
+      id={id + '-mode'}
+      schema={schema}
+      value={value}
+      componentKey={componentKey}
+      onChange={onChange}
+    />
+  )
+
+  // A binding is not text, so it gets its own editor rather than a box that
+  // would silently flatten it back to a string.
+  if (value?.kind === 'computed') {
     return (
-      <div className="fs-prop-row">
+      <div className="fs-prop-row is-set is-binding">
         <label htmlFor={id}>{schema.label}</label>
-        <output id={id} className="fs-prop-binding">
-          {value.kind === 'computed' ? 'Computed expression' : 'Translation: ' + value.key}
-        </output>
+        {mode}
+        <ComputedEditor id={id} value={value} onChange={onChange} />
+        <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
+      </div>
+    )
+  }
+
+  if (value?.kind === 'i18n') {
+    return (
+      <div className="fs-prop-row is-set is-binding">
+        <label htmlFor={id}>{schema.label}</label>
+        {mode}
+        <TranslationEditor
+          id={id}
+          value={value}
+          languages={languages}
+          defaultLanguage={defaultLanguage}
+          translations={translations}
+          onChange={onChange}
+          onTranslate={onTranslate}
+        />
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
       </div>
     )
@@ -83,6 +132,7 @@ function PropRow({ schema, value, onChange }: PropRowProps): ReactNode {
         {schema.label}
         {isSet && <span className="fs-prop-row__dot" aria-label="Modified" />}
       </label>
+      {mode}
 
       {schema.editor === 'boolean' ? (
         <input
