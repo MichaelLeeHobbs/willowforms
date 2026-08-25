@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react'
 import type { ComponentNode, Kit } from '@formsmith/core'
-import { indexKit } from '@formsmith/core'
+import { flatten, indexKit } from '@formsmith/core'
 
 import { resolveTreeDrop } from '../dnd.js'
 import type { TreeDropTarget, TreeRow } from '../dnd.js'
 import type { DragController } from '../drag.js'
 import { originOf } from '../geometry.js'
 import type { Origin } from '../geometry.js'
+import { describeMove, focusTarget, moveTarget } from '../keyboard.js'
+import type { Direction } from '../keyboard.js'
 
 export interface TreeProps {
   root: ComponentNode
@@ -15,6 +21,9 @@ export interface TreeProps {
   selectedKey: string | undefined
   onSelect: (key: string) => void
   onRemove: (key: string) => void
+  onMove: (key: string, parentKey: string, index: number) => void
+  /** Text for the live region, so a keyboard move is not silent. */
+  announce: (message: string) => void
   drag: DragController
 }
 
@@ -35,7 +44,16 @@ interface Snapshot {
  * separate rows below it. So the tree resolves drops on its own terms, with the
  * shared arithmetic living in `dnd.ts`.
  */
-export function Tree({ root, kit, selectedKey, onSelect, onRemove, drag }: TreeProps): ReactNode {
+export function Tree({
+  root,
+  kit,
+  selectedKey,
+  onSelect,
+  onRemove,
+  onMove,
+  announce,
+  drag,
+}: TreeProps): ReactNode {
   const listRef = useRef<HTMLUListElement>(null)
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
@@ -99,6 +117,81 @@ export function Tree({ root, kit, selectedKey, onSelect, onRemove, drag }: TreeP
     [begin, root.key],
   )
 
+  /** Move focus to a row and select it, since selection follows focus here. */
+  const focusRow = useCallback(
+    (key: string) => {
+      onSelect(key)
+      listRef.current?.querySelector<HTMLElement>(`[data-fs-row="${CSS.escape(key)}"]`)?.focus()
+    },
+    [onSelect],
+  )
+
+  /*
+   * Arrows move focus; the same arrows with Alt move the component.
+   *
+   * Drag and drop is a pointer gesture with no keyboard equivalent, which would
+   * otherwise make every rearrangement in this builder impossible without a
+   * mouse. WAI-ARIA has no standard pattern for that, so this follows the
+   * outliner convention people already know from editors and file trees.
+   */
+  const onRowKeyDown = useCallback(
+    (node: ComponentNode, event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const rows = flatten(root)
+      const defs = indexKit(kit)
+
+      const DIRECTIONS: Record<string, Direction> = {
+        ArrowUp: 'up',
+        ArrowDown: 'down',
+        ArrowLeft: 'left',
+        ArrowRight: 'right',
+      }
+      const direction = DIRECTIONS[event.key]
+
+      if (direction) {
+        event.preventDefault()
+
+        if (event.altKey) {
+          const target = moveTarget(rows, node.key, direction, (type) => {
+            return defs.get(type)?.container === true
+          })
+          if (!target) {
+            announce(node.key + ' cannot move that way.')
+            return
+          }
+          onMove(node.key, target.parentKey, target.index)
+          announce(describeMove(node.key, direction))
+          // The row is re-rendered in its new place; put focus back on it.
+          requestAnimationFrame(() => focusRow(node.key))
+          return
+        }
+
+        const next = focusTarget(rows, node.key, direction)
+        if (next) focusRow(next)
+        return
+      }
+
+      if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault()
+        const target = event.key === 'Home' ? rows[0] : rows[rows.length - 1]
+        if (target) focusRow(target.node.key)
+        return
+      }
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        onSelect(node.key)
+        return
+      }
+
+      if ((event.key === 'Delete' || event.key === 'Backspace') && node.key !== root.key) {
+        event.preventDefault()
+        onRemove(node.key)
+        announce(node.key + ' removed.')
+      }
+    },
+    [announce, focusRow, kit, onMove, onRemove, onSelect, root],
+  )
+
   /*
    * Derived during render, not set from an effect. The pointer moves many times
    * a second, and state-set-from-effect would render twice for every move.
@@ -142,6 +235,14 @@ export function Tree({ root, kit, selectedKey, onSelect, onRemove, drag }: TreeP
 
   useEffect(() => registerZone('tree', resolveRelease), [registerZone, resolveRelease])
 
+  /*
+   * One tab stop for the whole tree: the selection if it is still in the
+   * document, and the root otherwise. Without this every row is a tab stop and
+   * a long form buries the rest of the page behind dozens of them.
+   */
+  const tabStop =
+    selectedKey && flatten(root).some((r) => r.node.key === selectedKey) ? selectedKey : root.key
+
   return (
     <section className="fs-tree">
       <h2 className="fs-panel__heading">Structure</h2>
@@ -163,6 +264,8 @@ export function Tree({ root, kit, selectedKey, onSelect, onRemove, drag }: TreeP
           onSelect={onSelect}
           onRemove={onRemove}
           onRowPointerDown={onRowPointerDown}
+          onRowKeyDown={onRowKeyDown}
+          tabStop={tabStop}
           consumeClick={consumeClick}
           target={target}
           isRoot
@@ -179,6 +282,9 @@ interface TreeItemProps {
   onSelect: (key: string) => void
   onRemove: (key: string) => void
   onRowPointerDown: (node: ComponentNode, event: ReactPointerEvent) => void
+  onRowKeyDown: (node: ComponentNode, event: ReactKeyboardEvent<HTMLDivElement>) => void
+  /** Key of the one row that holds the tab stop. */
+  tabStop: string
   consumeClick: () => boolean
   target: TreeDropTarget | undefined
   isRoot?: boolean
@@ -191,6 +297,8 @@ function TreeItem({
   onSelect,
   onRemove,
   onRowPointerDown,
+  onRowKeyDown,
+  tabStop,
   consumeClick,
   target,
   isRoot = false,
@@ -207,7 +315,9 @@ function TreeItem({
         aria-selected={selected}
         aria-level={depth + 1}
         aria-expanded={children.length > 0 ? true : undefined}
-        tabIndex={selected ? 0 : -1}
+        // Roving tabindex: exactly one row is in the tab order, so Tab reaches
+        // the tree once and the arrows take over inside it.
+        tabIndex={tabStop === node.key ? 0 : -1}
         className={
           'fs-tree__row' + (selected ? ' is-selected' : '') + (drop ? ' is-drop-' + drop : '')
         }
@@ -217,12 +327,7 @@ function TreeItem({
           if (consumeClick()) return
           onSelect(node.key)
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onSelect(node.key)
-          }
-        }}
+        onKeyDown={(e) => onRowKeyDown(node, e)}
       >
         <span className="fs-tree__key">{node.key}</span>
         <span className="fs-tree__type">{node.type}</span>
@@ -253,6 +358,8 @@ function TreeItem({
               onSelect={onSelect}
               onRemove={onRemove}
               onRowPointerDown={onRowPointerDown}
+              onRowKeyDown={onRowKeyDown}
+              tabStop={tabStop}
               consumeClick={consumeClick}
               target={target}
             />
