@@ -1,0 +1,37 @@
+{
+  "name": "formsmith",
+  "private": true,
+  "type": "module",
+  "description": "An MIT-licensed visual form designer. The designer, not just the renderer.",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc --build && node scripts/copy-assets.mjs",
+    "dev": "pnpm --filter playground dev",
+    "dev:server": "pnpm --filter demo-server dev",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint packages apps",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "clean": "rimraf \"packages/*/dist\" \"apps/*/dist\" \"**/*.tsbuildinfo\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.33.4"
+}

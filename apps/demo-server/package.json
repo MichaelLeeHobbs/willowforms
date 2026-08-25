@@ -1,0 +1,16 @@
+{
+  "name": "demo-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal persistence for the demo. Deliberately tiny: Formsmith is a frontend library.",
+  "scripts": {
+    "dev": "node --experimental-strip-types --watch src/index.ts",
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "dependencies": {
+    "@formsmith/core": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.14"
+  }
+}
