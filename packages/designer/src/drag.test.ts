@@ -1,0 +1,159 @@
+/**
+ * @vitest-environment jsdom
+ */
+
+/**
+ * The drag controller's contract with its drop zones.
+ *
+ * The zones themselves need layout to say anything useful, which jsdom cannot
+ * provide, so what is pinned here is the handshake between them: who is told
+ * what is being dragged, and when.
+ *
+ * That handshake is where a real bug lived. Each zone used to read the dragged
+ * component out of React state inside its own resolver, and a resolver
+ * registered from an effect can close over state a render behind. A tree zone
+ * that believed nothing was being dragged failed to exclude the dragged node
+ * from its own sibling list, and every downward reorder landed one position too
+ * far. The controller knows what it is dragging, so it passes it in.
+ */
+
+import { act, renderHook } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+
+import { useDrag } from './drag.js'
+import type { DropCommit, DropResolver } from './drag.js'
+
+const press = (x: number, y: number): ReactPointerEvent =>
+  ({ clientX: x, clientY: y }) as ReactPointerEvent
+
+function pointer(type: string, x: number, y: number): void {
+  window.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true }))
+}
+
+/** Down, past the threshold, and up, which is the shortest real drag. */
+async function drag(begin: () => void, to: [number, number] = [200, 200]): Promise<void> {
+  await act(async () => {
+    begin()
+    pointer('pointermove', 40, 40)
+    pointer('pointermove', to[0], to[1])
+    pointer('pointerup', to[0], to[1])
+    await Promise.resolve()
+  })
+}
+
+describe('the drop zone handshake', () => {
+  it('tells the zone which component is being dragged', async () => {
+    const onCommit = vi.fn()
+    const resolve = vi.fn<DropResolver>(() => ({ parentKey: 'root', index: 0 }))
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('tree', resolve)
+    })
+    await drag(() => {
+      result.current.begin({ kind: 'move', key: 'heading', label: 'heading' }, press(10, 10))
+    })
+
+    expect(resolve).toHaveBeenCalledWith(200, 200, 'heading')
+  })
+
+  it('tells the zone that a palette drag has no component yet', async () => {
+    const resolve = vi.fn<DropResolver>(() => undefined)
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    const def = { type: 'Field', label: 'Field' } as never
+
+    act(() => {
+      result.current.registerZone('canvas', resolve)
+    })
+    await drag(() => {
+      result.current.begin({ kind: 'new', def }, press(10, 10))
+    })
+
+    expect(resolve).toHaveBeenCalledWith(200, 200, undefined)
+  })
+
+  it('commits what the first zone that claims the release returns', async () => {
+    const onCommit = vi.fn()
+    const empty = vi.fn<DropResolver>(() => undefined)
+    const claiming = vi.fn<DropResolver>(() => ({ parentKey: 'stack', index: 2 }))
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', empty)
+      result.current.registerZone('tree', claiming)
+    })
+    await drag(() => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+    })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit.mock.calls[0]?.[1]).toEqual<DropCommit>({ parentKey: 'stack', index: 2 })
+  })
+
+  it('commits nothing when no zone claims the release', async () => {
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => undefined)
+    })
+    await drag(() => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+    })
+
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('asks no zone at all when the pointer never passed the threshold', async () => {
+    const resolve = vi.fn<DropResolver>(() => ({ parentKey: 'root', index: 0 }))
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    act(() => {
+      result.current.registerZone('tree', resolve)
+    })
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      // Two pixels is a click, not a drag.
+      pointer('pointermove', 12, 10)
+      pointer('pointerup', 12, 10)
+      await Promise.resolve()
+    })
+
+    expect(resolve).not.toHaveBeenCalled()
+    expect(result.current.consumeClick()).toBe(false)
+  })
+
+  it('stops asking a zone once it unregisters', async () => {
+    const resolve = vi.fn<DropResolver>(() => undefined)
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    let unregister = (): void => undefined
+    act(() => {
+      unregister = result.current.registerZone('tree', resolve)
+    })
+    act(() => {
+      unregister()
+    })
+    await drag(() => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+    })
+
+    expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('reports a real position at the very edge of the viewport', async () => {
+    const resolve = vi.fn<DropResolver>(() => undefined)
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    act(() => {
+      result.current.registerZone('canvas', resolve)
+    })
+    await drag(() => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+    }, [0, 0])
+
+    // A clientX of 0 is the left edge, not a missing coordinate.
+    expect(resolve).toHaveBeenCalledWith(0, 0, 'a')
+  })
+})

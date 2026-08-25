@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import type { FormData, JsonValue, Kit } from '@formsmith/core'
+import type { FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
 import { indexKit, validateForm } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
@@ -12,6 +12,9 @@ import { keyFromEventTarget, measureTree, originOf, toLocal } from '../geometry.
 import type { Candidate, Origin } from '../geometry.js'
 import type { DesignerApi } from '../store.js'
 import { SelectionLayer } from './SelectionLayer.js'
+
+/** Shared, so an unvalidated canvas does not allocate a new object per render. */
+const NO_ERRORS: FormErrors = Object.freeze({})
 
 export interface CanvasProps {
   api: DesignerApi
@@ -52,7 +55,17 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
    */
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
-  const errors = validated ? validateForm(api.document.root, data) : {}
+  /*
+   * Memoised, and a shared empty object when nothing is validated. A fresh `{}`
+   * every render changed the renderer's context identity every render, which
+   * defeated the memo the renderer keeps to avoid re-rendering every node in the
+   * form. Validation also runs on the whole tree, so recomputing it per render
+   * meant doing that on every keystroke in preview.
+   */
+  const errors = useMemo(
+    () => (validated ? validateForm(api.document.root, data) : NO_ERRORS),
+    [validated, api.document.root, data],
+  )
 
   const onChange = useCallback((key: string, value: JsonValue) => {
     setData((d) => ({ ...d, [key]: value }))
@@ -137,17 +150,16 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
    * costs one layout pass per release and is never stale.
    */
   const resolveRelease = useCallback(
-    (clientX: number, clientY: number) => {
+    (clientX: number, clientY: number, draggedKey: string | undefined) => {
       if (preview) return undefined
       const snap = measureNow(0)
       if (!snap) return undefined
 
       const [x, y] = toLocal(snap.origin, clientX, clientY)
-      const dragged = dragState?.source.kind === 'move' ? dragState.source.key : undefined
-      const resolved = resolveDrop(snap.candidates, x, y, dragged)
+      const resolved = resolveDrop(snap.candidates, x, y, draggedKey)
       return resolved ? { parentKey: resolved.parentKey, index: resolved.index } : undefined
     },
-    [dragState, measureNow, preview],
+    [measureNow, preview],
   )
 
   useEffect(() => registerZone('canvas', resolveRelease), [registerZone, resolveRelease])

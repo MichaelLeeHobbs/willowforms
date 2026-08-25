@@ -14,6 +14,7 @@
  */
 
 import type { ReactNode } from 'react'
+import { languageTag } from '@formsmith/core'
 import type { Language, PropSchema, PropValue } from '@formsmith/core'
 
 export type BindingKind = PropValue['kind']
@@ -146,26 +147,30 @@ export function TranslationEditor({
 
       <ul className="fs-binding__languages">
         {languages.map((language) => {
-          const text = translations[language.code]?.[value.key] ?? ''
-          const fieldId = id + '-' + language.code
+          /*
+           * Bundles are keyed by BCP 47 tag, which is what the renderer looks up.
+           * Writing to the bare code put every translation authored here into a
+           * bundle nothing read, so the canvas kept showing the raw key.
+           */
+          const tag = languageTag(language)
+          const text = translations[tag]?.[value.key] ?? ''
+          const fieldId = id + '-' + tag
           return (
-            <li key={language.code}>
+            <li key={tag}>
               {/*
                 The badge sits outside the label so the field's accessible name
                 is exactly the language, not "English default".
               */}
               <div className="fs-binding__language-head">
                 <label htmlFor={fieldId}>{language.name}</label>
-                {language.code === defaultLanguage && (
-                  <span className="fs-binding__default">default</span>
-                )}
+                {tag === defaultLanguage && <span className="fs-binding__default">default</span>}
               </div>
               <input
                 id={fieldId}
                 type="text"
                 dir={language.bidi}
                 value={text}
-                onChange={(e) => onTranslate(language.code, value.key, e.target.value)}
+                onChange={(e) => onTranslate(tag, value.key, e.target.value)}
               />
             </li>
           )

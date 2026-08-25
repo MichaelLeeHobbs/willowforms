@@ -21,6 +21,7 @@ import {
   findNode,
   insertNode,
   instantiate,
+  languageTag,
   moveNode,
   removeNode,
   updateNode,
@@ -32,15 +33,42 @@ interface History {
   past: FormDocument[]
   present: FormDocument
   future: FormDocument[]
+  /**
+   * What produced `present`. Consecutive edits sharing a label are folded into
+   * one entry, so typing a label is one undo step rather than one per keystroke.
+   */
+  label?: string
 }
 
-function commit(history: History, next: FormDocument): History {
+/**
+ * Add a version to the history, coalescing a run of edits to the same thing.
+ *
+ * Without this, every keystroke in a text field was its own undo step: typing a
+ * thirteen-character label spent thirteen of the hundred slots and pushed the
+ * real edits out of reach, which made undo useless for anything but the last few
+ * characters.
+ *
+ * A run breaks when the label changes, which happens on a different property, a
+ * different component, a structural edit, or an undo. Deliberately not on a
+ * timer: wall-clock coalescing makes the behaviour depend on how fast someone
+ * types, and makes the tests depend on how fast the machine runs them. The cost
+ * is that pausing mid-field and resuming stays one entry, which is a smaller
+ * problem than the one it replaces.
+ */
+function commit(history: History, next: FormDocument, label?: string): History {
   if (next === history.present) return history
+
+  // Same label as the version already on top: replace it rather than stack on it.
+  if (label !== undefined && history.label === label) {
+    return { past: history.past, present: next, future: [], label }
+  }
+
   const past = [...history.past, history.present]
   return {
     past: past.length > MAX_HISTORY ? past.slice(past.length - MAX_HISTORY) : past,
     present: next,
     future: [],
+    ...(label === undefined ? {} : { label }),
   }
 }
 
@@ -51,6 +79,8 @@ function undo(history: History): History {
     past: history.past.slice(0, -1),
     present: previous,
     future: [history.present, ...history.future],
+    // The restored version was not produced by the edit that is still labelled,
+    // so the next keystroke must start a new entry rather than overwrite it.
   }
 }
 
@@ -63,6 +93,9 @@ function redo(history: History): History {
     future: history.future.slice(1),
   }
 }
+
+/** Why a rename was refused, so the panel can say so instead of doing nothing. */
+export type RenameResult = { ok: true } | { ok: false; reason: string }
 
 export interface DesignerApi {
   document: FormDocument
@@ -94,7 +127,7 @@ export interface DesignerApi {
    * does not have renders every translation as its raw key.
    */
   setLanguages: (languages: Language[], defaultLanguage?: string) => void
-  renameKey: (key: string, nextKey: string) => void
+  renameKey: (key: string, nextKey: string) => RenameResult
   moveComponent: (key: string, parentKey: string, index?: number) => void
   removeComponent: (key: string) => void
   replaceDocument: (next: FormDocument) => void
@@ -108,69 +141,84 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const document = history.present
 
-  const apply = useCallback((mutate: (doc: FormDocument) => FormDocument) => {
-    setHistory((h) => commit(h, mutate(h.present)))
+  const apply = useCallback((mutate: (doc: FormDocument) => FormDocument, label?: string) => {
+    setHistory((h) => commit(h, mutate(h.present), label))
   }, [])
 
   const addComponent = useCallback((def: ComponentDef, parentKey?: string, index?: number) => {
+    /*
+     * The new key is computed here rather than inside the updater. A state
+     * updater must be pure: React is free to call it twice, and this one used to
+     * call setSelectedKey from inside it, which is a state update during another
+     * component's render.
+     */
     setHistory((h) => {
       const node = instantiate(def, h.present.root)
       const parent = parentKey ?? h.present.root.key
-      const next = { ...h.present, root: insertNode(h.present.root, parent, node, index) }
-      setSelectedKey(node.key)
-      return commit(h, next)
+      queueMicrotask(() => setSelectedKey(node.key))
+      return commit(h, { ...h.present, root: insertNode(h.present.root, parent, node, index) })
     })
   }, [])
 
   const setProp = useCallback(
     (key: string, name: string, value: PropValue | undefined) => {
-      apply((doc) => ({
-        ...doc,
-        root: updateNode(doc.root, key, (node) => {
-          const props = { ...node.props }
-          // Clearing a property removes it so the component default applies again.
-          if (value === undefined) delete props[name]
-          else props[name] = value
-          return { ...node, props }
+      apply(
+        (doc) => ({
+          ...doc,
+          root: updateNode(doc.root, key, (node) => {
+            const props = { ...node.props }
+            // Clearing a property removes it so the component default applies again.
+            if (value === undefined) delete props[name]
+            else props[name] = value
+            return { ...node, props }
+          }),
         }),
-      }))
+        // Typing into one property is one undo step, not one per character.
+        'prop:' + key + ':' + name,
+      )
     },
     [apply],
   )
 
   const setFieldSchema = useCallback(
     (key: string, schema: FieldSchema | undefined) => {
-      apply((doc) => ({
-        ...doc,
-        root: updateNode(doc.root, key, (node) => {
-          if (!schema) {
-            // exactOptionalPropertyTypes: an absent schema is an absent key, not
-            // a key holding undefined.
-            const { schema: _dropped, ...rest } = node
-            return rest
-          }
-          return { ...node, schema }
+      apply(
+        (doc) => ({
+          ...doc,
+          root: updateNode(doc.root, key, (node) => {
+            if (!schema) {
+              // exactOptionalPropertyTypes: an absent schema is an absent key,
+              // not a key holding undefined.
+              const { schema: _dropped, ...rest } = node
+              return rest
+            }
+            return { ...node, schema }
+          }),
         }),
-      }))
+        'schema:' + key,
+      )
     },
     [apply],
   )
 
   const renameDocument = useCallback(
     (name: string) => {
-      apply((doc) => (doc.name === name ? doc : { ...doc, name }))
+      apply((doc) => (doc.name === name ? doc : { ...doc, name }), 'document-name')
     },
     [apply],
   )
 
   const setTranslation = useCallback(
     (language: string, key: string, text: string) => {
-      apply((doc) => {
-        const bundle = { ...(doc.translations[language] ?? {}) }
-        if (text) bundle[key] = text
-        else delete bundle[key]
-        return { ...doc, translations: { ...doc.translations, [language]: bundle } }
-      })
+      apply(
+        (doc) => {
+          const bundle = { ...(doc.translations[language] ?? {}) }
+          if (text) bundle[key] = text
+          else delete bundle[key]
+          return { ...doc, translations: { ...doc.translations, [language]: bundle } }
+        },
+        'translation:' + language + ':' + key,
+      )
     },
     [apply],
   )
@@ -179,14 +227,22 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     (languages: Language[], defaultLanguage?: string) => {
       apply((doc) => {
         if (languages.length === 0) return doc
-        const codes = languages.map((l) => l.code)
-        const preferred = defaultLanguage ?? doc.defaultLanguage
         const first = languages[0]
         if (!first) return doc
+
+        /*
+         * Compared as BCP 47 tags, not bare codes. A document's default is a tag
+         * such as `en-US`, and comparing it against `['en']` decided the default
+         * was missing and silently rewrote it, which then made the document fail
+         * its own structural validation on re-import.
+         */
+        const tags = languages.map(languageTag)
+        const preferred = defaultLanguage ?? doc.defaultLanguage
+
         return {
           ...doc,
           languages,
-          defaultLanguage: codes.includes(preferred) ? preferred : first.code,
+          defaultLanguage: tags.includes(preferred) ? preferred : languageTag(first),
         }
       })
     },
@@ -194,29 +250,52 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   )
 
   const renameKey = useCallback(
-    (key: string, nextKey: string) => {
+    (key: string, nextKey: string): RenameResult => {
       const trimmed = nextKey.trim()
-      if (!trimmed) return
-      apply((doc) => {
-        // Refuse a collision rather than silently producing a duplicate key.
-        if (findNode(doc.root, trimmed) && trimmed !== key) return doc
-        return { ...doc, root: updateNode(doc.root, key, (node) => ({ ...node, key: trimmed })) }
-      })
+      if (trimmed === key) return { ok: true }
+      if (!trimmed) return { ok: false, reason: 'A component key cannot be empty.' }
+
+      /*
+       * Checked against the current document rather than inside the updater. A
+       * state updater does not run when it is called, so a decision made in
+       * there cannot be reported back to the caller, and the old version moved
+       * the selection regardless: the panel silently began editing whichever
+       * component already owned the name.
+       */
+      if (findNode(history.present.root, trimmed)) {
+        return { ok: false, reason: trimmed + ' is already used by another component.' }
+      }
+
+      apply((doc) => ({
+        ...doc,
+        root: updateNode(doc.root, key, (node) => ({ ...node, key: trimmed })),
+      }))
       setSelectedKey((current) => (current === key ? trimmed : current))
+      return { ok: true }
     },
-    [apply],
+    [apply, history.present.root],
   )
 
   const moveComponent = useCallback(
     (key: string, parentKey: string, index?: number) => {
-      apply((doc) => ({ ...doc, root: moveNode(doc.root, key, parentKey, index) }))
+      apply((doc) => {
+        const root = moveNode(doc.root, key, parentKey, index)
+        // moveNode returns the same root for an illegal move. Wrapping it in a
+        // new document anyway defeated the identity check in commit, so a
+        // refused drop still grew the undo stack with a state identical to the
+        // one before it.
+        return root === doc.root ? doc : { ...doc, root }
+      })
     },
     [apply],
   )
 
   const removeComponent = useCallback(
     (key: string) => {
-      apply((doc) => ({ ...doc, root: removeNode(doc.root, key) }))
+      apply((doc) => {
+        const root = removeNode(doc.root, key)
+        return root === doc.root ? doc : { ...doc, root }
+      })
       setSelectedKey((current) => (current === key ? undefined : current))
     },
     [apply],

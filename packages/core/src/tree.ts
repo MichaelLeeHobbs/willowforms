@@ -102,6 +102,15 @@ export function generateKey(root: ComponentNode, type: string): string {
 }
 
 /** Replace the node matching key, returning a new tree. */
+/**
+ * Replace one node, sharing structure with everything that did not change.
+ *
+ * The identity checks matter as much as the result. `.map` over the children
+ * allocated a new object for every node on every edit, so an untouched sibling
+ * subtree came back new, `React.memo` could never skip anything, and a no-op
+ * edit produced a whole new tree that the undo stack then recorded as a version.
+ * ARCHITECTURE.md has always claimed otherwise; now it is true.
+ */
 export function updateNode(
   root: ComponentNode,
   key: string,
@@ -109,7 +118,15 @@ export function updateNode(
 ): ComponentNode {
   if (root.key === key) return update(root)
   if (!root.children) return root
-  return { ...root, children: root.children.map((c) => updateNode(c, key, update)) }
+
+  let changed = false
+  const children = root.children.map((child) => {
+    const next = updateNode(child, key, update)
+    if (next !== child) changed = true
+    return next
+  })
+
+  return changed ? { ...root, children } : root
 }
 
 /** Insert a node into the given parent's children at index, appended if omitted. */
@@ -131,10 +148,23 @@ export function insertNode(
 export function removeNode(root: ComponentNode, key: string): ComponentNode {
   if (root.key === key) return root
   if (!root.children) return root
-  return {
-    ...root,
-    children: root.children.filter((c) => c.key !== key).map((c) => removeNode(c, key)),
+
+  let changed = false
+  const children: ComponentNode[] = []
+
+  for (const child of root.children) {
+    if (child.key === key) {
+      changed = true
+      continue
+    }
+    const next = removeNode(child, key)
+    if (next !== child) changed = true
+    children.push(next)
   }
+
+  // Removing a key that is not in this subtree returns the subtree itself, so a
+  // remove that finds nothing is not recorded as an edit.
+  return changed ? { ...root, children } : root
 }
 
 /**
@@ -157,47 +187,132 @@ export function moveNode(
 }
 
 export interface StructuralError {
-  code: 'duplicate-key' | 'unknown-action' | 'empty-key' | 'unknown-language'
+  code: 'duplicate-key' | 'unknown-action' | 'empty-key' | 'unknown-language' | 'malformed'
   message: string
   key?: string
 }
 
-/** Structural checks that do not need a kit registry. */
+/**
+ * Structural checks that do not need a kit registry.
+ *
+ * Total by design: this is the gate untrusted documents pass through, both in
+ * the designer's JSON editor and in `apps/demo-server`, so it reports malformed
+ * structure as an error and never throws. It used to assume its argument really
+ * was a `FormDocument`, which meant a pasted `"children": 5` took the builder
+ * down and the same body reached the server as an unhandled 500.
+ *
+ * The type says `FormDocument` because that is what callers should have. The
+ * checks assume nothing.
+ */
 export function validateDocument(doc: FormDocument): StructuralError[] {
   const errors: StructuralError[] = []
   const seen = new Set<string>()
 
-  walk(doc.root, (n) => {
-    if (!n.key.trim()) {
-      errors.push({
-        code: 'empty-key',
-        message: 'Component of type ' + n.type + ' has an empty key.',
-      })
+  const malformed = (message: string): void => {
+    errors.push({ code: 'malformed', message })
+  }
+
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+
+  const candidate: unknown = doc
+  if (!isRecord(candidate)) {
+    malformed('A form document must be an object.')
+    return errors
+  }
+
+  const actions = isRecord(candidate['actions']) ? candidate['actions'] : undefined
+  if (candidate['actions'] !== undefined && !actions) malformed('actions must be an object.')
+
+  const visit = (value: unknown, path: string): void => {
+    if (!isRecord(value)) {
+      malformed(path + ' is not a component node.')
       return
     }
-    if (seen.has(n.key)) {
-      errors.push({ code: 'duplicate-key', message: 'Duplicate key: ' + n.key, key: n.key })
-    }
-    seen.add(n.key)
 
-    for (const refs of Object.values(n.events ?? {})) {
+    const key = value['key']
+    const type = value['type']
+
+    if (typeof type !== 'string') malformed(path + ' needs a string type.')
+
+    if (typeof key !== 'string') {
+      malformed(path + ' needs a string key.')
+    } else if (!key.trim()) {
+      errors.push({
+        code: 'empty-key',
+        message:
+          'Component of type ' +
+          (typeof type === 'string' ? type : 'unknown') +
+          ' has an empty key.',
+      })
+    } else {
+      if (seen.has(key)) {
+        errors.push({ code: 'duplicate-key', message: 'Duplicate key: ' + key, key })
+      }
+      seen.add(key)
+      visitEvents(value['events'], key, path)
+    }
+
+    const children = value['children']
+    if (children === undefined) return
+    if (!Array.isArray(children)) {
+      malformed(path + '.children must be an array.')
+      return
+    }
+    children.forEach((child, index) => visit(child, path + '.children[' + String(index) + ']'))
+  }
+
+  const visitEvents = (events: unknown, key: string, path: string): void => {
+    if (events === undefined) return
+    if (!isRecord(events)) {
+      malformed(path + '.events must be an object.')
+      return
+    }
+
+    for (const refs of Object.values(events)) {
+      if (!Array.isArray(refs)) {
+        malformed(path + '.events must map each event to an array.')
+        continue
+      }
       for (const ref of refs) {
-        if (ref.type === 'code' && !doc.actions[ref.name]) {
+        if (!isRecord(ref)) {
+          malformed(path + '.events contains an entry that is not an action reference.')
+          continue
+        }
+        const name = ref['name']
+        if (ref['type'] !== 'code' || typeof name !== 'string') continue
+        if (!actions || actions[name] === undefined) {
           errors.push({
             code: 'unknown-action',
-            message: 'Component ' + n.key + ' references undefined action ' + ref.name + '.',
-            key: n.key,
+            message: 'Component ' + key + ' references undefined action ' + name + '.',
+            key,
           })
         }
       }
     }
+  }
+
+  visit(candidate['root'], 'root')
+
+  const languages = candidate['languages']
+  if (!Array.isArray(languages)) {
+    malformed('languages must be an array.')
+    return errors
+  }
+
+  const tags = languages.map((language) => {
+    if (!isRecord(language) || typeof language['code'] !== 'string') return undefined
+    // Same shape as languageTag, spelled out because the input is untrusted here.
+    const dialect = language['dialect']
+    return typeof dialect === 'string' ? language['code'] + '-' + dialect : language['code']
   })
 
-  const tags = doc.languages.map((l) => (l.dialect ? l.code + '-' + l.dialect : l.code))
-  if (!tags.includes(doc.defaultLanguage)) {
+  if (tags.some((tag) => tag === undefined)) malformed('every language needs a string code.')
+
+  if (!tags.includes(candidate['defaultLanguage'] as string)) {
     errors.push({
       code: 'unknown-language',
-      message: 'defaultLanguage ' + doc.defaultLanguage + ' is not in languages.',
+      message: 'defaultLanguage ' + String(candidate['defaultLanguage']) + ' is not in languages.',
     })
   }
 

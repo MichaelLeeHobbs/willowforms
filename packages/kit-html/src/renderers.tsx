@@ -17,9 +17,10 @@
  * these produces an inaccessible form no amount of designer polish can fix.
  */
 
-import { useId } from 'react'
+import { createElement, useId } from 'react'
 import type { ReactNode } from 'react'
 import { jsonToString } from '@formsmith/core'
+import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 type Level = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
@@ -53,14 +54,26 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   )
 }
 
+const LEVELS: Level[] = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+
+function isLevel(value: string): value is Level {
+  return (LEVELS as string[]).includes(value)
+}
+
 function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
-  const level = str(props['level'], 'h2') as Level
-  const Tag = level
-  return (
-    <Tag {...nodeProps} className="fsh-heading">
-      {str(props['text'])}
-    </Tag>
-  )
+  /*
+   * Checked, not cast. `level` reaches this from the JSON editor or a computed
+   * binding, so the cast was a lie: a capitalised string made React treat it as
+   * a component reference and throw, and any other string rendered a tag the
+   * kit never intended.
+   */
+  const raw = str(props['level'], 'h2')
+  const tag: Level = isLevel(raw) ? raw : 'h2'
+
+  // createElement rather than a dynamic JSX tag: the element type is data here,
+  // and writing it as <Tag> reads to React and to the linter as a component
+  // being defined during render.
+  return createElement(tag, { ...nodeProps, className: 'fsh-heading' }, str(props['text']))
 }
 
 /**
@@ -202,10 +215,16 @@ function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
         >
           <option value="">Choose…</option>
           {options.map((option, i) => {
-            const o = option as { label?: unknown; value?: unknown }
-            const v = str(o.value, String(i))
+            const o = option as { label?: unknown; value?: JsonValue }
+            /*
+             * jsonToString, not a fallback to the array index. Numeric option
+             * values are the natural thing to type into the JSON editor, and
+             * treating them as missing made every value its own position:
+             * choosing the first option submitted "0" whatever it said.
+             */
+            const v = o.value === undefined ? String(i) : jsonToString(o.value)
             return (
-              <option key={v} value={v}>
+              <option key={v || String(i)} value={v}>
                 {str(o.label, v)}
               </option>
             )

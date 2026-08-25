@@ -301,3 +301,54 @@ describe('resolveTreeDrop', () => {
     expect(resolveTreeDrop(rows(), 98, 'stack')).toMatchObject({ parentKey: 'root' })
   })
 })
+
+describe('resolveTreeDrop index against moveNode', () => {
+  /**
+   * `moveNode` removes the node before inserting it, so the index has to be
+   * measured against the siblings that remain. Measuring it against the list
+   * that still holds the dragged node put a downward reorder one place too far.
+   */
+  const siblingRows = (): TreeRow[] => {
+    const row = (key: string, index: number, top: number): TreeRow => ({
+      key,
+      parentKey: 'root',
+      index,
+      container: false,
+      rect: { top, left: 0, width: 200, height: 20 },
+    })
+    return [
+      {
+        key: 'root',
+        parentKey: undefined,
+        index: 0,
+        container: true,
+        rect: { top: 0, left: 0, width: 200, height: 20 },
+      },
+      row('a', 0, 20),
+      row('b', 1, 40),
+      row('c', 2, 60),
+    ]
+  }
+
+  it('moves a node down to exactly where the indicator showed', () => {
+    // Bottom band of `b`, dragging `a`: a lands between b and c.
+    const target = resolveTreeDrop(siblingRows(), 58, 'a')
+    expect(target).toMatchObject({ parentKey: 'root', mode: 'after', index: 1 })
+  })
+
+  it('moves a node up to exactly where the indicator showed', () => {
+    // Top band of `a`, dragging `c`: c lands first.
+    const target = resolveTreeDrop(siblingRows(), 22, 'c')
+    expect(target).toMatchObject({ parentKey: 'root', mode: 'before', index: 0 })
+  })
+
+  it('is unaffected when the dragged node is not a sibling', () => {
+    const target = resolveTreeDrop(siblingRows(), 58, 'elsewhere')
+    expect(target).toMatchObject({ index: 2 })
+  })
+
+  it('places a new component by position among the existing siblings', () => {
+    const target = resolveTreeDrop(siblingRows(), 58)
+    expect(target).toMatchObject({ index: 2 })
+  })
+})

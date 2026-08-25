@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { languageTag } from '@formsmith/core'
 import type { Language } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
@@ -32,7 +33,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
       setError('Enter a language code, such as fr or pt-BR.')
       return
     }
-    if (doc.languages.some((l) => l.code === trimmed)) {
+    if (doc.languages.some((l) => languageTag(l) === trimmed)) {
       setError(trimmed + ' is already in the list.')
       return
     }
@@ -46,7 +47,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
 
   const remove = (target: string): void => {
     if (doc.languages.length === 1) return
-    api.setLanguages(doc.languages.filter((l) => l.code !== target))
+    api.setLanguages(doc.languages.filter((l) => languageTag(l) !== target))
   }
 
   return (
@@ -67,11 +68,12 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
 
       <ul className="fs-languages">
         {doc.languages.map((language) => {
-          const isDefault = language.code === doc.defaultLanguage
+          const tag = languageTag(language)
+          const isDefault = tag === doc.defaultLanguage
           return (
-            <li key={language.code} className="fs-languages__item">
+            <li key={tag} className="fs-languages__item">
               <span className="fs-languages__name">
-                {language.name} <code>{language.code}</code>
+                {language.name} <code>{tag}</code>
               </span>
 
               <div className="fs-languages__controls">
@@ -80,7 +82,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                     type="radio"
                     name="fs-default-language"
                     checked={isDefault}
-                    onChange={() => api.setLanguages(doc.languages, language.code)}
+                    onChange={() => api.setLanguages(doc.languages, tag)}
                   />
                   Default
                 </label>
@@ -92,7 +94,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                     onChange={(e) =>
                       api.setLanguages(
                         doc.languages.map((l) =>
-                          l.code === language.code
+                          languageTag(l) === tag
                             ? { ...l, bidi: e.target.checked ? 'rtl' : 'ltr' }
                             : l,
                         ),

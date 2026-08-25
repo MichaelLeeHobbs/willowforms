@@ -41,14 +41,21 @@ const DRAFT = 'https://json-schema.org/draft/2020-12/schema'
 /**
  * Rules that JSON Schema has no vocabulary for.
  *
- * `custom` is arbitrary JavaScript, so nothing in a declarative schema can carry
- * it. Callers that need to know their export is lossy can ask.
+ * `custom` is arbitrary JavaScript, and any rule carrying a `when` guard applies
+ * conditionally, which no keyword expresses. Both are dropped from the export,
+ * so callers that need to know theirs is lossy can ask.
  */
 export function unexportableRules(document: FormDocument): { key: string; rule: string }[] {
   const lossy: { key: string; rule: string }[] = []
   walk(document.root, (node) => {
     for (const rule of node.schema?.validations ?? []) {
-      if (rule.key === 'custom') lossy.push({ key: node.key, rule: rule.key })
+      // Arbitrary JavaScript has no declarative equivalent at all.
+      if (rule.key === 'custom') {
+        lossy.push({ key: node.key, rule: rule.key })
+        continue
+      }
+      // A guarded rule applies only sometimes, and no keyword expresses that.
+      if (rule.when) lossy.push({ key: node.key, rule: rule.key })
     }
   })
   return lossy
@@ -127,7 +134,14 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
 
     for (const rule of field.validations) {
       property = applyRule(property, rule)
-      if (rule.key === 'required' && !required.includes(node.key)) required.push(node.key)
+      /*
+       * Only an unguarded `required` becomes a schema requirement. A guarded one
+       * applies sometimes, and JSON Schema's `required` is unconditional, so
+       * exporting it would reject payloads the form itself accepts.
+       */
+      if (rule.key === 'required' && !rule.when && !required.includes(node.key)) {
+        required.push(node.key)
+      }
     }
 
     properties[node.key] = property

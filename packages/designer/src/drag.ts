@@ -33,7 +33,20 @@ export interface DropCommit {
  * undefined if this zone does not want it. The canvas and the tree cannot both
  * be under the pointer, so the first zone that claims a release wins.
  */
-export type DropResolver = (clientX: number, clientY: number) => DropCommit | undefined
+export type DropResolver = (
+  clientX: number,
+  clientY: number,
+  /**
+   * The component being dragged, or undefined for a new one from the palette.
+   *
+   * Passed in rather than read from React state inside the zone. A zone's
+   * resolver is registered from an effect, so the state it closes over can be a
+   * render behind, and a resolver that thought nothing was being dragged failed
+   * to exclude the dragged node from its own sibling list and placed a downward
+   * reorder one position too far.
+   */
+  draggedKey: string | undefined,
+) => DropCommit | undefined
 
 export interface DragState {
   /**
@@ -132,12 +145,17 @@ export function useDrag(
 
       // Ask each zone where this release lands, now, rather than reading a
       // target some earlier effect may or may not have published yet.
+      // Not `||`: a release at the very left or top edge has a clientX of 0,
+      // which is a real position rather than a missing one.
+      const x = Number.isFinite(event.clientX) ? event.clientX : at.current.x
+      const y = Number.isFinite(event.clientY) ? event.clientY : at.current.y
+
+      const draggedKey = press?.source.kind === 'move' ? press.source.key : undefined
+
       let landed: DropCommit | undefined
       if (dragged) {
-        const x = event.clientX || at.current.x
-        const y = event.clientY || at.current.y
         for (const resolve of zones.current.values()) {
-          landed = resolve(x, y)
+          landed = resolve(x, y, draggedKey)
           if (landed) break
         }
       }
