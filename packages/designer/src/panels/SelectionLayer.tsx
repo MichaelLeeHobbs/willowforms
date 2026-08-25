@@ -13,48 +13,22 @@ import { useCallback, useLayoutEffect, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { FormDocument } from '@formsmith/core'
 
-interface Box {
-  top: number
-  left: number
-  width: number
-  height: number
-}
-
-/** The key of the nearest rendered node at or above an event target. */
-export function keyFromEventTarget(target: EventTarget | null): string | undefined {
-  if (!(target instanceof Element)) return undefined
-  return target.closest<HTMLElement>('[data-fs-key]')?.dataset['fsKey']
-}
-
-function nodeElement(surface: HTMLElement, key: string): HTMLElement | null {
-  return surface.querySelector<HTMLElement>(`[data-fs-key="${CSS.escape(key)}"]`)
-}
+import { measureIn, nodeElement } from '../geometry.js'
+import type { Rect } from '../geometry.js'
 
 /**
- * Measure in the surface's own coordinate space. Absolutely positioned children
- * resolve against the padding box, so client borders come off and scroll goes
- * back on; otherwise the frame drifts as soon as the canvas scrolls.
+ * A node hidden by `renderWhen` is absent from the DOM, which is the only way a
+ * selectable node currently goes invisible. If per-node CSS ever lands, a
+ * `display: none` node would measure zero here and want a visibility check.
  */
-function measure(surface: HTMLElement, key: string | undefined): Box | undefined {
+function measure(surface: HTMLElement, key: string | undefined): Rect | undefined {
   if (!key) return undefined
-  // A node hidden by `renderWhen` is absent from the DOM, which is the only way
-  // a selectable node currently goes invisible. If per-node CSS ever lands, a
-  // `display: none` node would measure zero here and want a visibility check.
   const element = nodeElement(surface, key)
   if (!element) return undefined
-
-  const s = surface.getBoundingClientRect()
-  const r = element.getBoundingClientRect()
-
-  return {
-    top: r.top - s.top - surface.clientTop + surface.scrollTop,
-    left: r.left - s.left - surface.clientLeft + surface.scrollLeft,
-    width: r.width,
-    height: r.height,
-  }
+  return measureIn(surface, element)
 }
 
-function frameStyle(box: Box): CSSProperties {
+function frameStyle(box: Rect): CSSProperties {
   return { top: box.top, left: box.left, width: box.width, height: box.height }
 }
 
@@ -75,8 +49,8 @@ export function SelectionLayer({
   selectedType,
   hoverKey,
 }: SelectionLayerProps): ReactNode {
-  const [selected, setSelected] = useState<Box | undefined>(undefined)
-  const [hover, setHover] = useState<Box | undefined>(undefined)
+  const [selected, setSelected] = useState<Rect | undefined>(undefined)
+  const [hover, setHover] = useState<Rect | undefined>(undefined)
 
   const remeasure = useCallback(() => {
     const surface = surfaceRef.current

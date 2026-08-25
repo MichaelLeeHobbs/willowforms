@@ -284,6 +284,79 @@
  * into them. See the CSS isolation note in ARCHITECTURE.md.
  */
 /*
+ * Drop indicators and the label that follows a drag.
+ *
+ * Same discipline as the selection frames: absolutely positioned siblings that
+ * never wrap a component, so a drag cannot disturb the kit's layout.
+ */
+.fs-drop {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.fs-drop--bar {
+  background: var(--fs-accent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--fs-bg-app);
+}
+
+.fs-drop--empty {
+  border: 2px dashed var(--fs-accent);
+  border-radius: var(--fs-radius);
+}
+
+.fs-drag-label {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  transform: translate(12px, 12px);
+  padding: 3px 8px;
+  border-radius: var(--fs-radius);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--fs-primary-text);
+  background: var(--fs-primary);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+
+.fs-palette__item {
+  touch-action: none;
+}
+
+/*
+ * Tree drop feedback. A line above or below the row for a reorder, and a filled
+ * outline when the drop goes inside a container.
+ */
+.fs-tree__row {
+  position: relative;
+  touch-action: none;
+}
+
+.fs-tree__row.is-drop-before::before,
+.fs-tree__row.is-drop-after::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--fs-accent);
+}
+
+.fs-tree__row.is-drop-before::before {
+  inset-block-start: 0;
+}
+
+.fs-tree__row.is-drop-after::before {
+  inset-block-end: 0;
+}
+
+.fs-tree__row.is-drop-inside {
+  outline: 2px dashed var(--fs-accent);
+  outline-offset: -2px;
+}
+
+/*
  * The one rule here that touches a kit component, and it is deliberate. A kit
  * may set `pointer-events: none` on a disabled control; MUI does on Button. That
  * makes the component impossible to click on the canvas and, worse, silently

@@ -12,6 +12,8 @@ import type { ReactNode } from 'react'
 import type { FormDocument, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
 
+import { dragLabel, useDrag } from './drag.js'
+import type { DragSource, DropCommit } from './drag.js'
 import { Canvas } from './panels/Canvas.js'
 import { Palette } from './panels/Palette.js'
 import { Properties } from './panels/Properties.js'
@@ -43,28 +45,54 @@ export function Designer({
 
   useKeyboardShortcuts(api)
 
+  const commitDrop = useCallback(
+    (source: DragSource, target: DropCommit) => {
+      if (source.kind === 'new') api.addComponent(source.def, target.parentKey, target.index)
+      else api.moveComponent(source.key, target.parentKey, target.index)
+    },
+    [api],
+  )
+
+  const drag = useDrag(commitDrop)
+
   return (
     <div className="fs-shell" data-testid="formsmith-designer">
       <Toolbar api={api} />
       <div className="fs-body">
         <aside className="fs-panel fs-panel--left" aria-label="Components and structure">
-          <Palette kit={kit} onAdd={(def) => api.addComponent(def, api.selectedKey)} />
+          <Palette
+            kit={kit}
+            onAdd={(def) => api.addComponent(def, api.selectedKey)}
+            onDragStart={(def, event) => drag.begin({ kind: 'new', def }, event)}
+          />
           <Tree
             root={api.document.root}
+            kit={kit}
             selectedKey={api.selectedKey}
             onSelect={api.select}
             onRemove={api.removeComponent}
+            drag={drag}
           />
         </aside>
 
         <main className="fs-canvas" aria-label="Form canvas">
-          <Canvas api={api} rendererKit={rendererKit} />
+          <Canvas api={api} kit={kit} rendererKit={rendererKit} drag={drag} />
         </main>
 
         <aside className="fs-panel fs-panel--right" aria-label="Component properties">
           <Properties api={api} kit={kit} />
         </aside>
       </div>
+
+      {drag.state && (
+        <div
+          className="fs-drag-label"
+          style={{ top: drag.state.y, left: drag.state.x }}
+          aria-hidden="true"
+        >
+          {dragLabel(drag.state.source)}
+        </div>
+      )}
     </div>
   )
 }

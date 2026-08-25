@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { ComponentDef, Kit, PaletteGroup } from '@formsmith/core'
 import { groupKit } from '@formsmith/core'
 
@@ -15,10 +15,13 @@ const GROUP_LABELS: Record<PaletteGroup, string> = {
 
 export interface PaletteProps {
   kit: Kit
+  /** Click. Adds under the current selection, which is the no-aim path. */
   onAdd: (def: ComponentDef) => void
+  /** Press and move. The drag controller decides which of the two happened. */
+  onDragStart: (def: ComponentDef, event: ReactPointerEvent) => void
 }
 
-export function Palette({ kit, onAdd }: PaletteProps): ReactNode {
+export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
   const [query, setQuery] = useState('')
   const groups = useMemo(() => groupKit(kit), [kit])
 
@@ -63,7 +66,8 @@ export function Palette({ kit, onAdd }: PaletteProps): ReactNode {
                   type="button"
                   className="fs-palette__item"
                   onClick={() => onAdd(def)}
-                  title={'Add ' + def.label}
+                  onPointerDown={(event) => onDragStart(def, event)}
+                  title={'Add ' + def.label + ', or drag it onto the canvas'}
                 >
                   {def.label}
                 </button>

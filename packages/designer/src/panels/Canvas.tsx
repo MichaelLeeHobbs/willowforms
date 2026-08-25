@@ -1,16 +1,31 @@
-import { useCallback, useRef, useState } from 'react'
-import type { MouseEvent, ReactNode } from 'react'
-import type { FormData, JsonValue } from '@formsmith/core'
-import { validateForm } from '@formsmith/core'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import type { FormData, JsonValue, Kit } from '@formsmith/core'
+import { indexKit, validateForm } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 
+import { resolveDrop } from '../dnd.js'
+import type { DropTarget } from '../dnd.js'
+import type { DragController } from '../drag.js'
+import { keyFromEventTarget, measureTree, originOf, toLocal } from '../geometry.js'
+import type { Candidate, Origin } from '../geometry.js'
 import type { DesignerApi } from '../store.js'
-import { SelectionLayer, keyFromEventTarget } from './SelectionLayer.js'
+import { SelectionLayer } from './SelectionLayer.js'
 
 export interface CanvasProps {
   api: DesignerApi
+  kit: Kit
   rendererKit: RendererKit
+  drag: DragController
+}
+
+/** Everything a drag needs to know about the canvas, frozen when it starts. */
+interface Snapshot {
+  /** Which drag this was measured for. A mismatch means it is stale. */
+  dragId: number
+  candidates: Candidate[]
+  origin: Origin
 }
 
 /**
@@ -18,17 +33,25 @@ export interface CanvasProps {
  * What you see is literally what ships, which is the only way a WYSIWYG builder
  * stays honest as the kit evolves.
  *
- * While editing, a click is a selection gesture rather than an interaction, so
- * pointer events are swallowed in the capture phase before the kit's components
- * see them. Preview mode hands the form back its own events untouched.
+ * While editing, a click is a selection gesture, so pointer events are swallowed
+ * in the capture phase before the kit's components see them. Preview mode hands
+ * the form back its own events untouched.
  */
-export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
+export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
   const [hoverKey, setHoverKey] = useState<string | undefined>(undefined)
 
   const surfaceRef = useRef<HTMLDivElement>(null)
+  /*
+   * Measured once when a drag begins, and held in state rather than a ref.
+   * The layout cannot change mid-drag, so one snapshot is enough; keeping it in
+   * state is what lets the indicator be derived during render as a pure function
+   * of state, instead of set from an effect that fires on every pointer move.
+   */
+  const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
+
   const errors = validated ? validateForm(api.document.root, data) : {}
 
   const onChange = useCallback((key: string, value: JsonValue) => {
@@ -36,6 +59,33 @@ export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
   }, [])
 
   const { select } = api
+  const { state: dragState, begin, registerZone, consumeClick } = drag
+
+  const measureNow = useCallback(
+    (dragId: number): Snapshot | undefined => {
+      const surface = surfaceRef.current
+      if (!surface) return undefined
+      const defs = indexKit(kit)
+      return {
+        dragId,
+        candidates: measureTree(
+          surface,
+          api.document.root,
+          (type) => defs.get(type)?.container === true,
+        ),
+        origin: originOf(surface),
+      }
+    },
+    [api.document.root, kit],
+  )
+
+  const takeSnapshot = useCallback(
+    (dragId: number) => {
+      const next = measureNow(dragId)
+      if (next) setSnapshot(next)
+    },
+    [measureNow],
+  )
 
   // Capture-phase mousedown is what actually stops a click from focusing a text
   // field, toggling a checkbox, or opening a select. Cancelling only the click
@@ -44,13 +94,65 @@ export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
     event.preventDefault()
   }, [])
 
+  const onPointerDownCapture = useCallback(
+    (event: ReactPointerEvent) => {
+      const key = keyFromEventTarget(event.target)
+      // The root is the canvas itself; dragging it has nowhere to go.
+      if (!key || key === api.document.root.key) return
+      begin({ kind: 'move', key, label: key }, event)
+    },
+    [api.document.root.key, begin],
+  )
+
   const onClickCapture = useCallback(
     (event: MouseEvent) => {
       event.stopPropagation()
+      if (consumeClick()) return
       select(keyFromEventTarget(event.target))
     },
-    [select],
+    [consumeClick, select],
   )
+
+  /*
+   * Derived during render rather than in an effect. The pointer moves many times
+   * a second, and setting state from an effect would render twice for every one
+   * of them: once for the new pointer position, once for the target it implies.
+   */
+  const dropTarget = useMemo<DropTarget | undefined>(() => {
+    if (!dragState || preview || snapshot?.dragId !== dragState.id) return undefined
+
+    const [x, y] = toLocal(snapshot.origin, dragState.x, dragState.y)
+    const dragged = dragState.source.kind === 'move' ? dragState.source.key : undefined
+    return resolveDrop(snapshot.candidates, x, y, dragged)
+  }, [dragState, preview, snapshot])
+
+  /*
+   * Asked by the controller when the pointer is released, and it measures afresh
+   * rather than trusting the snapshot the indicator is drawn from.
+   *
+   * That snapshot is taken by a React pointer handler, which always runs before
+   * the window listener that records the drag, so it is inherently one event
+   * behind. A quick flick from the palette to the canvas can be released before
+   * any of it has happened, and the drop would be silently lost. Measuring here
+   * costs one layout pass per release and is never stale.
+   */
+  const resolveRelease = useCallback(
+    (clientX: number, clientY: number) => {
+      if (preview) return undefined
+      const snap = measureNow(0)
+      if (!snap) return undefined
+
+      const [x, y] = toLocal(snap.origin, clientX, clientY)
+      const dragged = dragState?.source.kind === 'move' ? dragState.source.key : undefined
+      const resolved = resolveDrop(snap.candidates, x, y, dragged)
+      return resolved ? { parentKey: resolved.parentKey, index: resolved.index } : undefined
+    },
+    [dragState, measureNow, preview],
+  )
+
+  useEffect(() => registerZone('canvas', resolveRelease), [registerZone, resolveRelease])
+
+  const editing = !preview
 
   return (
     <div className="fs-canvas__inner">
@@ -88,14 +190,23 @@ export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
       <div
         ref={surfaceRef}
         className={'fs-canvas__surface' + (preview ? ' is-preview' : '')}
-        {...(preview
-          ? {}
-          : {
+        {...(editing
+          ? {
               onMouseDownCapture,
+              onPointerDownCapture,
               onClickCapture,
-              onPointerOver: (event: MouseEvent) => setHoverKey(keyFromEventTarget(event.target)),
+              // Measured on the first move of each drag that reaches the canvas,
+              // including one that started in the palette and never touched it.
+              // Doing this in an event handler rather than an effect is what
+              // keeps render a pure function of state.
+              onPointerMove: () => {
+                if (dragState && snapshot?.dragId !== dragState.id) takeSnapshot(dragState.id)
+              },
+              onPointerOver: (event: ReactPointerEvent) =>
+                setHoverKey(keyFromEventTarget(event.target)),
               onPointerLeave: () => setHoverKey(undefined),
-            })}
+            }
+          : {})}
       >
         <FormRenderer
           document={api.document}
@@ -105,13 +216,25 @@ export function Canvas({ api, rendererKit }: CanvasProps): ReactNode {
           onChange={onChange}
         />
 
-        {!preview && (
+        {editing && (
           <SelectionLayer
             surfaceRef={surfaceRef}
             document={api.document}
             selectedKey={api.selectedKey}
             selectedType={api.selectedNode?.type}
-            hoverKey={hoverKey}
+            hoverKey={dragState ? undefined : hoverKey}
+          />
+        )}
+
+        {editing && dropTarget && (
+          <div
+            className={'fs-drop' + (dropTarget.empty ? ' fs-drop--empty' : ' fs-drop--bar')}
+            style={{
+              top: dropTarget.indicator.top,
+              left: dropTarget.indicator.left,
+              width: dropTarget.indicator.width,
+              height: dropTarget.indicator.height,
+            }}
           />
         )}
       </div>
