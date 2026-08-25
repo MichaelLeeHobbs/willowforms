@@ -26,7 +26,10 @@ export function Palette({ kit, onAdd }: PaletteProps): ReactNode {
     const q = query.trim().toLowerCase()
     if (!q) return groups
     return groups
-      .map((g) => ({ ...g, components: g.components.filter((c) => c.label.toLowerCase().includes(q)) }))
+      .map((g) => ({
+        ...g,
+        components: g.components.filter((c) => c.label.toLowerCase().includes(q)),
+      }))
       .filter((g) => g.components.length > 0)
   }, [groups, query])
 

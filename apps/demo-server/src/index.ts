@@ -12,7 +12,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import type { FormDocument } from '@formsmith/core'
+import type { FormData, FormDocument } from '@formsmith/core'
 import { validateDocument, validateForm } from '@formsmith/core'
 
 const STORE = new URL('../forms.json', import.meta.url)
@@ -47,7 +47,7 @@ app.get('/api/forms/:id', async (c) => {
 })
 
 app.put('/api/forms/:id', async (c) => {
-  const doc = (await c.req.json()) as FormDocument
+  const doc = await c.req.json<FormDocument>()
   const errors = validateDocument(doc)
   if (errors.length > 0) return c.json({ error: 'Invalid document', errors }, 422)
 
@@ -72,7 +72,7 @@ app.post('/api/forms/:id/submit', async (c) => {
   const doc = (await readStore())[c.req.param('id')]
   if (!doc) return c.json({ error: 'Not found' }, 404)
 
-  const data = (await c.req.json()) as Record<string, never>
+  const data = await c.req.json<FormData>()
   const errors = validateForm(doc.root, data)
   if (Object.keys(errors).length > 0) return c.json({ ok: false, errors }, 422)
 

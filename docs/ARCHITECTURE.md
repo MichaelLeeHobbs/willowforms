@@ -60,12 +60,12 @@ FormDocument
 
 ```ts
 type PropValue =
-  | { kind: 'static';   value: JsonValue }
+  | { kind: 'static'; value: JsonValue }
   | { kind: 'computed'; expression: string }
-  | { kind: 'i18n';     key: string }
+  | { kind: 'i18n'; key: string }
 ```
 
-FormEngine's equivalent is a bag discriminated by the *presence* of an optional `computeType` field.
+FormEngine's equivalent is a bag discriminated by the _presence_ of an optional `computeType` field.
 A tagged union means every consumer switches exhaustively, so adding a fourth binding mode is a compile
 error at every call site rather than a silent fallthrough.
 
@@ -113,7 +113,9 @@ must inherit nothing from the builder.
 There is exactly one deliberate exception, and it sets no visual property:
 
 ```css
-.fs-canvas__surface:not(.is-preview) [data-fs-key] { pointer-events: auto; }
+.fs-canvas__surface:not(.is-preview) [data-fs-key] {
+  pointer-events: auto;
+}
 ```
 
 MUI sets `pointer-events: none` on a disabled Button, and a kit is free to do the same on any disabled

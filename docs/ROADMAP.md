@@ -20,6 +20,8 @@ product.
   `PropSchema`, canvas rendering the real runtime renderer, preview mode with live data and errors,
   keyboard undo/redo/delete.
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
+- Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
+  covers the test files, and CI running all of it on every PR. **65 tests.**
 
 Confirmed by driving the playground in a browser: palette renders grouped, tree selection populates the
 properties panel with the correct per-type schema, preview validates, and a `url`-only field correctly
@@ -54,7 +56,7 @@ save, load, import, or export.
 names and focus rings. Not done: roving tabindex on the tree, arrow-key navigation, focus trapping,
 `aria-live` announcements for selection and mode changes, and a real audit.
 
-**Tests for anything React.** 52 of the 61 tests are pure functions. Component tests now exist for canvas
+**Tests for anything React.** 56 of the 65 tests are pure functions. Component tests now exist for canvas
 selection only; every other panel is untested, and there is no end-to-end setup. jsdom has no layout
 engine, so geometry stays a browser check no matter how far the component tests grow. Closing this gap
 matters more than any feature below it.

@@ -9,13 +9,13 @@ An MIT-licensed visual form designer for React. The **designer**, not just the r
 
 Every good form builder splits the same way: the runtime is open source, the visual designer is not.
 
-| Product | Runtime | Designer |
-|---|---|---|
-| FormEngine | `@react-form-builder/core` — MIT | `@react-form-builder/designer` — proprietary EULA, ~$1,300/yr, source not published |
-| SurveyJS | `survey-core` — MIT | `survey-creator-core` — commercial |
-| Vueform | `@vueform/vueform` — MIT | Vueform Builder — commercial |
-| OpnForm, HeyForm | AGPL-3.0 | AGPL-3.0 |
-| **Formsmith** | **MIT** | **MIT** |
+| Product          | Runtime                          | Designer                                                                            |
+| ---------------- | -------------------------------- | ----------------------------------------------------------------------------------- |
+| FormEngine       | `@react-form-builder/core` — MIT | `@react-form-builder/designer` — proprietary EULA, ~$1,300/yr, source not published |
+| SurveyJS         | `survey-core` — MIT              | `survey-creator-core` — commercial                                                  |
+| Vueform          | `@vueform/vueform` — MIT         | Vueform Builder — commercial                                                        |
+| OpnForm, HeyForm | AGPL-3.0                         | AGPL-3.0                                                                            |
+| **Formsmith**    | **MIT**                          | **MIT**                                                                             |
 
 `@formio/js` is the one honest exception and ships an MIT builder, but it is a 2018-era architecture
 carrying `moment`, `dragula`, and jQuery-shaped patterns. Formsmith is the modern take.
@@ -26,12 +26,12 @@ year for a drag-and-drop panel.
 
 ## Packages
 
-| Package | What it is |
-|---|---|
-| `@formsmith/core` | Document model, kit contract, tree operations, validation. Zero dependencies, no UI, runs in Node. |
-| `@formsmith/renderer` | Runtime renderer. Embed a form without shipping the designer. |
-| `@formsmith/designer` | The visual builder. No UI-library dependency; chrome is plain CSS custom properties. |
-| `@formsmith/kit-mui` | Material UI component kit. The reference implementation of the kit contract. |
+| Package               | What it is                                                                                         |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `@formsmith/core`     | Document model, kit contract, tree operations, validation. Zero dependencies, no UI, runs in Node. |
+| `@formsmith/renderer` | Runtime renderer. Embed a form without shipping the designer.                                      |
+| `@formsmith/designer` | The visual builder. No UI-library dependency; chrome is plain CSS custom properties.               |
+| `@formsmith/kit-mui`  | Material UI component kit. The reference implementation of the kit contract.                       |
 
 Two apps, neither published: `apps/playground` (Vite demo) and `apps/demo-server` (a deliberately tiny
 Hono server so the demo can persist a document and prove server-side validation shares one rule set).
@@ -52,7 +52,7 @@ import { Designer } from '@formsmith/designer'
 import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
 import '@formsmith/designer/styles.css'
 
-<Designer
+;<Designer
   initialDocument={doc}
   kit={muiKit}
   rendererKit={muiRendererKit}

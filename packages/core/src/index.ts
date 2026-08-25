@@ -16,15 +16,10 @@ export type {
   ValidationRule,
 } from './types.js'
 
-export type {
-  ComponentDef,
-  Kit,
-  PaletteGroup,
-  PropEditor,
-  PropOption,
-  PropSchema,
-} from './kit.js'
+export type { ComponentDef, Kit, PaletteGroup, PropEditor, PropOption, PropSchema } from './kit.js'
 export { groupKit, indexKit } from './kit.js'
+
+export { jsonToString } from './json.js'
 
 export type { StructuralError } from './tree.js'
 export {

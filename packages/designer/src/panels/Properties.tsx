@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { JsonValue, Kit, PropSchema, PropValue } from '@formsmith/core'
-import { indexKit } from '@formsmith/core'
+import { indexKit, jsonToString } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
 
@@ -85,13 +85,20 @@ function PropRow({ schema, value, onChange }: PropRowProps): ReactNode {
       </label>
 
       {schema.editor === 'boolean' ? (
-        <input id={id} type="checkbox" checked={raw === true} onChange={(e) => set(e.target.checked)} />
+        <input
+          id={id}
+          type="checkbox"
+          checked={raw === true}
+          onChange={(e) => set(e.target.checked)}
+        />
       ) : schema.editor === 'number' ? (
         <input
           id={id}
           type="number"
           value={typeof raw === 'number' ? raw : ''}
-          onChange={(e) => (e.target.value === '' ? onChange(undefined) : set(Number(e.target.value)))}
+          onChange={(e) =>
+            e.target.value === '' ? onChange(undefined) : set(Number(e.target.value))
+          }
         />
       ) : schema.editor === 'select' ? (
         <select
@@ -101,7 +108,7 @@ function PropRow({ schema, value, onChange }: PropRowProps): ReactNode {
         >
           <option value="">(default)</option>
           {schema.options?.map((o) => (
-            <option key={String(o.value)} value={String(o.value)}>
+            <option key={jsonToString(o.value)} value={jsonToString(o.value)}>
               {o.label}
             </option>
           ))}
@@ -125,7 +132,12 @@ function PropRow({ schema, value, onChange }: PropRowProps): ReactNode {
 
 function ClearButton({ label, onClear }: { label: string; onClear: () => void }): ReactNode {
   return (
-    <button type="button" className="fs-prop-row__clear" aria-label={'Reset ' + label} onClick={onClear}>
+    <button
+      type="button"
+      className="fs-prop-row__clear"
+      aria-label={'Reset ' + label}
+      onClick={onClear}
+    >
       Reset
     </button>
   )

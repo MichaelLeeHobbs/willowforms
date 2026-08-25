@@ -1,0 +1,60 @@
+# Every gate that decides whether a change is safe to merge.
+#
+# One job rather than four parallel ones: the install dominates the runtime here,
+# and splitting would pay for it four times to save a few seconds of checks.
+# Revisit if the test suite grows past a couple of minutes.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes the in-flight run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      # Covers the test files too, which the per-package build configs exclude.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # dist is what consumers actually get, so prove it exists and carries types.
+      - name: Check build output
+        run: |
+          for pkg in core renderer designer kit-mui; do
+            test -f "packages/$pkg/dist/index.js" || { echo "missing dist/index.js in $pkg"; exit 1; }
+            test -f "packages/$pkg/dist/index.d.ts" || { echo "missing types in $pkg"; exit 1; }
+          done
+          test -f packages/designer/dist/designer.css || { echo "designer.css was not copied"; exit 1; }
+          echo "all packages built with types"

@@ -151,7 +151,12 @@ describe('validateDocument', () => {
   it('reports an event referencing an undefined action', () => {
     const doc = createDocument('Test', 'id-1')
     doc.root = container('root', [
-      { key: 'a', type: 'Button', props: {}, events: { onClick: [{ name: 'ghost', type: 'code' }] } },
+      {
+        key: 'a',
+        type: 'Button',
+        props: {},
+        events: { onClick: [{ name: 'ghost', type: 'code' }] },
+      },
     ])
     expect(validateDocument(doc).map((e) => e.code)).toContain('unknown-action')
   })
@@ -160,7 +165,12 @@ describe('validateDocument', () => {
     const doc = createDocument('Test', 'id-1')
     doc.actions['submit'] = { name: 'submit', body: '', params: {} }
     doc.root = container('root', [
-      { key: 'a', type: 'Button', props: {}, events: { onClick: [{ name: 'submit', type: 'code' }] } },
+      {
+        key: 'a',
+        type: 'Button',
+        props: {},
+        events: { onClick: [{ name: 'submit', type: 'code' }] },
+      },
     ])
     expect(validateDocument(doc)).toEqual([])
   })

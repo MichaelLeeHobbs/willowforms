@@ -91,14 +91,22 @@ function makeDocument(): FormDocument {
       ],
     },
     actions: {},
-    languages: [{ code: 'en', label: 'English' }],
+    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en',
     translations: {},
     settings: {},
   }
 }
 
-function setup() {
+interface Harness {
+  user: ReturnType<typeof userEvent.setup>
+  view: ReturnType<typeof render>
+  node: (key: string) => HTMLElement
+  frame: () => HTMLElement | null
+  hoverFrame: () => HTMLElement | null
+}
+
+function setup(): Harness {
   const user = userEvent.setup()
   const view = render(
     <Designer initialDocument={makeDocument()} kit={kit} rendererKit={rendererKit} />,

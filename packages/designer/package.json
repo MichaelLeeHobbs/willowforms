@@ -14,7 +14,8 @@
     "./styles.css": "./dist/designer.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc --build",
@@ -25,6 +26,37 @@
     "@formsmith/renderer": "workspace:*"
   },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "keywords": [
+    "form",
+    "form-builder",
+    "form-designer",
+    "react",
+    "json-schema",
+    "low-code",
+    "drag-and-drop",
+    "visual-editor",
+    "wysiwyg"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MichaelLeeHobbs/formsmith.git",
+    "directory": "packages/designer"
+  },
+  "bugs": {
+    "url": "https://github.com/MichaelLeeHobbs/formsmith/issues"
+  },
+  "homepage": "https://github.com/MichaelLeeHobbs/formsmith/tree/main/packages/designer#readme",
+  "author": "Michael Hobbs",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
