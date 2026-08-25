@@ -331,6 +331,117 @@
   outline-offset: -2px;
 }
 
+/*
+ * The JSON dialog. A native <dialog>, so focus trapping, Escape, the inert
+ * background, and the backdrop all come from the browser.
+ */
+.fs-dialog {
+  width: min(880px, 92vw);
+  max-height: 86vh;
+  padding: 16px;
+  color: var(--fs-text);
+  background: var(--fs-bg-panel);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  font-family: var(--fs-font);
+  font-size: var(--fs-font-size);
+}
+
+.fs-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+
+.fs-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: 12px;
+}
+
+.fs-dialog__close {
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--fs-text-muted);
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--fs-radius);
+  cursor: pointer;
+}
+
+.fs-dialog__close:hover {
+  color: var(--fs-text);
+  border-color: var(--fs-border);
+}
+
+.fs-dialog__editor {
+  display: block;
+  width: 100%;
+  min-height: 46vh;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fs-text);
+  padding: 8px;
+  background: var(--fs-bg-well);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  resize: vertical;
+}
+
+.fs-dialog__errors {
+  margin: 8px 0 0;
+  padding: 8px 8px 8px 24px;
+  color: var(--fs-danger);
+  background: var(--fs-bg-well);
+  border: 1px solid var(--fs-danger);
+  border-radius: var(--fs-radius);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.fs-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-start: 12px;
+}
+
+.fs-dialog__actions button,
+.fs-dialog__file {
+  font: inherit;
+  color: inherit;
+  padding: 5px 10px;
+  background: var(--fs-bg-panel);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  cursor: pointer;
+}
+
+.fs-dialog__actions button:hover,
+.fs-dialog__file:hover {
+  background: var(--fs-bg-well);
+}
+
+.fs-dialog__actions button.is-primary {
+  color: var(--fs-primary-text);
+  background: var(--fs-primary);
+  border-color: var(--fs-primary);
+}
+
+.fs-dialog__note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--fs-text-muted);
+}
+
+.fs-dialog :focus-visible {
+  outline: 2px solid var(--fs-primary);
+  outline-offset: 2px;
+}
+
 /* Validation rules. */
 .fs-rules__heading {
   display: flex;
