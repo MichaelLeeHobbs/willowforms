@@ -75,7 +75,7 @@ function guardPasses(when: PropValue | undefined, data: FormData, evaluate?: Eva
  *
  * Every rule except 'required' passes on an empty value. Requiredness is one
  * rule's job; a 'url' rule reporting "required" on an empty field is the exact
- * bug the FormEngine teardown flagged in its own demo.
+ * bug the prior-art study found in the demo it examined.
  */
 export function applyRule(
   rule: ValidationRule,

@@ -1,7 +1,7 @@
 /**
  * The right-hand panel: properties and validation, behind tabs.
  *
- * Implemented as a real tablist rather than styled buttons. The teardown in
+ * Implemented as a real tablist rather than styled buttons. The study in
  * docs/prior-art records the product this project studied shipping tab strips
  * with no `role="tablist"` wrapper at all, which leaves a screen reader
  * announcing a row of unrelated buttons. Roving tabindex and arrow keys are the

@@ -27,7 +27,7 @@ describe('required', () => {
 })
 
 describe('every non-required rule passes on an empty value', () => {
-  // This is the FormEngine demo bug the teardown flagged: a field declaring only
+  // This is the bug the prior-art study found in the demo it examined: a field declaring only
   // a `url` rule reported "Required" when left blank. Requiredness is one rule's
   // job, and only one.
   const rules: ValidationRule[] = [

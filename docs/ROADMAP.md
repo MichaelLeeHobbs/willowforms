@@ -103,7 +103,7 @@ geometry stays a browser check no matter how far the component tests grow.
 4. Component tests for the remaining panels. The setup landed with canvas selection; coverage is partial.
 5. ~~Import, export, JSON editing, JSON Schema.~~ Done.
 6. ~~Binding editors: expressions, then localization.~~ Done.
-7. ~~Accessibility pass with an audit against the checklist in the prior-art teardown.~~ Done. Remaining
+7. ~~Accessibility pass, against the gap list in `docs/prior-art`.~~ Done. Remaining
    gaps are listed honestly in `docs/accessibility.md`.
 8. ~~A second kit, to prove the seam holds.~~ Done.
 

@@ -115,7 +115,7 @@ lint rule fails the build if anyone imports one.
 JavaScript. Core deliberately ships no evaluator, so the host injects one and owns the sandbox. With
 none injected, those rules degrade to permissive rather than throwing.
 
-**Accessibility is not a later milestone.** The teardown that seeded this project measured its subject at
+**Accessibility is not a later milestone.** The prior-art study that seeded this project measured its subject at
 30 buttons with no accessible name, zero `role="tablist"` wrappers, no landmarks, and a primary button at
 3.03:1 contrast. Here every button is named, the tabs are a real tablist, contrast is computed from the
 stylesheets in CI, and axe-core runs over the designer in six states.

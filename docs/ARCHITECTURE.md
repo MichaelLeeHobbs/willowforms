@@ -97,7 +97,7 @@ type ValidationRule =
 The rule set studied for prior art was an untyped `{ key, message? }`, which cannot express `minLength`
 without a side channel.
 
-Two behavioural rules, both learned from that teardown:
+Two behavioural rules, both learned from the prior-art study in `docs/prior-art`:
 
 1. **Every rule except `required` passes on an empty value.** Requiredness is one rule's job. A field
    declaring only `url` must not report "Required" when blank; that was a real bug in the demo we studied

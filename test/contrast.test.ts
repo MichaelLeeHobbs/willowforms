@@ -1,7 +1,7 @@
 /**
  * Colour contrast, enforced.
  *
- * The teardown in docs/prior-art records the product this project studied
+ * The study in docs/prior-art records the product this project studied
  * shipping a primary button whose label sat at 3.03:1, failing WCAG AA. Beating
  * that is a stated goal, and a goal nobody measures is a wish, so both
  * stylesheets in this repo are measured here in both themes.
@@ -80,7 +80,7 @@ describe.each(palettes(designerCss, '.fs-shell', ".fs-shell[data-fs-theme='dark'
     })
 
     it('primary button text clears AA', () => {
-      // The exact failure the teardown recorded, at 3.03:1.
+      // The exact failure the prior-art study recorded, at 3.03:1.
       expect(on('--fs-primary-text', '--fs-primary')).toBeGreaterThanOrEqual(AA_TEXT)
     })
 

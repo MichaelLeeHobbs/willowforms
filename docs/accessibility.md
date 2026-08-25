@@ -34,8 +34,8 @@ measured value in each palette:
 | HTML kit, light | 4.83:1       | field border on the field, needs 3:1 |
 | HTML kit, dark  | 4.15:1       | field border on the field, needs 3:1 |
 
-The primary button label, which the teardown in `docs/prior-art` recorded at 3.03:1 in the product this
-project studied, sits at 5.49:1 light and 6.39:1 dark.
+The primary button label, which the prior-art study recorded at 3.03:1 in the product this project
+studied, sits at 5.49:1 light and 6.39:1 dark. See `docs/prior-art`.
 
 ## Keyboard
 
