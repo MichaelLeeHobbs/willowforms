@@ -46,7 +46,11 @@ three kits, and the registry is where its extensibility lives.
 
 A form is a recursive tree of `ComponentNode`. The tree is the source of truth. JSON Schema is an
 **export** format, never storage, because JSON Schema cannot express layout or nesting, and layout is
-half of what a visual builder produces.
+half of what a visual builder produces. `toJsonSchema` in core is that one-way projection: it walks the
+tree, keeps only data-bound components, and produces a flat object, because `FormData` is flat and keyed
+by component key regardless of how deeply the components nest. A `custom` rule is arbitrary JavaScript
+and has no declarative equivalent, so `unexportableRules` names the fields whose rules the export drops
+rather than letting the loss go unmentioned.
 
 ```
 FormDocument
