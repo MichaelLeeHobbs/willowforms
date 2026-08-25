@@ -42,6 +42,18 @@ written against concrete components, and every one of those call sites becomes a
 second kit is wanted. The abstraction is not speculative: the competitor this project studied ships
 three kits, and the registry is where its extensibility lives.
 
+`@formsmith/kit-html` is the evidence rather than the argument. Adding it touched four files outside its
+own package, all of them build plumbing: a project reference, a source alias, a stylesheet copy, and the
+lockfile. Nothing in `core`, `renderer`, or `designer` changed. The playground switches between the two
+kits at runtime on the same document.
+
+`test/kit-contract.test.tsx` turns the contract into an executable spec that runs against every kit in
+the repo: a renderer for every palette entry and no orphans, `nodeProps` reaching the DOM, containers
+rendering children inside themselves, data-bound components surviving an absent value, and errors
+actually being displayed. A third kit is added to that list and nothing else. Writing it immediately
+found a real bug: the MUI Checkbox had been discarding its error, so a required checkbox failed a submit
+while saying nothing.
+
 ## The document model
 
 A form is a recursive tree of `ComponentNode`. The tree is the source of truth. JSON Schema is an

@@ -21,6 +21,7 @@ packages/core       document model, tree ops, validation. No React, runs in Node
 packages/renderer   runtime renderer. Ships without the designer.
 packages/designer   the builder. No UI-library dependency; chrome is plain CSS.
 packages/kit-mui    Material UI kit. Reference implementation of the kit contract.
+packages/kit-html   Dependency-free HTML kit. Proves a kit is a package, not a rewrite.
 apps/playground     Vite demo, port 5180
 apps/demo-server    Hono, port 5181. A demo, not a product.
 ```
@@ -46,7 +47,7 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 157 tests
+pnpm test          # vitest, 197 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
