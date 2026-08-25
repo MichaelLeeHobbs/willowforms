@@ -1,0 +1,119 @@
+/**
+ * The Formsmith document model.
+ *
+ * A form is a recursive tree of {@link ComponentNode}. The tree is the source of
+ * truth; JSON Schema is an export format, not the storage format, because JSON
+ * Schema cannot express layout or nesting.
+ */
+
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue }
+
+/** Breakpoints a style value can be scoped to. */
+export type Device = 'any' | 'desktop' | 'tablet' | 'mobile'
+
+/** Lifecycle hooks a component can subscribe to. */
+export type EventName = 'onChange' | 'onClick' | 'onBlur' | 'onFocus' | 'onMount' | 'onUnmount'
+
+/**
+ * A property value is a tagged union rather than a bag discriminated by the
+ * presence of an optional field. Every consumer switches on `kind` exhaustively,
+ * so adding a fourth binding mode is a compile error at every call site.
+ */
+export type PropValue =
+  | { kind: 'static'; value: JsonValue }
+  /** A JS expression evaluated against the live form at render time. */
+  | { kind: 'computed'; expression: string }
+  /** A lookup into the active language's translation bundle. */
+  | { kind: 'i18n'; key: string }
+
+export interface ActionRef {
+  /** Name of a {@link CodeAction} on the document, or a built-in. */
+  name: string
+  type: 'code' | 'builtin'
+}
+
+export interface CodeAction {
+  name: string
+  /** JavaScript source. Executed in a sandbox; see docs/ARCHITECTURE.md. */
+  body: string
+  params: Record<string, JsonValue>
+}
+
+export interface Language {
+  /** BCP 47 primary subtag, e.g. `en`. */
+  code: string
+  /** Region subtag, e.g. `US`. Optional for languages without one. */
+  dialect?: string
+  name: string
+  bidi: 'ltr' | 'rtl'
+}
+
+/** The data-shape contract for a component that participates in form data. */
+export interface FieldSchema {
+  type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object' | 'file'
+  validations: ValidationRule[]
+  /** Validate on change rather than only on submit. */
+  autoValidate?: boolean
+}
+
+/**
+ * Validation rules carry their parameters in the type. FormEngine's equivalent
+ * is an untyped `{key, message?}`, which cannot express `minLength` without a
+ * side channel.
+ */
+export type ValidationRule =
+  | { key: 'required'; message?: string; when?: PropValue }
+  | { key: 'minLength'; value: number; message?: string; when?: PropValue }
+  | { key: 'maxLength'; value: number; message?: string; when?: PropValue }
+  | { key: 'min'; value: number; message?: string; when?: PropValue }
+  | { key: 'max'; value: number; message?: string; when?: PropValue }
+  | { key: 'pattern'; value: string; message?: string; when?: PropValue }
+  | { key: 'email'; message?: string; when?: PropValue }
+  | { key: 'url'; message?: string; when?: PropValue }
+  | { key: 'uuid'; message?: string; when?: PropValue }
+  | { key: 'custom'; expression: string; message?: string; when?: PropValue }
+
+export type ValidationKey = ValidationRule['key']
+
+export interface ComponentNode {
+  /** Unique within the document. Doubles as the data key unless overridden. */
+  key: string
+  /** Kit-scoped component id, e.g. `TextField`, `Stack`. */
+  type: string
+  props: Record<string, PropValue>
+  /** Present only on data-bound components. */
+  schema?: FieldSchema
+  events?: Partial<Record<EventName, ActionRef[]>>
+  /** Containers only. Absent means the component cannot take children. */
+  children?: ComponentNode[]
+  /** Raw CSS text per breakpoint. */
+  css?: Partial<Record<Device, string>>
+  /** Conditional visibility. Absent means always rendered. */
+  renderWhen?: PropValue
+}
+
+export interface FormSettings {
+  /** Component type used to wrap fields in an error state. */
+  errorType?: string
+  tooltipType?: string
+}
+
+export interface FormDocument {
+  version: '1'
+  id: string
+  name: string
+  /** Always a container. */
+  root: ComponentNode
+  actions: Record<string, CodeAction>
+  languages: Language[]
+  /** Must match a `code` (plus optional `-dialect`) in `languages`. */
+  defaultLanguage: string
+  /** lang tag -> translation key -> text */
+  translations: Record<string, Record<string, string>>
+  settings: FormSettings
+}
+
+/** Runtime form data, keyed by component key. */
+export type FormData = Record<string, JsonValue>
+/** Runtime validation errors, keyed by component key. */
+export type FormErrors = Record<string, string>

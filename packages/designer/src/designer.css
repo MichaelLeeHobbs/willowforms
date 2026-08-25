@@ -1,0 +1,341 @@
+/*
+ * Designer chrome.
+ *
+ * Every value is a custom property on .fs-shell, so a host app restyles the
+ * builder by overriding tokens rather than fighting specificity. Light is the
+ * base; dark is a token swap under prefers-color-scheme and an explicit
+ * [data-fs-theme] override, so a host that manages its own theme can force it.
+ */
+
+.fs-shell {
+  --fs-bg-app: #f5f6f8;
+  --fs-bg-panel: #ffffff;
+  --fs-bg-well: #eef0f3;
+  --fs-border: #d7dbe0;
+  --fs-text: #1c1f23;
+  --fs-text-muted: #5b6470;
+  --fs-primary: #0b6fa4;
+  --fs-primary-text: #ffffff;
+  --fs-accent: #b5179e;
+  --fs-danger: #b3261e;
+  --fs-radius: 6px;
+  --fs-panel-width: 288px;
+  --fs-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --fs-font-size: 14px;
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-family: var(--fs-font);
+  font-size: var(--fs-font-size);
+  color: var(--fs-text);
+  background: var(--fs-bg-app);
+}
+
+@media (prefers-color-scheme: dark) {
+  .fs-shell:not([data-fs-theme="light"]) {
+    --fs-bg-app: #1b1d21;
+    --fs-bg-panel: #24272c;
+    --fs-bg-well: #15171a;
+    --fs-border: #3a3f46;
+    --fs-text: #e9ebf0;
+    --fs-text-muted: #a4a9b3;
+    --fs-primary: #2f9fd8;
+    --fs-primary-text: #0b1116;
+    --fs-accent: #e879d6;
+    --fs-danger: #f2705f;
+  }
+}
+
+.fs-shell[data-fs-theme="dark"] {
+  --fs-bg-app: #1b1d21;
+  --fs-bg-panel: #24272c;
+  --fs-bg-well: #15171a;
+  --fs-border: #3a3f46;
+  --fs-text: #e9ebf0;
+  --fs-text-muted: #a4a9b3;
+  --fs-primary: #2f9fd8;
+  --fs-primary-text: #0b1116;
+  --fs-accent: #e879d6;
+  --fs-danger: #f2705f;
+}
+
+.fs-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Every chrome control gets a visible ring. The canvas keeps the kit's own. */
+.fs-toolbar :focus-visible,
+.fs-panel :focus-visible,
+.fs-canvas__bar :focus-visible {
+  outline: 2px solid var(--fs-primary);
+  outline-offset: 2px;
+}
+
+.fs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--fs-bg-panel);
+  border-block-end: 1px solid var(--fs-border);
+}
+
+.fs-toolbar__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fs-toolbar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fs-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.fs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: var(--fs-panel-width);
+  flex: 0 0 var(--fs-panel-width);
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--fs-bg-panel);
+}
+
+.fs-panel--left {
+  border-inline-end: 1px solid var(--fs-border);
+}
+
+.fs-panel--right {
+  border-inline-start: 1px solid var(--fs-border);
+}
+
+.fs-panel__heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fs-text-muted);
+}
+
+.fs-empty {
+  margin: 0;
+  color: var(--fs-text-muted);
+}
+
+/*
+ * Chrome control styling is scoped to the chrome regions, never to .fs-shell.
+ * The canvas hosts the kit's own components, and a bare `.fs-shell input` rule
+ * reaches straight into them: it overrode MUI's input padding and broke the
+ * notched outline so every label sat on top of its border. The canvas surface
+ * must inherit nothing from here.
+ */
+.fs-chrome button,
+.fs-toolbar button,
+.fs-panel button,
+.fs-canvas__bar button {
+  font: inherit;
+  color: inherit;
+  padding: 5px 10px;
+  background: var(--fs-bg-panel);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  cursor: pointer;
+}
+
+.fs-toolbar button:hover:not(:disabled),
+.fs-panel button:hover:not(:disabled),
+.fs-canvas__bar button:hover:not(:disabled) {
+  background: var(--fs-bg-well);
+}
+
+.fs-toolbar button:disabled,
+.fs-panel button:disabled,
+.fs-canvas__bar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fs-panel input,
+.fs-panel select,
+.fs-panel textarea,
+.fs-toolbar input {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  padding: 5px 8px;
+  background: var(--fs-bg-app);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+}
+
+.fs-palette__search {
+  margin-block-end: 12px;
+}
+
+.fs-palette__group-title {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fs-text-muted);
+}
+
+.fs-palette__items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.fs-palette__item {
+  text-align: start;
+}
+
+.fs-tree__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fs-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--fs-radius);
+  cursor: pointer;
+}
+
+.fs-tree__row:hover {
+  background: var(--fs-bg-well);
+}
+
+.fs-tree__row.is-selected {
+  background: var(--fs-primary);
+  color: var(--fs-primary-text);
+}
+
+.fs-tree__key {
+  font-weight: 600;
+}
+
+.fs-tree__type {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.fs-tree__remove {
+  margin-inline-start: auto;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+}
+
+.fs-canvas {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  background: var(--fs-bg-app);
+}
+
+.fs-canvas__inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.fs-canvas__bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-block-end: 1px solid var(--fs-border);
+}
+
+.fs-canvas__surface {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+}
+
+.fs-canvas__data {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px;
+  border-block-start: 1px solid var(--fs-border);
+  background: var(--fs-bg-panel);
+}
+
+.fs-canvas__data pre {
+  margin: 0;
+  padding: 8px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+  background: var(--fs-bg-well);
+  border-radius: var(--fs-radius);
+}
+
+.fs-prop-row {
+  display: grid;
+  grid-template-columns: 108px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-block-end: 10px;
+}
+
+.fs-prop-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--fs-text-muted);
+}
+
+/* A modified property is marked by a dot, not by colour alone. */
+.fs-prop-row.is-set label {
+  color: var(--fs-text);
+  font-weight: 600;
+}
+
+.fs-prop-row__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fs-accent);
+}
+
+.fs-prop-row__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--fs-text-muted);
+}
+
+.fs-prop-row__clear {
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.fs-prop-binding {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--fs-accent);
+}
