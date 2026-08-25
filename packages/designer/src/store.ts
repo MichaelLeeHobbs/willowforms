@@ -9,7 +9,13 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
-import type { ComponentDef, ComponentNode, FormDocument, PropValue } from '@formsmith/core'
+import type {
+  ComponentDef,
+  ComponentNode,
+  FieldSchema,
+  FormDocument,
+  PropValue,
+} from '@formsmith/core'
 import {
   findNode,
   insertNode,
@@ -68,6 +74,12 @@ export interface DesignerApi {
   /** Add a palette entry under a parent, selecting the new node. */
   addComponent: (def: ComponentDef, parentKey?: string, index?: number) => void
   setProp: (key: string, name: string, value: PropValue | undefined) => void
+  /**
+   * Replace a component's field schema, which is where its validation rules
+   * live. Passing undefined drops the schema entirely, which is what a
+   * component that carries no form data should have.
+   */
+  setFieldSchema: (key: string, schema: FieldSchema | undefined) => void
   renameKey: (key: string, nextKey: string) => void
   moveComponent: (key: string, parentKey: string, index?: number) => void
   removeComponent: (key: string) => void
@@ -106,6 +118,24 @@ export function useDesigner(initial: FormDocument): DesignerApi {
           if (value === undefined) delete props[name]
           else props[name] = value
           return { ...node, props }
+        }),
+      }))
+    },
+    [apply],
+  )
+
+  const setFieldSchema = useCallback(
+    (key: string, schema: FieldSchema | undefined) => {
+      apply((doc) => ({
+        ...doc,
+        root: updateNode(doc.root, key, (node) => {
+          if (!schema) {
+            // exactOptionalPropertyTypes: an absent schema is an absent key, not
+            // a key holding undefined.
+            const { schema: _dropped, ...rest } = node
+            return rest
+          }
+          return { ...node, schema }
         }),
       }))
     },
@@ -160,6 +190,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     select: setSelectedKey,
     addComponent,
     setProp,
+    setFieldSchema,
     renameKey,
     moveComponent,
     removeComponent,
