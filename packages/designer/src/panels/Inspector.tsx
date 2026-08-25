@@ -13,14 +13,16 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import type { Kit } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
+import { FormSettings } from './FormSettings.js'
 import { Properties } from './Properties.js'
 import { Rules } from './Rules.js'
 
-type TabId = 'properties' | 'rules'
+type TabId = 'properties' | 'rules' | 'form'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'properties', label: 'Properties' },
   { id: 'rules', label: 'Rules' },
+  { id: 'form', label: 'Form' },
 ]
 
 export interface InspectorProps {
@@ -97,7 +99,9 @@ export function Inspector({ api, kit }: InspectorProps): ReactNode {
         tabIndex={0}
         className="fs-tabs__panel"
       >
-        {active === 'properties' ? <Properties api={api} kit={kit} /> : <Rules api={api} />}
+        {active === 'properties' && <Properties api={api} kit={kit} />}
+        {active === 'rules' && <Rules api={api} />}
+        {active === 'form' && <FormSettings api={api} />}
       </div>
     </section>
   )
