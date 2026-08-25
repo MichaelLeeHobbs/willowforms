@@ -2,8 +2,9 @@
 
 An MIT-licensed visual form designer for React. The **designer**, not just the renderer.
 
-> Status: pre-alpha. The architecture and the core are real and tested. Most of the designer is not
-> built yet. See [docs/ROADMAP.md](docs/ROADMAP.md) for what actually works today.
+> Status: beta. The builder works end to end and is covered by 290 tests, but nothing is published to
+> npm yet and no release has been cut. [docs/ROADMAP.md](docs/ROADMAP.md) is the honest status,
+> including what is still missing.
 
 ## Why this exists
 
@@ -24,14 +25,34 @@ The AGPL projects are genuinely open, and if AGPL suits you they are further alo
 Formsmith exists for everyone who cannot take a copyleft dependency and refuses to pay four figures a
 year for a drag-and-drop panel.
 
+## What works
+
+- **Canvas.** Click a component to select it, with a selection frame and hover outline. Drag from the
+  palette onto the canvas or the tree, drag components to move them, reorder and reparent in the
+  structure tree. Drop indicators show exactly where a release lands.
+- **Properties.** Per-type panels built from kit metadata. Any property can be a literal value, a
+  computed expression, or a translation key, with an editor for each.
+- **Validation.** Ten rule types carrying their parameters in the type system, edited in a Rules tab,
+  and the same engine runs in Node so a server enforces the form's own rules.
+- **Localization.** Languages, a default, per-language writing direction, and translations edited inline
+  beside the property they belong to.
+- **JSON in and out.** Edit the document as JSON with parse and structural errors reported rather than
+  swallowed, import a file, copy or download, and export a JSON Schema of the submitted data.
+- **Keyboard and screen readers.** The tree is fully operable without a pointer, including moving
+  components. See [docs/accessibility.md](docs/accessibility.md), which is honest about the gaps.
+- **Two kits**, switchable at runtime on the same document.
+
+Undo and redo cover all of it.
+
 ## Packages
 
-| Package               | What it is                                                                                         |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| `@formsmith/core`     | Document model, kit contract, tree operations, validation. Zero dependencies, no UI, runs in Node. |
-| `@formsmith/renderer` | Runtime renderer. Embed a form without shipping the designer.                                      |
-| `@formsmith/designer` | The visual builder. No UI-library dependency; chrome is plain CSS custom properties.               |
-| `@formsmith/kit-mui`  | Material UI component kit. The reference implementation of the kit contract.                       |
+| Package               | What it is                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------------- |
+| `@formsmith/core`     | Document model, kit contract, tree operations, validation, JSON Schema export. No UI, runs in Node. |
+| `@formsmith/renderer` | Runtime renderer. Embed a form without shipping the designer.                                       |
+| `@formsmith/designer` | The visual builder. No UI-library dependency; chrome is plain CSS custom properties.                |
+| `@formsmith/kit-mui`  | Material UI kit. The reference implementation of the kit contract.                                  |
+| `@formsmith/kit-html` | Dependency-free HTML kit. Copy it to build your own.                                                |
 
 Two apps, neither published: `apps/playground` (Vite demo) and `apps/demo-server` (a deliberately tiny
 Hono server so the demo can persist a document and prove server-side validation shares one rule set).
@@ -41,7 +62,7 @@ Hono server so the demo can persist a document and prove server-side validation 
 ```bash
 pnpm install
 pnpm dev          # playground at http://localhost:5180
-pnpm test         # 52 tests
+pnpm test         # 290 tests
 pnpm build        # tsc --build across all packages
 ```
 
@@ -75,20 +96,39 @@ implementation to keep in sync.
 
 ## Design commitments
 
-These are the decisions worth holding onto as the project grows.
+These are the decisions worth holding onto as the project grows. Each is backed by something you can
+check rather than a promise.
 
 **The designer stays MIT.** No open-core split, no "enterprise" directory. The moment the designer goes
 behind a license, this project has become the thing it was built to replace.
 
-**Kits are pluggable from day one.** The designer knows `ComponentDef` metadata and nothing about MUI.
-Adding a kit is a new package, not a change to the designer. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Kits are pluggable, and that is demonstrated.** Adding `@formsmith/kit-html` touched four files outside
+its own package, all of them build plumbing. Nothing in core, the renderer, or the designer changed.
+`test/kit-contract.test.tsx` runs the contract against every kit in the repo, so a third one is added to
+a list and nothing else. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 **The designer has no UI-library dependency.** Chrome is plain CSS driven by custom properties, so it
-drops into a host app without dragging in a second component library or fighting the host's theme.
+drops into a host app without dragging in a second component library or fighting the host's theme. A
+lint rule fails the build if anyone imports one.
+
+**Code execution is the host's boundary.** Computed properties and custom rules run author-supplied
+JavaScript. Core deliberately ships no evaluator, so the host injects one and owns the sandbox. With
+none injected, those rules degrade to permissive rather than throwing.
 
 **Accessibility is not a later milestone.** The teardown that seeded this project measured its subject at
-30 buttons with no accessible name, zero `role="tablist"` wrappers, no landmarks, and a primary button
-at 3.03:1 contrast. Those are the table stakes to clear, not stretch goals.
+30 buttons with no accessible name, zero `role="tablist"` wrappers, no landmarks, and a primary button at
+3.03:1 contrast. Here every button is named, the tabs are a real tablist, contrast is computed from the
+stylesheets in CI, and axe-core runs over the designer in six states.
+
+## Contributing
+
+`pnpm lint` enforces more than style. The architectural invariants in [CLAUDE.md](CLAUDE.md) are
+`no-restricted-imports` rules, so importing React into core or a component library into the designer
+fails with a message explaining why the rule exists. The CSS isolation rule and the colour-contrast
+thresholds are enforced by tests that parse the stylesheets.
+
+If one of those fires, read the message before silencing it. Each is there because the failure it
+prevents is invisible to the type checker.
 
 ## Licence
 

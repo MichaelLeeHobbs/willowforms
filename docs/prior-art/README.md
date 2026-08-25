@@ -42,5 +42,6 @@ So:
 
 ## Refreshing it
 
-The teardown was captured 2026-08-24 against v10.2.0. To re-run it, use the browser-driven audit prompt
-at `isaiah-job-research/best-practices/prompts/ui-feature-specification.md`.
+The teardown was captured 2026-08-24 against v10.2.0. Re-running it means driving the public demo in a
+browser and recording what it does, section by section, against the same outline: layout, component
+inventory, interactions, validation, data model, content states, accessibility, and theme.
