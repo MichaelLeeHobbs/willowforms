@@ -25,6 +25,7 @@
       "@formsmith/core": ["./packages/core/src/index.ts"],
       "@formsmith/renderer": ["./packages/renderer/src/index.tsx"],
       "@formsmith/kit-mui": ["./packages/kit-mui/src/index.ts"],
+      "@formsmith/kit-html": ["./packages/kit-html/src/index.ts"],
       "@formsmith/designer": ["./packages/designer/src/index.ts"]
     }
   },

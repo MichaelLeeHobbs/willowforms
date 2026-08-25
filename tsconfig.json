@@ -1,9 +1,20 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/renderer" },
-    { "path": "./packages/kit-mui" },
-    { "path": "./packages/designer" }
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/renderer"
+    },
+    {
+      "path": "./packages/kit-mui"
+    },
+    {
+      "path": "./packages/kit-html"
+    },
+    {
+      "path": "./packages/designer"
+    }
   ]
 }

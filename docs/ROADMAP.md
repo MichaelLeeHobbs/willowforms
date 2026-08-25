@@ -11,6 +11,12 @@ product.
   kit, honours `renderWhen`, and shows a visible fallback for an unknown component type.
 - `@formsmith/kit-mui`: 8 components (Screen, Stack, Heading, TextField, NumberField, Checkbox, Select,
   Button) with metadata and renderers.
+- `@formsmith/kit-html`: the same 8 components with no dependencies at all, as semantic elements and a
+  stylesheet. It exists to make the architecture's central claim checkable rather than asserted, and
+  adding it changed nothing in core, the renderer, or the designer.
+- A kit contract spec that runs against every kit in the repo: renderer coverage in both directions,
+  `nodeProps` reaching the DOM, containers rendering children inside themselves, data-bound components
+  surviving an absent value, and errors actually being shown. **40 tests.**
 - `@formsmith/designer` history: undo/redo with a capped stack. **7 tests.**
 - Designer shell: palette with search and grouping, structure tree, properties panel driven by per-type
   `PropSchema`, canvas rendering the real runtime renderer, preview mode with live data and errors,
@@ -36,7 +42,7 @@ product.
   **20 tests.**
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
-  covers the test files, and CI running all of it on every PR. **157 tests.**
+  covers the test files, and CI running all of it on every PR. **197 tests.**
 
 ### What "verified" means here
 
@@ -55,6 +61,12 @@ untouched, and a plain click still selecting rather than being swallowed by the 
 The Rules tab, end to end: a `minLength` rule authored in the panel with a custom message landed in the
 document with the right shape, then failed a short value in preview with exactly that message, while the
 `email` rule on the same field passed.
+
+The second kit was driven in a browser on the same document as the first: canvas selection, a palette
+drag landing where aimed, and preview validation reporting the same errors through entirely different
+markup. Its accessibility wiring was checked in the DOM rather than assumed, with `<label for>` matching
+the input id, `aria-invalid` on the failing field, `aria-describedby` pointing at an element that exists,
+and `role="alert"` on the message.
 
 Localization end to end: a language added on the Form tab, the email field's label switched to a
 translation binding and auto-keyed `email_label`, both translations stored, and the canvas rendering the
@@ -75,7 +87,7 @@ names and focus rings, and the inspector is a real tablist with a roving tabinde
 done: the same keyboard treatment for the tree, focus trapping, `aria-live` announcements for selection
 and mode changes, a keyboard path for drag and drop, and a real audit.
 
-**Tests for anything React.** 97 of the 157 tests are pure functions. Component tests cover canvas
+**Tests for anything React.** 97 of the 197 tests are pure functions. Component tests cover canvas
 selection, the drag wiring, the rules editor, the inspector tabs, the JSON dialog, the binding editors,
 and form settings. The palette and tree rendering are still untested, and there is no end-to-end setup. jsdom has no layout engine, so
 geometry stays a browser check no matter how far the component tests grow.
@@ -89,7 +101,7 @@ geometry stays a browser check no matter how far the component tests grow.
 5. ~~Import, export, JSON editing, JSON Schema.~~ Done.
 6. ~~Binding editors: expressions, then localization.~~ Done.
 7. Accessibility pass with an audit against the checklist in the prior-art teardown.
-8. A second kit, to prove the seam holds. Until a second kit exists, the abstraction is a claim.
+8. ~~A second kit, to prove the seam holds.~~ Done.
 
 ## Non-goals
 

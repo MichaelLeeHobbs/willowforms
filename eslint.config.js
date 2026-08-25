@@ -160,6 +160,10 @@ export default tseslint.config(
     plugins: { vitest },
     rules: {
       ...vitest.configs.recommended.rules,
+      // vitest's expect takes an optional message as a second argument, which
+      // the jest-shaped default rule rejects. The kit contract test leans on it
+      // so a failure explains which obligation was missed.
+      'vitest/valid-expect': ['error', { maxArgs: 2 }],
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',

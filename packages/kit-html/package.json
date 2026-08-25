@@ -1,0 +1,62 @@
+{
+  "name": "@formsmith/kit-html",
+  "version": "0.0.0",
+  "description": "Dependency-free HTML kit for Formsmith. Semantic elements and a stylesheet you can override.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./dist/kit-html.css"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@formsmith/core": "workspace:*",
+    "@formsmith/renderer": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "keywords": [
+    "form",
+    "form-builder",
+    "form-designer",
+    "react",
+    "json-schema",
+    "low-code",
+    "drag-and-drop",
+    "html",
+    "headless"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MichaelLeeHobbs/formsmith.git",
+    "directory": "packages/kit-html"
+  },
+  "bugs": {
+    "url": "https://github.com/MichaelLeeHobbs/formsmith/issues"
+  },
+  "homepage": "https://github.com/MichaelLeeHobbs/formsmith/tree/main/packages/kit-html#readme",
+  "author": "Michael Hobbs",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

@@ -13,6 +13,7 @@
     "@emotion/styled": "^11.14.0",
     "@formsmith/core": "workspace:*",
     "@formsmith/designer": "workspace:*",
+    "@formsmith/kit-html": "workspace:*",
     "@formsmith/kit-mui": "workspace:*",
     "@formsmith/renderer": "workspace:*",
     "@mui/material": "^6.3.0",
