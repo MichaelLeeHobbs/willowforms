@@ -49,6 +49,39 @@ export function pathTo(root: ComponentNode, key: string): string[] {
   return search(root, []) ?? []
 }
 
+/** One node's place in the tree, as a flat list in document order. */
+export interface FlatNode {
+  node: ComponentNode
+  /** Undefined for the root. */
+  parentKey: string | undefined
+  /** Position among its parent's children. */
+  index: number
+  /** Root is 0; deeper nodes count up. */
+  depth: number
+}
+
+/**
+ * The tree as a flat list, parents before children.
+ *
+ * This is the order the structure panel draws and the order keyboard navigation
+ * moves through, so both read it from here rather than each walking the tree and
+ * disagreeing about what "the next row" means.
+ */
+export function flatten(root: ComponentNode): FlatNode[] {
+  const out: FlatNode[] = []
+  const visit = (
+    node: ComponentNode,
+    parentKey: string | undefined,
+    index: number,
+    depth: number,
+  ): void => {
+    out.push({ node, parentKey, index, depth })
+    node.children?.forEach((child, i) => visit(child, node.key, i, depth + 1))
+  }
+  visit(root, undefined, 0, 0)
+  return out
+}
+
 export function collectKeys(root: ComponentNode): string[] {
   const keys: string[] = []
   walk(root, (n) => keys.push(n.key))

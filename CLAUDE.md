@@ -13,6 +13,8 @@ renderer, because every competitor paywalls exactly that piece.
 - `docs/ROADMAP.md` — honest status. Most of the designer is not built. Check here before assuming a
   feature exists.
 - `docs/prior-art/README.md` — the FormEngine teardown and the rules for using it.
+- `docs/accessibility.md` — what is checked, how, and what is still missing. Several of those checks
+  fail the build, so read it before changing a colour token or a keyboard handler.
 
 ## Layout
 
@@ -47,7 +49,7 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 197 tests
+pnpm test          # vitest, 278 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs

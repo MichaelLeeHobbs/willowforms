@@ -130,7 +130,18 @@ function PropRow({
     <div className={'fs-prop-row' + (isSet ? ' is-set' : '')}>
       <label htmlFor={id}>
         {schema.label}
-        {isSet && <span className="fs-prop-row__dot" aria-label="Modified" />}
+        {isSet && (
+          <>
+            {/*
+              A bare span has no role, and ARIA prohibits aria-label there, so a
+              screen reader ignored it entirely: the marker looked handled and
+              announced nothing. The dot is decoration; the word is the message,
+              and it reads as part of the label.
+            */}
+            <span className="fs-prop-row__dot" aria-hidden="true" />
+            <span className="fs-visually-hidden"> (modified)</span>
+          </>
+        )}
       </label>
       {mode}
 
