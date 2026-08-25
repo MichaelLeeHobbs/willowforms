@@ -20,7 +20,7 @@
   --fs-danger: #b3261e;
   --fs-radius: 6px;
   --fs-panel-width: 288px;
-  --fs-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --fs-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --fs-font-size: 14px;
 
   display: flex;
@@ -34,7 +34,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .fs-shell:not([data-fs-theme="light"]) {
+  .fs-shell:not([data-fs-theme='light']) {
     --fs-bg-app: #1b1d21;
     --fs-bg-panel: #24272c;
     --fs-bg-well: #15171a;
@@ -48,7 +48,7 @@
   }
 }
 
-.fs-shell[data-fs-theme="dark"] {
+.fs-shell[data-fs-theme='dark'] {
   --fs-bg-app: #1b1d21;
   --fs-bg-panel: #24272c;
   --fs-bg-well: #15171a;

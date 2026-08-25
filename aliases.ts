@@ -14,7 +14,10 @@ import { fileURLToPath } from 'node:url'
 const at = (p: string): string => fileURLToPath(new URL(p, import.meta.url))
 
 export const formsmithAliases = [
-  { find: '@formsmith/designer/styles.css', replacement: at('./packages/designer/src/designer.css') },
+  {
+    find: '@formsmith/designer/styles.css',
+    replacement: at('./packages/designer/src/designer.css'),
+  },
   { find: /^@formsmith\/core$/, replacement: at('./packages/core/src/index.ts') },
   { find: /^@formsmith\/renderer$/, replacement: at('./packages/renderer/src/index.tsx') },
   { find: /^@formsmith\/kit-mui$/, replacement: at('./packages/kit-mui/src/index.ts') },

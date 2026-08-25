@@ -6,14 +6,14 @@
 
 ## 0. Spec Metadata
 
-| Field | Value |
-|---|---|
-| **Page name / `<title>`** | `Form Builder Demo` |
-| **URL pattern** | `https://formbuilder.formengine.io/` (single route; no path params, no query string, no hash routing observed) |
-| **`<html lang>`** | `en` |
-| **Product version** | `v10.2.0` (shown as a disabled item at the bottom of the workspace main menu) |
-| **One-line purpose** | A browser-based WYSIWYG form designer: drag components onto a canvas, configure their properties/styles/events/validation, then preview, test, and export the resulting form definition as JSON. |
-| **Page type** | Full-viewport, three-pane **application shell / visual editor** (not a document page). Contains embedded form-preview, modals, and a dockable bottom code panel. |
+| Field                     | Value                                                                                                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Page name / `<title>`** | `Form Builder Demo`                                                                                                                                                                              |
+| **URL pattern**           | `https://formbuilder.formengine.io/` (single route; no path params, no query string, no hash routing observed)                                                                                   |
+| **`<html lang>`**         | `en`                                                                                                                                                                                             |
+| **Product version**       | `v10.2.0` (shown as a disabled item at the bottom of the workspace main menu)                                                                                                                    |
+| **One-line purpose**      | A browser-based WYSIWYG form designer: drag components onto a canvas, configure their properties/styles/events/validation, then preview, test, and export the resulting form definition as JSON. |
+| **Page type**             | Full-viewport, three-pane **application shell / visual editor** (not a document page). Contains embedded form-preview, modals, and a dockable bottom code panel.                                 |
 
 ### Primary user goals
 
@@ -131,15 +131,15 @@ Full-viewport (`100vw × 100vh`), no page scroll. A fixed **top strip** (exclude
 
 ### Measured metrics (desktop, 1335 × 893 viewport)
 
-| Region | Metric |
-|---|---|
-| Excluded top bar | full width × **58 px** |
-| Workspace row | full width × remaining height (`835 px`) |
-| Left panel | **≈290 px** fixed (inner nav 280 px, offset 5 px) |
-| Right panel | **≈290 px** fixed (starts at x ≈ 1045) |
-| Centre canvas viewport | fluid; measured `721 px` wide × `766 px` tall at this viewport |
-| Bottom property panel | full width, **380 px** default height (persisted, user-resizable via top edge) |
-| Toolbar row (centre) | ~48 px, vertically centred at y ≈ 83 |
+| Region                 | Metric                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| Excluded top bar       | full width × **58 px**                                                         |
+| Workspace row          | full width × remaining height (`835 px`)                                       |
+| Left panel             | **≈290 px** fixed (inner nav 280 px, offset 5 px)                              |
+| Right panel            | **≈290 px** fixed (starts at x ≈ 1045)                                         |
+| Centre canvas viewport | fluid; measured `721 px` wide × `766 px` tall at this viewport                 |
+| Bottom property panel  | full width, **380 px** default height (persisted, user-resizable via top edge) |
+| Toolbar row (centre)   | ~48 px, vertically centred at y ≈ 83                                           |
 
 ### Region breakdown (DOM/visual order)
 
@@ -183,15 +183,15 @@ Full-viewport (`100vw × 100vh`), no page scroll. A fixed **top strip** (exclude
 
 ### Responsive behaviour
 
-**[ASSUMPTION — VERIFY]** The builder shell itself was only observed at desktop width and appears to be a **fixed desktop-only layout**: side panels are fixed-pixel, the shell fills the viewport with no page scroll, and no breakpoint-driven reflow was observed. There is no hamburger/off-canvas fallback for the side panels other than the manual collapse chevrons. Treat mobile/tablet support for the *builder chrome* as an open product question.
+**[ASSUMPTION — VERIFY]** The builder shell itself was only observed at desktop width and appears to be a **fixed desktop-only layout**: side panels are fixed-pixel, the shell fills the viewport with no page scroll, and no breakpoint-driven reflow was observed. There is no hamburger/off-canvas fallback for the side panels other than the manual collapse chevrons. Treat mobile/tablet support for the _builder chrome_ as an open product question.
 
 What **is** responsive is the **canvas content**, deliberately, via the viewport simulator:
 
-| Toolbar button | Canvas result |
-|---|---|
-| Desktop (default) | Canvas fills the centre column full-bleed. |
-| Mobile | Canvas constrained to a centred phone-width frame; `Orientation` button appears. |
-| Tablet | Canvas constrained to a centred tablet-width frame; `Orientation` button appears. |
+| Toolbar button                               | Canvas result                                                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop (default)                            | Canvas fills the centre column full-bleed.                                                                                                        |
+| Mobile                                       | Canvas constrained to a centred phone-width frame; `Orientation` button appears.                                                                  |
+| Tablet                                       | Canvas constrained to a centred tablet-width frame; `Orientation` button appears.                                                                 |
 | Orientation (only when Mobile/Tablet active) | Swaps the frame between portrait and landscape. In landscape the frame can be wider than the centre column and visually overlaps the side panels. |
 
 Per-component responsive styling is authored in the right panel's `Style` tab via the `For device` selector (`Any / Desktop / Mobile / Tablet`), which scopes every style value below it to that breakpoint.
@@ -205,44 +205,48 @@ Listed in reading order: left panel → centre toolbar → canvas → right pane
 ### 4.1 Left panel
 
 #### `LP-TABS` — Left panel tab bar
+
 - **Type:** Icon+label tab bar (4 tabs, `role="tab"` buttons).
 - **Copy:** `Components`, `Tree`, `Settings`, `Forms`.
 - **Default:** `Components` on first load; afterwards restored from `localStorage.leftPanelActiveTab`.
-- **States:** *default* — icon and label in secondary grey `#A4A9B3`. *selected* — icon and label take a per-tab accent colour and a matching 2 px underline appears. Accent tokens read from CSS: `Components → var(--rs-green-600)`, `Tree → var(--rs-navs-selected)`, `Settings → violet`, `Forms → #f67f1f`.
+- **States:** _default_ — icon and label in secondary grey `#A4A9B3`. _selected_ — icon and label take a per-tab accent colour and a matching 2 px underline appears. Accent tokens read from CSS: `Components → var(--rs-green-600)`, `Tree → var(--rs-navs-selected)`, `Settings → violet`, `Forms → #f67f1f`.
 - **Behaviour:** Swaps the panel body. Selection persists across reloads.
 
 #### `LP-SEARCH` — Palette search
+
 - **Type:** Single-line text input with trailing magnifier icon.
 - **Placeholder:** `Search...`
-- **States:** *default* — magnifier icon at right. *focus* — blue focus ring. *filled* — magnifier is replaced by a clear `✕`.
+- **States:** _default_ — magnifier icon at right. _focus_ — blue focus ring. _filled_ — magnifier is replaced by a clear `✕`.
 - **Behaviour:** Filters the palette live on every keystroke; empty groups are hidden.
 - **Empty result:** the entire palette body is replaced by `Not found`.
 - **Constraints:** none observed (no min length, no debounce visible).
 
 #### `LP-PALETTE` — Component palette (Components tab)
+
 - **Type:** Grouped grid of draggable component chips, two per row (single full-width row when a group has an odd trailing item). Vertically scrolling.
 - **Data-driven:** **Yes — entirely.** The list is supplied by the active UI kit and changes completely when the kit changes (see §7).
 - **Items (Material UI kit), verbatim, by group:**
 
-| Group | Items |
-|---|---|
-| `Inputs` | `Button`, `Button group`, `Checkbox`, `Date picker`, `Radio group`, `Radio item`, `Select`, `Switch`, `Text field`, `Uploader` |
-| `Data display` | `List`, `List item`, `Tooltip`, `Typography` |
-| `Feedback` | `Circular progress`, `Linear progress` |
-| `Layout` | `Box`, `Container`, `Dialog layout`, `Stack` |
-| `Surfaces` | `Card` |
-| `Navigation` | `Breadcrumbs`, `Link` |
-| `Form` | `Form control label`, `Form label` |
-| `Templates` | `Embedded form`, `Slot` |
-| `Structure` | `Repeater` |
-| `Modal` | `Modal` |
+| Group          | Items                                                                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Inputs`       | `Button`, `Button group`, `Checkbox`, `Date picker`, `Radio group`, `Radio item`, `Select`, `Switch`, `Text field`, `Uploader` |
+| `Data display` | `List`, `List item`, `Tooltip`, `Typography`                                                                                   |
+| `Feedback`     | `Circular progress`, `Linear progress`                                                                                         |
+| `Layout`       | `Box`, `Container`, `Dialog layout`, `Stack`                                                                                   |
+| `Surfaces`     | `Card`                                                                                                                         |
+| `Navigation`   | `Breadcrumbs`, `Link`                                                                                                          |
+| `Form`         | `Form control label`, `Form label`                                                                                             |
+| `Templates`    | `Embedded form`, `Slot`                                                                                                        |
+| `Structure`    | `Repeater`                                                                                                                     |
+| `Modal`        | `Modal`                                                                                                                        |
 
-- **States:** *default* — dark chip with 1 px border, monochrome glyph + label. *hover* — chip lightens. *dragging* — chip follows cursor; the canvas shows an insertion indicator at the valid drop position.
+- **States:** _default_ — dark chip with 1 px border, monochrome glyph + label. _hover_ — chip lightens. _dragging_ — chip follows cursor; the canvas shows an insertion indicator at the valid drop position.
 - **Behaviour:** Drag onto the canvas to insert. On drop the new node is created, auto-keyed `<typeCamelCase><n>` (e.g. `muiCheckbox1`), auto-selected, and the right panel loads it.
 
 > **[INFERRED]** For comparison, switching to the Mantine kit replaces the palette with ~60 items under groups `Inputs, Other extensions, Combobox, Dates, Buttons, Miscellaneous, Overlays, Typography …`. The palette is therefore a per-kit registry, not a hard-coded list.
 
 #### `LP-TREE` — Structure tree (Tree tab)
+
 - **Type:** Collapsible tree, plus two text/icon commands.
 - **Copy:** `Expand all`, `Collapse all`.
 - **Row format:** `<component key>` in primary text weight followed by `<component type>` in muted grey.
@@ -304,32 +308,34 @@ screen 1 (Screen)
 │  └─ successMessage    MuiTypography
 ```
 
-- **States:** *default*, *hover* (row background lightens), *selected* (row filled with a blue-tinted background), *expanded/collapsed* (chevron rotates).
+- **States:** _default_, _hover_ (row background lightens), _selected_ (row filled with a blue-tinted background), _expanded/collapsed_ (chevron rotates).
 - **Behaviour:** Clicking a row selects that component on the canvas and loads it in the right panel; canvas selection highlights the matching row. **[ASSUMPTION — VERIFY]** drag-to-reorder within the tree was not exercised.
 
 #### `LP-SETTINGS` — Form-level settings (Settings tab)
 
-| Section | Control | Type | Value / options observed |
-|---|---|---|---|
-| `Actions` | `Add a code action` | full-width button | opens a code-action editor |
-| `Actions` | `showValidationResult` | list row | trailing ✏️ edit, ⧉ duplicate, ✕ delete icons |
-| `Actions` | `loadCountries` | list row | same three icons |
-| `Form validator` | `Code` → `Edit code` | dashed-outline button | opens a code editor for a whole-form validator |
-| `Error settings` | `Show` | checkbox | unchecked |
-| `Error settings` | `Error Type` | token/select with ✕ | `Mui Error Wrapper` |
-| `Tooltip` | `Tooltip Type` | token/select with ✕ | `Mui Tooltip` |
-| `Modal` | `Modal Type` | token/select with ✕ | `Mui Dialog` |
-| `Language settings` | `Default Language` | token/select with ✕ | `English` |
+| Section             | Control                | Type                  | Value / options observed                       |
+| ------------------- | ---------------------- | --------------------- | ---------------------------------------------- |
+| `Actions`           | `Add a code action`    | full-width button     | opens a code-action editor                     |
+| `Actions`           | `showValidationResult` | list row              | trailing ✏️ edit, ⧉ duplicate, ✕ delete icons  |
+| `Actions`           | `loadCountries`        | list row              | same three icons                               |
+| `Form validator`    | `Code` → `Edit code`   | dashed-outline button | opens a code editor for a whole-form validator |
+| `Error settings`    | `Show`                 | checkbox              | unchecked                                      |
+| `Error settings`    | `Error Type`           | token/select with ✕   | `Mui Error Wrapper`                            |
+| `Tooltip`           | `Tooltip Type`         | token/select with ✕   | `Mui Tooltip`                                  |
+| `Modal`             | `Modal Type`           | token/select with ✕   | `Mui Dialog`                                   |
+| `Language settings` | `Default Language`     | token/select with ✕   | `English`                                      |
 
 Labels rendered in the link/accent blue (`Error Type`, `Tooltip Type`, `Modal Type`) indicate a value is set; `Show` and `Default Language` render in normal text.
 
 #### `LP-FORMS` — Forms list (Forms tab)
+
 - **Controls:** `Search...` input (same component as `LP-SEARCH`); `Add a new form` full-width button; a list of form rows.
 - **Row:** form name in accent blue + ✏️ (rename) + ✕ (delete). Demo contains exactly one: `MuiForm`.
 - **Data-driven:** Yes — the list is the project's form collection.
-- **States:** *selected* row has a filled background; *hover* reveals/highlights the row icons.
+- **States:** _selected_ row has a filled background; _hover_ reveals/highlights the row icons.
 
 #### `LP-COLLAPSE` / `RP-COLLAPSE` — Panel collapse handles
+
 - **Type:** Thin chevron affordance, vertically centred on the panel edge.
 - **Copy:** none (glyph only: `‹` / `›`).
 - **Behaviour:** Collapses its panel to zero width; the canvas expands to fill. The glyph flips direction and moves to the viewport edge to restore. Left and right are independent.
@@ -339,99 +345,103 @@ Labels rendered in the link/accent blue (`Error Type`, `Tooltip Type`, `Modal Ty
 
 Reading order, left to right.
 
-| ID | Type | Glyph / copy | Behaviour | States |
-|---|---|---|---|---|
-| `TB-MENU` | icon button (primary-filled) | hamburger | Opens the workspace main menu (below) | always filled blue `#169DE0` |
-| `TB-SAVE` | icon button | floppy disk | Saves the project **[ASSUMPTION — VERIFY]** to `localStorage` | enabled |
-| `TB-UNDO` | icon button | ↺ | Undo last edit | *disabled* (dimmed) when the undo stack is empty |
-| `TB-REDO` | icon button | ↻ | Redo | *disabled* (dimmed) when the redo stack is empty |
-| `TB-MODE` | primary pill button | `▶ Preview` / `✎ Edit` | Toggles edit ⇄ preview(testing) mode | edit-mode: blue `#169DE0`, label `Preview`; preview-mode: green, label `Edit`. Has an animated transition class (`_animatedButton_…`) |
-| `TB-ORIENT` | icon button | rotate glyph, tooltip `Orientation` | Portrait ⇄ landscape | **only rendered when Mobile or Tablet is active** |
-| `TB-DESKTOP` | icon toggle | monitor, tooltip `Desktop` | Full-width canvas | *active* = filled blue |
-| `TB-MOBILE` | icon toggle | phone | Phone-width canvas frame | *active* = filled blue |
-| `TB-TABLET` | icon toggle | tablet | Tablet-width canvas frame | *active* = filled blue |
-| `TB-JSON` | icon button | `</>`, tooltip `Edit JSON` | Opens the Edit JSON modal | — |
-| `TB-LANG` | select | `EN` + chevron | Switches the language the canvas renders strings in | scrollable list, same 12 languages as the Translation submenu |
-| `TB-THEME` | icon button | moon / sun, tooltip `Toggle theme` | Toggles the **rendered form's** light/dark theme only | persisted at `localStorage.formbuilder-mui-theme` |
+| ID           | Type                         | Glyph / copy                        | Behaviour                                                     | States                                                                                                                                |
+| ------------ | ---------------------------- | ----------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `TB-MENU`    | icon button (primary-filled) | hamburger                           | Opens the workspace main menu (below)                         | always filled blue `#169DE0`                                                                                                          |
+| `TB-SAVE`    | icon button                  | floppy disk                         | Saves the project **[ASSUMPTION — VERIFY]** to `localStorage` | enabled                                                                                                                               |
+| `TB-UNDO`    | icon button                  | ↺                                   | Undo last edit                                                | _disabled_ (dimmed) when the undo stack is empty                                                                                      |
+| `TB-REDO`    | icon button                  | ↻                                   | Redo                                                          | _disabled_ (dimmed) when the redo stack is empty                                                                                      |
+| `TB-MODE`    | primary pill button          | `▶ Preview` / `✎ Edit`              | Toggles edit ⇄ preview(testing) mode                          | edit-mode: blue `#169DE0`, label `Preview`; preview-mode: green, label `Edit`. Has an animated transition class (`_animatedButton_…`) |
+| `TB-ORIENT`  | icon button                  | rotate glyph, tooltip `Orientation` | Portrait ⇄ landscape                                          | **only rendered when Mobile or Tablet is active**                                                                                     |
+| `TB-DESKTOP` | icon toggle                  | monitor, tooltip `Desktop`          | Full-width canvas                                             | _active_ = filled blue                                                                                                                |
+| `TB-MOBILE`  | icon toggle                  | phone                               | Phone-width canvas frame                                      | _active_ = filled blue                                                                                                                |
+| `TB-TABLET`  | icon toggle                  | tablet                              | Tablet-width canvas frame                                     | _active_ = filled blue                                                                                                                |
+| `TB-JSON`    | icon button                  | `</>`, tooltip `Edit JSON`          | Opens the Edit JSON modal                                     | —                                                                                                                                     |
+| `TB-LANG`    | select                       | `EN` + chevron                      | Switches the language the canvas renders strings in           | scrollable list, same 12 languages as the Translation submenu                                                                         |
+| `TB-THEME`   | icon button                  | moon / sun, tooltip `Toggle theme`  | Toggles the **rendered form's** light/dark theme only         | persisted at `localStorage.formbuilder-mui-theme`                                                                                     |
 
 #### `TB-MENU-ITEMS` — Workspace main menu
 
 Vertical menu, each item icon + label:
 
-`Add a new form` · `Download` · `Upload` · `Translation ▸` · `Save` · `Save as...` · `Export forms` · `Import forms` · `Clear` · `Export JSON form schema` · `v10.2.0` *(disabled, informational)*
+`Add a new form` · `Download` · `Upload` · `Translation ▸` · `Save` · `Save as...` · `Export forms` · `Import forms` · `Clear` · `Export JSON form schema` · `v10.2.0` _(disabled, informational)_
 
 **`Translation ▸` submenu** — 12 rows, each `<CODE>` + native name; every non-English row carries a trailing "AI translate" glyph:
 
-`EN English` *(highlighted/current)* · `DE Deutsch` · `AR عربى` · `IT Italiano` · `FA فارسی` · `FR Français` · `HI हिन्दी` · `ES Español` · `JA 日本語` · `KO 한국어` · `SR Српски` · `ZH 中文`
+`EN English` _(highlighted/current)_ · `DE Deutsch` · `AR عربى` · `IT Italiano` · `FA فارسی` · `FR Français` · `HI हिन्दी` · `ES Español` · `JA 日本語` · `KO 한국어` · `SR Српски` · `ZH 中文`
 
 ### 4.3 Canvas
 
 #### `CV-VIEWPORT`
+
 - **Type:** Scrolling, bordered surface that renders the form with the real runtime renderer.
-- **States:** *edit* — components are inert (clicks select rather than activate) and hovering any component draws a **dashed blue outline**; *preview* — components are fully interactive.
+- **States:** _edit_ — components are inert (clicks select rather than activate) and hovering any component draws a **dashed blue outline**; _preview_ — components are fully interactive.
 
 #### `CV-SELECTION` — Selection frame + action badge
+
 - **Type:** Solid blue frame around the selected node plus a badge anchored top-right.
 - **Badge copy:** `<component key> (<component type>)` — e.g. `Last name (MuiTextField)`.
 - **Actions (icons, left→right), tooltips verbatim:**
 
-| Icon | Tooltip | Behaviour |
-|---|---|---|
-| `+` | `Add new element` | Opens a two-row flyout: `↑ Before` / `↓ After` — inserts a sibling at that position |
-| ⧉ | `Clone component` | Duplicates the node in place |
-| ⚑ | `Create a preset component` | Opens the *Please enter a preset name* modal |
-| 🗑 | `Remove component` | Deletes the node |
+| Icon | Tooltip                     | Behaviour                                                                           |
+| ---- | --------------------------- | ----------------------------------------------------------------------------------- |
+| `+`  | `Add new element`           | Opens a two-row flyout: `↑ Before` / `↓ After` — inserts a sibling at that position |
+| ⧉    | `Clone component`           | Duplicates the node in place                                                        |
+| ⚑    | `Create a preset component` | Opens the _Please enter a preset name_ modal                                        |
+| 🗑    | `Remove component`          | Deletes the node                                                                    |
 
 #### `CV-FORM` — The demo form's own content
 
 Rendered content in order, with verbatim copy. All of it is data-driven from the form definition (§7), **not** hard-coded page content.
 
-| # | Key | Type | Verbatim copy / config |
-|---|---|---|---|
-| 1 | `Header` | MuiTypography `h4` | `Complex Master Form` |
-| 2 | `Email hint` | MuiTypography | `Use a permanent address where you can receive mail.` |
-| 3 | `Main container` | MuiStack | `spacing: 10px`; wrapper CSS `padding: 10px; border: 1px solid lightgray; border-radius: 6px;` |
-| 4 | `First name` | MuiTextField | label `First name`; required; validations `[required]`; `autoValidate: true` |
-| 5 | `Last name` | MuiTextField | label `Last name`; required; validations `[required]` |
-| 6 | `Email` | MuiTextField | label `Email address`; validations `[email, required]` |
-| 7 | `Country 1` | MuiSelect | label `Country / Region`; items computed: `return form.state.countries` |
-| 8 | `Subheader` | MuiTypography `h5` | `Subheader inside the form` |
-| 9 | `Email hint 2` | MuiTypography | `Use a permanent address where you can receive mail.` |
-| 10 | `Street address` | MuiTextField | label `Street address` |
-| 11 | `City` / `State` / `ZIP` | MuiTextField ×3 in a MuiStack | labels `City`, `State / Province`, `ZIP / Postal` |
-| 12 | `Country 2/3/4` | MuiSelect ×3 in a MuiStack | label `Country / Region`; same computed items; `Country 2` has `onDidMount → loadCountries` |
-| 13 | `Website` | MuiTextField | label `Website`; placeholder `https://www.example.com`; validations `[url]` |
-| 14 | `About` | MuiTextField | label `About`; `multiline: true`; `rows: 4`; placeholder `you@example.com` *(see §12)* |
-| 15 | `About hint` | MuiTypography | `Brief description for your profile. URLs are hyperlinked. ` *(trailing space in source)* |
-| 16 | `Photo label` | MuiTypography | `Photo` |
-| 17 | `uploader1` | Uploader | `action: http://localhost:3001/upload`; `dropzone: false`; child button `muiButton1` (MuiButton, `variant: contained`) labelled `Upload` — rendered uppercase as `UPLOAD` by MUI |
-| 18 | `muiList1` → `repeater1` → `muiListItem1` → `muiTypography1` | MuiList / Repeater / MuiListItem / MuiTypography | Repeater value: `return form.data.uploader1?.map(item => item)`. Row text computed: `` return url ?? `${name ?? 'File name'} - ${error ?? status ?? 'status'}` ``; row `className` computed `form.data.status === 'error' ? 'error' : 'success'`. **Empty state:** placeholder row reads `File name - status`. |
-| 19 | `Notifications header` | MuiTypography | `Notifications` |
-| 20 | `Notifications hint` | MuiTypography | `Use a permanent address where you can receive mail.` |
-| 21 | `Email header` | MuiTypography (bold) | `By Email` |
-| 22 | `Comments checkbox` | MuiFormControlLabel (`control: Checkbox`) | label `Comments`; `checked: false` |
-| 23 | `Comments label` | MuiTypography | `Get notified when someones posts a comment on a posting.` *(typo in source)* |
-| 24 | `Candidates checkbox` | MuiFormControlLabel | label `Candidates`; `checked: false` |
-| 25 | `Candidates label` | MuiTypography | `Get notified when a candidate applies for a job.` |
-| 26 | `Offers checkbox` | MuiFormControlLabel | label `Offers`; `checked: false` |
-| 27 | `Offers label` | MuiTypography | `Get notified when a candidate accepts or rejects an offer.` |
-| 28 | `Push header` | MuiTypography (bold) | `Push Notifications` |
-| 29 | `Push hint` | MuiTypography | `These are delivered via SMS to your mobile phone.` |
-| 30 | `Push select` | MuiRadioGroup | `name: Push notifications`; renders MUI's default group label `Label` |
-| 31 | `Push everything` / `Push same as email` / `Push none` | MuiRadioItem ×3 | values & labels `Everything`, `Same as email`, `No push notifications` |
-| 32 | `Save button` | MuiButton | `variant: contained`, `size: small`, text `Save` (rendered `SAVE`); `onClick: [validate (common), showValidationResult (code)]` |
-| 33 | `errorMessage` | MuiTypography | `Not all fields of the form are filled in correctly. Correct the values of the form fields and try again.`; `sx.color: red`; `renderWhen: false` (hidden until toggled by `showValidationResult`) |
-| 34 | `successMessage` | MuiTypography | `The form has been sent, thank you!`; `sx.color: green`; `renderWhen: false` |
+| #   | Key                                                          | Type                                             | Verbatim copy / config                                                                                                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `Header`                                                     | MuiTypography `h4`                               | `Complex Master Form`                                                                                                                                                                                                                                                                                          |
+| 2   | `Email hint`                                                 | MuiTypography                                    | `Use a permanent address where you can receive mail.`                                                                                                                                                                                                                                                          |
+| 3   | `Main container`                                             | MuiStack                                         | `spacing: 10px`; wrapper CSS `padding: 10px; border: 1px solid lightgray; border-radius: 6px;`                                                                                                                                                                                                                 |
+| 4   | `First name`                                                 | MuiTextField                                     | label `First name`; required; validations `[required]`; `autoValidate: true`                                                                                                                                                                                                                                   |
+| 5   | `Last name`                                                  | MuiTextField                                     | label `Last name`; required; validations `[required]`                                                                                                                                                                                                                                                          |
+| 6   | `Email`                                                      | MuiTextField                                     | label `Email address`; validations `[email, required]`                                                                                                                                                                                                                                                         |
+| 7   | `Country 1`                                                  | MuiSelect                                        | label `Country / Region`; items computed: `return form.state.countries`                                                                                                                                                                                                                                        |
+| 8   | `Subheader`                                                  | MuiTypography `h5`                               | `Subheader inside the form`                                                                                                                                                                                                                                                                                    |
+| 9   | `Email hint 2`                                               | MuiTypography                                    | `Use a permanent address where you can receive mail.`                                                                                                                                                                                                                                                          |
+| 10  | `Street address`                                             | MuiTextField                                     | label `Street address`                                                                                                                                                                                                                                                                                         |
+| 11  | `City` / `State` / `ZIP`                                     | MuiTextField ×3 in a MuiStack                    | labels `City`, `State / Province`, `ZIP / Postal`                                                                                                                                                                                                                                                              |
+| 12  | `Country 2/3/4`                                              | MuiSelect ×3 in a MuiStack                       | label `Country / Region`; same computed items; `Country 2` has `onDidMount → loadCountries`                                                                                                                                                                                                                    |
+| 13  | `Website`                                                    | MuiTextField                                     | label `Website`; placeholder `https://www.example.com`; validations `[url]`                                                                                                                                                                                                                                    |
+| 14  | `About`                                                      | MuiTextField                                     | label `About`; `multiline: true`; `rows: 4`; placeholder `you@example.com` _(see §12)_                                                                                                                                                                                                                         |
+| 15  | `About hint`                                                 | MuiTypography                                    | `Brief description for your profile. URLs are hyperlinked. ` _(trailing space in source)_                                                                                                                                                                                                                      |
+| 16  | `Photo label`                                                | MuiTypography                                    | `Photo`                                                                                                                                                                                                                                                                                                        |
+| 17  | `uploader1`                                                  | Uploader                                         | `action: http://localhost:3001/upload`; `dropzone: false`; child button `muiButton1` (MuiButton, `variant: contained`) labelled `Upload` — rendered uppercase as `UPLOAD` by MUI                                                                                                                               |
+| 18  | `muiList1` → `repeater1` → `muiListItem1` → `muiTypography1` | MuiList / Repeater / MuiListItem / MuiTypography | Repeater value: `return form.data.uploader1?.map(item => item)`. Row text computed: `` return url ?? `${name ?? 'File name'} - ${error ?? status ?? 'status'}` ``; row `className` computed `form.data.status === 'error' ? 'error' : 'success'`. **Empty state:** placeholder row reads `File name - status`. |
+| 19  | `Notifications header`                                       | MuiTypography                                    | `Notifications`                                                                                                                                                                                                                                                                                                |
+| 20  | `Notifications hint`                                         | MuiTypography                                    | `Use a permanent address where you can receive mail.`                                                                                                                                                                                                                                                          |
+| 21  | `Email header`                                               | MuiTypography (bold)                             | `By Email`                                                                                                                                                                                                                                                                                                     |
+| 22  | `Comments checkbox`                                          | MuiFormControlLabel (`control: Checkbox`)        | label `Comments`; `checked: false`                                                                                                                                                                                                                                                                             |
+| 23  | `Comments label`                                             | MuiTypography                                    | `Get notified when someones posts a comment on a posting.` _(typo in source)_                                                                                                                                                                                                                                  |
+| 24  | `Candidates checkbox`                                        | MuiFormControlLabel                              | label `Candidates`; `checked: false`                                                                                                                                                                                                                                                                           |
+| 25  | `Candidates label`                                           | MuiTypography                                    | `Get notified when a candidate applies for a job.`                                                                                                                                                                                                                                                             |
+| 26  | `Offers checkbox`                                            | MuiFormControlLabel                              | label `Offers`; `checked: false`                                                                                                                                                                                                                                                                               |
+| 27  | `Offers label`                                               | MuiTypography                                    | `Get notified when a candidate accepts or rejects an offer.`                                                                                                                                                                                                                                                   |
+| 28  | `Push header`                                                | MuiTypography (bold)                             | `Push Notifications`                                                                                                                                                                                                                                                                                           |
+| 29  | `Push hint`                                                  | MuiTypography                                    | `These are delivered via SMS to your mobile phone.`                                                                                                                                                                                                                                                            |
+| 30  | `Push select`                                                | MuiRadioGroup                                    | `name: Push notifications`; renders MUI's default group label `Label`                                                                                                                                                                                                                                          |
+| 31  | `Push everything` / `Push same as email` / `Push none`       | MuiRadioItem ×3                                  | values & labels `Everything`, `Same as email`, `No push notifications`                                                                                                                                                                                                                                         |
+| 32  | `Save button`                                                | MuiButton                                        | `variant: contained`, `size: small`, text `Save` (rendered `SAVE`); `onClick: [validate (common), showValidationResult (code)]`                                                                                                                                                                                |
+| 33  | `errorMessage`                                               | MuiTypography                                    | `Not all fields of the form are filled in correctly. Correct the values of the form fields and try again.`; `sx.color: red`; `renderWhen: false` (hidden until toggled by `showValidationResult`)                                                                                                              |
+| 34  | `successMessage`                                             | MuiTypography                                    | `The form has been sent, thank you!`; `sx.color: green`; `renderWhen: false`                                                                                                                                                                                                                                   |
 
 ### 4.4 Right panel (properties)
 
 #### `RP-TABS`
+
 - **Type:** Icon+label tab bar: `Main`, `Style`, `Actions`, `Rules`.
 - **Default:** restored from `localStorage.propertiesActiveTab`.
 - **Accents (CSS vars):** `Main → var(--rs-navs-selected)` (blue), `Style → #f67f1f` (orange), `Actions → violet`, `Rules → var(--rs-green-600)` (green).
 - **Empty state (nothing selected):** body shows only `Select element on form for edit properties`.
 
 #### `RP-PROPROW` — Generic property row
+
 Every property in `Main` and most in `Style` share one row anatomy:
 
 `[✏️ calculable/localize toggle] [Label] [editor control] [✕ clear]`
@@ -442,53 +452,55 @@ Every property in `Main` and most in `Style` share one row anatomy:
 
 #### `RP-MAIN` — Main tab, `MuiTextField` (representative)
 
-| Property | Control | Default | Options / constraints |
-|---|---|---|---|
-| `Key *` | text + ✓ confirm | `Last name` | **Required.** Unique component identifier. |
-| `Data key` | text | empty | Overrides the data-object key |
-| `Value` | text | empty | Initial value |
-| `Type` | select | `Text` | `Text, Number, Password, Date, Time, Datetime Local, Month, Week, Range, Color` |
-| `Multiline` | checkbox | unchecked | |
-| `Max rows` | number spinner | empty | |
-| `Variant` | select, placeholder `Select` | unset | `Standard, Outlined, Filled` |
-| `Label` | text | `Last name` | |
-| `Required` | checkbox | checked | |
-| `Disabled` | checkbox | unchecked | |
-| `Error` | checkbox | unchecked | |
-| `Helper text` | text | empty | |
-| `Read only` | checkbox | unchecked | |
-| `Size` | select, placeholder `Select` | unset | `Small, Medium` |
-| `Margin` | select, placeholder `Select` | unset | `Dense, Normal, None` |
-| `Tooltip` | checkbox (section header) | unchecked | see below |
-| **`Additional properties`** | section header | | |
-| `Render When` | text/expression | empty | Conditional visibility |
-| `HTML attributes` | key/value table + `+` button | empty | Columns `Name`, `Value`; **empty state** `No data found`; a `Loading...` string exists in the DOM for the async state |
+| Property                    | Control                      | Default     | Options / constraints                                                                                                 |
+| --------------------------- | ---------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Key *`                     | text + ✓ confirm             | `Last name` | **Required.** Unique component identifier.                                                                            |
+| `Data key`                  | text                         | empty       | Overrides the data-object key                                                                                         |
+| `Value`                     | text                         | empty       | Initial value                                                                                                         |
+| `Type`                      | select                       | `Text`      | `Text, Number, Password, Date, Time, Datetime Local, Month, Week, Range, Color`                                       |
+| `Multiline`                 | checkbox                     | unchecked   |                                                                                                                       |
+| `Max rows`                  | number spinner               | empty       |                                                                                                                       |
+| `Variant`                   | select, placeholder `Select` | unset       | `Standard, Outlined, Filled`                                                                                          |
+| `Label`                     | text                         | `Last name` |                                                                                                                       |
+| `Required`                  | checkbox                     | checked     |                                                                                                                       |
+| `Disabled`                  | checkbox                     | unchecked   |                                                                                                                       |
+| `Error`                     | checkbox                     | unchecked   |                                                                                                                       |
+| `Helper text`               | text                         | empty       |                                                                                                                       |
+| `Read only`                 | checkbox                     | unchecked   |                                                                                                                       |
+| `Size`                      | select, placeholder `Select` | unset       | `Small, Medium`                                                                                                       |
+| `Margin`                    | select, placeholder `Select` | unset       | `Dense, Normal, None`                                                                                                 |
+| `Tooltip`                   | checkbox (section header)    | unchecked   | see below                                                                                                             |
+| **`Additional properties`** | section header               |             |                                                                                                                       |
+| `Render When`               | text/expression              | empty       | Conditional visibility                                                                                                |
+| `HTML attributes`           | key/value table + `+` button | empty       | Columns `Name`, `Value`; **empty state** `No data found`; a `Loading...` string exists in the DOM for the async state |
 
 **`Tooltip` sub-properties** (revealed only when the `Tooltip` checkbox is checked):
 `Arrow`, `Disable Focus Listener`, `Disable Interactive`, `Disable Hover Listener`, `Disable Touch Listener`, `Follow Cursor`, `Enter Delay`, `Leave Delay`, `Placement` (select), `Title`.
 
 #### `RP-MAIN` — Main tab, `MuiSelect` (to show the schema is per-type)
+
 `Key`, `Data key`, `Value`, `Items`, `Variant`, `Size`, `Label`, `Required`, `Disabled`, `Error`, `Helper text`, `Read only`, `Tooltip`, `Additional properties → Render When`, `HTML attributes`.
 
 > The Main tab is **fully schema-driven per component type**. A developer must not hard-code these rows; they come from the component's declared property metadata.
 
 #### `RP-STYLE` — Style tab
 
-| Group | Control | Notes |
-|---|---|---|
-| — | `For device` (select, right-aligned) | `Any` (default), `Desktop`, `Mobile`, `Tablet`. Scopes every value below to that breakpoint. |
-| `Component` | `Class Name` (text + ✕) | |
-| `Wrapper` | `Width` | number spinner + unit select; demo value `100` `%` |
-| `Wrapper` | `Height` | number spinner + unit select |
-| `Wrapper` | `Margin Top` / `Margin Right` / `Margin Bottom` / `Margin Left` | number spinner + unit select |
-| `Wrapper` | `Color`, `Background Color` | colour swatch pickers (checkerboard = transparent/unset) + ✕ |
-| `Styles for className` | section header with tooltip `CSS styles that are applied via the 'className' property` | |
-| `Styles for className` | tabs `Component` \| `Wrapper` | |
-| `Styles for className` | CSS code editor | seeded with `element.style {` / `}` |
+| Group                  | Control                                                                                | Notes                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| —                      | `For device` (select, right-aligned)                                                   | `Any` (default), `Desktop`, `Mobile`, `Tablet`. Scopes every value below to that breakpoint. |
+| `Component`            | `Class Name` (text + ✕)                                                                |                                                                                              |
+| `Wrapper`              | `Width`                                                                                | number spinner + unit select; demo value `100` `%`                                           |
+| `Wrapper`              | `Height`                                                                               | number spinner + unit select                                                                 |
+| `Wrapper`              | `Margin Top` / `Margin Right` / `Margin Bottom` / `Margin Left`                        | number spinner + unit select                                                                 |
+| `Wrapper`              | `Color`, `Background Color`                                                            | colour swatch pickers (checkerboard = transparent/unset) + ✕                                 |
+| `Styles for className` | section header with tooltip `CSS styles that are applied via the 'className' property` |                                                                                              |
+| `Styles for className` | tabs `Component` \| `Wrapper`                                                          |                                                                                              |
+| `Styles for className` | CSS code editor                                                                        | seeded with `element.style {` / `}`                                                          |
 
 **Unit select options (all dimension fields):** `px`, `%`, `em`, `vw`, `vh`, `max-content`, `min-content`, `fit-content`, `auto`.
 
 #### `RP-ACTIONS` — Actions tab
+
 - **Type:** One section per lifecycle/DOM event supported by the selected component type, each with a full-width `+  Add an action` button.
 - **Observed event sets:** `MuiTextField` → `onChange`, `onDidMount`, `onWillUnmount`. `MuiStack` → `onDidMount`, `onWillUnmount`. `MuiButton` (`Save button`) → `onClick` (+ mount hooks). **The set is type-dependent.**
 - **`Add an action` menu:** two submenus.
@@ -496,53 +508,58 @@ Every property in `Main` and most in `Style` share one row anatomy:
   - `Code ▸` → the project's code actions (`showValidationResult`, `loadCountries`) plus `+ Add a code action`
 
 #### `RP-RULES` — Rules tab
+
 - `Auto Validate` — checkbox with ✕ (checked for `First name`).
 - `Add a validation rule` — full-width button. Menu: `Non empty`, `Length`, `Min`, `Max`, `Regex`, `Email`, `Url`, `Uuid`, `Ip`, `Datetime`, `Includes`, `Starts with`, `Ends with`, `Code`.
 - **Rule card** — header = rule name (e.g. `Required`) + ✕ remove; body = property rows `Message` and `Validate when`, each with the ✏️ calculable toggle and ✕ clear.
-- **Empty state:** for a non-input component (e.g. `MuiStack`) the Rules tab body is **completely empty** — no message. *(See §12.)*
+- **Empty state:** for a non-input component (e.g. `MuiStack`) the Rules tab body is **completely empty** — no message. _(See §12.)_
 
 ### 4.5 Bottom property panel
 
 #### `BP-PANEL`
+
 - **Header:** `Edit property: <Key>.<Property>` (e.g. `Edit property: Last name.Label`), then the word `Use`, then a segmented control.
 - **Segmented control:** `Calculable value` | `Localization` | `Simple value` (active item underlined in accent blue). Default `Simple value`.
 - **Footer (always):** `Save` (primary) and `Close` (ghost).
 - **Height:** 380 px default, persisted at `localStorage.formbuilder-mui-bottomPanelHeight`; resizable by dragging the panel's top edge **[ASSUMPTION — VERIFY]**.
 
-| Tab | Body |
-|---|---|
-| `Simple value` | Single centred message: `Edit the property in the right panel` |
+| Tab                | Body                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Simple value`     | Single centred message: `Edit the property in the right panel`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `Calculable value` | **Left:** JS code editor (Monaco, line numbers, minimap) seeded with:<br>`/**`<br>` * @param {IFormData} form`<br>` * @return {string}`<br>` */`<br>`function Calculation (form) {`<br>`// enter your code here`<br>`}`<br>**Right:** pane titled `Test form data` containing an editable JSON object `{ "data": { … }, "errors": {} }` prefilled with the form's current data.<br>**Bottom bar:** `▶ Run` primary button (left of centre-right) and `Autorun` checkbox (far right, persisted at `localStorage.formbuilder-mui-testingAutorun`). |
-| `Localization` | Properties-file editor showing `<Key>_<property> = <value>` (e.g. `Last_name_label = Last name`). Footer gains a language select (`EN`) and a `Clear` button beside `Save` / `Close`. `Test form data` pane remains on the right. |
+| `Localization`     | Properties-file editor showing `<Key>_<property> = <value>` (e.g. `Last_name_label = Last name`). Footer gains a language select (`EN`) and a `Clear` button beside `Save` / `Close`. `Test form data` pane remains on the right.                                                                                                                                                                                                                                                                                                                |
 
 ### 4.6 Preview / testing mode (left panel replacement)
 
-| ID | Type | Copy | Behaviour |
-|---|---|---|---|
-| `PV-DATA-HDR` | section heading | `Data` | |
-| `PV-VALIDATE` | ghost button w/ icon | `Validate` | Runs all validations; paints failing fields and fills `Errors` |
-| `PV-RESET` | ghost button | `Reset to default` | Restores declared default data |
-| `PV-CLEAR` | ghost button | `Clear` | Empties the data object |
-| `PV-DATA` | read-only JSON viewer | initial: `{ "repeater1": [], "Comments checkbox": false, "Candidates checkbox": false, "Offers checkbox": false }` | Updates live on every keystroke/selection in the canvas |
-| `PV-ERR-HDR` | section heading | `Errors` | |
-| `PV-ERRORS` | read-only JSON viewer | `{}` when valid | After a failed `Validate`: `{ "First name": "Required", "Last name": "Required", "Email": "Required", "Website": "Required" }` |
+| ID            | Type                  | Copy                                                                                                               | Behaviour                                                                                                                      |
+| ------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `PV-DATA-HDR` | section heading       | `Data`                                                                                                             |                                                                                                                                |
+| `PV-VALIDATE` | ghost button w/ icon  | `Validate`                                                                                                         | Runs all validations; paints failing fields and fills `Errors`                                                                 |
+| `PV-RESET`    | ghost button          | `Reset to default`                                                                                                 | Restores declared default data                                                                                                 |
+| `PV-CLEAR`    | ghost button          | `Clear`                                                                                                            | Empties the data object                                                                                                        |
+| `PV-DATA`     | read-only JSON viewer | initial: `{ "repeater1": [], "Comments checkbox": false, "Candidates checkbox": false, "Offers checkbox": false }` | Updates live on every keystroke/selection in the canvas                                                                        |
+| `PV-ERR-HDR`  | section heading       | `Errors`                                                                                                           |                                                                                                                                |
+| `PV-ERRORS`   | read-only JSON viewer | `{}` when valid                                                                                                    | After a failed `Validate`: `{ "First name": "Required", "Last name": "Required", "Email": "Required", "Website": "Required" }` |
 
 The right properties panel is emptied in this mode; the left tab bar is hidden.
 
 ### 4.7 Modals
 
 #### `MD-JSON` — Edit JSON
+
 - **Title:** `Edit JSON`; close `✕` top-right. Fills ~100 % of the viewport.
 - **Body:** Monaco JSON editor, line numbers, syntax highlighting, code minimap, word-wrap on. Demo document is **803 lines**.
 - **Footer:** none observed — edits appear to apply live/on close. **[ASSUMPTION — VERIFY]**
 
 #### `MD-PRESET` — Create a preset component
+
 - **Title:** `Please enter a preset name`; close `✕`.
 - **Fields:** `Name` (text, placeholder `Enter a preset name`), `Category` (select, placeholder `Select`).
 - **Category options:** `inputs`, `dataDisplay`, `feedback`, `layout`, `surfaces`, `navigation`, `form`, `templates`, `structure`, `modal` — i.e. the palette group ids.
 - **Buttons:** `OK` (primary), `Cancel` (ghost).
 
 #### `MD-NEWFORM` — Add a new form
+
 - **Title:** `Please enter form name`; close `✕`.
 - **Fields:** one unlabeled text input (autofocused, no placeholder).
 - **Buttons:** `OK` (primary), `Cancel` (ghost).
@@ -559,15 +576,15 @@ The right properties panel is emptied in this mode; the left tab bar is hidden.
 
 ### Conditional / dependent UI
 
-| Trigger | Dependent result |
-|---|---|
-| `Tooltip` checkbox → checked | Reveals 10 tooltip sub-property rows |
-| Viewport = Mobile or Tablet | Reveals the `Orientation` toolbar button |
-| Component type | Determines which `Main` rows, which `Actions` event groups, and whether `Rules` has content |
-| ✏️ on a property row | Opens/reroutes the bottom panel to that property |
-| Selection = none | Right panel shows its empty-state message |
-| UI kit change (external top bar) | Replaces palette, renderer, sample form, and resets form data |
-| `renderWhen: false` on a component | Component is hidden at runtime (used by `errorMessage` / `successMessage`) |
+| Trigger                            | Dependent result                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| `Tooltip` checkbox → checked       | Reveals 10 tooltip sub-property rows                                                        |
+| Viewport = Mobile or Tablet        | Reveals the `Orientation` toolbar button                                                    |
+| Component type                     | Determines which `Main` rows, which `Actions` event groups, and whether `Rules` has content |
+| ✏️ on a property row               | Opens/reroutes the bottom panel to that property                                            |
+| Selection = none                   | Right panel shows its empty-state message                                                   |
+| UI kit change (external top bar)   | Replaces palette, renderer, sample form, and resets form data                               |
+| `renderWhen: false` on a component | Component is hidden at runtime (used by `errorMessage` / `successMessage`)                  |
 
 ### Event flows
 
@@ -584,14 +601,14 @@ The right properties panel is emptied in this mode; the left tab bar is hidden.
 
 ### Client-side feedback
 
-| Mechanism | Where |
-|---|---|
+| Mechanism                                                          | Where                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Tooltips** (dark rounded, ~500 ms delay, below/right of trigger) | `Edit JSON`, `Desktop`, `Orientation`, `Toggle theme`, all four canvas-overlay icons, `Make this property calculable or localize`, `CSS styles that are applied via the 'className' property`. **Not** present on the ☰ menu, save, undo, or redo buttons. |
-| **Flyout menus** | ☰ main menu (with `Translation ▸` submenu), `Add an action` (`Common ▸` / `Code ▸`), `Add a validation rule`, overlay `+` (`Before` / `After`) |
-| **Modals** | `Edit JSON`, `Please enter a preset name`, `Please enter form name` |
-| **Inline messages** | Field-level `Required` helper text; form-level red/green messages; `Not found`; `No data found`; `Select element on form for edit properties`; `Edit the property in the right panel` |
-| **Toasts / snackbars** | **None observed.** |
-| **Loading spinners** | None observed on the shell; the string `Loading...` exists in the HTML-attributes table markup. |
+| **Flyout menus**                                                   | ☰ main menu (with `Translation ▸` submenu), `Add an action` (`Common ▸` / `Code ▸`), `Add a validation rule`, overlay `+` (`Before` / `After`)                                                                                                             |
+| **Modals**                                                         | `Edit JSON`, `Please enter a preset name`, `Please enter form name`                                                                                                                                                                                         |
+| **Inline messages**                                                | Field-level `Required` helper text; form-level red/green messages; `Not found`; `No data found`; `Select element on form for edit properties`; `Edit the property in the right panel`                                                                       |
+| **Toasts / snackbars**                                             | **None observed.**                                                                                                                                                                                                                                          |
+| **Loading spinners**                                               | None observed on the shell; the string `Loading...` exists in the HTML-attributes table markup.                                                                                                                                                             |
 
 ### Animations / transitions
 
@@ -602,13 +619,13 @@ The right properties panel is emptied in this mode; the left tab bar is hidden.
 
 ### Keyboard
 
-| Key | Effect | Confidence |
-|---|---|---|
-| `Delete` | Removes the selected canvas component; selection moves to a sibling | **Verified** |
-| `Ctrl+Z` | Undo | **Verified** |
-| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo | **[ASSUMPTION — VERIFY]** |
-| `Escape` | Closed the flyout menus and modals inconsistently in testing — some menus required an outside click | **[ASSUMPTION — VERIFY]** |
-| `Tab` | Standard browser focus order; no custom roving-tabindex observed | **[INFERRED]** |
+| Key                       | Effect                                                                                              | Confidence                |
+| ------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------- |
+| `Delete`                  | Removes the selected canvas component; selection moves to a sibling                                 | **Verified**              |
+| `Ctrl+Z`                  | Undo                                                                                                | **Verified**              |
+| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo                                                                                                | **[ASSUMPTION — VERIFY]** |
+| `Escape`                  | Closed the flyout menus and modals inconsistently in testing — some menus required an outside click | **[ASSUMPTION — VERIFY]** |
+| `Tab`                     | Standard browser focus order; no custom roving-tabindex observed                                    | **[INFERRED]**            |
 
 No shortcut cheatsheet or help affordance exists on the page.
 
@@ -618,11 +635,11 @@ No shortcut cheatsheet or help affordance exists on the page.
 
 ### Builder-level (authoring UI)
 
-| Field | Rule | Message |
-|---|---|---|
-| Right panel `Key` | Marked required with a red `*`; has a ✓ confirm affordance | **No error text observed** when cleared |
-| `Please enter form name` → `OK` with empty input | Submission is silently blocked; modal stays open | **None — no message rendered.** |
-| `Please enter a preset name` → `OK` with empty `Name` | **[ASSUMPTION — VERIFY]** presumed same silent block | — |
+| Field                                                 | Rule                                                       | Message                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------- |
+| Right panel `Key`                                     | Marked required with a red `*`; has a ✓ confirm affordance | **No error text observed** when cleared |
+| `Please enter form name` → `OK` with empty input      | Submission is silently blocked; modal stays open           | **None — no message rendered.**         |
+| `Please enter a preset name` → `OK` with empty `Name` | **[ASSUMPTION — VERIFY]** presumed same silent block       | —                                       |
 
 > **Gap:** the authoring UI blocks invalid submits **without telling the user why**. A rebuild should add inline error copy (e.g. `Form name is required.`).
 
@@ -630,13 +647,13 @@ No shortcut cheatsheet or help affordance exists on the page.
 
 Validation is declarative per component: `schema.validations: [{key: "<rule>"}]` plus an optional per-rule `Message` and `Validate when`. When no custom `Message` is set, the runtime supplies the rule's default text.
 
-| Field | Rules | Message shown (verbatim) |
-|---|---|---|
-| `First name` | `required` (`autoValidate: true`) | `Required` |
-| `Last name` | `required` | `Required` |
-| `Email` | `email`, `required` | `Required` (empty case) |
-| `Website` | `url` | `Required` (empty case — see below) |
-| all others | none | — |
+| Field        | Rules                             | Message shown (verbatim)            |
+| ------------ | --------------------------------- | ----------------------------------- |
+| `First name` | `required` (`autoValidate: true`) | `Required`                          |
+| `Last name`  | `required`                        | `Required`                          |
+| `Email`      | `email`, `required`               | `Required` (empty case)             |
+| `Website`    | `url`                             | `Required` (empty case — see below) |
+| all others   | none                              | —                                   |
 
 **Error presentation:** the field's outline, label, and helper text all turn red (`MuiErrorWrapper`, configured in Settings → `Error Type`); the message renders as helper text directly below the control. The `Errors` box in preview mode mirrors this as a flat `{ "<key>": "<message>" }` object.
 
@@ -644,9 +661,9 @@ Validation is declarative per component: `schema.validations: [{key: "<rule>"}]`
 
 **Submit-blocking:** `SAVE` is never disabled. Clicking it always runs `validate`, then `showValidationResult` reveals exactly one of:
 
-> `Not all fields of the form are filled in correctly. Correct the values of the form fields and try again.` *(red)*
+> `Not all fields of the form are filled in correctly. Correct the values of the form fields and try again.` _(red)_
 
-> `The form has been sent, thank you!` *(green)*
+> `The form has been sent, thank you!` _(green)_
 
 ### Server / network failures
 
@@ -660,13 +677,15 @@ Validation is declarative per component: `schema.validations: [{key: "<rule>"}]`
 ### 7.1 Entities
 
 #### `Project` (the workspace)
-| Field | Type | Notes |
-|---|---|---|
-| `forms` | `Form[]` | Rendered by the Forms tab; demo has one |
-| `activeFormName` | `string` | `MuiForm` |
-| `uiKit` | `"rsuite-inject-css" \| "mui" \| "mantine"` | Set by the excluded top bar; namespaces all persistence |
+
+| Field            | Type                                        | Notes                                                   |
+| ---------------- | ------------------------------------------- | ------------------------------------------------------- |
+| `forms`          | `Form[]`                                    | Rendered by the Forms tab; demo has one                 |
+| `activeFormName` | `string`                                    | `MuiForm`                                               |
+| `uiKit`          | `"rsuite-inject-css" \| "mui" \| "mantine"` | Set by the excluded top bar; namespaces all persistence |
 
 #### `Form` (the JSON document edited by `Edit JSON`)
+
 Top-level shape, verbatim key names:
 
 ```jsonc
@@ -676,29 +695,36 @@ Top-level shape, verbatim key names:
   "tooltipType": "MuiTooltip",
   "modalType": "MuiDialog",
   "errorType": "MuiErrorWrapper",
-  "form": { /* root ComponentNode, type "Screen" */ },
+  "form": {/* root ComponentNode, type "Screen" */},
   "languages": [
-    { "code": "en", "dialect": "US", "name": "English",
-      "description": "American English", "bidi": "ltr" }
+    {
+      "code": "en",
+      "dialect": "US",
+      "name": "English",
+      "description": "American English",
+      "bidi": "ltr",
+    },
   ],
-  "defaultLanguage": "en-US"
+  "defaultLanguage": "en-US",
 }
 ```
 
 #### `ComponentNode` (recursive)
-| Field | Type | Notes |
-|---|---|---|
-| `key` | `string` | **Required, unique.** Doubles as the data key unless `dataKey` overrides it |
-| `type` | `string` | Kit-scoped component id, e.g. `MuiTextField`, `MuiStack`, `Repeater`, `Uploader` |
-| `props` | `Record<string, PropValue>` | Per-type; see below |
-| `schema` | `{ type: "string" \| …, validations: Validation[], autoValidate?: boolean }` | Present on data-bound components |
-| `events` | `Record<EventName, ActionRef[]>` | `onChange`, `onClick`, `onDidMount`, `onWillUnmount` |
-| `children` | `ComponentNode[]` | Containers only |
-| `css` | `{ [device]: { string: "<css text>" } }` | `device` ∈ `any \| desktop \| mobile \| tablet` |
-| `wrapperCss` | `{ [device]: { object: {…} } }` | Style-tab wrapper values |
-| `renderWhen` | `PropValue` | Conditional visibility |
+
+| Field        | Type                                                                         | Notes                                                                            |
+| ------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `key`        | `string`                                                                     | **Required, unique.** Doubles as the data key unless `dataKey` overrides it      |
+| `type`       | `string`                                                                     | Kit-scoped component id, e.g. `MuiTextField`, `MuiStack`, `Repeater`, `Uploader` |
+| `props`      | `Record<string, PropValue>`                                                  | Per-type; see below                                                              |
+| `schema`     | `{ type: "string" \| …, validations: Validation[], autoValidate?: boolean }` | Present on data-bound components                                                 |
+| `events`     | `Record<EventName, ActionRef[]>`                                             | `onChange`, `onClick`, `onDidMount`, `onWillUnmount`                             |
+| `children`   | `ComponentNode[]`                                                            | Containers only                                                                  |
+| `css`        | `{ [device]: { string: "<css text>" } }`                                     | `device` ∈ `any \| desktop \| mobile \| tablet`                                  |
+| `wrapperCss` | `{ [device]: { object: {…} } }`                                              | Style-tab wrapper values                                                         |
+| `renderWhen` | `PropValue`                                                                  | Conditional visibility                                                           |
 
 #### `PropValue` (discriminated by presence of `computeType`)
+
 ```jsonc
 { "value": "First name" }                                      // simple
 { "value": "…", "editorType": "string" }                       // simple, typed editor
@@ -706,47 +732,52 @@ Top-level shape, verbatim key names:
 ```
 
 #### `Validation`
+
 `{ "key": "required" | "email" | "url" | "nonEmpty" | "length" | "min" | "max" | "regex" | "uuid" | "ip" | "datetime" | "includes" | "startsWith" | "endsWith" | "code", "message"?: string, "validateWhen"?: PropValue }`
 
 #### `CodeAction`
+
 `{ name: string, body: string /* JS */, params: object }` — referenced from events as `{ "name": "loadCountries", "type": "code" }`. Common actions are referenced as `{ "name": "validate", "type": "common" }`.
 
 #### `Preset`
+
 `{ name: string, category: "inputs" | "dataDisplay" | "feedback" | "layout" | "surfaces" | "navigation" | "form" | "templates" | "structure" | "modal", node: ComponentNode }`
 
 #### `Language`
+
 `{ code, dialect, name, description, bidi }` + a translation bundle of `<Key>_<property> = <text>` pairs.
 
 #### `FormData` (runtime, shown in preview)
+
 Keyed by component `key`: `{ "First name": "", "Comments checkbox": false, "repeater1": [], … }`, with a sibling `errors: Record<key, message>`.
 
 ### 7.2 Static vs. dynamic
 
-| Element | Source |
-|---|---|
-| Panel tab labels, toolbar, menus, modal copy | **Static** application chrome |
-| Component palette + groups | **Dynamic** — supplied by the active UI-kit registry |
-| Tree, canvas, right-panel property rows, Actions event groups, Rules content | **Dynamic** — derived from the `Form` document + per-type component metadata |
-| Forms list | **Dynamic** — the project's form collection |
-| `Country / Region` options | **Dynamic at runtime** — `fetch('https://gist.githubusercontent.com/rogargon/5534902/raw/434445021e155240ca78e378f10f70391dd594ea/countries.json')`, mapped to `{value, label}` |
-| Uploaded file list | **Dynamic at runtime** — `Repeater` over `form.data.uploader1` |
-| Translation language list | **Dynamic** — the `languages` array |
+| Element                                                                      | Source                                                                                                                                                                          |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Panel tab labels, toolbar, menus, modal copy                                 | **Static** application chrome                                                                                                                                                   |
+| Component palette + groups                                                   | **Dynamic** — supplied by the active UI-kit registry                                                                                                                            |
+| Tree, canvas, right-panel property rows, Actions event groups, Rules content | **Dynamic** — derived from the `Form` document + per-type component metadata                                                                                                    |
+| Forms list                                                                   | **Dynamic** — the project's form collection                                                                                                                                     |
+| `Country / Region` options                                                   | **Dynamic at runtime** — `fetch('https://gist.githubusercontent.com/rogargon/5534902/raw/434445021e155240ca78e378f10f70391dd594ea/countries.json')`, mapped to `{value, label}` |
+| Uploaded file list                                                           | **Dynamic at runtime** — `Repeater` over `form.data.uploader1`                                                                                                                  |
+| Translation language list                                                    | **Dynamic** — the `languages` array                                                                                                                                             |
 
 ### 7.3 Persistence — the demo is client-only
 
 There is **no application backend**. All editor state lives in `localStorage`, namespaced by UI kit:
 
-| Key | Observed value | Purpose |
-|---|---|---|
-| `formbuilder-view-name` | `mui` | Active UI kit |
-| `formbuilder-mui-formName` | `MuiForm` | Active form |
-| `formbuilder-mui-theme` | `dark` | Canvas theme |
-| `formbuilder-mui-resolution` | `desktop` | Viewport simulator |
-| `formbuilder-mui-openedPanels` | `["left","right"]` | Panel collapse state |
-| `formbuilder-mui-bottomPanelHeight` | `380` | Bottom panel height |
-| `formbuilder-mui-testingAutorun` | `false` | Autorun checkbox |
-| `leftPanelActiveTab` | `forms` | Left tab |
-| `propertiesActiveTab` | `actions` | Right tab |
+| Key                                 | Observed value     | Purpose              |
+| ----------------------------------- | ------------------ | -------------------- |
+| `formbuilder-view-name`             | `mui`              | Active UI kit        |
+| `formbuilder-mui-formName`          | `MuiForm`          | Active form          |
+| `formbuilder-mui-theme`             | `dark`             | Canvas theme         |
+| `formbuilder-mui-resolution`        | `desktop`          | Viewport simulator   |
+| `formbuilder-mui-openedPanels`      | `["left","right"]` | Panel collapse state |
+| `formbuilder-mui-bottomPanelHeight` | `380`              | Bottom panel height  |
+| `formbuilder-mui-testingAutorun`    | `false`            | Autorun checkbox     |
+| `leftPanelActiveTab`                | `forms`            | Left tab             |
+| `propertiesActiveTab`               | `actions`          | Right tab            |
 
 Third-party analytics keys were also present (`_gcl_ls`, `li_adsId`) — Google/LinkedIn tags, unrelated to the editor.
 
@@ -754,50 +785,50 @@ Third-party analytics keys were also present (`_gcl_ls`, `li_adsId`) — Google/
 
 None of these exist in the demo; all are **inferred from the UI's affordances**.
 
-| Method + path | Purpose | Driven by |
-|---|---|---|
-| `GET /api/forms` | List forms in the project | Forms tab |
-| `POST /api/forms` | Create a form | `Add a new form` |
-| `GET /api/forms/{id}` | Load a form definition | Form selection |
-| `PUT /api/forms/{id}` | Save a form definition | `Save`, toolbar 💾 |
-| `POST /api/forms/{id}/copy` | Save under a new name | `Save as...` |
-| `PATCH /api/forms/{id}` | Rename | Forms-tab ✏️ |
-| `DELETE /api/forms/{id}` | Delete | Forms-tab ✕ |
-| `GET /api/forms/export` · `POST /api/forms/import` | Bundle export/import | `Export forms` / `Import forms` |
-| `GET /api/forms/{id}/schema` | JSON Schema derivation | `Export JSON form schema` |
-| `GET /api/presets` · `POST /api/presets` | Preset library CRUD | `Create a preset component` |
-| `POST /api/i18n/{formId}/{lang}/translate` | Machine translation | AI glyph on `Translation ▸` rows |
-| `PUT /api/i18n/{formId}/{lang}` | Save a translation bundle | Localization tab `Save` |
-| `GET /api/components?kit={kit}` | Palette + property metadata | Palette, Main tab |
-| `POST /upload` *(configurable per Uploader)* | File upload target | `uploader1.action` |
-| `GET {options-url}` *(author-supplied)* | Select option sources | `loadCountries` pattern |
+| Method + path                                      | Purpose                     | Driven by                        |
+| -------------------------------------------------- | --------------------------- | -------------------------------- |
+| `GET /api/forms`                                   | List forms in the project   | Forms tab                        |
+| `POST /api/forms`                                  | Create a form               | `Add a new form`                 |
+| `GET /api/forms/{id}`                              | Load a form definition      | Form selection                   |
+| `PUT /api/forms/{id}`                              | Save a form definition      | `Save`, toolbar 💾               |
+| `POST /api/forms/{id}/copy`                        | Save under a new name       | `Save as...`                     |
+| `PATCH /api/forms/{id}`                            | Rename                      | Forms-tab ✏️                     |
+| `DELETE /api/forms/{id}`                           | Delete                      | Forms-tab ✕                      |
+| `GET /api/forms/export` · `POST /api/forms/import` | Bundle export/import        | `Export forms` / `Import forms`  |
+| `GET /api/forms/{id}/schema`                       | JSON Schema derivation      | `Export JSON form schema`        |
+| `GET /api/presets` · `POST /api/presets`           | Preset library CRUD         | `Create a preset component`      |
+| `POST /api/i18n/{formId}/{lang}/translate`         | Machine translation         | AI glyph on `Translation ▸` rows |
+| `PUT /api/i18n/{formId}/{lang}`                    | Save a translation bundle   | Localization tab `Save`          |
+| `GET /api/components?kit={kit}`                    | Palette + property metadata | Palette, Main tab                |
+| `POST /upload` _(configurable per Uploader)_       | File upload target          | `uploader1.action`               |
+| `GET {options-url}` _(author-supplied)_            | Select option sources       | `loadCountries` pattern          |
 
 ### 7.5 CRUD / admin needs
 
-| Data-driven content | Who manages it | Fields |
-|---|---|---|
-| Component palette | Product/engineering, per UI kit | id, type, display name, group, icon, property schema, supported events, default props |
-| Presets | End users (via `Create a preset component`) | name, category, serialized node |
-| Code actions | End users (Settings → `Add a code action`) | name, JS body, params |
-| Validation rule catalogue | Product/engineering | key, label, parameters, default message |
-| Languages | Product (list) + end users (bundles) | code, dialect, name, description, bidi |
-| Forms | End users | name, definition JSON |
+| Data-driven content       | Who manages it                              | Fields                                                                                |
+| ------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Component palette         | Product/engineering, per UI kit             | id, type, display name, group, icon, property schema, supported events, default props |
+| Presets                   | End users (via `Create a preset component`) | name, category, serialized node                                                       |
+| Code actions              | End users (Settings → `Add a code action`)  | name, JS body, params                                                                 |
+| Validation rule catalogue | Product/engineering                         | key, label, parameters, default message                                               |
+| Languages                 | Product (list) + end users (bundles)        | code, dialect, name, description, bidi                                                |
+| Forms                     | End users                                   | name, definition JSON                                                                 |
 
 ### 7.6 Auth, roles, permissions
 
-**None.** No sign-in, no user identity, no role checks, and no permission-gated controls anywhere on the page. A production deployment would need at minimum: authenticated sessions; per-project membership; and a distinction between *authors* (full editor) and *viewers/translators* (localization tab + preview only) — because the `Code` editors execute arbitrary JavaScript and are a privilege boundary.
+**None.** No sign-in, no user identity, no role checks, and no permission-gated controls anywhere on the page. A production deployment would need at minimum: authenticated sessions; per-project membership; and a distinction between _authors_ (full editor) and _viewers/translators_ (localization tab + preview only) — because the `Code` editors execute arbitrary JavaScript and are a privilege boundary.
 
 ---
 
 ## 8. Content States
 
-| State | Behaviour on this page |
-|---|---|
-| **Loading** | **Not applicable / not implemented.** The shell renders synchronously with the demo form already present; no skeletons or spinners were observed on first paint or on tab switches. The only loading string in the DOM is `Loading...` in the HTML-attributes table. The `loadCountries` fetch has **no** loading indicator — selects simply have no options until it resolves. |
-| **Empty / no data** | Several, all verbatim: palette search with no match → `Not found`. Right panel with no selection → `Select element on form for edit properties`. `HTML attributes` table → `No data found`. `Simple value` bottom-panel tab → `Edit the property in the right panel`. Preview `Errors` box when valid → `{}`. Repeater with no uploads → the placeholder row `File name - status`. `Rules` tab for a non-input component → **completely blank, no message** (gap). |
-| **Error** | Form-level: the red `Not all fields of the form are filled in correctly…` message plus per-field red outlines and `Required` helper text. **Application/network errors have no UI at all** — a failed country fetch or a failed upload fails silently. |
-| **Success / confirmation** | Form-level: green `The form has been sent, thank you!`. **No confirmation for builder actions** — `Save`, `Clear`, `Download`, `Import forms`, delete-a-form and delete-a-component all complete with no toast and **no destructive-action confirmation dialog**. |
-| **Partial / permission-restricted** | **Not applicable.** No auth, no roles, no gated content. |
+| State                               | Behaviour on this page                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Loading**                         | **Not applicable / not implemented.** The shell renders synchronously with the demo form already present; no skeletons or spinners were observed on first paint or on tab switches. The only loading string in the DOM is `Loading...` in the HTML-attributes table. The `loadCountries` fetch has **no** loading indicator — selects simply have no options until it resolves.                                                                                    |
+| **Empty / no data**                 | Several, all verbatim: palette search with no match → `Not found`. Right panel with no selection → `Select element on form for edit properties`. `HTML attributes` table → `No data found`. `Simple value` bottom-panel tab → `Edit the property in the right panel`. Preview `Errors` box when valid → `{}`. Repeater with no uploads → the placeholder row `File name - status`. `Rules` tab for a non-input component → **completely blank, no message** (gap). |
+| **Error**                           | Form-level: the red `Not all fields of the form are filled in correctly…` message plus per-field red outlines and `Required` helper text. **Application/network errors have no UI at all** — a failed country fetch or a failed upload fails silently.                                                                                                                                                                                                             |
+| **Success / confirmation**          | Form-level: green `The form has been sent, thank you!`. **No confirmation for builder actions** — `Save`, `Clear`, `Download`, `Import forms`, delete-a-form and delete-a-component all complete with no toast and **no destructive-action confirmation dialog**.                                                                                                                                                                                                  |
+| **Partial / permission-restricted** | **Not applicable.** No auth, no roles, no gated content.                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -805,25 +836,27 @@ None of these exist in the demo; all are **inferred from the UI's affordances**.
 
 ### Observed structure (measured on the live DOM)
 
-| Check | Result |
-|---|---|
-| `<html lang>` | `en` ✅ |
-| `role="tablist"` wrappers | **0** ❌ (tab buttons carry `role="tab"` but have no owning tablist) |
-| `aria-selected` | Present (`true`) on the selected tab only; **absent (null) on unselected tabs** ❌ |
-| `h1` / `h2` / `h3` | **0 / 0 / 0** ❌ — the only heading in the document is the single `h4` **inside the form being edited** |
-| `<main>` / `<header>` landmarks | **0 / 0** ❌ |
-| `<nav>` | 1 ✅ |
-| Buttons with neither text nor `aria-label` | **30** ❌ |
-| Accessible names for tab buttons | Missing in the accessibility tree despite visible text ❌ |
-| Focus indicators | Present on text inputs and selects (blue ring); **not observed** on icon buttons |
+| Check                                      | Result                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `<html lang>`                              | `en` ✅                                                                                                 |
+| `role="tablist"` wrappers                  | **0** ❌ (tab buttons carry `role="tab"` but have no owning tablist)                                    |
+| `aria-selected`                            | Present (`true`) on the selected tab only; **absent (null) on unselected tabs** ❌                      |
+| `h1` / `h2` / `h3`                         | **0 / 0 / 0** ❌ — the only heading in the document is the single `h4` **inside the form being edited** |
+| `<main>` / `<header>` landmarks            | **0 / 0** ❌                                                                                            |
+| `<nav>`                                    | 1 ✅                                                                                                    |
+| Buttons with neither text nor `aria-label` | **30** ❌                                                                                               |
+| Accessible names for tab buttons           | Missing in the accessibility tree despite visible text ❌                                               |
+| Focus indicators                           | Present on text inputs and selects (blue ring); **not observed** on icon buttons                        |
 
 ### Requirements for a rebuild
 
 **Semantics & landmarks**
+
 - Wrap the shell in `<header>` (toolbar), `<nav aria-label="Component palette">`, `<main aria-label="Form canvas">`, and `<aside aria-label="Component properties">`.
 - Give the page a visually-hidden `<h1>` (e.g. the active form name) and use `h2` for each panel section (`Inputs`, `Actions`, `Wrapper`, `Additional properties`, `Data`, `Errors`).
 
 **Tabs**
+
 - Wrap each tab group in `role="tablist"` with `aria-label`; set `aria-selected` explicitly to `true`/`false` on **every** tab; link each tab to its panel via `aria-controls` / `role="tabpanel"` / `aria-labelledby`.
 - Implement the roving-tabindex pattern: `←`/`→` moves between tabs, `Home`/`End` jump to first/last.
 
@@ -831,26 +864,28 @@ None of these exist in the demo; all are **inferred from the UI's affordances**.
 Every one of the 30 unnamed buttons needs an `aria-label`. Reuse the existing tooltip copy where it exists (`Edit JSON`, `Desktop`, `Orientation`, `Toggle theme`, `Add new element`, `Clone component`, `Create a preset component`, `Remove component`, `Make this property calculable or localize`) and author copy for the rest (`Open workspace menu`, `Save form`, `Undo`, `Redo`, `Mobile viewport`, `Tablet viewport`, `Clear property value`, `Collapse left panel`, `Collapse properties panel`, `Rename form`, `Delete form`, `Edit code action`, `Duplicate code action`, `Delete code action`, `Add HTML attribute`).
 
 **Keyboard**
+
 - Every drag-and-drop insertion must have a keyboard equivalent — the overlay `+ → Before / After` flyout provides one; expose it in the palette too (e.g. `Enter` on a palette chip inserts after the current selection).
 - Tree: `↑`/`↓` move, `←`/`→` collapse/expand, `Enter` select, `Delete` remove; expose as `role="tree"` / `role="treeitem"` with `aria-expanded` and `aria-level`.
 - Focus order: toolbar → left panel → canvas → right panel → bottom panel. Trap focus inside modals and the bottom panel; return focus to the ✏️ trigger when the bottom panel closes.
 - Announce mode changes (`Preview` ⇄ `Edit`) and selection changes via an `aria-live="polite"` region.
 
 **Colour & non-colour indicators**
+
 - The property-row "has a value" state is communicated **by label colour alone** — add a non-colour cue (e.g. a filled dot, a bold weight, or "modified" text).
 - Validation state on a field is red outline + red text + the word `Required` — the text carries the meaning, so this passes, but wire `aria-invalid="true"` and `aria-describedby` to the helper text.
 - Measured contrast ratios (computed from the sampled hex values):
 
-| Foreground | Background | Ratio | WCAG AA (normal text, 4.5:1) |
-|---|---|---|---|
-| Text `#E9EBF0` | Panel `#303336` | **10.65:1** | ✅ |
-| Link/nav `#34C3FF` | Panel `#303336` | **6.29:1** | ✅ |
-| Muted `#A4A9B3` | Panel `#303336` | **5.39:1** | ✅ (fails AAA) |
-| Violet accent `#EE82EE` | Panel `#303336` | **5.48:1** | ✅ |
-| Orange accent `#F67F1F` | Panel `#303336` | **4.83:1** | ✅ |
-| Green accent `#3FAB45` | Panel `#303336` | **4.31:1** | ❌ (passes 3:1 for large text / UI only) |
-| Primary `#169DE0` | Panel `#303336` | **4.20:1** | ❌ (passes 3:1 for UI components) |
-| **White label on primary button `#169DE0`** | — | **3.03:1** | ❌ **Fails** — the `Preview` button's 14 px label is below 4.5:1 |
+| Foreground                                  | Background      | Ratio       | WCAG AA (normal text, 4.5:1)                                     |
+| ------------------------------------------- | --------------- | ----------- | ---------------------------------------------------------------- |
+| Text `#E9EBF0`                              | Panel `#303336` | **10.65:1** | ✅                                                               |
+| Link/nav `#34C3FF`                          | Panel `#303336` | **6.29:1**  | ✅                                                               |
+| Muted `#A4A9B3`                             | Panel `#303336` | **5.39:1**  | ✅ (fails AAA)                                                   |
+| Violet accent `#EE82EE`                     | Panel `#303336` | **5.48:1**  | ✅                                                               |
+| Orange accent `#F67F1F`                     | Panel `#303336` | **4.83:1**  | ✅                                                               |
+| Green accent `#3FAB45`                      | Panel `#303336` | **4.31:1**  | ❌ (passes 3:1 for large text / UI only)                         |
+| Primary `#169DE0`                           | Panel `#303336` | **4.20:1**  | ❌ (passes 3:1 for UI components)                                |
+| **White label on primary button `#169DE0`** | —               | **3.03:1**  | ❌ **Fails** — the `Preview` button's 14 px label is below 4.5:1 |
 
 - **Action:** darken the primary fill (≈`#0B6FA4` reaches 4.5:1 with white) or increase the button label to 18.66 px bold. The green Rules/Components accent should not be used for small text on the panel background.
 - The **disabled** undo/redo glyphs and the dimmed `v10.2.0` menu row are well below 3:1 and need a non-colour disabled cue (`aria-disabled` plus a shape/opacity change that is not the sole indicator).
@@ -863,46 +898,46 @@ The builder chrome is **RSuite** (dark theme, customised); the canvas renders in
 
 ### Colour — builder chrome (dark, as shipped)
 
-| Role | Value |
-|---|---|
-| Excluded top bar surface | `#2B2B2B` |
-| App shell background | `#2B2B2B` |
-| Panel + workspace surface | `#303336` |
-| Elevated card / popover surface (`--rs-bg-card`) | `#1A1D24` |
-| Well / inset surface (`--rs-bg-well`) | `#0F131A` |
-| Overlay / menu surface (`--rs-bg-overlay`) | `#292D33` |
-| Border (`--rs-border-primary`) | `#3C3F43` |
-| Text primary (`--rs-text-primary`) | `#E9EBF0` |
-| Text secondary / inactive icons (`--rs-text-secondary`) | `#A4A9B3` |
-| Primary action / active toggle | `#169DE0` |
-| Link + selected-nav accent (`--rs-primary-500`, `--rs-navs-selected`) | `#34C3FF` |
-| Success / Rules + Components accent (`--rs-green-600`) | `#3FAB45` |
-| Warning / Style + Forms accent | `#F67F1F` |
-| Settings + Actions accent | `violet` (CSS keyword, `#EE82EE`) |
-| Danger / error (`--rs-red-500`) | `#F44336` |
+| Role                                                                  | Value                             |
+| --------------------------------------------------------------------- | --------------------------------- |
+| Excluded top bar surface                                              | `#2B2B2B`                         |
+| App shell background                                                  | `#2B2B2B`                         |
+| Panel + workspace surface                                             | `#303336`                         |
+| Elevated card / popover surface (`--rs-bg-card`)                      | `#1A1D24`                         |
+| Well / inset surface (`--rs-bg-well`)                                 | `#0F131A`                         |
+| Overlay / menu surface (`--rs-bg-overlay`)                            | `#292D33`                         |
+| Border (`--rs-border-primary`)                                        | `#3C3F43`                         |
+| Text primary (`--rs-text-primary`)                                    | `#E9EBF0`                         |
+| Text secondary / inactive icons (`--rs-text-secondary`)               | `#A4A9B3`                         |
+| Primary action / active toggle                                        | `#169DE0`                         |
+| Link + selected-nav accent (`--rs-primary-500`, `--rs-navs-selected`) | `#34C3FF`                         |
+| Success / Rules + Components accent (`--rs-green-600`)                | `#3FAB45`                         |
+| Warning / Style + Forms accent                                        | `#F67F1F`                         |
+| Settings + Actions accent                                             | `violet` (CSS keyword, `#EE82EE`) |
+| Danger / error (`--rs-red-500`)                                       | `#F44336`                         |
 
 ### Colour — canvas (Material UI dark)
 
-| Role | Value |
-|---|---|
-| Paper / form surface | `#121212` |
-| Body text | `#FFFFFF` |
+| Role                   | Value                                       |
+| ---------------------- | ------------------------------------------- |
+| Paper / form surface   | `#121212`                                   |
+| Body text              | `#FFFFFF`                                   |
 | Field border (default) | MUI `rgba(255,255,255,0.23)` **[INFERRED]** |
-| Error text + outline | MUI `error.main` (red) |
-| Form error message | `sx.color: "red"` (CSS keyword) |
-| Form success message | `sx.color: "green"` (CSS keyword) |
-| Demo container border | `1px solid lightgray` |
+| Error text + outline   | MUI `error.main` (red)                      |
+| Form error message     | `sx.color: "red"` (CSS keyword)             |
+| Form success message   | `sx.color: "green"` (CSS keyword)           |
+| Demo container border  | `1px solid lightgray`                       |
 
 ### Typography
 
-| Context | Family | Size / weight / line-height |
-|---|---|---|
-| Builder chrome | `Apple-System, Arial, Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", STXihei, sans-serif` | base **14 px / 400 / 20 px** |
-| Panel tab labels | same | 14 px / 400 |
-| Section headings (`Inputs`, `Actions`, `Wrapper`, `Data`) | same | ~14 px, bold, secondary colour |
-| `Documentation` link *(excluded bar)* | same | 16 px / 600 / 24 px |
-| Code editors | monospace (Monaco default) | ~13 px |
-| Canvas | `Roboto, Helvetica, Arial, sans-serif` (MUI) | body 16 px; `h4` **34 px / 400**; `h5` ~24 px |
+| Context                                                   | Family                                                                                                      | Size / weight / line-height                   |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Builder chrome                                            | `Apple-System, Arial, Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", STXihei, sans-serif` | base **14 px / 400 / 20 px**                  |
+| Panel tab labels                                          | same                                                                                                        | 14 px / 400                                   |
+| Section headings (`Inputs`, `Actions`, `Wrapper`, `Data`) | same                                                                                                        | ~14 px, bold, secondary colour                |
+| `Documentation` link _(excluded bar)_                     | same                                                                                                        | 16 px / 600 / 24 px                           |
+| Code editors                                              | monospace (Monaco default)                                                                                  | ~13 px                                        |
+| Canvas                                                    | `Roboto, Helvetica, Arial, sans-serif` (MUI)                                                                | body 16 px; `h4` **34 px / 400**; `h5` ~24 px |
 
 ### Spacing, radius, elevation, density
 
@@ -921,38 +956,39 @@ Monoline outline icons at 16–18 px, single-colour, inheriting `currentColor` �
 
 ```css
 /* surfaces */
---fb-bg-app:        #2B2B2B;
---fb-bg-panel:      #303336;
---fb-bg-card:       #1A1D24;
---fb-bg-well:       #0F131A;
---fb-bg-overlay:    #292D33;
---fb-border:        #3C3F43;
+--fb-bg-app: #2b2b2b;
+--fb-bg-panel: #303336;
+--fb-bg-card: #1a1d24;
+--fb-bg-well: #0f131a;
+--fb-bg-overlay: #292d33;
+--fb-border: #3c3f43;
 
 /* text */
---fb-text:          #E9EBF0;
---fb-text-muted:    #A4A9B3;
+--fb-text: #e9ebf0;
+--fb-text-muted: #a4a9b3;
 
 /* accents */
---fb-primary:       #169DE0;   /* filled actions, active toggles */
---fb-link:          #34C3FF;   /* links, selected nav, Main tab */
---fb-accent-green:  #3FAB45;   /* Components tab, Rules tab */
---fb-accent-orange: #F67F1F;   /* Forms tab, Style tab */
---fb-accent-violet: #EE82EE;   /* Settings tab, Actions tab */
---fb-danger:        #F44336;
+--fb-primary: #169de0; /* filled actions, active toggles */
+--fb-link: #34c3ff; /* links, selected nav, Main tab */
+--fb-accent-green: #3fab45; /* Components tab, Rules tab */
+--fb-accent-orange: #f67f1f; /* Forms tab, Style tab */
+--fb-accent-violet: #ee82ee; /* Settings tab, Actions tab */
+--fb-danger: #f44336;
 
 /* geometry */
---fb-radius:        6px;
---fb-border-width:  1px;
---fb-panel-width:   290px;
+--fb-radius: 6px;
+--fb-border-width: 1px;
+--fb-panel-width: 290px;
 --fb-topbar-height: 58px;
 --fb-bottom-panel-height: 380px;
---fb-row-height:    34px;
+--fb-row-height: 34px;
 
 /* type */
---fb-font:          Apple-System, Arial, Helvetica, "PingFang SC",
-                    "Hiragino Sans GB", "Microsoft YaHei", STXihei, sans-serif;
---fb-font-size:     14px;
---fb-line-height:   20px;
+--fb-font:
+  Apple-System, Arial, Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', STXihei,
+  sans-serif;
+--fb-font-size: 14px;
+--fb-line-height: 20px;
 ```
 
 ---

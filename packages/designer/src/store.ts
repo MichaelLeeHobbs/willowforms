@@ -10,7 +10,14 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import type { ComponentDef, ComponentNode, FormDocument, PropValue } from '@formsmith/core'
-import { findNode, insertNode, instantiate, moveNode, removeNode, updateNode } from '@formsmith/core'
+import {
+  findNode,
+  insertNode,
+  instantiate,
+  moveNode,
+  removeNode,
+  updateNode,
+} from '@formsmith/core'
 
 export const MAX_HISTORY = 100
 
@@ -79,18 +86,15 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     setHistory((h) => commit(h, mutate(h.present)))
   }, [])
 
-  const addComponent = useCallback(
-    (def: ComponentDef, parentKey?: string, index?: number) => {
-      setHistory((h) => {
-        const node = instantiate(def, h.present.root)
-        const parent = parentKey ?? h.present.root.key
-        const next = { ...h.present, root: insertNode(h.present.root, parent, node, index) }
-        setSelectedKey(node.key)
-        return commit(h, next)
-      })
-    },
-    [],
-  )
+  const addComponent = useCallback((def: ComponentDef, parentKey?: string, index?: number) => {
+    setHistory((h) => {
+      const node = instantiate(def, h.present.root)
+      const parent = parentKey ?? h.present.root.key
+      const next = { ...h.present, root: insertNode(h.present.root, parent, node, index) }
+      setSelectedKey(node.key)
+      return commit(h, next)
+    })
+  }, [])
 
   const setProp = useCallback(
     (key: string, name: string, value: PropValue | undefined) => {
@@ -137,13 +141,10 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply],
   )
 
-  const replaceDocument = useCallback(
-    (next: FormDocument) => {
-      setHistory((h) => commit(h, next))
-      setSelectedKey(undefined)
-    },
-    [],
-  )
+  const replaceDocument = useCallback((next: FormDocument) => {
+    setHistory((h) => commit(h, next))
+    setSelectedKey(undefined)
+  }, [])
 
   const selectedNode = useMemo(
     () => (selectedKey ? findNode(document.root, selectedKey) : undefined),

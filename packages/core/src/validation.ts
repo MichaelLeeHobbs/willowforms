@@ -11,6 +11,7 @@
  * sandbox degrades to permissive rather than throwing.
  */
 
+import { jsonToString } from './json.js'
 import type {
   ComponentNode,
   FormData,
@@ -48,7 +49,7 @@ function isEmpty(value: JsonValue | undefined): boolean {
 }
 
 function asString(value: JsonValue | undefined): string {
-  return typeof value === 'string' ? value : String(value ?? '')
+  return jsonToString(value)
 }
 
 function asNumber(value: JsonValue | undefined): number {

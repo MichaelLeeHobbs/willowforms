@@ -16,6 +16,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
 
+import { jsonToString } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
@@ -83,7 +84,7 @@ function NumberFieldNode({
       type="number"
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
-      value={value === undefined || value === null ? '' : String(value)}
+      value={jsonToString(value)}
       error={Boolean(error)}
       helperText={error ?? str(props['helperText'])}
       onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}

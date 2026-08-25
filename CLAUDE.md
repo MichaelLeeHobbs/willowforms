@@ -27,7 +27,10 @@ apps/demo-server    Hono, port 5181. A demo, not a product.
 
 ## Invariants
 
-Breaking any of these is a design regression, not a refactor.
+Breaking any of these is a design regression, not a refactor. The first three are enforced rather than
+merely documented: 1 and 2 by `no-restricted-imports` blocks in `eslint.config.js`, 3 by
+`packages/designer/src/designer.css.test.ts`, which parses the stylesheet and fails on the shape of the
+mistake. Each error explains why the rule exists. Read that before silencing one.
 
 1. **`@formsmith/core` imports no React and no component library.** Server-side validation depends on it.
 2. **`@formsmith/designer` imports no component library.** It consumes `ComponentDef` metadata only. If
@@ -42,11 +45,18 @@ Breaking any of these is a design regression, not a refactor.
 ## Commands
 
 ```bash
-pnpm dev        # playground on :5180
-pnpm test       # vitest, 52 tests
-pnpm build      # tsc --build, then copies designer.css
-pnpm typecheck  # tsc --build --force
+pnpm dev           # playground on :5180
+pnpm test          # vitest, 65 tests
+pnpm lint          # eslint, including the invariant guardrails
+pnpm format:check  # prettier
+pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
+pnpm build         # tsc --build, then copies designer.css
 ```
+
+CI runs exactly these, in that order, plus a check that every package emitted `dist/index.js` and
+`dist/index.d.ts`. `pnpm typecheck` is two passes on purpose: the per-package configs exclude tests so
+they stay out of `dist`, which left every test file unchecked until `tsconfig.eslint.json` picked them
+up. It found a type error in the first test file it ever saw.
 
 `aliases.ts` at the root maps `@formsmith/*` to `src` for vitest and the playground, so in-repo edits
 need no rebuild. Published packages resolve through `dist`. Entries are anchored regexes on purpose: a

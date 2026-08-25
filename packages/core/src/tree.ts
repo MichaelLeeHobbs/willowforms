@@ -136,7 +136,10 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
 
   walk(doc.root, (n) => {
     if (!n.key.trim()) {
-      errors.push({ code: 'empty-key', message: 'Component of type ' + n.type + ' has an empty key.' })
+      errors.push({
+        code: 'empty-key',
+        message: 'Component of type ' + n.type + ' has an empty key.',
+      })
       return
     }
     if (seen.has(n.key)) {
