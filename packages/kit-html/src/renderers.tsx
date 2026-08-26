@@ -17,7 +17,7 @@
  * these produces an inaccessible form no amount of designer polish can fix.
  */
 
-import { createElement, useId } from 'react'
+import { createContext, createElement, useContext, useId } from 'react'
 import type { ReactNode } from 'react'
 import { jsonToString, optionValue, safeHref } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
@@ -429,6 +429,24 @@ function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
   )
 }
 
+/**
+ * What a RadioItem needs from the group above it.
+ *
+ * A RadioItem used to render a radio wired to nothing, so clicking one did
+ * nothing at all while looking exactly like an option. The group owns
+ * selection, which is right; it just has to hand the item enough to take part.
+ *
+ * Kit-local, and deliberately so: this is two components in one package
+ * agreeing with each other, not a new obligation on the kit contract.
+ */
+interface RadioContext {
+  name: string
+  selected: string
+  onSelect: (value: JsonValue) => void
+}
+
+const RadioGroupContext = createContext<RadioContext | undefined>(undefined)
+
 function RadioGroupNode({
   props,
   nodeProps,
@@ -456,26 +474,30 @@ function RadioGroupNode({
       aria-describedby={messageId}
     >
       <legend className="fsh-field__label">{str(props['label'])}</legend>
-      <div className={'fsh-radios fsh-radios--' + str(props['direction'], 'column')}>
-        {options.map((option, i) => {
-          const o = option as { label?: unknown; value?: JsonValue }
-          const v = o.value === undefined ? String(i) : jsonToString(o.value)
-          return (
-            <label key={v || String(i)} className="fsh-radio">
-              <input
-                type="radio"
-                name={id}
-                value={v}
-                checked={jsonToString(value) === v}
-                onChange={() => onChange(optionValue(options, v))}
-              />
-              <span>{typeof o.label === 'string' ? o.label : v}</span>
-            </label>
-          )
-        })}
-        {/* Children are RadioItems, for options that need their own layout. */}
-        {children}
-      </div>
+      <RadioGroupContext.Provider
+        value={{ name: id, selected: jsonToString(value), onSelect: onChange }}
+      >
+        <div className={'fsh-radios fsh-radios--' + str(props['direction'], 'column')}>
+          {options.map((option, i) => {
+            const o = option as { label?: unknown; value?: JsonValue }
+            const v = o.value === undefined ? String(i) : jsonToString(o.value)
+            return (
+              <label key={v || String(i)} className="fsh-radio">
+                <input
+                  type="radio"
+                  name={id}
+                  value={v}
+                  checked={jsonToString(value) === v}
+                  onChange={() => onChange(optionValue(options, v))}
+                />
+                <span>{typeof o.label === 'string' ? o.label : v}</span>
+              </label>
+            )
+          })}
+          {/* Children are RadioItems, for options that need their own layout. */}
+          {children}
+        </div>
+      </RadioGroupContext.Provider>
       <p
         id={messageId}
         className={'fsh-field__message' + (error ? ' is-error' : '')}
@@ -488,14 +510,25 @@ function RadioGroupNode({
 }
 
 function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const group = useContext(RadioGroupContext)
+  const value = str(props['value'])
+
   /*
-   * Deliberately not wired to the group's value. A RadioItem is a slot for an
-   * option that needs its own layout, and the group owns selection; making this
-   * self-controlling would give one question two sources of truth.
+   * Outside a group there is no question to answer, so the radio is disabled
+   * rather than rendered as a control that cannot do anything. The designer
+   * lets a RadioItem be dropped anywhere; this is what it looks like when it
+   * has been dropped somewhere that makes no sense.
    */
   return (
     <label {...nodeProps} className="fsh-radio">
-      <input type="radio" value={str(props['value'])} disabled={bool(props['disabled'])} readOnly />
+      <input
+        type="radio"
+        name={group?.name}
+        value={value}
+        checked={group ? group.selected === value : false}
+        disabled={!group || bool(props['disabled'])}
+        onChange={() => group?.onSelect(value)}
+      />
       <span>{str(props['label'])}</span>
     </label>
   )

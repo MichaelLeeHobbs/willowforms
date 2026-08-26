@@ -202,6 +202,8 @@ function ButtonNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   const minWidth = num(props['minColumnWidth'], 200)
+  const columns = num(props['columns'], 2)
+  const gap = num(props['gap'], 16)
   return (
     <Box
       {...nodeProps}
@@ -210,7 +212,11 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
         // auto-fit with a floor: columns collapse when they cannot fit, so the
         // author never writes a breakpoint.
         gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
-        gap: num(props['gap'], 16) / 8,
+        gap: gap / 8,
+        // `columns` caps how many can ever fit, which is what makes it mean
+        // something alongside auto-fit. Ignoring it here made the same document
+        // lay out differently in the two kits.
+        maxWidth: columns > 0 ? columns * (minWidth + gap) : undefined,
       }}
     >
       {children}
@@ -259,9 +265,14 @@ function TextNode({ props, nodeProps }: NodeRendererProps): ReactNode {
    * document's start/end are mapped here rather than passed through. The HTML
    * kit uses `text-align: start` directly and is correct in RTL for free; this
    * one is correct in LTR, which is what MUI's own API allows.
+   *
+   * `start` maps to left rather than to `inherit`. Inheriting means a Text
+   * inside a centred container comes out centred while its own property says
+   * start, so the one alignment an author never set explicitly was the one that
+   * could not be relied on.
    */
   const rawAlign = props['align']
-  const align = rawAlign === 'center' ? 'center' : rawAlign === 'end' ? 'right' : 'inherit'
+  const align = rawAlign === 'center' ? 'center' : rawAlign === 'end' ? 'right' : 'left'
   return (
     <Typography {...nodeProps} variant={variant} align={align}>
       {str(props['text'])}

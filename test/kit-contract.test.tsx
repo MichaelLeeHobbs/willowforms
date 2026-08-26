@@ -15,8 +15,8 @@
  * missed.
  */
 
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
@@ -332,6 +332,50 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     expect(offered, 'the root must not be draggable out of the palette').not.toContain(
       emptyRoot().type,
     )
+  })
+
+  it('lets a RadioItem child take part in its group', () => {
+    /*
+     * 03-components.md says a RadioGroup "also accepts RadioItem children, for
+     * the case where an option needs its own layout". Both kits shipped that
+     * child wired to nothing, so it looked exactly like an option and did
+     * nothing when clicked, which is the failure this project treats as worst.
+     */
+    const group = kit.components.find((c) => c.type === 'RadioGroup')
+    const item = kit.components.find((c) => c.type === 'RadioItem')
+    if (!group || !item) return
+
+    const node: ComponentNode = {
+      key: 'choice',
+      type: 'RadioGroup',
+      props: {
+        label: { kind: 'static', value: 'Pick one' },
+        options: { kind: 'static', value: [] },
+      },
+      schema: { type: 'string', validations: [] },
+      children: [
+        {
+          key: 'custom',
+          type: 'RadioItem',
+          props: {
+            label: { kind: 'static', value: 'The custom one' },
+            value: { kind: 'static', value: 'custom' },
+          },
+        },
+      ],
+    }
+
+    const onChange = vi.fn()
+    render(
+      <FormRenderer document={documentOf(node)} kit={renderers} data={{}} onChange={onChange} />,
+    )
+
+    fireEvent.click(screen.getByLabelText('The custom one'))
+
+    expect(
+      onChange,
+      'clicking a RadioItem did not reach the group it is inside',
+    ).toHaveBeenCalledWith('choice', 'custom')
   })
 
   it('builds a palette index without collisions', () => {

@@ -89,6 +89,25 @@ describe('safeHref', () => {
     expect(safeHref('#section')).toBe('#section')
   })
 
+  it('refuses a network-path reference, which is not relative at all', () => {
+    /*
+     * `//evil.com` names no scheme, so a scheme check waves it through and the
+     * browser borrows the page's own scheme to navigate off-origin. Backslash
+     * forms count because browsers normalise them to forward slashes.
+     */
+    expect(safeHref('//evil.com')).toBeUndefined()
+    expect(safeHref('//evil.com/path?a=1')).toBeUndefined()
+    expect(safeHref('\\\\evil.com')).toBeUndefined()
+    expect(safeHref('/\\evil.com')).toBeUndefined()
+    expect(safeHref('\\/evil.com')).toBeUndefined()
+    expect(safeHref('  //evil.com  ')).toBeUndefined()
+  })
+
+  it('still allows a single leading slash, which stays on this origin', () => {
+    expect(safeHref('/help')).toBe('/help')
+    expect(safeHref('/a//b')).toBe('/a//b')
+  })
+
   it('refuses javascript', () => {
     expect(safeHref('javascript:alert(1)')).toBeUndefined()
     expect(safeHref('JavaScript:alert(1)')).toBeUndefined()

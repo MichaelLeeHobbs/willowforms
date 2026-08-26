@@ -72,7 +72,20 @@ export function safeHref(value: JsonValue | undefined): string | undefined {
   // eslint-disable-next-line no-control-regex -- matching them is the point
   if (/[\u0000-\u001f\u007f]/.test(raw)) return undefined
 
-  // Relative: no scheme to check, and it cannot escape the current origin.
+  /*
+   * A network-path reference. `//evil.com` names no scheme, so the scheme check
+   * below waves it through, and the browser then borrows the page's own scheme
+   * and navigates off-origin. Backslashes count, because browsers normalise
+   * them to forward slashes, so `\\evil.com` and `/\evil.com` reach the same
+   * place.
+   *
+   * This is the case that made the rest of this function worth nothing. The
+   * comment that used to sit below said a relative address cannot escape the
+   * origin, which is true, and missed that this was never a relative address.
+   */
+  if (/^[/\\]{2}/.test(raw)) return undefined
+
+  // Relative: no scheme to borrow and no authority to name, so it stays here.
   if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return raw
 
   const parsed = URL.parse ? URL.parse(raw) : null

@@ -77,25 +77,26 @@ evaluates an expression — that happens once, in the renderer, for every kit. A
 Each is a test in `test/kit-contract.test.tsx`, run against every registered kit. A failure names the
 obligation missed.
 
-| Rule                                                             | Why                                                                |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Both halves declare the same `id`                                | A mismatched pairing is otherwise impossible to spot               |
-| Every palette entry has a renderer                               | A component that cannot render should not be offered               |
-| Every renderer has a palette entry                               | An orphan renderer is dead code or a missing entry                 |
-| At least one component is a container                            | Nothing can be composed otherwise                                  |
-| Component types are unique                                       | The type is the lookup key                                         |
-| Every data-bound component declares a `dataType`                 | The Rules tab has nothing to validate against otherwise            |
-| Every prop schema has a name and a label                         | An unlabelled row in the panel is unusable                         |
-| Every `select` editor supplies options                           | An empty picker is a dead end                                      |
-| Every renderer puts `data-fs-key` in the DOM                     | The designer cannot select it otherwise                            |
-| Containers render children inside themselves                     | Rendering them outside breaks drop targeting                       |
-| Data-bound components survive an absent value                    | A freshly dropped field has no data yet                            |
-| Every data-bound component displays its error                    | A failed submit that says nothing is the worst outcome             |
-| The message carries `role="alert"` when it errors                | A silent failure is announced to nobody                            |
-| Every control describes itself by an element that already exists | A description added with the error is announced late or not at all |
-| Exactly one component is the root, and it is not in the palette  | The root exists already; a second one nests a screen in a screen   |
-| Every palette entry declares an icon                             | Half a palette with icons reads as a bug rather than a choice      |
-| The palette index has no colliding types                         | The type is how a node finds its renderer                          |
+| Rule                                                             | Why                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Both halves declare the same `id`                                | A mismatched pairing is otherwise impossible to spot                         |
+| Every palette entry has a renderer                               | A component that cannot render should not be offered                         |
+| Every renderer has a palette entry                               | An orphan renderer is dead code or a missing entry                           |
+| At least one component is a container                            | Nothing can be composed otherwise                                            |
+| Component types are unique                                       | The type is the lookup key                                                   |
+| Every data-bound component declares a `dataType`                 | The Rules tab has nothing to validate against otherwise                      |
+| Every prop schema has a name and a label                         | An unlabelled row in the panel is unusable                                   |
+| Every `select` editor supplies options                           | An empty picker is a dead end                                                |
+| Every renderer puts `data-fs-key` in the DOM                     | The designer cannot select it otherwise                                      |
+| Containers render children inside themselves                     | Rendering them outside breaks drop targeting                                 |
+| Data-bound components survive an absent value                    | A freshly dropped field has no data yet                                      |
+| Every data-bound component displays its error                    | A failed submit that says nothing is the worst outcome                       |
+| The message carries `role="alert"` when it errors                | A silent failure is announced to nobody                                      |
+| Every control describes itself by an element that already exists | A description added with the error is announced late or not at all           |
+| Exactly one component is the root, and it is not in the palette  | The root exists already; a second one nests a screen in a screen             |
+| Every palette entry declares an icon                             | Half a palette with icons reads as a bug rather than a choice                |
+| A RadioItem child can be selected in its group                   | A child that looks like an option and answers nothing is worse than no child |
+| The palette index has no colliding types                         | The type is how a node finds its renderer                                    |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two
