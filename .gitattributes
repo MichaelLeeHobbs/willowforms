@@ -1,0 +1,16 @@
+# Prettier writes LF and checks for it, so `pnpm format:check` fails on a
+# CRLF working tree. With core.autocrlf=true, which is Git for Windows' own
+# default, a fresh clone or merge converts every file and the check then fails
+# for the whole repository at once on Windows and passes in CI, which is the
+# worst way round: the person who can fix it is the one who cannot see it.
+#
+# Normalising here settles it for everyone regardless of their local setting.
+* text=auto eol=lf
+
+# Binary, so Git must never touch these.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
