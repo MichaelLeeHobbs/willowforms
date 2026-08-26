@@ -45,3 +45,40 @@ export function optionValue(options: readonly JsonValue[], submitted: string): J
   }
   return submitted
 }
+
+/**
+ * A link address that is safe to put in `href`, or undefined.
+ *
+ * A document is data, and a form author is not always the person deploying the
+ * form. `javascript:` in an `href` runs on click with the page's full
+ * privileges, which is the same code-execution boundary this project refuses to
+ * cross anywhere else: core ships no evaluator, so it must not ship one by
+ * accident in a URL.
+ *
+ * Allowed: http, https, mailto, tel, and anything relative. Relative addresses
+ * cannot name a scheme, so they cannot smuggle one.
+ */
+const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
+
+export function safeHref(value: JsonValue | undefined): string | undefined {
+  const raw = jsonToString(value).trim()
+  if (!raw) return undefined
+
+  /*
+   * A leading control character is stripped by the URL parser and by browsers,
+   * so "java\tscript:alert(1)" parses as javascript: after the fact. Rejecting
+   * them outright is simpler than reasoning about which ones survive.
+   */
+  // eslint-disable-next-line no-control-regex -- matching them is the point
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return undefined
+
+  // Relative: no scheme to check, and it cannot escape the current origin.
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return raw
+
+  const parsed = URL.parse ? URL.parse(raw) : null
+  if (parsed) return SAFE_SCHEMES.has(parsed.protocol) ? raw : undefined
+
+  // Older runtimes: fall back to matching the scheme directly.
+  const scheme = raw.slice(0, raw.indexOf(':') + 1).toLowerCase()
+  return SAFE_SCHEMES.has(scheme) ? raw : undefined
+}

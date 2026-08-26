@@ -57,6 +57,7 @@ export type IconName =
   | 'copy'
   | 'plus'
   | 'trash'
+  | 'progress'
 
 /** Which editor the properties panel renders for a prop. */
 export type PropEditor =

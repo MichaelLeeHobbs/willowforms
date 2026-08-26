@@ -362,3 +362,122 @@ fieldset.fsh-field {
   padding: 0;
   border: 0;
 }
+
+/*
+ * Feedback and navigation.
+ *
+ * Severity is carried by a border and never by the text colour, so every alert
+ * reads at the same contrast as body text and needs no palette of its own. It
+ * also means severity is not the only signal: an author who cannot distinguish
+ * the four colours still has the title and the words.
+ */
+.fsh-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--fsh-border);
+  border-inline-start: 4px solid var(--fsh-muted);
+  border-radius: var(--fsh-radius);
+  color: var(--fsh-text);
+  background: var(--fsh-surface);
+}
+
+.fsh-alert__title {
+  font-weight: 600;
+}
+
+.fsh-alert--info {
+  border-inline-start-color: var(--fsh-accent);
+}
+
+.fsh-alert--success {
+  border-inline-start-color: #2e7d32;
+}
+
+.fsh-alert--warning {
+  border-inline-start-color: #b26a00;
+}
+
+.fsh-alert--error {
+  border-inline-start-color: var(--fsh-danger);
+}
+
+.fsh-progress {
+  position: relative;
+  block-size: 6px;
+  inline-size: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--fsh-field);
+}
+
+.fsh-progress__fill {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+  border-radius: inherit;
+  background: var(--fsh-accent);
+}
+
+/* Indeterminate: no width was set, so it sweeps instead of filling. */
+.fsh-progress__fill:not([style]) {
+  inline-size: 40%;
+  animation: fsh-progress-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes fsh-progress-sweep {
+  from {
+    translate: -100% 0;
+  }
+
+  to {
+    translate: 250% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fsh-progress__fill:not([style]) {
+    animation: none;
+    inline-size: 100%;
+    opacity: 0.5;
+  }
+}
+
+.fsh-progress--circular {
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: 50%;
+}
+
+.fsh-link {
+  color: var(--fsh-accent);
+  text-decoration: underline;
+}
+
+/* An address the kit refused. It is text, and it does not pretend otherwise. */
+.fsh-link.is-inert {
+  color: var(--fsh-muted);
+  text-decoration: none;
+}
+
+.fsh-link:focus-visible {
+  outline: 2px solid var(--fsh-accent);
+  outline-offset: 2px;
+}
+
+.fsh-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--fsh-muted);
+}
+
+.fsh-breadcrumbs li + li::before {
+  content: '/';
+  margin-inline-end: 8px;
+  color: var(--fsh-border);
+}

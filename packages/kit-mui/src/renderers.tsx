@@ -6,7 +6,11 @@
  * for the renderer and MUI, and nothing else.
  */
 
+import Alert from '@mui/material/Alert'
+import AlertTitle from '@mui/material/AlertTitle'
 import Box from '@mui/material/Box'
+import Breadcrumbs from '@mui/material/Breadcrumbs'
+import CircularProgress from '@mui/material/CircularProgress'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -20,6 +24,8 @@ import FormLabel from '@mui/material/FormLabel'
 import Radio from '@mui/material/Radio'
 import RadioGroup from '@mui/material/RadioGroup'
 import Switch from '@mui/material/Switch'
+import LinearProgress from '@mui/material/LinearProgress'
+import Link from '@mui/material/Link'
 import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
@@ -27,7 +33,7 @@ import Typography from '@mui/material/Typography'
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 
-import { jsonToString, optionValue } from '@formsmith/core'
+import { jsonToString, optionValue, safeHref } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -419,6 +425,172 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
+function DatePickerNode({
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
+  const id = useId()
+  /*
+   * A native date input, not MUI's DatePicker: that lives in @mui/x-date-pickers
+   * and needs a date library alongside it. A kit is meant to be cheap to write,
+   * and two dependencies for one component is not cheap.
+   */
+  return (
+    <TextField
+      {...nodeProps}
+      id={id}
+      fullWidth
+      type="date"
+      label={str(props['label'])}
+      disabled={bool(props['disabled'])}
+      value={str(value)}
+      error={Boolean(error)}
+      helperText={message(error, str(props['helperText']))}
+      slotProps={{
+        formHelperText: alertWhenError(error),
+        // Without this the label sits on top of the browser's date placeholder.
+        inputLabel: { shrink: true },
+        htmlInput: {
+          ...(str(props['min']) ? { min: str(props['min']) } : {}),
+          ...(str(props['max']) ? { max: str(props['max']) } : {}),
+        },
+      }}
+      onChange={(e) => onChange(e.target.value || null)}
+    />
+  )
+}
+
+function FileUploadNode({ props, nodeProps, error, onChange }: NodeRendererProps): ReactNode {
+  const id = useId()
+  const multiple = bool(props['multiple'])
+  /*
+   * The value is the selected file's name and nothing more. A file input is
+   * uncontrolled by design, and turning bytes into form data is an upload
+   * protocol this project does not own.
+   */
+  return (
+    <TextField
+      {...nodeProps}
+      id={id}
+      fullWidth
+      type="file"
+      label={str(props['label'])}
+      disabled={bool(props['disabled'])}
+      error={Boolean(error)}
+      helperText={message(error, str(props['helperText']))}
+      slotProps={{
+        formHelperText: alertWhenError(error),
+        inputLabel: { shrink: true },
+        htmlInput: {
+          multiple,
+          ...(str(props['accept']) ? { accept: str(props['accept']) } : {}),
+        },
+      }}
+      onChange={(e) => {
+        const input = e.target as unknown as HTMLInputElement
+        const files = Array.from(input.files ?? []).map((file) => file.name)
+        onChange(multiple ? files : (files[0] ?? null))
+      }}
+    />
+  )
+}
+
+function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const raw = props['severity']
+  const severity =
+    raw === 'success' || raw === 'warning' || raw === 'error' ? raw : ('info' as const)
+  const title = str(props['title'])
+  /*
+   * Only an error announces itself. This component is authored into the form,
+   * so it is on screen from the first paint; role="alert" on all four would
+   * have a screen reader read every notice before the form itself.
+   */
+  return (
+    <Alert {...nodeProps} severity={severity} {...(severity === 'error' ? {} : { role: 'note' })}>
+      {title && <AlertTitle>{title}</AlertTitle>}
+      {str(props['text'])}
+    </Alert>
+  )
+}
+
+function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const circular = props['variant'] === 'circular'
+  const raw = props['value']
+  const determinate = typeof raw === 'number'
+  const value = determinate ? Math.min(100, Math.max(0, raw)) : 0
+  const shared = {
+    'aria-label': str(props['label'], 'Progress'),
+    ...(determinate ? { variant: 'determinate' as const, value } : {}),
+  }
+  return circular ? (
+    <Box {...nodeProps}>
+      <CircularProgress {...shared} />
+    </Box>
+  ) : (
+    <Box {...nodeProps}>
+      <LinearProgress {...shared} />
+    </Box>
+  )
+}
+
+function LinkNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const href = safeHref(props['href'])
+  const blank = props['target'] === 'blank'
+  /*
+   * A refused address renders as text, not as a dead link. A link that looks
+   * like one and does nothing is the failure this project treats as worst.
+   */
+  if (!href) {
+    return (
+      <Typography {...nodeProps} component="span">
+        {str(props['text'], 'Link')}
+      </Typography>
+    )
+  }
+  return (
+    <Link
+      {...nodeProps}
+      href={href}
+      {...(blank ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    >
+      {str(props['text'], 'Link')}
+    </Link>
+  )
+}
+
+function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const raw = props['items']
+  const items = Array.isArray(raw) ? raw : []
+  const last = items.length - 1
+
+  return (
+    <Breadcrumbs {...nodeProps} aria-label="Breadcrumb">
+      {items.map((item, i) => {
+        const entry = item as { label?: unknown; href?: JsonValue }
+        const text = typeof entry.label === 'string' ? entry.label : String(i + 1)
+        const href = safeHref(entry.href)
+        // The last crumb is where you are, so it is text and says so.
+        return i === last || !href ? (
+          <Typography
+            key={text + ':' + String(i)}
+            component="span"
+            {...(i === last ? { 'aria-current': 'page' as const } : {})}
+          >
+            {text}
+          </Typography>
+        ) : (
+          <Link key={text + ':' + String(i)} href={href}>
+            {text}
+          </Link>
+        )
+      })}
+    </Breadcrumbs>
+  )
+}
+
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack: StackNode,
@@ -439,6 +611,12 @@ const renderers: Record<string, NodeRenderer> = {
   Switch: SwitchNode,
   RadioGroup: RadioGroupNode,
   RadioItem: RadioItemNode,
+  DatePicker: DatePickerNode,
+  FileUpload: FileUploadNode,
+  Alert: AlertNode,
+  Progress: ProgressNode,
+  Link: LinkNode,
+  Breadcrumbs: BreadcrumbsNode,
 }
 
 export const muiRendererKit: RendererKit = { id: 'mui', renderers }

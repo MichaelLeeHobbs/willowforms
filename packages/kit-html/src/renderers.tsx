@@ -19,7 +19,7 @@
 
 import { createElement, useId } from 'react'
 import type { ReactNode } from 'react'
-import { jsonToString, optionValue } from '@formsmith/core'
+import { jsonToString, optionValue, safeHref } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -501,6 +501,168 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
+function DatePickerNode({
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
+  const id = useId()
+  return (
+    <div {...nodeProps}>
+      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
+        <input
+          id={id}
+          type="date"
+          className="fsh-input"
+          min={str(props['min']) || undefined}
+          max={str(props['max']) || undefined}
+          disabled={bool(props['disabled'])}
+          value={str(value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={id + '-message'}
+          onChange={(e) => onChange(e.target.value || null)}
+        />
+      </Field>
+    </div>
+  )
+}
+
+function FileUploadNode({ props, nodeProps, error, onChange }: NodeRendererProps): ReactNode {
+  const id = useId()
+  const multiple = bool(props['multiple'])
+  /*
+   * The value is the selected file's name, and nothing more. A file input is
+   * uncontrolled by design, and turning bytes into form data is an upload
+   * protocol this project does not own: the host reads the input when it
+   * submits. Reporting the name keeps validation and the schema honest about
+   * whether a file was chosen.
+   */
+  return (
+    <div {...nodeProps}>
+      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
+        <input
+          id={id}
+          type="file"
+          className="fsh-input"
+          accept={str(props['accept']) || undefined}
+          multiple={multiple}
+          disabled={bool(props['disabled'])}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={id + '-message'}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []).map((file) => file.name)
+            onChange(multiple ? files : (files[0] ?? null))
+          }}
+        />
+      </Field>
+    </div>
+  )
+}
+
+function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const severity = str(props['severity'], 'info')
+  const title = str(props['title'])
+  /*
+   * Only an error announces itself. This component is authored into the form,
+   * so it is on screen from the first paint; `role="alert"` on all four would
+   * have a screen reader read every notice on the page before the form itself.
+   */
+  return (
+    <div
+      {...nodeProps}
+      className={'fsh-alert fsh-alert--' + severity}
+      {...(severity === 'error' ? { role: 'alert' as const } : {})}
+    >
+      {title && <strong className="fsh-alert__title">{title}</strong>}
+      <span>{str(props['text'])}</span>
+    </div>
+  )
+}
+
+function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const circular = props['variant'] === 'circular'
+  const raw = props['value']
+  const determinate = typeof raw === 'number'
+  const value = determinate ? Math.min(100, Math.max(0, raw)) : 0
+
+  return (
+    <div
+      {...nodeProps}
+      role="progressbar"
+      aria-label={str(props['label'], 'Progress')}
+      // Omitted entirely when indeterminate, which is how the platform says
+      // "running, length unknown" rather than "zero percent done".
+      {...(determinate ? { 'aria-valuenow': value, 'aria-valuemin': 0, 'aria-valuemax': 100 } : {})}
+      className={'fsh-progress' + (circular ? ' fsh-progress--circular' : '')}
+    >
+      <span
+        className="fsh-progress__fill"
+        style={determinate ? { inlineSize: value + '%' } : undefined}
+      />
+    </div>
+  )
+}
+
+function LinkNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const href = safeHref(props['href'])
+  const blank = props['target'] === 'blank'
+  /*
+   * A refused address renders as text, not as a dead link. A link that looks
+   * like a link and does nothing is the failure this project treats as worst.
+   */
+  if (!href) {
+    return (
+      <span {...nodeProps} className="fsh-link is-inert">
+        {str(props['text'], 'Link')}
+      </span>
+    )
+  }
+  return (
+    <a
+      {...nodeProps}
+      className="fsh-link"
+      href={href}
+      // noopener is what stops the opened page reaching back through
+      // window.opener; noreferrer is the courtesy that goes with it.
+      {...(blank ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    >
+      {str(props['text'], 'Link')}
+    </a>
+  )
+}
+
+function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const raw = props['items']
+  const items = Array.isArray(raw) ? raw : []
+  const last = items.length - 1
+
+  return (
+    <nav {...nodeProps} aria-label="Breadcrumb">
+      <ol className="fsh-breadcrumbs">
+        {items.map((item, i) => {
+          const entry = item as { label?: unknown; href?: JsonValue }
+          const text = typeof entry.label === 'string' ? entry.label : String(i + 1)
+          const href = safeHref(entry.href)
+          return (
+            <li key={text + ':' + String(i)}>
+              {/* The last crumb is where you are, so it is text and says so. */}
+              {i === last || !href ? (
+                <span {...(i === last ? { 'aria-current': 'page' as const } : {})}>{text}</span>
+              ) : (
+                <a className="fsh-link" href={href}>
+                  {text}
+                </a>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack,
@@ -521,6 +683,12 @@ const renderers: Record<string, NodeRenderer> = {
   Switch: SwitchNode,
   RadioGroup: RadioGroupNode,
   RadioItem: RadioItemNode,
+  DatePicker: DatePickerNode,
+  FileUpload: FileUploadNode,
+  Alert: AlertNode,
+  Progress: ProgressNode,
+  Link: LinkNode,
+  Breadcrumbs: BreadcrumbsNode,
 }
 
 export const htmlRendererKit: RendererKit = { id: 'html', renderers }
