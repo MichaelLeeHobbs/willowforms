@@ -13,3 +13,8 @@ coverage/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Scratch and competitive research. Never committed: these hold another
+# product's measured metrics, tokens, and interface copy, which is research
+# input and not something this repository publishes. See docs/prior-art.
+/tmp/

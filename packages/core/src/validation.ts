@@ -12,6 +12,7 @@
  */
 
 import { jsonToString } from './json.js'
+import { flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
   ComponentNode,
@@ -65,6 +66,21 @@ function isEmpty(value: JsonValue | undefined): boolean {
   return false
 }
 
+/**
+ * Requiredness is stricter than emptiness, and only for booleans.
+ *
+ * An unchecked box is a non-answer, not a value of false. "I accept the terms"
+ * is the canonical required checkbox and it has to be checked, which is exactly
+ * what the platform's own `<input type="checkbox" required>` means. Treating
+ * `false` as a supplied value let a required consent box pass while unticked.
+ *
+ * Every other rule keeps using `isEmpty`, where `false` is a value: requiredness
+ * is one rule's job.
+ */
+function isMissing(value: JsonValue | undefined): boolean {
+  return value === false || isEmpty(value)
+}
+
 function asString(value: JsonValue | undefined): string {
   return jsonToString(value)
 }
@@ -104,7 +120,7 @@ export function applyRule(
 
   const fail = (): string => rule.message ?? DEFAULT_MESSAGES[rule.key]
 
-  if (rule.key === 'required') return isEmpty(value) ? fail() : undefined
+  if (rule.key === 'required') return isMissing(value) ? fail() : undefined
   if (isEmpty(value)) return undefined
 
   switch (rule.key) {
@@ -171,4 +187,23 @@ export function validateForm(
 
   visit(root)
   return errors
+}
+
+/**
+ * The fields that asked to be validated while they are being typed into.
+ *
+ * `FieldSchema.autoValidate` is a per-field hint, and the host decides what to
+ * do with it: Formsmith never owns the form's data, so it cannot own the moment
+ * validation runs either. The designer's preview reads this, and a host that
+ * wants the same behaviour reads it the same way.
+ *
+ * It was written by the Rules tab and read by nothing at all for the whole of
+ * the tab's life, so the checkbox looked like a setting and was decoration.
+ */
+export function autoValidateKeys(root: ComponentNode): Set<string> {
+  const keys = new Set<string>()
+  for (const { node } of flatten(root)) {
+    if (node.schema?.autoValidate === true) keys.add(node.key)
+  }
+  return keys
 }

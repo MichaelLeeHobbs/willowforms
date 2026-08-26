@@ -28,17 +28,31 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
   const [error, setError] = useState('')
 
   const add = (): void => {
-    const trimmed = code.trim().toLowerCase()
-    if (!trimmed) {
+    const raw = code.trim()
+    /*
+     * A tag is a primary subtag and an optional region, and Language keeps the
+     * two in separate fields. Lowercasing the whole string into `code` made
+     * pt-BR the language "pt-br": `dialect` could never be set through the UI,
+     * and the tag the renderer looks translations up by was never the one the
+     * panel had written.
+     */
+    const [primary = '', region] = raw.split('-')
+    const language: Language = {
+      code: primary.toLowerCase(),
+      ...(region ? { dialect: region.toUpperCase() } : {}),
+      name: name.trim() || raw,
+      bidi: 'ltr',
+    }
+    if (!language.code) {
       setError('Enter a language code, such as fr or pt-BR.')
       return
     }
-    if (doc.languages.some((l) => languageTag(l) === trimmed)) {
-      setError(trimmed + ' is already in the list.')
+    const tag = languageTag(language)
+    if (doc.languages.some((l) => languageTag(l).toLowerCase() === tag.toLowerCase())) {
+      setError(tag + ' is already in the list.')
       return
     }
 
-    const language: Language = { code: trimmed, name: name.trim() || trimmed, bidi: 'ltr' }
     api.setLanguages([...doc.languages, language])
     setCode('')
     setName('')
@@ -111,7 +125,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                   // A document with no languages renders every translation as its
                   // raw key, so the last one cannot be removed.
                   disabled={doc.languages.length === 1}
-                  onClick={() => remove(language.code)}
+                  onClick={() => remove(languageTag(language))}
                 >
                   &times;
                 </button>

@@ -208,7 +208,7 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
             An export, never storage. JSON Schema cannot express layout or nesting, so this
             describes the submitted data and nothing about how the form looks.
             {lossy.length > 0 && (
-              <> Custom rules on {lossy.map((l) => l.key).join(', ')} have no equivalent here.</>
+              <> No equivalent here for {lossy.map((l) => l.rule + ' on ' + l.key).join(', ')}.</>
             )}
           </p>
 

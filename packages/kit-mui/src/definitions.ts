@@ -39,6 +39,7 @@ export const muiKit: Kit = {
       label: 'Screen',
       group: 'layout',
       container: true,
+      root: true,
       defaultProps: { maxWidth: 640, gap: 2 },
       props: [
         { name: 'maxWidth', label: 'Max width', editor: 'number', section: 'style' },

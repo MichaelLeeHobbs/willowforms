@@ -48,6 +48,13 @@ export interface ComponentDef {
   icon?: string
   /** Accepts children. */
   container?: boolean
+  /**
+   * The document root. Exactly one component per kit declares this, and it is
+   * the type `emptyRoot()` produces. It is never offered in the palette: the
+   * root already exists, and dropping a second one nests a screen inside a
+   * screen. It used to appear there, because the palette showed everything.
+   */
+  root?: boolean
   /** Participates in form data and therefore gets a schema. */
   dataBound?: boolean
   /** Default FieldSchema type for data-bound components. */
@@ -68,10 +75,17 @@ export function indexKit(kit: Kit): ReadonlyMap<string, ComponentDef> {
   return new Map(kit.components.map((c) => [c.type, c]))
 }
 
-/** Group a kit's components for palette rendering, preserving declaration order. */
+/**
+ * Group a kit's components for palette rendering, preserving declaration order.
+ *
+ * The root component is left out. This is the only place the palette's contents
+ * are decided, so excluding it here excludes it from the panel, its search, and
+ * every drag source at once.
+ */
 export function groupKit(kit: Kit): Array<{ group: PaletteGroup; components: ComponentDef[] }> {
   const out: Array<{ group: PaletteGroup; components: ComponentDef[] }> = []
   for (const component of kit.components) {
+    if (component.root === true) continue
     let bucket = out.find((b) => b.group === component.group)
     if (!bucket) {
       bucket = { group: component.group, components: [] }

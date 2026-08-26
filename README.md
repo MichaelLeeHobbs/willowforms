@@ -2,7 +2,7 @@
 
 An MIT-licensed visual form designer for React. The **designer**, not just the renderer.
 
-> Status: beta. The builder works end to end and is covered by 345 tests, but nothing is published to
+> Status: beta. The builder works end to end and is covered by 418 tests, but nothing is published to
 > npm yet and no release has been cut. [docs/ROADMAP.md](docs/ROADMAP.md) is the honest status,
 > including what is still missing.
 
@@ -42,6 +42,9 @@ year for a drag-and-drop panel.
   components. See [docs/accessibility.md](docs/accessibility.md), which is honest about the gaps.
 - **Two kits**, switchable at runtime on the same document.
 
+The full specification is in [docs/spec](docs/spec/README.md), one file per contract, with a status on
+every section.
+
 Undo and redo cover all of it.
 
 ## Packages
@@ -62,7 +65,7 @@ Hono server so the demo can persist a document and prove server-side validation 
 ```bash
 pnpm install
 pnpm dev          # playground at http://localhost:5180
-pnpm test         # 345 tests
+pnpm test         # 418 tests
 pnpm e2e          # 40 more, in a real browser
 pnpm build        # tsc --build across all packages
 ```
