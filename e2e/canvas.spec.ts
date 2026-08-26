@@ -134,3 +134,18 @@ test('Escape abandons a drag without changing the document', async ({ designer }
   await expect(designer.page.locator('.fs-drag-label')).toHaveCount(0)
   expect(await designer.rootChildren()).toEqual(before)
 })
+
+test('the palette does not offer the root component', async ({ designer }) => {
+  /*
+   * Screen is the document root and every kit declares it, so the palette
+   * showed it alongside everything else: it could be clicked or dragged onto
+   * the canvas, nesting a screen inside the screen. The contract test pins the
+   * metadata; this pins what a user can actually reach.
+   */
+  const panel = designer.page.locator('.fs-panel').first()
+  await expect(panel.getByRole('button', { name: 'Screen', exact: true })).toHaveCount(0)
+
+  // The rest of the layout group is still there, so this is an exclusion and
+  // not an empty palette.
+  await expect(panel.getByRole('button', { name: 'Stack', exact: true })).toBeVisible()
+})
