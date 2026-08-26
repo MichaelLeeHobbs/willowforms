@@ -12,7 +12,7 @@ renderer, because every competitor paywalls exactly that piece.
   It is also the roadmap. Read the relevant contract before changing behaviour it describes.
 - `docs/ARCHITECTURE.md` — the kit seam, the document model, why the tree is the source of truth. Read
   before changing anything in `core`.
-- `docs/ROADMAP.md` — honest status. Most of the designer is not built. Check here before assuming a
+- `docs/ROADMAP.md` — a pointer at the spec, which carries the status. Check there before assuming a
   feature exists.
 - `docs/prior-art/README.md` — what the competitor study found, the gaps it set as targets, and the
   ground rules for using any of it.
@@ -52,7 +52,7 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 379 tests
+pnpm test          # vitest, 418 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs

@@ -33,10 +33,10 @@ interface ComponentDef {
 The rule this catalogue follows: **a property earns its place by being something a form author changes,
 not by existing in the underlying component's API.**
 
-The studied product's date picker exposes more than thirty properties, because it forwards Material UI's
-prop surface into a panel. That is not generosity, it is an absent decision: a form author is now reading
-`disableHighlightToday` and `fixedWeekNumber` to find `label`. Ours exposes eight, and a kit that wants
-the rest can add them without changing anything here.
+Forwarding a component library's whole prop list into the panel is the easy path and the wrong one: a
+date picker built that way offers upwards of thirty properties, and a form author hunting for `label`
+reads past all of them. A Formsmith date picker is specified with five. A kit that wants the rest can add
+them without changing anything here.
 
 Convergence with other builders on the properties that _are_ included is expected. A field has a label, a
 placeholder, a disabled state and helper text; a container has a direction and a gap. Those are the
@@ -44,17 +44,17 @@ domain, not anyone's invention.
 
 ### Shared property traits
 
-Defined once per kit and reused, so the same concept has the same name and editor everywhere.
+Three are defined once per kit and reused, so the same concept has the same name and editor everywhere.
 
-| Trait         | Editor    | Localizable | Notes                               |
-| ------------- | --------- | ----------- | ----------------------------------- |
-| `label`       | `string`  | yes         | The field's visible name            |
-| `placeholder` | `string`  | yes         | Inputs only                         |
-| `helperText`  | `string`  | yes         | Shown beneath, replaced by an error |
-| `disabled`    | `boolean` | no          | `advanced` section                  |
-| `readOnly`    | `boolean` | no          | `advanced` section                  |
-| `gap`         | `number`  | no          | `style` section, containers         |
-| `align`       | `select`  | no          | `style` section                     |
+| Trait        | Editor    | Localizable | Notes                               |
+| ------------ | --------- | ----------- | ----------------------------------- |
+| `label`      | `string`  | yes         | The field's visible name            |
+| `helperText` | `string`  | yes         | Shown beneath, replaced by an error |
+| `disabled`   | `boolean` | no          | `advanced` section                  |
+
+`placeholder` and `gap` are written out at each use instead. They belong here on the same argument and
+have simply not been moved. Nothing enforces that a repeated property keeps the same editor across
+components, which is the reason to move them rather than a reason not to.
 
 ## Palette groups
 
@@ -71,7 +71,7 @@ Twenty-six components. **Built** means both kits implement it and the contract t
 | Component  | Status  | Container | Properties                                        |
 | ---------- | ------- | --------- | ------------------------------------------------- |
 | `Screen`   | Built   | yes       | `maxWidth`, `gap`                                 |
-| `Stack`    | Built   | yes       | `direction`, `gap`, `align`, `wrap`               |
+| `Stack`    | Built   | yes       | `direction`, `gap`                                |
 | `Grid`     | Planned | yes       | `columns`, `gap`, `minColumnWidth`                |
 | `Box`      | Planned | yes       | `padding`, `background`, `radius`                 |
 | `Card`     | Planned | yes       | `title`, `subtitle`, `variant`                    |
@@ -103,7 +103,7 @@ statement from having forgotten.
 | ------------- | ------- | --------- | ------------------------------------------------------------------ |
 | `TextField`   | Built   | `string`  | `label`, `placeholder`, `helperText`, `multiline`, `disabled`      |
 | `TextArea`    | Planned | `string`  | `label`, `placeholder`, `helperText`, `rows`, `disabled`           |
-| `NumberField` | Built   | `number`  | `label`, `helperText`, `step`, `disabled`                          |
+| `NumberField` | Built   | `number`  | `label`, `helperText`, `disabled`                                  |
 | `DatePicker`  | Planned | `date`    | `label`, `helperText`, `min`, `max`, `disabled`                    |
 | `FileUpload`  | Planned | `file`    | `label`, `helperText`, `accept`, `multiple`, `maxSize`, `disabled` |
 | `Button`      | Built   | no        | `text`, `variant`, `disabled`                                      |
@@ -158,12 +158,16 @@ rather than being two components, because they are one idea with two shapes.
 Every component declares which of the six `EventName`s it can raise. Authoring them is
 [09-actions.md](09-actions.md), which is not built.
 
-| Event                   | Raised by             |
-| ----------------------- | --------------------- |
-| `onChange`              | data-bound components |
-| `onClick`               | `Button`, `Link`      |
-| `onFocus` / `onBlur`    | focusable inputs      |
-| `onMount` / `onUnmount` | everything            |
+The right-hand column is what the two kits declare today, not a rule. Since nothing fires an event yet,
+these lists have never had to be right: `onFocus` is missing from every input but `TextField`, and
+lifecycle events are declared only by `Screen`. Settle them when something reads them.
+
+| Event                   | Raised by                                    |
+| ----------------------- | -------------------------------------------- |
+| `onChange`              | data-bound components                        |
+| `onClick`               | `Button`, `Link`                             |
+| `onFocus` / `onBlur`    | `TextField`; `onBlur` alone on `NumberField` |
+| `onMount` / `onUnmount` | `Screen`                                     |
 
 ## What is deliberately absent
 
@@ -180,5 +184,6 @@ Every component declares which of the six `EventName`s it can raise. Authoring t
 
 1. Add the `ComponentDef` to both kits' metadata.
 2. Add a renderer to both kits, spreading `nodeProps`.
-3. Run `test/kit-contract.test.tsx`. It checks twelve obligations per component in every kit.
+3. Run `test/kit-contract.test.tsx`. It checks sixteen obligations against every kit. Most hold for the
+   kit as a whole; the `nodeProps` rule runs once per component.
 4. Add a row above and mark it Built.

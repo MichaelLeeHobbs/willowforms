@@ -19,8 +19,8 @@ Every other rule passes when the value is empty. A field carrying only a `url` r
 blank, because requiredness is one rule's job and folding it into every other rule makes it impossible to
 express "optional, but must be a URL if given".
 
-The studied product's demo gets this wrong: a field declaring only `url` reports _Required_ when blank.
-`validation.test.ts` has a test named after that bug.
+`validation.test.ts` holds this under `every non-required rule passes on an empty value`, which runs the
+whole catalogue rather than one case.
 
 ### Validation and rendering agree about what is visible
 
@@ -36,7 +36,7 @@ decides now, and both callers use it. See [01-document-model.md](01-document-mod
 ## The rule catalogue
 
 Every rule carries its parameters in the type. A rule set of `{ key, message? }` cannot express
-`minLength` without a side channel, which is the shape the studied product uses.
+`minLength` without a side channel, which is the shape FormEngine uses.
 
 ```ts
 type ValidationRule =
@@ -71,10 +71,9 @@ value, not an absence.
 the platform's own `<input type="checkbox" required>` means. Every other rule keeps treating `false` as a
 supplied value, because requiredness is one rule's job.
 
-This paragraph is the reason to write specifications. The prose here said an unchecked required box was
-caught; the code treated `false` as an answer and let a consent checkbox pass while unticked. The prose
-was right about what should happen and the code was wrong, and neither the type checker nor the tests had
-an opinion, because nothing had ever asked.
+This rule was written here before it was true anywhere else. The code treated `false` as a supplied
+answer, so a consent checkbox passed while unticked, and an existing test asserted that behaviour as
+correct. Neither the type checker nor the suite had an opinion, because nothing had ever asked.
 
 ### Every failure degrades rather than throws
 

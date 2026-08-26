@@ -93,8 +93,9 @@ not the primary path.
 
 ## Firing
 
-**Status: planned.** The renderer receives `onChange` from a data-bound component today and does nothing
-else with events. It would need:
+**Status: undecided.** The renderer receives `onChange` from a data-bound component today and does
+nothing else with events. The open question at the end of this section is the semantics of the whole
+feature, so nothing here is buildable yet. It would need:
 
 - an `onAction` prop, so the host decides what running an action means
 - lifecycle events, which means the renderer knows when a node mounts and unmounts
@@ -113,6 +114,5 @@ the actions themselves. Both need the `code` property editor, which does not exi
 
 ## Why this is last
 
-It is the only feature here whose absence has a good workaround: a host that needs behaviour can wire it
-outside the form, using `onChange` on the whole document. It is also the only one that can make a form
-unsafe, and shipping it half-specified would be worse than not shipping it.
+Its absence has a workaround the others do not: a host that needs behaviour can wire it outside the form
+through `onChange` on the whole document. It is also the only feature here that can make a form unsafe.

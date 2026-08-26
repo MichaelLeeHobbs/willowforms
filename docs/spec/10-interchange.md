@@ -15,10 +15,13 @@ people embedding it.
 <Designer initialDocument={doc} kit={kit} rendererKit={renderers} onChange={save} />
 ```
 
-`onChange` fires on every change, including every coalesced keystroke run. A host that wants a Save
-button rather than continuous saving passes `onSave`, and the toolbar shows one; without it there is no
-button, because a Save that the designer cannot honour is worse than none. See
-[04-shell.md](04-shell.md#toolbar).
+`onChange` fires on every change, including every coalesced keystroke run. It is the only output the
+designer has today.
+
+**Planned:** a host that wants a Save button rather than continuous saving passes `onSave`, and the
+toolbar shows one; without it there is no button, because a Save the designer cannot honour is worse than
+none. `DesignerProps` has no `onSave` yet. See [04-shell.md](04-shell.md#toolbar) and
+[12-api.md](12-api.md).
 
 `apps/demo-server` exists to demonstrate the other half — that `validateForm` is the same function on a
 server — and not to suggest Formsmith needs a backend.
@@ -45,7 +48,7 @@ rather than having already replaced the form.
 **Status: built.** This is the one place a user hands the builder arbitrary data, so it gets the same
 treatment any untrusted input would.
 
-Apply does three things in order, and stops at the first that fails:
+Apply runs three stages in order and stops at the first stage that reports anything:
 
 1. **Parse.** A syntax error is reported as one.
 2. **Check the shape.** `version`, `id`, `name`, and a `root` with a string `key` and `type`. This is what
@@ -53,8 +56,11 @@ Apply does three things in order, and stops at the first that fails:
 3. **Validate the structure.** `validateDocument` catches duplicate keys, empty keys, unknown action
    references, and a `defaultLanguage` naming a language the document does not have.
 
-**Every problem is reported at once**, not the first. A document missing four fields says so four times,
-because fixing them one round trip at a time is miserable.
+**Within a stage, every problem is reported at once.** A document missing four fields says so four times,
+because fixing them one round trip at a time is miserable. Between stages there is nothing to report
+together: a file that does not parse has no shape to check, and a document of the wrong shape cannot be
+walked. The guarantee is per stage, and stating it without that qualifier reads as a contradiction of the
+sentence above it.
 
 ### validateDocument never throws
 
@@ -70,9 +76,15 @@ whose entire job is to judge untrusted documents was the one that could be crash
 **Status: built.** A one-way projection. JSON Schema is an export format, never storage: it cannot
 express layout or nesting, and layout is half of what a visual builder produces.
 
-`toJsonSchema(document)` walks the tree, keeps only data-bound components, and produces a **flat** object.
+`toJsonSchema(document)` walks the tree, keeps every component carrying a `schema`, and produces a
+**flat** object. That is the predicate, and it is not quite the same as `ComponentDef.dataBound`: a
+hand-edited document can carry a schema on a component the kit does not consider data-bound, and the
+export takes it at its word.
 Form data is flat, keyed by component key however deeply the components nest, so a nested schema would
 misrepresent the payload.
+
+`FieldSchema['type']` also permits `array` and `object`. Both are accepted and exported as the matching
+type, and neither has a component that produces one yet.
 
 | Model                           | Schema                                  |
 | ------------------------------- | --------------------------------------- |
@@ -84,12 +96,13 @@ misrepresent the payload.
 | `pattern`                       | `pattern`                               |
 | `email` / `url` / `uuid`        | `format: email` / `uri` / `uuid`        |
 | `required`, unguarded           | the parent object's `required` array    |
-| A static `label`                | `title`                                 |
+| A static `label`, or `text`     | `title`                                 |
 
 ### What it cannot carry
 
-`unexportableRules()` names the fields whose rules the export drops, and the dialog says so rather than
-leaving the loss unmentioned:
+`unexportableRules()` names each dropped rule and the field it was on, and the dialog lists them rather
+than leaving the loss unmentioned. It used to describe all of them as custom rules, so a guarded
+`required` was reported as something it was not:
 
 - **`custom` rules.** Arbitrary JavaScript has no declarative equivalent.
 - **Guarded rules.** A rule with a `when` guard applies only sometimes, and JSON Schema's `required` is

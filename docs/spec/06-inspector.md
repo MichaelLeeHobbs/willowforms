@@ -21,11 +21,13 @@ rather than the selection. See [04-shell.md](04-shell.md#tabbed-left-pane).
 
 ### It is a real tablist
 
-**Status: built.** `role="tablist"`, roving tabindex, arrow keys, Home and End, and tabs and panels
-pointing at each other in both directions.
+**Status: built.** `role="tablist"`, roving tabindex, arrow keys, Home and End, and `aria-selected` on
+every tab rather than only the selected one.
 
-Worth stating because it is cheap and commonly skipped: the studied product ships tab strips with
-`role="tab"` buttons and no owning `tablist`, and with `aria-selected` present only on the selected one.
+Only the selected panel is rendered, so only the selected tab carries `aria-controls`. Every tab used to
+carry it, which left two of the three naming an id that was not in the document. An unresolved IDREF is
+not an axe violation, so the accessibility suite passed over it for as long as it existed.
+
 The whole pattern costs about fifteen lines, and tests hold it.
 
 ## Properties
@@ -93,7 +95,9 @@ an element with no role, so it announced nothing at all while looking handled. a
 
 ## Style
 
-**Status: planned.** Nothing exists.
+**Status: undecided.** Nothing exists, and the three questions below are open rather than settled. Two
+implementers reading this would build incompatible Style tabs and both could claim they had followed it.
+It stays undecided until they are answered.
 
 Writes `node.css`, which is `Partial<Record<Device, string>>` — raw CSS text per breakpoint. Editing is
 scoped to the viewport currently simulated on the canvas, so **viewport simulation has to come first**:
@@ -129,7 +133,11 @@ tab is about `custom`. An action that silently never fires is worse than one tha
 
 **Status: built.** See [08-validation.md](08-validation.md) for semantics.
 
-The field's data type and its validate-while-typing flag sit above a list of rules. Each rule gets the
+The field's data type and its validate-while-typing flag sit above a list of rules. That flag writes
+`FieldSchema.autoValidate`, which is a hint to whoever owns the form's data, since Formsmith never does.
+The canvas preview reads it: a field that asked for it shows its error once the user has touched it,
+rather than waiting for Validate. It was written by this checkbox and read by nothing at all until
+recently, which made it a setting that did nothing. Each rule gets the
 parameter its type demands, a message that falls back to the built-in default, and a remove button. A
 rule already applied drops out of the add menu, except `custom`, where more than one is meaningful.
 

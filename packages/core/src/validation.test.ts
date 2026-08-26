@@ -235,13 +235,18 @@ describe('autoValidateKeys', () => {
     type: 'Screen',
     props: {},
     children: [
-      { key: 'eager', type: 'Field', props: {}, schema: { type: 'string', autoValidate: true } },
-      { key: 'patient', type: 'Field', props: {}, schema: { type: 'string' } },
+      {
+        key: 'eager',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [], autoValidate: true },
+      },
+      { key: 'patient', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
       {
         key: 'explicit',
         type: 'Field',
         props: {},
-        schema: { type: 'string', autoValidate: false },
+        schema: { type: 'string', validations: [], autoValidate: false },
       },
       {
         key: 'group',
@@ -252,7 +257,7 @@ describe('autoValidateKeys', () => {
             key: 'nested',
             type: 'Field',
             props: {},
-            schema: { type: 'string', autoValidate: true },
+            schema: { type: 'string', validations: [], autoValidate: true },
           },
         ],
       },

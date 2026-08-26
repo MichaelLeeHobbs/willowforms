@@ -1,7 +1,11 @@
 # Document model
 
-**Status: partial.** The tree, property values, and validation rules are built and tested. Three fields
-the type declares have no implementation behind them, and the format has no version migration path yet.
+**Status: partial.** The tree, property values, and validation rules are built and tested. The format has
+no version migration path, and six fields the types declare have nothing reading them: `ComponentNode.css`
+and `ComponentNode.events` (see [06-inspector.md](06-inspector.md#style) and
+[09-actions.md](09-actions.md)), `ComponentDef.icon` (see [11-theming.md](11-theming.md#icons)),
+`FormDocument.version`, and both members of `FormSettings`. `FieldSchema.autoValidate` was a seventh
+until the canvas preview began reading it.
 
 A form is a recursive tree of `ComponentNode`. The tree is the source of truth. Everything else —
 JSON Schema, submitted data, the palette, the properties panel — is derived from it or projected out
@@ -135,8 +139,7 @@ type PropValue =
 
 A tagged union rather than a bag discriminated by which optional field happens to be present. Every
 consumer switches on `kind` exhaustively, so adding a fourth binding mode is a compile error at every
-call site instead of a silent fallthrough. The studied product uses the other shape and cannot express
-`minLength` without a side channel.
+call site instead of a silent fallthrough. FormEngine uses the other shape.
 
 Switching a property between modes starts the new mode empty. An expression is not a label, and seeding
 one with the other produces something that looks authored and is broken.
@@ -162,8 +165,8 @@ identities directly now.
 **Status: built.** Decided deliberately, and worth recording because the obvious comparison goes the
 other way.
 
-A document holds exactly one `root`. The studied product puts several named forms in one document and
-gives them a panel, and we are not going to.
+A document holds exactly one `root`. FormEngine puts several named forms in one document and gives them
+a panel. Formsmith will not.
 
 Formsmith has no persistence of its own by design, so "a project" is already the host's concept: a host
 that needs many forms holds many documents, and it already can. Putting them in one document would break

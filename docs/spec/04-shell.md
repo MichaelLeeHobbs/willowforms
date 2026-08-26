@@ -7,7 +7,8 @@ The shell is everything around the canvas: the panes, the toolbar, and the rules
 
 ## Layout
 
-Three panes under a toolbar.
+Three panes under a toolbar. **Status: built** for the arrangement; the pane contents below are where it
+is going, not where it is.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -21,6 +22,10 @@ Three panes under a toolbar.
 │            │  └──────────────────────────────┘  │ Rules          │
 └────────────┴────────────────────────────────────┴────────────────┘
 ```
+
+Today the left pane is one scrolling column of palette above tree, Settings is the inspector's third tab
+and is labelled **Form**, and the inspector has three tabs rather than four. The two sections below say
+what moves. Read the picture as the target.
 
 Both side panes are `--fs-panel-width` (288px) and fixed. The canvas takes what is left.
 
@@ -40,6 +45,10 @@ form with thirty components pushes the palette out of reach. They become tabs:
 | Components | The palette, searchable and grouped    |
 | Tree       | The structure tree                     |
 | Settings   | Form name, languages, default language |
+
+The tab is called **Form** in the code and everywhere a test selects it. It is called Settings here
+because that is what it becomes when it moves; rename it when it moves, not before, or the spec and the
+suite disagree about a string a user can read.
 
 Settings moves out of the inspector, where it currently sits as a third tab. It is a property of the
 document, not of the selected component, and putting it beside per-component properties was a

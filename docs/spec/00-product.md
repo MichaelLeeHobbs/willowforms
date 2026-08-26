@@ -1,6 +1,11 @@
 # Product
 
-**Status: built.** What Formsmith is, who it is for, and the lines it will not cross.
+What Formsmith is, who it is for, and the lines it will not cross.
+
+This file carries no status. Every other file uses one to say whether the code matches the prose, and a
+statement of intent has nothing to match: marking a scope document "built" put four product commitments
+in the same category of trust as a function that exists, and one of those commitments was wrong for
+months without anything being able to notice.
 
 ## The one-line version
 
@@ -71,11 +76,15 @@ See [10-interchange.md](10-interchange.md).
 Four commitments, each backed by something checkable rather than asserted.
 
 **Kits are pluggable.** Adding one is a new package, not a change to the designer. Checked: adding the
-second kit touched four files outside its own package, all build plumbing, and a contract test runs
-against every kit in the repository.
+second kit changed nothing in `core`, `renderer` or `designer`, and a contract test runs against every
+kit in the repository. It did touch build configuration, the playground, and one bug in the other kit
+that the new contract test exposed. An earlier draft of this paragraph said "four files, all build
+plumbing", which was the number of build files and not the number of files.
 
 **The designer has no UI-library dependency.** Its chrome is plain CSS driven by custom properties.
-A lint rule fails the build if anyone imports a component library into it.
+A lint rule fails CI if anyone imports one of the named component libraries into it. The list is an
+allowlist in `eslint.config.js`, so it catches the libraries this project has heard of and not the
+category, and it fails `pnpm lint` rather than `pnpm build`.
 
 **Accessibility is not a later milestone.** Every button is named, the tabs are a real tablist, the tree
 is fully keyboard-operable including moving components, contrast is computed from the stylesheets in CI,

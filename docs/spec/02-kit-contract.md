@@ -18,13 +18,14 @@ A kit package exports both. `@formsmith/kit-mui` exports `muiKit` and `muiRender
 
 The split is the whole design. **The designer only ever imports the metadata half.** It builds the
 palette from `ComponentDef[]` and the properties panel from `PropSchema[]`, and it never imports a
-component library. A lint rule fails the build if anyone makes it.
+component library. A lint rule fails CI if anyone imports one of the named libraries into it.
 
 Three things follow:
 
-- **Adding a kit is a new package.** No change to core, the renderer, or the designer. This is checked,
-  not asserted: adding `@formsmith/kit-html` touched four files outside its own package, all of them
-  build plumbing.
+- **Adding a kit is a new package.** No change to core, the renderer, or the designer. That is the
+  claim, and the commit adding `@formsmith/kit-html` holds it: nothing under those three packages
+  changed. It did change build configuration, the playground that demonstrates switching kits, and one
+  bug in `@formsmith/kit-mui` that the new contract test exposed.
 - **Core runs in Node.** No React anywhere in `@formsmith/core`, so the same validation runs on a server.
 - **The runtime ships without the designer.** Most consumers embed a form and never embed a builder.
 
@@ -76,25 +77,30 @@ evaluates an expression — that happens once, in the renderer, for every kit. A
 Each is a test in `test/kit-contract.test.tsx`, run against every registered kit. A failure names the
 obligation missed.
 
-| Rule                                             | Why                                                     |
-| ------------------------------------------------ | ------------------------------------------------------- |
-| Both halves declare the same `id`                | A mismatched pairing is otherwise impossible to spot    |
-| Every palette entry has a renderer               | A component that cannot render should not be offered    |
-| Every renderer has a palette entry               | An orphan renderer is dead code or a missing entry      |
-| At least one component is a container            | Nothing can be composed otherwise                       |
-| Component types are unique                       | The type is the lookup key                              |
-| Every data-bound component declares a `dataType` | The Rules tab has nothing to validate against otherwise |
-| Every prop schema has a name and a label         | An unlabelled row in the panel is unusable              |
-| Every `select` editor supplies options           | An empty picker is a dead end                           |
-| Every renderer puts `data-fs-key` in the DOM     | The designer cannot select it otherwise                 |
-| Containers render children inside themselves     | Rendering them outside breaks drop targeting            |
-| Data-bound components survive an absent value    | A freshly dropped field has no data yet                 |
-| Every data-bound component displays its error    | A failed submit that says nothing is the worst outcome  |
+| Rule                                                             | Why                                                                |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Both halves declare the same `id`                                | A mismatched pairing is otherwise impossible to spot               |
+| Every palette entry has a renderer                               | A component that cannot render should not be offered               |
+| Every renderer has a palette entry                               | An orphan renderer is dead code or a missing entry                 |
+| At least one component is a container                            | Nothing can be composed otherwise                                  |
+| Component types are unique                                       | The type is the lookup key                                         |
+| Every data-bound component declares a `dataType`                 | The Rules tab has nothing to validate against otherwise            |
+| Every prop schema has a name and a label                         | An unlabelled row in the panel is unusable                         |
+| Every `select` editor supplies options                           | An empty picker is a dead end                                      |
+| Every renderer puts `data-fs-key` in the DOM                     | The designer cannot select it otherwise                            |
+| Containers render children inside themselves                     | Rendering them outside breaks drop targeting                       |
+| Data-bound components survive an absent value                    | A freshly dropped field has no data yet                            |
+| Every data-bound component displays its error                    | A failed submit that says nothing is the worst outcome             |
+| The message carries `role="alert"` when it errors                | A silent failure is announced to nobody                            |
+| Every control describes itself by an element that already exists | A description added with the error is announced late or not at all |
+| Exactly one component is the root, and it is not in the palette  | The root exists already; a second one nests a screen in a screen   |
+| The palette index has no colliding types                         | The type is how a node finds its renderer                          |
 
-That last rule found a real bug the day it was written: the MUI checkbox had never destructured `error`,
-so a required checkbox failed a submit while displaying nothing. It had been that way since the first
-commit, invisible to the type checker and to 157 passing tests, because nothing had ever asked the
-question.
+Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
+had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two
+accessibility rules caught `@formsmith/kit-mui` failing both: no renderer in it set `role="alert"`, and
+its checkbox built the message element only once there was an error. Those two obligations had been
+written down here, as things a kit must do, for as long as this file has existed. Nothing ran them.
 
 ## Accessibility is the kit's job
 
@@ -111,10 +117,14 @@ A kit must:
 `@formsmith/kit-html` is the reference implementation of all five and is deliberately dependency-free, so
 it can be read and copied without also reading a component library.
 
+The third and fourth bullets are executed by the contract test. The other three are not: no test checks
+that a label points at its control, that `aria-invalid` is set, or that a focus indicator survives. They
+are obligations a kit author is trusted with, and saying so is better than implying a test is watching.
+
 ## Writing your own kit
 
-Copy `packages/kit-html`. It is semantic elements and a stylesheet, roughly 250 lines, with no
-dependencies beyond React.
+Copy `packages/kit-html`. It is semantic elements and a stylesheet, around 620 lines across renderers,
+definitions and CSS, with no dependencies beyond React.
 
 1. Export a `Kit` from `@formsmith/core` and a `RendererKit` from `@formsmith/renderer`, sharing an `id`.
 2. Spread `nodeProps` in every renderer.

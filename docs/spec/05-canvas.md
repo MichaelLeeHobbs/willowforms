@@ -106,11 +106,19 @@ its children are separate rows below it, so "innermost container under the point
 A row's top and bottom bands reorder among siblings. The middle band drops _into_ the row when it is a
 container, and otherwise falls back to the nearer edge, so a leaf row never swallows a drop.
 
-### Indices are measured after removal
+### An index means two different things
 
-`moveNode` removes before it inserts, so the index has to be measured against the siblings that remain.
-Measuring against the list that still contains the dragged node puts every downward reorder one position
-too far.
+Drop resolution measures slots in a list with the dragged node filtered out, and what that slot means
+depends on where the node came from.
+
+Reordering **within** a parent, the slot is already right: `moveNode` removes before it inserts, so the
+list it inserts into is the filtered one. Measuring against the list that still contains the dragged node
+put every downward reorder one position too far.
+
+Coming from **another** parent, the node was never among these siblings, so the slot has to be translated
+back into the real children list. `documentIndex` picks between the two, and the distinction is easy to
+lose: an earlier draft of this section stated only the first case, which reads as a rule that would break
+the second.
 
 ### The controller tells the zone what is being dragged
 

@@ -133,6 +133,22 @@ describe('inspector tabs', () => {
     expect(selected?.getAttribute('aria-controls')).toBe(panel?.id)
   })
 
+  it('never points a tab at a panel that is not rendered', () => {
+    const { view } = setup()
+
+    // Only the selected panel is in the DOM. Every tab used to claim one, so
+    // two of the three named an id nothing resolved to. An unresolved IDREF is
+    // not an axe violation, which is how this survived an accessibility suite.
+    for (const tab of within(screen.getByRole('tablist')).getAllByRole('tab')) {
+      const controls = tab.getAttribute('aria-controls')
+      if (controls === null) continue
+      expect(
+        view.container.querySelector('[id="' + controls + '"]'),
+        `the ${tab.textContent} tab controls #${controls}, which is not in the DOM`,
+      ).not.toBeNull()
+    }
+  })
+
   it('keeps exactly one tab in the tab order', () => {
     setup()
     const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')

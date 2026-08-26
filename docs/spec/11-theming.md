@@ -78,13 +78,12 @@ base, and computes every ratio. A token change that breaks one fails CI.
 Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for interface component boundaries and focus
 indicators. The lowest measured value in any palette is 4.15:1 against a 3:1 requirement.
 
-The studied product ships a primary button label at 3.03:1, which fails AA. Ours is 5.49:1 in light and
-6.39:1 in dark. That comparison is the reason the test exists: a goal nobody measures is a wish.
+Our primary button label is 5.49:1 in light and 6.39:1 in dark. Contrast failures in shipped builders
+are common enough that measuring is the only way to know, which is why this is a test and not a goal.
 
-That test was itself wrong once, in a way worth recording. It matched token blocks by substring, so
-`.fs-shell` also matched `.fs-shell[data-fs-theme='dark']` and the light palette silently held the dark
-values — 32 assertions passing while checking one palette twice. Selectors are matched exactly now, and
-it throws if either finds nothing.
+Selectors are matched exactly, and the test throws if a palette finds nothing. Substring matching meant
+`.fs-shell` also matched `.fs-shell[data-fs-theme='dark']`, so all 32 assertions ran twice against the
+dark palette and never once against the light one.
 
 ## Scrollbars
 

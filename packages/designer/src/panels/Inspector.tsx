@@ -81,7 +81,13 @@ export function Inspector({ api, kit }: InspectorProps): ReactNode {
             type="button"
             role="tab"
             aria-selected={active === tab.id}
-            aria-controls={panelId(tab.id)}
+            /*
+             * Only the selected tab's panel is in the DOM, so only the selected
+             * tab can name one. Every tab carried this, which left two of the
+             * three pointing aria-controls at an id that did not exist. axe does
+             * not flag an unresolved IDREF, so nothing caught it.
+             */
+            {...(active === tab.id ? { 'aria-controls': panelId(tab.id) } : {})}
             tabIndex={active === tab.id ? 0 : -1}
             className={'fs-tabs__tab' + (active === tab.id ? ' is-active' : '')}
             onClick={() => setActive(tab.id)}

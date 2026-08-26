@@ -115,9 +115,9 @@ in another language while building it.
 
 ## Why a tagged union
 
-The alternative — one bag of fields where the presence of `expression` means "this is computed" — is what
-the studied product uses. A tagged union means every consumer switches on `kind` exhaustively, so adding
-a fourth mode is a compile error at every call site rather than a silent fallthrough at some of them.
+The alternative, one bag of fields where the presence of `expression` means "this is computed", is what
+FormEngine uses. A tagged union means every consumer switches on `kind` exhaustively, so adding a fourth
+mode is a compile error at every call site rather than a silent fallthrough at some of them.
 
 It also makes "which mode is this in" a question with an answer, which is what lets the panel show one
 picker instead of inferring intent from which fields happen to be filled in.
