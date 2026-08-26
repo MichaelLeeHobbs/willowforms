@@ -40,8 +40,10 @@ export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
 
   return (
     <section className="fs-palette">
-      <h2 className="fs-panel__heading">Components</h2>
-
+      {/*
+        The tab above says Components, and the panel is labelled by it. A
+        heading here repeated the word directly under itself.
+      */}
       <div className="fs-palette__search">
         <label className="fs-visually-hidden" htmlFor="fs-palette-search">
           Search components
