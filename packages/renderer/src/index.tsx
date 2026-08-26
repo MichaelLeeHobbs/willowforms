@@ -133,9 +133,13 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     [node, translations, data, evaluate],
   )
 
+  // On the derived string, not on the node. Depending on the node re-creates
+  // this on any edit to it, which defeats memoisation in every kit component
+  // that compares props by identity.
+  const dataKey = dataKeyOf(node)
   const handleChange = useCallback(
-    (value: JsonValue) => onChange(dataKeyOf(node), value),
-    [onChange, node],
+    (value: JsonValue) => onChange(dataKey, value),
+    [onChange, dataKey],
   )
 
   const nodeProps = useMemo<NodeAttributes>(
@@ -158,7 +162,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       nodeProps={nodeProps}
       // Value by data key, error by node key. Two components may share a data
       // key; they can still fail for different reasons.
-      value={data[dataKeyOf(node)]}
+      value={data[dataKey]}
       error={errors[node.key]}
       onChange={handleChange}
     >

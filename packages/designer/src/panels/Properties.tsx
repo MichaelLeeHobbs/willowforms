@@ -97,8 +97,16 @@ function DataKeyField({
   const [draft, setDraft] = useState(value)
 
   const commit = (): void => {
-    if (draft.trim() === value) return
-    onCommit(draft)
+    /*
+     * Normalised first, then compared. Comparing the trimmed draft while
+     * leaving the field untrimmed meant typing " email " over `email` stored
+     * nothing and displayed the padded string, so the panel showed a value the
+     * document did not have.
+     */
+    const trimmed = draft.trim()
+    if (trimmed !== draft) setDraft(trimmed)
+    if (trimmed === value) return
+    onCommit(trimmed)
   }
 
   return (

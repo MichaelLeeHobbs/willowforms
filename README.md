@@ -2,7 +2,7 @@
 
 An MIT-licensed visual form designer for React. The **designer**, not just the renderer.
 
-> Status: beta. The builder works end to end and is covered by 508 tests, but nothing is published to
+> Status: beta. The builder works end to end and is covered by 510 tests, but nothing is published to
 > npm yet and no release has been cut. [docs/ROADMAP.md](docs/ROADMAP.md) is the honest status,
 > including what is still missing.
 
@@ -65,8 +65,8 @@ Hono server so the demo can persist a document and prove server-side validation 
 ```bash
 pnpm install
 pnpm dev          # playground at http://localhost:5180
-pnpm test         # 508 tests
-pnpm e2e          # 40 more, in a real browser
+pnpm test         # 510 tests
+pnpm e2e          # 44 more, in a real browser
 pnpm build        # tsc --build across all packages
 ```
 

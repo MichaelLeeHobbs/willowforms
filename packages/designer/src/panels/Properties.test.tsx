@@ -178,6 +178,35 @@ describe('the data key field', () => {
     expect(latest()?.dataKey).toBeUndefined()
   })
 
+  it('trims what it stores, and shows what it stored', async () => {
+    const { user, select, latest } = setup({ ...dataField(), dataKey: 'email' })
+    await select()
+
+    const input = screen.getByLabelText('Data key')
+    await user.clear(input)
+    await user.type(input, '  email  ')
+    await user.tab()
+
+    // The padded string is not a different data key, so nothing is written.
+    // The field still has to stop displaying it, or the panel shows a value the
+    // document does not hold.
+    expect(latest()?.dataKey).toBe('email')
+    expect(input).toHaveProperty('value', 'email')
+  })
+
+  it('trims a genuinely new data key before storing it', async () => {
+    const { user, select, latest } = setup(dataField())
+    await select()
+
+    const input = screen.getByLabelText('Data key')
+    await user.clear(input)
+    await user.type(input, '  email  ')
+    await user.tab()
+
+    expect(latest()?.dataKey).toBe('email')
+    expect(input).toHaveProperty('value', 'email')
+  })
+
   it('says what the component submits when an override is set', async () => {
     const { select } = setup({ ...dataField(), dataKey: 'email' })
     await select()
