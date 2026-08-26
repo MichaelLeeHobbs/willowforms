@@ -33,6 +33,7 @@ import '@formsmith/designer/styles.css'
 | `kit`             | `Kit`                              | yes      | Palette metadata                  |
 | `rendererKit`     | `RendererKit`                      | yes      | Canvas renderers for the same kit |
 | `onChange`        | `(document: FormDocument) => void` | no       | Fires on every change             |
+| `onSave`          | `(document: FormDocument) => void` | no       | Shows a Save button when passed   |
 
 `initialDocument` is a starting value, not a controlled prop. The designer owns the document from mount,
 and observing it means `onChange`; passing a different `initialDocument` later does nothing. A host that
@@ -41,7 +42,8 @@ needs to replace the document from outside needs an API that does not exist yet.
 The stylesheet is a separate import so a host theming by token override can load it once, in its own
 order. See [11-theming.md](11-theming.md).
 
-**Planned:** `onSave`, which is what makes the toolbar show a Save button. See
+`onSave` is what makes the toolbar show a Save button, and its absence is why there is no button by
+default: Formsmith does not persist, and one it cannot honour is worse than none. See
 [04-shell.md](04-shell.md#toolbar).
 
 ## Rendering a form
@@ -144,9 +146,15 @@ one function.
 
 ## Stability
 
-**Status: undecided**, and worth settling before the packages are published rather than after.
+**Status: undecided, deliberately.** Not an oversight, and not a question waiting on someone to find
+time. Nothing here is published yet, so there is no promise to break and no evidence about which parts of
+these types real kit authors lean on. Deciding now would mean guessing, and a compatibility promise is
+the one kind of decision that is expensive to walk back.
 
-Nothing states which of these types are protected by semver. `ComponentDef` and `PropSchema` are the ones
-that matter, because a kit is written against them by someone this project will never meet, and adding a
-required field to either breaks every kit at once. Adding an optional one does not, which is why
-`ComponentDef.root` could be added the way it was.
+What the decision will be about, when there is enough to go on: `ComponentDef` and `PropSchema` are the
+types that matter, because a kit is written against them by someone this project will never meet. Adding
+a required field to either breaks every kit at once. Adding an optional one does not, which is how
+`ComponentDef.root` and `ComponentDef.icon` were added.
+
+**Revisit before the first publish to npm.** That is the moment the question stops being theoretical,
+because the first published version is the first one anyone can depend on.

@@ -110,7 +110,7 @@ test('a translated label reaches the canvas', async ({ designer }) => {
 })
 
 test('adding a language leaves the document valid', async ({ designer }) => {
-  await designer.openTab('Form')
+  await designer.openTab('Settings')
   // Scoped by id: "Name" and "Code" both appear in more than one panel.
   await designer.page.locator('#fs-language-code').fill('fr')
   await designer.page.locator('#fs-language-name').fill('French')

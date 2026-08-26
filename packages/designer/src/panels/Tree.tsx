@@ -269,7 +269,6 @@ export function Tree({
 
   return (
     <section className="fs-tree">
-      <h2 className="fs-panel__heading">Structure</h2>
       <ul
         role="tree"
         aria-label="Form structure"

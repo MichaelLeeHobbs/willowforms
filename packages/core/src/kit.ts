@@ -48,9 +48,15 @@ export type IconName =
   | 'box'
   | 'card'
   | 'screen'
+  | 'tablet'
+  | 'mobile'
   | 'repeat'
   | 'alert'
   | 'tabs'
+  | 'chevron'
+  | 'copy'
+  | 'plus'
+  | 'trash'
 
 /** Which editor the properties panel renders for a prop. */
 export type PropEditor =

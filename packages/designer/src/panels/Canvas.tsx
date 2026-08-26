@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import type { FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
-import { autoValidateKeys, indexKit, validateForm } from '@formsmith/core'
+import type { Device, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
+import { autoValidateKeys, findParent, indexKit, validateForm } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -16,11 +16,48 @@ import { SelectionLayer } from './SelectionLayer.js'
 /** Shared, so an unvalidated canvas does not allocate a new object per render. */
 const NO_ERRORS: FormErrors = Object.freeze({})
 
+/**
+ * A device the canvas can pretend to be.
+ *
+ * `Device` from core also has `any`, which is the base layer per-breakpoint CSS
+ * falls back to rather than something anyone can look at. Excluding it here
+ * means the viewport control cannot offer it and the Style tab cannot ask the
+ * canvas to show it.
+ */
+export type Viewport = Exclude<Device, 'any'>
+
 export interface CanvasProps {
   api: DesignerApi
   kit: Kit
   rendererKit: RendererKit
   drag: DragController
+  /**
+   * Which device the canvas is pretending to be. A view preference, not part of
+   * the document: two people editing one form must not disagree about what it
+   * is, and nobody wants a form whose stored shape depends on the last window
+   * someone had open.
+   */
+  viewport: Viewport
+  /** Language tag the canvas renders in. Omitted means the document's default. */
+  language?: string
+}
+
+/**
+ * How wide the frame is at each viewport.
+ *
+ * Desktop has no width because it is not a simulation: the canvas is the
+ * viewport, and constraining it would be inventing a device nobody asked for.
+ * The other two are the widths the common breakpoints are written against.
+ *
+ * Not clamped to the canvas. A 768px frame in a 656px canvas would be 656px
+ * wide while claiming to be a tablet, which is the one thing a simulation must
+ * not do. It overflows and the canvas scrolls instead. Scaling it down with a
+ * transform would be worse still: every rectangle the drop arithmetic measures
+ * would stop matching the coordinates the pointer arrives in.
+ */
+const FRAME_WIDTH: Partial<Record<Viewport, number>> = {
+  tablet: 768,
+  mobile: 390,
 }
 
 /** Everything a drag needs to know about the canvas, frozen when it starts. */
@@ -40,13 +77,55 @@ interface Snapshot {
  * in the capture phase before the kit's components see them. Preview mode hands
  * the form back its own events untouched.
  */
-export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode {
+export function Canvas({
+  api,
+  kit,
+  rendererKit,
+  drag,
+  viewport,
+  language,
+}: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
   /** Fields the user has changed. A field validates while typing only after it is touched. */
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [hoverKey, setHoverKey] = useState<string | undefined>(undefined)
+
+  const frameWidth = FRAME_WIDTH[viewport]
+
+  /*
+   * Omitted for the root, which has no siblings to sit among and cannot be
+   * removed. Passing handlers that refuse would put three dead buttons on the
+   * frame, which is worse than no toolbar.
+   */
+  const selected = api.selectedNode
+  const selectedKey = api.selectedKey
+  const parent =
+    selectedKey && selectedKey !== api.document.root.key
+      ? findParent(api.document.root, selectedKey)
+      : undefined
+
+  const { addComponent, duplicateComponent, removeComponent } = api
+  const selectionActions = useMemo(() => {
+    if (!selected || !selectedKey || !parent) return undefined
+    const index = parent.children?.findIndex((child) => child.key === selectedKey) ?? -1
+    if (index === -1) return undefined
+
+    return {
+      onDuplicate: () => duplicateComponent(selectedKey),
+      /*
+       * A fresh component of the same type, not a copy. Duplicate is for "another
+       * one configured like this"; this is for "another one of these", which is
+       * the commoner intent and the one the palette makes you aim for.
+       */
+      onAddSibling: () => {
+        const def = indexKit(kit).get(selected.type)
+        if (def) addComponent(def, parent.key, index + 1)
+      },
+      onRemove: () => removeComponent(selectedKey),
+    }
+  }, [selected, selectedKey, parent, kit, addComponent, duplicateComponent, removeComponent])
 
   const surfaceRef = useRef<HTMLDivElement>(null)
   /*
@@ -129,13 +208,27 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
    * one carrying data-fs-key, and cancelling the default does nothing to a
    * React handler that has already been given the event.
    */
+  /*
+   * The canvas cancels pointer events in the capture phase so a click selects a
+   * component instead of operating it. That rule is about the kit's components,
+   * and the designer has chrome of its own inside the surface: the selection
+   * toolbar sits there so it can be positioned against the frame.
+   *
+   * Without this exemption the canvas swallowed its own toolbar's clicks, and
+   * the buttons read as dead rather than broken.
+   */
+  const isOwnChrome = (target: EventTarget | null): boolean =>
+    target instanceof Element && target.closest('.fs-selection') !== null
+
   const onMouseDownCapture = useCallback((event: MouseEvent) => {
+    if (isOwnChrome(event.target)) return
     event.preventDefault()
     event.stopPropagation()
   }, [])
 
   const onPointerDownCapture = useCallback(
     (event: ReactPointerEvent) => {
+      if (isOwnChrome(event.target)) return
       const key = keyFromEventTarget(event.target)
       // The root is the canvas itself; dragging it has nowhere to go.
       if (!key || key === api.document.root.key) return
@@ -146,6 +239,7 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
 
   const onClickCapture = useCallback(
     (event: MouseEvent) => {
+      if (isOwnChrome(event.target)) return
       event.stopPropagation()
       if (consumeClick()) return
       select(keyFromEventTarget(event.target))
@@ -248,13 +342,26 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
             }
           : {})}
       >
-        <FormRenderer
-          document={api.document}
-          kit={rendererKit}
-          data={data}
-          errors={errors}
-          onChange={onChange}
-        />
+        {/*
+         * The form sits inside a frame the designer owns, never in a wrapper the
+         * kit can see. Hit-testing is `closest('[data-fs-key]')` and the overlay
+         * measures against the surface, so an element carrying neither is
+         * invisible to both.
+         */}
+        <div
+          className="fs-canvas__frame"
+          data-fs-viewport={viewport}
+          style={frameWidth === undefined ? undefined : { width: frameWidth }}
+        >
+          <FormRenderer
+            document={api.document}
+            kit={rendererKit}
+            data={data}
+            errors={errors}
+            onChange={onChange}
+            {...(language ? { language } : {})}
+          />
+        </div>
 
         {editing && (
           <SelectionLayer
@@ -263,6 +370,7 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
             selectedKey={api.selectedKey}
             selectedType={api.selectedNode?.type}
             hoverKey={dragState ? undefined : hoverKey}
+            {...(selectionActions ? { actions: selectionActions } : {})}
           />
         )}
 

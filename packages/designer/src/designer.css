@@ -75,12 +75,31 @@
   white-space: nowrap;
 }
 
-/* Every chrome control gets a visible ring. The canvas keeps the kit's own. */
+/*
+ * Every chrome control gets a visible ring. The canvas keeps the kit's own.
+ *
+ * The last two are named individually because they are the designer's only
+ * controls that live outside a panel or a bar: the pane grips sit between the
+ * panes so a collapsed pane can still be reopened, and the selection toolbar
+ * sits on the canvas so it can be positioned against the frame. Both were
+ * falling back to the browser's default ring, which is not guaranteed to have
+ * any contrast against these surfaces.
+ */
 .fs-toolbar :focus-visible,
 .fs-panel :focus-visible,
-.fs-canvas__bar :focus-visible {
+.fs-canvas__bar :focus-visible,
+.fs-pane-handle:focus-visible,
+.fs-selection__toolbar button:focus-visible {
   outline: 2px solid var(--fs-primary);
   outline-offset: 2px;
+}
+
+/*
+ * Inset, because the grip is a 14px strip flush against its neighbours: a ring
+ * offset outwards would be drawn underneath the pane and the canvas.
+ */
+.fs-pane-handle:focus-visible {
+  outline-offset: -3px;
 }
 
 .fs-toolbar {
@@ -722,6 +741,105 @@
 }
 
 /*
+ * The device frame.
+ *
+ * A designer-owned box around the form, never a wrapper the kit can see. At
+ * desktop it has no width and the form keeps whatever its own Screen maxWidth
+ * gives it; at tablet and mobile the width comes from the component, so the
+ * margins either side stop being wasted space and start being the device.
+ *
+ * The border and background appear only when a device is being simulated. A
+ * frame drawn around a desktop canvas would be a picture of a monitor, which
+ * tells the author nothing they cannot already see.
+ */
+.fs-canvas__frame {
+  margin-inline: auto;
+}
+
+.fs-canvas__frame[data-fs-viewport='tablet'],
+.fs-canvas__frame[data-fs-viewport='mobile'] {
+  border: 1px solid var(--fs-border);
+  border-radius: calc(var(--fs-radius) * 2);
+  background: var(--fs-bg-panel);
+  box-shadow: 0 1px 12px rgb(0 0 0 / 12%);
+  overflow: hidden;
+}
+
+/*
+ * The pane grips.
+ *
+ * Outside the pane they control, so a collapsed pane can still be reopened.
+ * They are full-height strips rather than small buttons because the edge of a
+ * pane is a large, easy target and a 16px handle in the middle of it is not.
+ */
+.fs-pane-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--fs-text-muted);
+  background: var(--fs-bg-panel);
+}
+
+.fs-pane-handle--left {
+  border-inline-end: 1px solid var(--fs-border);
+}
+
+.fs-pane-handle--right {
+  border-inline-start: 1px solid var(--fs-border);
+}
+
+.fs-pane-handle:hover {
+  color: var(--fs-text);
+  background: var(--fs-bg-well);
+}
+
+.fs-pane-handle__glyph {
+  display: flex;
+}
+
+.fs-pane-handle__glyph.is-flipped {
+  transform: rotate(180deg);
+}
+
+.fs-toolbar__field {
+  display: flex;
+  align-items: center;
+}
+
+.fs-toolbar__group {
+  display: flex;
+  gap: 2px;
+  margin-inline-start: 8px;
+  padding: 2px;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+}
+
+.fs-toolbar__toggle {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+}
+
+.fs-toolbar__toggle.is-active {
+  color: var(--fs-primary-text);
+  background: var(--fs-primary);
+}
+
+/*
+ * The glyph inherits the token above, so an active toggle does not keep the
+ * muted colour .fs-icon sets and vanish into its own background.
+ */
+.fs-toolbar__toggle.is-active .fs-icon {
+  color: inherit;
+}
+
+/*
  * Scrollbars.
  *
  * A dark designer showed the platform's light scrollbars, because nothing here
@@ -807,6 +925,51 @@
 .fs-selection--active {
   outline: 2px solid var(--fs-primary);
   outline-offset: 2px;
+}
+
+/*
+ * The selection toolbar.
+ *
+ * The frame it sits on is pointer-events: none, so a click meant for the
+ * component underneath passes through it. The toolbar has to opt back in or its
+ * own buttons are unclickable, which is the sort of thing that looks like a
+ * dead control rather than a CSS mistake.
+ */
+.fs-selection__toolbar {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-end: -2px;
+  display: flex;
+  gap: 2px;
+  margin-block-end: 4px;
+  padding: 2px;
+  border-radius: var(--fs-radius);
+  background: var(--fs-bg-panel);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 22%);
+  pointer-events: auto;
+}
+
+.fs-selection__toolbar button {
+  display: flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--fs-text-muted);
+  background: transparent;
+}
+
+.fs-selection__toolbar button:hover {
+  color: var(--fs-text);
+  background: var(--fs-bg-well);
+}
+
+.fs-selection__toolbar button.is-danger:hover {
+  color: var(--fs-primary-text);
+  background: var(--fs-danger);
+}
+
+.fs-selection__toolbar .fs-icon {
+  color: inherit;
 }
 
 .fs-selection__label {

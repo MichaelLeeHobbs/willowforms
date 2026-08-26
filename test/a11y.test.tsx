@@ -147,6 +147,7 @@ describe('axe audit of the designer', () => {
     const user = userEvent.setup()
     const container = renderDesigner()
 
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
     const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
@@ -158,6 +159,7 @@ describe('axe audit of the designer', () => {
     const user = userEvent.setup()
     const container = renderDesigner()
 
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
     const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
@@ -166,11 +168,11 @@ describe('axe audit of the designer', () => {
     expect(await audit(container)).toEqual([])
   }, 20000)
 
-  it('has none on the Form tab', async () => {
+  it('has none on the Settings tab', async () => {
     const user = userEvent.setup()
     const container = renderDesigner()
 
-    await user.click(screen.getByRole('tab', { name: 'Form' }))
+    await user.click(screen.getByRole('tab', { name: 'Settings' }))
 
     expect(await audit(container)).toEqual([])
   }, 20000)
@@ -184,6 +186,18 @@ describe('axe audit of the designer', () => {
 
     // Validated, so every required field is showing an error. Error wiring is
     // exactly where form accessibility usually breaks.
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+
+  it('has none with both panes collapsed', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner()
+
+    // A collapsed pane is hidden, and hiding a region that still contains the
+    // focused element is one of the ways this goes wrong quietly.
+    await user.click(screen.getByRole('button', { name: /Hide Components and structure/ }))
+    await user.click(screen.getByRole('button', { name: /Hide Component properties/ }))
+
     expect(await audit(container)).toEqual([])
   }, 20000)
 

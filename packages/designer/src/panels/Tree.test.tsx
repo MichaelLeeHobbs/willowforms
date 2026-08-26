@@ -12,7 +12,7 @@
  * a focus that has not moved.
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
@@ -112,6 +112,10 @@ function setup(): Harness {
       }}
     />,
   )
+
+  // The structure tree is behind a tab in the left pane. Opened here so every
+  // test starts where it used to, rather than repeating the click in each.
+  fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const row = (key: string): HTMLElement => {
     const element = view.container.querySelector<HTMLElement>(`[data-fs-row="${key}"]`)
@@ -353,6 +357,8 @@ describe('the live region', () => {
   it('announces a palette addition', async () => {
     const { user, live } = setup()
 
+    // Back to the palette: setup() opens the Tree tab, which most tests want.
+    await user.click(screen.getByRole('tab', { name: 'Components' }))
     await user.click(screen.getByTitle('Add Field, or drag it onto the canvas'))
 
     expect(live()).toMatch(/Field added/)

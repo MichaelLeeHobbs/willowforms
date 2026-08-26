@@ -16,7 +16,7 @@ editor.
 | Actions    | Planned | The selected component's `events`              |
 | Rules      | Built   | The selected component's `schema.validations`  |
 
-Today a third tab holds form settings. That moves to the left pane, because it belongs to the document
+A third tab used to hold form settings. It has moved to the left pane, because it belongs to the document
 rather than the selection. See [04-shell.md](04-shell.md#tabbed-left-pane).
 
 ### It is a real tablist
@@ -28,7 +28,9 @@ Only the selected panel is rendered, so only the selected tab carries `aria-cont
 carry it, which left two of the three naming an id that was not in the document. An unresolved IDREF is
 not an axe violation, so the accessibility suite passed over it for as long as it existed.
 
-The whole pattern costs about fifteen lines, and tests hold it.
+The whole pattern costs about fifteen lines, and tests hold it. It lives in `panels/Tabs.tsx` and both
+panes use it: the left pane needed the same thing, and two copies would have been two places to get the
+roving tabindex subtly wrong.
 
 ## Properties
 
@@ -95,25 +97,48 @@ an element with no role, so it announced nothing at all while looking handled. a
 
 ## Style
 
-**Status: undecided.** Nothing exists, and the three questions below are open rather than settled. Two
-implementers reading this would build incompatible Style tabs and both could claim they had followed it.
-It stays undecided until they are answered.
+**Status: planned.** Nothing exists. The three questions this section used to leave open are answered
+below, so it is a commitment rather than a sketch.
 
-Writes `node.css`, which is `Partial<Record<Device, string>>` — raw CSS text per breakpoint. Editing is
-scoped to the viewport currently simulated on the canvas, so **viewport simulation has to come first**:
-authoring a tablet rule with no way to see a tablet is writing blind. See
+Writes `node.css`, which is `Partial<Record<Device, string>>`: raw CSS text per breakpoint. Editing is
+scoped to the viewport currently simulated on the canvas, so **viewport simulation has to come first**.
+Authoring a tablet rule with no way to see a tablet is writing blind. See
 [04-shell.md](04-shell.md#the-canvas-and-the-wasted-space).
 
-Open questions, to answer before building:
+### Two ways to write the same text
 
-- Raw CSS text, or a structured subset with a form? Raw is honest about being an escape hatch and needs
-  no vocabulary; structured is safer and discoverable, and is what most authors want for padding and
-  alignment. The likely answer is both, with the structured controls writing the same text.
-- What selector does the text apply to? The component's own element only, or descendants too? Only the
-  component's own element keeps the blast radius small and matches how the rest of the designer treats
-  the kit's internals as off-limits.
-- `any` versus the three devices: does `any` mean "all viewports" as a base layer, with the others
-  overriding? That is the useful reading and should be stated rather than inferred.
+Structured controls for the common properties, and a raw CSS field underneath. The structured controls
+write into the same string the raw field edits, so there is one stored value and no second format to keep
+in step.
+
+Both, rather than either, because they fail in opposite directions. Raw text alone makes padding a typing
+exercise and offers nothing to discover. A structured form alone turns every gap in its vocabulary into a
+wall, and the vocabulary is never finished. Structured for what most authors want, raw for everything
+else, and the raw field is what the structured controls are a shortcut for.
+
+The structured set is deliberately small: padding, margin, alignment, width, background, border, radius.
+Anything beyond that is the raw field's job. A property earns a control the same way a component property
+earns a row, by being something a form author changes rather than by existing.
+
+### It applies to the component's own element only
+
+Not to descendants. The rest of the designer treats a kit's internals as off-limits, and invariant 3 has
+a test enforcing that for the designer's own stylesheet; a Style tab that let an author write
+`input { padding: 0 }` would hand every user the ability to make the same mistake the invariant exists to
+prevent, one form at a time.
+
+The text is applied scoped to the element carrying `data-fs-key`, and a selector in it cannot escape that
+scope. What an author can still do is style that one element, which is the blast radius they can reason
+about.
+
+### `any` is the base layer
+
+`Device` is `any | mobile | tablet | desktop`. `any` is not a fourth breakpoint. It is the base, applied
+at every width, and the three device entries override it at theirs. A component with only `any` looks the
+same everywhere, which is what an author who never opens the viewport switcher should get.
+
+Cascade order is `any`, then the device matching the simulated viewport. Two device entries never apply
+at once, so there is no ordering question between them.
 
 ## Actions
 

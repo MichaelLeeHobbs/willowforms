@@ -17,7 +17,6 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
   if (!node) {
     return (
       <section className="fs-properties">
-        <h2 className="fs-panel__heading">Properties</h2>
         <p className="fs-empty">Select a component on the canvas to edit its properties.</p>
       </section>
     )

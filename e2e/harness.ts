@@ -22,7 +22,11 @@ export interface Designer {
   /** The whole document as the playground has persisted it. */
   document: () => Promise<FormDocumentShape>
   select: (key: string) => Promise<void>
-  openTab: (name: 'Properties' | 'Rules' | 'Form') => Promise<void>
+  /**
+   * Open a tab in either pane. The left pane holds Components, Tree and
+   * Settings; the inspector holds Properties and Rules.
+   */
+  openTab: (name: 'Components' | 'Tree' | 'Settings' | 'Properties' | 'Rules') => Promise<void>
   undo: () => Promise<void>
 }
 
@@ -52,6 +56,14 @@ export const test = base.extend<{ designer: Designer }>({
     // The shell is the signal that React has mounted and the kit has rendered.
     await expect(page.locator('.fs-shell')).toBeVisible()
     await expect(page.locator('[data-fs-key="root"]')).toBeVisible()
+
+    /*
+     * The structure tree is behind a tab in the left pane. Opened here so every
+     * test starts where it used to; the few that want the palette open the
+     * Components tab themselves.
+     */
+    await page.getByRole('tab', { name: 'Tree' }).click()
+    await expect(page.locator('[data-fs-row="root"]')).toBeVisible()
 
     const designer: Designer = {
       page,

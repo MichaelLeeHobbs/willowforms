@@ -143,6 +143,41 @@ const GLYPHS: Record<IconName, ReactNode> = {
       <path d="M9 21h6M12 17v4" />
     </>
   ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M15 9V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4" />
+    </>
+  ),
+  plus: (
+    <>
+      <path d="M12 5v14M5 12h14" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M10 4h4M6 7l1 13h10l1-13" />
+      <path d="M10 11v6M14 11v6" />
+    </>
+  ),
+  chevron: (
+    <>
+      <path d="m9 5 7 7-7 7" />
+    </>
+  ),
+  tablet: (
+    <>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M10 18.5h4" />
+    </>
+  ),
+  mobile: (
+    <>
+      <rect x="6" y="2" width="12" height="20" rx="2.5" />
+      <path d="M10.5 18.5h3" />
+    </>
+  ),
   repeat: (
     <>
       <path d="M4 9a5 5 0 0 1 5-5h11" />

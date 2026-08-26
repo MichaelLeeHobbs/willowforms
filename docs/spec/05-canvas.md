@@ -58,12 +58,29 @@ the designer marked. It sets no visual property, which is the bar any future exc
 
 ### Selection toolbar
 
-**Status: planned.** A small toolbar on the selection frame: duplicate, delete, and add a sibling.
+**Status: built.** A small toolbar on the selection frame: duplicate, add a sibling, and remove. It is
+omitted on the root, which has no siblings to sit among and cannot be removed; three buttons that refused
+would be worse than no toolbar.
 
-Duplicating is the one of the three that already works. `duplicateNode` is in core and `Ctrl`/`Cmd` + `D`
-reaches it from the tree; what is missing is the toolbar, which is the pointer route to the same thing.
+**Duplicate and add-a-sibling are different actions**, which is why both are there. Duplicate copies the
+component's configuration, so it means "another one set up like this". Add-a-sibling instantiates the
+same type with its defaults, so it means "another one of these". The second is the commoner intent and
+the palette is the only route to it otherwise, which makes you aim at a drop target to say something
+simple.
 
-It re-keys the copied subtree, because every key is unique within a document. An earlier draft of this
+`Ctrl`/`Cmd` + `D` is the keyboard route to duplicate, from the tree.
+
+### The canvas cancels events, including its own
+
+The toolbar sits inside `.fs-canvas__surface` so it can be positioned against the frame, which puts it
+inside the capture-phase handlers that stop a click operating a kit component. Those handlers exempt
+anything inside `.fs-selection`.
+
+Without the exemption the canvas swallowed its own toolbar's clicks. The buttons then read as dead
+rather than broken, which is the failure mode this project treats as worst, and no unit test could see
+it: the handlers are real DOM capture and the frame's `pointer-events` is layout. It took a browser.
+
+Duplicate re-keys the copied subtree, because every key is unique within a document. An earlier draft of this
 section guessed it would key a copy the way `instantiate` keys a new component, from the type. That is
 wrong for a copy: it renames `emailAddress` to `textField7` and throws away the only part of the name a
 form author chose. A copy is keyed from the original's name instead, with a trailing number stripped
@@ -81,9 +98,12 @@ drag-and-drop was rejected: no control over the drag image, and close to unusabl
 | From    | To     | Result                 |
 | ------- | ------ | ---------------------- |
 | Palette | Canvas | Insert a new component |
-| Palette | Tree   | Insert a new component |
 | Canvas  | Canvas | Move                   |
 | Tree    | Tree   | Reorder or reparent    |
+
+Palette to tree used to work and no longer can: the two are on separate tabs in the left pane, so they
+are never on screen at the same time. The drop zone still exists and would resolve correctly if they
+were. See [04-shell.md](04-shell.md#tabbed-left-pane).
 
 ### The threshold
 

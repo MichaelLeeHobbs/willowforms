@@ -1,7 +1,7 @@
 # Designer shell
 
-**Status: partial.** The three-pane layout, the toolbar, and the keyboard map are built. Panels do not
-collapse, the left pane is not tabbed, there is no viewport simulation, and the scrollbars are unstyled.
+**Status: built.** The layout, the toolbar, the keyboard map, the scrollbars, viewport simulation,
+collapsible panes and the tabbed left pane are all built.
 
 The shell is everything around the canvas: the panes, the toolbar, and the rules for what has focus.
 
@@ -31,14 +31,24 @@ Both side panes are `--fs-panel-width` (288px) and fixed. The canvas takes what 
 
 ### Collapsible panes
 
-**Status: planned.** A handle on the inner edge of each pane collapses it, and the canvas takes the
-space. Collapse state is per-pane and is not part of the document — it is a view preference, and putting
-it in the document would mean two people editing the same form disagree about what it looks like.
+**Status: built.** A grip on the inner edge of each pane collapses it, and the canvas takes the space.
+Collapse state is per pane and is not part of the document: it is a view preference, and putting it in
+the document would mean two people editing the same form disagree about what it looks like.
+
+Per pane rather than one shared flag, because hiding the palette to see a wide form and hiding the
+inspector to see the tree are different intentions.
+
+**The grip sits outside the pane it controls.** Inside, it would be a one-way door: collapsing the pane
+would take the control that reopens it with it. The chevron points the way the pane will move.
+
+A collapsed pane is `hidden`, so it leaves the accessibility tree and the tab order rather than becoming
+a zero-width region a keyboard can still land in. `test/a11y.test.tsx` audits that state.
 
 ### Tabbed left pane
 
-**Status: planned.** Today the palette and the structure tree are stacked in one scrolling column, so a
-form with thirty components pushes the palette out of reach. They become tabs:
+**Status: built.** The palette and the structure tree were stacked in one scrolling column, so a form
+with thirty components pushed the palette out of reach: the thing you reach for most often was the thing
+furthest from the top. They are tabs:
 
 | Tab        | Holds                                  |
 | ---------- | -------------------------------------- |
@@ -46,17 +56,26 @@ form with thirty components pushes the palette out of reach. They become tabs:
 | Tree       | The structure tree                     |
 | Settings   | Form name, languages, default language |
 
-The tab is called **Form** in the code and everywhere a test selects it. It is called Settings here
-because that is what it becomes when it moves; rename it when it moves, not before, or the spec and the
-suite disagree about a string a user can read.
+Settings has moved out of the inspector, where it was a third tab called Form. It belongs to the
+document, not to whatever is selected, and putting it beside per-component properties was a convenience
+that made the panel mean two things.
 
-Settings moves out of the inspector, where it currently sits as a third tab. It is a property of the
-document, not of the selected component, and putting it beside per-component properties was a
-mistake of convenience.
+**One consequence, and it is a real loss.** A component could be dragged from the palette straight into
+the tree, which is how you put something inside a container the canvas has made hard to aim at. The two
+are never on screen together now, so that route is gone; palette to canvas and tree to tree both still
+work. See [05-canvas.md](05-canvas.md#what-can-be-dragged-where). Switching to the Tree tab when a
+palette drag begins would bring it back, at the cost of the palette vanishing after every drop, which is
+worse for the common case of adding three fields in a row. A third option, splitting the pane so the tree
+sits collapsible beneath the palette, is recorded in [../ideas.md](../ideas.md) against the day the drop
+is actually missed.
+
+The tablist is the same component the inspector uses. It was extracted rather than copied: roving
+tabindex, arrow keys, Home and End, and panels naming their tab is fifteen lines that are easy to get
+subtly wrong twice, and the inspector's copy had already been wrong once.
 
 ## The canvas and the wasted space
 
-**Status: planned**, and worth explaining because the obvious fix is wrong.
+**Status: built**, and worth explaining because the obvious fix is wrong.
 
 The canvas currently shows the form centred, with dead space either side. That space is the `Screen`
 component's own `maxWidth`, which is a real property of the form being authored — a form that renders at
@@ -72,37 +91,61 @@ What makes that space meaningful is **viewport simulation**. The canvas becomes 
 | Mobile   | 390px | Centred, with the frame visible         |
 
 The margins stop being wasted and become the device. `Device` is already in the document model,
-declared as `'any' | 'desktop' | 'tablet' | 'mobile'`, and is what per-breakpoint CSS keys on — so this
-is also a prerequisite for the Style tab. See [06-inspector.md](06-inspector.md#style).
+declared as `'any' | 'desktop' | 'tablet' | 'mobile'`, and is what per-breakpoint CSS keys on, so this
+is also a prerequisite for the Style tab. See [06-inspector.md](06-inspector.md#style). The designer
+works in `Viewport`, which is `Device` without `any`: `any` is the base layer per-breakpoint CSS falls
+back to, not something anyone can look at.
 
-Viewport is a view preference, not part of the document.
+Viewport is a view preference, not part of the document. Two people editing one form must not disagree
+about what the form is because one of them last opened it on a phone.
+
+**The frame is not clamped to the canvas.** A 768px frame in a 656px canvas would be 656px wide while
+calling itself a tablet, which is the one thing a simulation must not do. It overflows and the canvas
+scrolls. Scaling it with a transform would be worse: every rectangle the drop arithmetic measures would
+stop matching the coordinates the pointer arrives in.
+
+The form sits in a frame the designer owns and the kit cannot see. Hit-testing is
+`closest('[data-fs-key]')` and the selection overlay measures against the surface, so an element carrying
+neither is invisible to both. That is a claim about geometry, so it is checked in a browser rather than
+here: `e2e/viewport.spec.ts` selects and drags at 390px wide.
 
 ## Toolbar
 
 **Status: partial.**
 
-| Control     | Status  | Does                                                              |
-| ----------- | ------- | ----------------------------------------------------------------- |
-| Form name   | Built   | Shown; edited on the Settings tab                                 |
-| Undo / Redo | Built   | Disabled when there is nothing to undo                            |
-| JSON        | Built   | Opens the document dialog                                         |
-| Preview     | Built   | On the canvas bar, not the toolbar                                |
-| Save        | Planned | Calls a new `onSave` prop; hidden when the host does not pass one |
-| Viewport    | Planned | Desktop / tablet / mobile                                         |
-| Language    | Planned | Which language the canvas renders in                              |
-| Theme       | Planned | Light / dark for the designer chrome                              |
+| Control     | Status | Does                                                             |
+| ----------- | ------ | ---------------------------------------------------------------- |
+| Form name   | Built  | Shown; edited on the Settings tab                                |
+| Undo / Redo | Built  | Disabled when there is nothing to undo                           |
+| JSON        | Built  | Opens the document dialog                                        |
+| Preview     | Built  | On the canvas bar, not the toolbar                               |
+| Save        | Built  | Calls the `onSave` prop; hidden when the host does not pass one  |
+| Viewport    | Built  | Desktop / tablet / mobile                                        |
+| Language    | Built  | Which language the canvas renders in; hidden below two languages |
+| Theme       | Built  | System / light / dark for the designer chrome                    |
 
 **Save needs care.** Formsmith does not persist, so a Save button that appears unconditionally promises
 something the designer cannot deliver. It renders only when the host passes `onSave`, and its absence is
 the honest default: `onChange` already emits every version, and many hosts save from that.
 
+**Theme, language and viewport are view state.** None of them touches the document, and there are tests
+saying so, because the temptation to store the author's last choice in the form they were editing is
+real and the consequence is two people disagreeing about what a form is.
+
+`system` is the absence of `data-fs-theme`, not a third palette: the stylesheet already answers
+`prefers-color-scheme`, so writing an explicit value would override the media query with nothing.
+
+The language select is hidden below two languages, where it is furniture. If the language the canvas is
+showing is removed from the document, the canvas falls back to the default. That is derived during
+render rather than corrected afterwards, so there is no frame in which the canvas points at a language
+the document does not have and draws every translation as its raw key.
+
 ## Scrollbars
 
-**Status: planned.** Nothing in either stylesheet styles a scrollbar, so a dark theme shows the
-platform's light ones. Both panes and the canvas need `scrollbar-width: thin` with `scrollbar-color`
-from the existing tokens, and the `::-webkit-scrollbar` equivalents.
+**Status: built.** See [11-theming.md](11-theming.md#scrollbars), which owns the tokens and the reason
+the canvas needs an exception to invariant 3.
 
-Small, and disproportionately visible: unstyled scrollbars make the whole thing read as unfinished.
+Small, and disproportionately visible: unstyled scrollbars made the whole thing read as unfinished.
 
 ## Keyboard
 

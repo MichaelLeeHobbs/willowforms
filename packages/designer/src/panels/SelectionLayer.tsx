@@ -13,6 +13,7 @@ import { useCallback, useLayoutEffect, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { FormDocument } from '@formsmith/core'
 
+import { Icon } from '../Icon.js'
 import { measureIn, nodeElement } from '../geometry.js'
 import type { Rect } from '../geometry.js'
 
@@ -40,6 +41,17 @@ export interface SelectionLayerProps {
   /** Component type of the selection, shown on the frame's label. */
   selectedType: string | undefined
   hoverKey: string | undefined
+  /**
+   * Actions for the selection frame's own toolbar. Omitted for the root, which
+   * cannot be duplicated, removed, or given a sibling.
+   */
+  actions?: SelectionActions
+}
+
+export interface SelectionActions {
+  onDuplicate: () => void
+  onAddSibling: () => void
+  onRemove: () => void
 }
 
 export function SelectionLayer({
@@ -48,6 +60,7 @@ export function SelectionLayer({
   selectedKey,
   selectedType,
   hoverKey,
+  actions,
 }: SelectionLayerProps): ReactNode {
   const [selected, setSelected] = useState<Rect | undefined>(undefined)
   const [hover, setHover] = useState<Rect | undefined>(undefined)
@@ -95,6 +108,41 @@ export function SelectionLayer({
       {selected && (
         <div className="fs-selection fs-selection--active" style={frameStyle(selected)}>
           <span className="fs-selection__label">{selectedType ?? 'Component'}</span>
+
+          {/*
+           * The frame is pointer-events: none so it cannot swallow a click meant
+           * for the component underneath. The toolbar has to opt back in, or its
+           * own buttons would be unclickable.
+           */}
+          {actions && (
+            <div className="fs-selection__toolbar">
+              <button
+                type="button"
+                aria-label={'Duplicate ' + (selectedKey ?? 'component')}
+                title="Duplicate"
+                onClick={actions.onDuplicate}
+              >
+                <Icon name="copy" size={13} />
+              </button>
+              <button
+                type="button"
+                aria-label={'Add a sibling after ' + (selectedKey ?? 'component')}
+                title="Add a sibling"
+                onClick={actions.onAddSibling}
+              >
+                <Icon name="plus" size={13} />
+              </button>
+              <button
+                type="button"
+                className="is-danger"
+                aria-label={'Remove ' + (selectedKey ?? 'component')}
+                title="Remove"
+                onClick={actions.onRemove}
+              >
+                <Icon name="trash" size={13} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

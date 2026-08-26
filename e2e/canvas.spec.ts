@@ -64,6 +64,7 @@ test('clicking a select does not open its dropdown', async ({ designer }) => {
 })
 
 test('dragging from the palette drops the component where the bar showed', async ({ designer }) => {
+  await designer.openTab('Components')
   const before = await designer.rootChildren()
   expect(before).not.toContain('checkbox')
 
@@ -87,6 +88,7 @@ test('dragging a component on the canvas moves it', async ({ designer }) => {
 })
 
 test('dropping into a row container infers the horizontal axis', async ({ designer }) => {
+  await designer.openTab('Components')
   // `name` lays its children out in a row, so the insertion point comes from x.
   const first = await designer.node('firstName').boundingBox()
   if (!first) throw new Error('nothing to measure')
@@ -110,6 +112,7 @@ test('dropping into a row container infers the horizontal axis', async ({ design
 })
 
 test('a plain click is still a click, not a swallowed drag', async ({ designer }) => {
+  await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Checkbox', exact: true }).click()
 
   // Clicking a palette entry adds under the selection rather than doing nothing.
@@ -136,6 +139,7 @@ test('Escape abandons a drag without changing the document', async ({ designer }
 })
 
 test('the palette does not offer the root component', async ({ designer }) => {
+  await designer.openTab('Components')
   /*
    * Screen is the document root and every kit declares it, so the palette
    * showed it alongside everything else: it could be clicked or dragged onto
@@ -151,6 +155,7 @@ test('the palette does not offer the root component', async ({ designer }) => {
 })
 
 test('every palette entry carries an icon beside its label', async ({ designer }) => {
+  await designer.openTab('Components')
   const items = designer.page.locator('.fs-palette__item')
   const count = await items.count()
   expect(count).toBeGreaterThan(5)
@@ -161,4 +166,57 @@ test('every palette entry carries an icon beside its label', async ({ designer }
     await expect(glyph).toHaveCount(1)
     expect(await glyph.locator('*').count()).toBeGreaterThan(0)
   }
+})
+
+test('the selection frame carries a toolbar, and the root does not', async ({ designer }) => {
+  await designer.node('email').click()
+  await expect(designer.page.locator('.fs-selection__toolbar')).toBeVisible()
+
+  // The root has no siblings to sit among and cannot be removed, so three
+  // buttons that refused would be worse than no toolbar.
+  await designer.row('root').click()
+  await expect(designer.page.locator('.fs-selection__toolbar')).toHaveCount(0)
+})
+
+test('the toolbar is clickable, despite sitting on a frame that is not', async ({ designer }) => {
+  /*
+   * The selection frame is pointer-events: none so a click meant for the
+   * component passes through it. The toolbar opts back in. Without that these
+   * buttons look dead rather than broken, which is why this is worth a test in
+   * a real browser.
+   */
+  await designer.node('email').click()
+  const before = await designer.rootChildren()
+
+  await designer.page.getByRole('button', { name: 'Duplicate email' }).click()
+
+  const after = await designer.rootChildren()
+  expect(after.length).toBe(before.length + 1)
+  expect(after[after.indexOf('email') + 1]).toBe('email2')
+})
+
+test('add a sibling makes a fresh component, not a copy', async ({ designer }) => {
+  await designer.node('email').click()
+  await designer.page.getByRole('button', { name: 'Add a sibling after email' }).click()
+
+  const doc = await designer.document()
+  const children = doc.root.children ?? []
+  const added = children[children.findIndex((child) => child.key === 'email') + 1]
+
+  // Same type, default props: "another one of these", not "another one
+  // configured like this".
+  expect(added?.type).toBe('TextField')
+  expect(added?.key).not.toBe('email2')
+  expect(added?.props['label']).toEqual({ kind: 'static', value: 'Label' })
+})
+
+test('the toolbar removes the selected component', async ({ designer }) => {
+  await designer.node('website').click()
+
+  // Scoped: the tree row offers a Remove with the same name, which is correct
+  // for a screen reader and ambiguous for a locator.
+  const toolbar = designer.page.locator('.fs-selection__toolbar')
+  await toolbar.getByRole('button', { name: 'Remove website' }).click()
+
+  expect(await designer.rootChildren()).not.toContain('website')
 })

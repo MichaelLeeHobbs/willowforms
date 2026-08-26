@@ -115,8 +115,23 @@ test('the inspector tabs are reachable and navigable by keyboard', async ({ desi
     'true',
   )
 
+  // Two tabs now: form settings moved to the left pane, so End lands on Rules.
   await designer.page.keyboard.press('End')
-  await expect(designer.page.getByRole('tab', { name: 'Form' })).toBeFocused()
+  await expect(designer.page.getByRole('tab', { name: 'Rules' })).toBeFocused()
+})
+
+test('the left pane tabs are reachable and navigable by keyboard', async ({ designer }) => {
+  await designer.page.getByRole('tab', { name: 'Components' }).focus()
+
+  await designer.page.keyboard.press('ArrowRight')
+  await expect(designer.page.getByRole('tab', { name: 'Tree' })).toBeFocused()
+
+  await designer.page.keyboard.press('End')
+  await expect(designer.page.getByRole('tab', { name: 'Settings' })).toBeFocused()
+
+  // Wraps, like the inspector's, because it is the same component.
+  await designer.page.keyboard.press('ArrowRight')
+  await expect(designer.page.getByRole('tab', { name: 'Components' })).toBeFocused()
 })
 
 test('the JSON dialog traps focus and closes on Escape', async ({ designer }) => {

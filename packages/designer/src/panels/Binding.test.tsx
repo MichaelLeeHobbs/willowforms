@@ -10,7 +10,7 @@
  * property only offers the modes its `PropSchema` allows.
  */
 
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
@@ -91,6 +91,10 @@ function setup(languages?: Language[]): Harness {
       }}
     />,
   )
+
+  // The structure tree is behind a tab in the left pane. Opened here so every
+  // test starts where it used to, rather than repeating the click in each.
+  fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   return {
     user,
@@ -241,7 +245,7 @@ describe('binding editors', () => {
 describe('form settings', () => {
   it('renames the form', async () => {
     const { user, openTab, latest } = setup()
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.clear(screen.getByLabelText('Form name'))
     await user.type(screen.getByLabelText('Form name'), 'Signup')
@@ -251,7 +255,7 @@ describe('form settings', () => {
 
   it('adds a language', async () => {
     const { user, openTab, latest } = setup()
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.type(screen.getByLabelText('Code'), 'fr')
     await user.type(screen.getByLabelText('Name'), 'French')
@@ -265,7 +269,7 @@ describe('form settings', () => {
 
   it('refuses a duplicate language code', async () => {
     const { user, openTab, latest } = setup()
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.type(screen.getByLabelText('Code'), 'en')
     await user.click(screen.getByRole('button', { name: 'Add language' }))
@@ -276,7 +280,7 @@ describe('form settings', () => {
 
   it('refuses an empty language code instead of adding a blank row', async () => {
     const { user, openTab, latest } = setup()
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.click(screen.getByRole('button', { name: 'Add language' }))
 
@@ -289,9 +293,16 @@ describe('form settings', () => {
       { code: 'en', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
     ])
-    await openTab('Form')
+    await openTab('Settings')
 
-    const french = screen.getByText('French').closest('li')
+    /*
+     * Scoped to the left pane, where settings now live. The toolbar's canvas
+     * language select names every language too, and there are two tabpanels on
+     * screen, so both an unscoped query and a role query match twice.
+     */
+    const pane = document.querySelector<HTMLElement>('.fs-panel--left')
+    if (!pane) throw new Error('no left pane')
+    const french = within(pane).getByText('French').closest('li')
     if (!french) throw new Error('no row for French')
     await user.click(within(french).getByRole('radio'))
 
@@ -303,7 +314,7 @@ describe('form settings', () => {
       { code: 'en', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
     ])
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.click(screen.getByRole('button', { name: 'Remove English' }))
 
@@ -324,7 +335,7 @@ describe('form settings', () => {
       { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
     ])
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.click(screen.getByRole('button', { name: 'Remove English' }))
 
@@ -334,7 +345,7 @@ describe('form settings', () => {
 
   it('splits a region subtag out of the code it was typed with', async () => {
     const { user, openTab, latest } = setup()
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.type(screen.getByLabelText('Code'), 'pt-BR')
     await user.type(screen.getByLabelText('Name'), 'Portuguese')
@@ -356,7 +367,7 @@ describe('form settings', () => {
     const { user, openTab, latest } = setup([
       { code: 'pt', dialect: 'BR', name: 'PT', bidi: 'ltr' },
     ])
-    await openTab('Form')
+    await openTab('Settings')
 
     await user.type(screen.getByLabelText('Code'), 'pt-br')
     await user.click(screen.getByRole('button', { name: 'Add language' }))
@@ -367,7 +378,7 @@ describe('form settings', () => {
 
   it('will not remove the last language', async () => {
     const { openTab, latest } = setup()
-    await openTab('Form')
+    await openTab('Settings')
 
     expect(screen.getByRole('button', { name: 'Remove English' })).toHaveProperty('disabled', true)
     expect(latest().languages).toHaveLength(1)
