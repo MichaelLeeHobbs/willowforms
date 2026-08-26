@@ -9,12 +9,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { FormDocument, Kit } from '@formsmith/core'
+import type { FormDocument, IconName, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
 
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
+import { Icon } from './Icon.js'
 import { Canvas } from './panels/Canvas.js'
+import type { Viewport } from './panels/Canvas.js'
 import { DocumentDialog } from './panels/DocumentDialog.js'
 import { Inspector } from './panels/Inspector.js'
 import { Palette } from './panels/Palette.js'
@@ -94,9 +96,21 @@ export function Designer({
 
   const drag = useDrag(commitDrop)
 
+  /*
+   * A view preference, so it lives here and never in the document. Two people
+   * editing one form must not disagree about what the form is because one of
+   * them last looked at it on a phone.
+   */
+  const [viewport, setViewport] = useState<Viewport>('desktop')
+
   return (
     <div className="fs-shell" data-testid="formsmith-designer">
-      <Toolbar api={api} onOpenJson={() => setJsonOpen(true)} />
+      <Toolbar
+        api={api}
+        onOpenJson={() => setJsonOpen(true)}
+        viewport={viewport}
+        onViewport={setViewport}
+      />
       <div className="fs-body">
         <aside className="fs-panel fs-panel--left" aria-label="Components and structure">
           <Palette
@@ -121,7 +135,13 @@ export function Designer({
         </aside>
 
         <main className="fs-canvas" aria-label="Form canvas">
-          <Canvas api={canvasApi} kit={kit} rendererKit={rendererKit} drag={drag} />
+          <Canvas
+            api={canvasApi}
+            kit={kit}
+            rendererKit={rendererKit}
+            drag={drag}
+            viewport={viewport}
+          />
         </main>
 
         <aside className="fs-panel fs-panel--right" aria-label="Component properties">
@@ -153,7 +173,30 @@ export function Designer({
   )
 }
 
-function Toolbar({ api, onOpenJson }: { api: DesignerApi; onOpenJson: () => void }): ReactNode {
+/**
+ * The viewports the canvas can pretend to be.
+ *
+ * `Device` also has `any`, which is the base layer per-breakpoint CSS falls back
+ * to rather than a device anyone can look at. It is deliberately not offered
+ * here. See [06-inspector.md](../../../docs/spec/06-inspector.md).
+ */
+const VIEWPORTS: { id: Viewport; label: string; icon: IconName }[] = [
+  { id: 'desktop', label: 'Desktop', icon: 'screen' },
+  { id: 'tablet', label: 'Tablet', icon: 'tablet' },
+  { id: 'mobile', label: 'Mobile', icon: 'mobile' },
+]
+
+function Toolbar({
+  api,
+  onOpenJson,
+  viewport,
+  onViewport,
+}: {
+  api: DesignerApi
+  onOpenJson: () => void
+  viewport: Viewport
+  onViewport: (next: Viewport) => void
+}): ReactNode {
   return (
     <header className="fs-toolbar">
       <h1 className="fs-toolbar__title">{api.document.name}</h1>
@@ -167,6 +210,27 @@ function Toolbar({ api, onOpenJson }: { api: DesignerApi; onOpenJson: () => void
         <button type="button" onClick={onOpenJson}>
           JSON
         </button>
+
+        {/*
+         * A group of toggles rather than a select: three options that are set
+         * and re-set constantly, where seeing which one is active matters more
+         * than saving the width.
+         */}
+        <div className="fs-toolbar__group" role="group" aria-label="Viewport">
+          {VIEWPORTS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={'fs-toolbar__toggle' + (viewport === option.id ? ' is-active' : '')}
+              aria-pressed={viewport === option.id}
+              title={option.label}
+              onClick={() => onViewport(option.id)}
+            >
+              <Icon name={option.icon} />
+              <span className="fs-visually-hidden">{option.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </header>
   )

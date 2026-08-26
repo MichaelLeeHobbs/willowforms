@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import type { FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
+import type { Device, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
 import { autoValidateKeys, indexKit, validateForm } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
@@ -16,11 +16,46 @@ import { SelectionLayer } from './SelectionLayer.js'
 /** Shared, so an unvalidated canvas does not allocate a new object per render. */
 const NO_ERRORS: FormErrors = Object.freeze({})
 
+/**
+ * A device the canvas can pretend to be.
+ *
+ * `Device` from core also has `any`, which is the base layer per-breakpoint CSS
+ * falls back to rather than something anyone can look at. Excluding it here
+ * means the viewport control cannot offer it and the Style tab cannot ask the
+ * canvas to show it.
+ */
+export type Viewport = Exclude<Device, 'any'>
+
 export interface CanvasProps {
   api: DesignerApi
   kit: Kit
   rendererKit: RendererKit
   drag: DragController
+  /**
+   * Which device the canvas is pretending to be. A view preference, not part of
+   * the document: two people editing one form must not disagree about what it
+   * is, and nobody wants a form whose stored shape depends on the last window
+   * someone had open.
+   */
+  viewport: Viewport
+}
+
+/**
+ * How wide the frame is at each viewport.
+ *
+ * Desktop has no width because it is not a simulation: the canvas is the
+ * viewport, and constraining it would be inventing a device nobody asked for.
+ * The other two are the widths the common breakpoints are written against.
+ *
+ * Not clamped to the canvas. A 768px frame in a 656px canvas would be 656px
+ * wide while claiming to be a tablet, which is the one thing a simulation must
+ * not do. It overflows and the canvas scrolls instead. Scaling it down with a
+ * transform would be worse still: every rectangle the drop arithmetic measures
+ * would stop matching the coordinates the pointer arrives in.
+ */
+const FRAME_WIDTH: Partial<Record<Viewport, number>> = {
+  tablet: 768,
+  mobile: 390,
 }
 
 /** Everything a drag needs to know about the canvas, frozen when it starts. */
@@ -40,13 +75,15 @@ interface Snapshot {
  * in the capture phase before the kit's components see them. Preview mode hands
  * the form back its own events untouched.
  */
-export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode {
+export function Canvas({ api, kit, rendererKit, drag, viewport }: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
   /** Fields the user has changed. A field validates while typing only after it is touched. */
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [hoverKey, setHoverKey] = useState<string | undefined>(undefined)
+
+  const frameWidth = FRAME_WIDTH[viewport]
 
   const surfaceRef = useRef<HTMLDivElement>(null)
   /*
@@ -248,13 +285,25 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
             }
           : {})}
       >
-        <FormRenderer
-          document={api.document}
-          kit={rendererKit}
-          data={data}
-          errors={errors}
-          onChange={onChange}
-        />
+        {/*
+         * The form sits inside a frame the designer owns, never in a wrapper the
+         * kit can see. Hit-testing is `closest('[data-fs-key]')` and the overlay
+         * measures against the surface, so an element carrying neither is
+         * invisible to both.
+         */}
+        <div
+          className="fs-canvas__frame"
+          data-fs-viewport={viewport}
+          style={frameWidth === undefined ? undefined : { width: frameWidth }}
+        >
+          <FormRenderer
+            document={api.document}
+            kit={rendererKit}
+            data={data}
+            errors={errors}
+            onChange={onChange}
+          />
+        </div>
 
         {editing && (
           <SelectionLayer

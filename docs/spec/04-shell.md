@@ -1,7 +1,7 @@
 # Designer shell
 
-**Status: partial.** The three-pane layout, the toolbar, and the keyboard map are built. Panels do not
-collapse, the left pane is not tabbed, there is no viewport simulation, and the scrollbars are unstyled.
+**Status: partial.** The three-pane layout, the toolbar, the keyboard map, and the scrollbars are built.
+Panels do not collapse, the left pane is not tabbed, and there is no viewport simulation.
 
 The shell is everything around the canvas: the panes, the toolbar, and the rules for what has focus.
 
@@ -56,7 +56,7 @@ mistake of convenience.
 
 ## The canvas and the wasted space
 
-**Status: planned**, and worth explaining because the obvious fix is wrong.
+**Status: built**, and worth explaining because the obvious fix is wrong.
 
 The canvas currently shows the form centred, with dead space either side. That space is the `Screen`
 component's own `maxWidth`, which is a real property of the form being authored — a form that renders at
@@ -72,10 +72,23 @@ What makes that space meaningful is **viewport simulation**. The canvas becomes 
 | Mobile   | 390px | Centred, with the frame visible         |
 
 The margins stop being wasted and become the device. `Device` is already in the document model,
-declared as `'any' | 'desktop' | 'tablet' | 'mobile'`, and is what per-breakpoint CSS keys on — so this
-is also a prerequisite for the Style tab. See [06-inspector.md](06-inspector.md#style).
+declared as `'any' | 'desktop' | 'tablet' | 'mobile'`, and is what per-breakpoint CSS keys on, so this
+is also a prerequisite for the Style tab. See [06-inspector.md](06-inspector.md#style). The designer
+works in `Viewport`, which is `Device` without `any`: `any` is the base layer per-breakpoint CSS falls
+back to, not something anyone can look at.
 
-Viewport is a view preference, not part of the document.
+Viewport is a view preference, not part of the document. Two people editing one form must not disagree
+about what the form is because one of them last opened it on a phone.
+
+**The frame is not clamped to the canvas.** A 768px frame in a 656px canvas would be 656px wide while
+calling itself a tablet, which is the one thing a simulation must not do. It overflows and the canvas
+scrolls. Scaling it with a transform would be worse: every rectangle the drop arithmetic measures would
+stop matching the coordinates the pointer arrives in.
+
+The form sits in a frame the designer owns and the kit cannot see. Hit-testing is
+`closest('[data-fs-key]')` and the selection overlay measures against the surface, so an element carrying
+neither is invisible to both. That is a claim about geometry, so it is checked in a browser rather than
+here: `e2e/viewport.spec.ts` selects and drags at 390px wide.
 
 ## Toolbar
 
@@ -88,7 +101,7 @@ Viewport is a view preference, not part of the document.
 | JSON        | Built   | Opens the document dialog                                         |
 | Preview     | Built   | On the canvas bar, not the toolbar                                |
 | Save        | Planned | Calls a new `onSave` prop; hidden when the host does not pass one |
-| Viewport    | Planned | Desktop / tablet / mobile                                         |
+| Viewport    | Built   | Desktop / tablet / mobile                                         |
 | Language    | Planned | Which language the canvas renders in                              |
 | Theme       | Planned | Light / dark for the designer chrome                              |
 
@@ -98,11 +111,10 @@ the honest default: `onChange` already emits every version, and many hosts save 
 
 ## Scrollbars
 
-**Status: planned.** Nothing in either stylesheet styles a scrollbar, so a dark theme shows the
-platform's light ones. Both panes and the canvas need `scrollbar-width: thin` with `scrollbar-color`
-from the existing tokens, and the `::-webkit-scrollbar` equivalents.
+**Status: built.** See [11-theming.md](11-theming.md#scrollbars), which owns the tokens and the reason
+the canvas needs an exception to invariant 3.
 
-Small, and disproportionately visible: unstyled scrollbars make the whole thing read as unfinished.
+Small, and disproportionately visible: unstyled scrollbars made the whole thing read as unfinished.
 
 ## Keyboard
 

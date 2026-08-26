@@ -143,6 +143,18 @@ const GLYPHS: Record<IconName, ReactNode> = {
       <path d="M9 21h6M12 17v4" />
     </>
   ),
+  tablet: (
+    <>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M10 18.5h4" />
+    </>
+  ),
+  mobile: (
+    <>
+      <rect x="6" y="2" width="12" height="20" rx="2.5" />
+      <path d="M10.5 18.5h3" />
+    </>
+  ),
   repeat: (
     <>
       <path d="M4 9a5 5 0 0 1 5-5h11" />

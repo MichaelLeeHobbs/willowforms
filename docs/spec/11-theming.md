@@ -108,7 +108,7 @@ declare, so neither can quietly grow a `background`.
 
 **Status: built.** Option 1 below, as recommended.
 
-`IconName` in `@formsmith/core` is a closed union of 23 names. `packages/designer/src/Icon.tsx` draws
+`IconName` in `@formsmith/core` is a closed union of 25 names. `packages/designer/src/Icon.tsx` draws
 each one as an inline 24x24 stroke glyph on `currentColor`, and a kit picks names from the list. The
 palette renders them beside the label, decoratively: the label already says the same word, so naming the
 glyph would have a screen reader read every entry twice.

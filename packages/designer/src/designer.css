@@ -722,6 +722,59 @@
 }
 
 /*
+ * The device frame.
+ *
+ * A designer-owned box around the form, never a wrapper the kit can see. At
+ * desktop it has no width and the form keeps whatever its own Screen maxWidth
+ * gives it; at tablet and mobile the width comes from the component, so the
+ * margins either side stop being wasted space and start being the device.
+ *
+ * The border and background appear only when a device is being simulated. A
+ * frame drawn around a desktop canvas would be a picture of a monitor, which
+ * tells the author nothing they cannot already see.
+ */
+.fs-canvas__frame {
+  margin-inline: auto;
+}
+
+.fs-canvas__frame[data-fs-viewport='tablet'],
+.fs-canvas__frame[data-fs-viewport='mobile'] {
+  border: 1px solid var(--fs-border);
+  border-radius: calc(var(--fs-radius) * 2);
+  background: var(--fs-bg-panel);
+  box-shadow: 0 1px 12px rgb(0 0 0 / 12%);
+  overflow: hidden;
+}
+
+.fs-toolbar__group {
+  display: flex;
+  gap: 2px;
+  margin-inline-start: 8px;
+  padding: 2px;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+}
+
+.fs-toolbar__toggle {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+}
+
+.fs-toolbar__toggle.is-active {
+  color: var(--fs-primary-text);
+  background: var(--fs-primary);
+}
+
+/*
+ * The glyph inherits the token above, so an active toggle does not keep the
+ * muted colour .fs-icon sets and vanish into its own background.
+ */
+.fs-toolbar__toggle.is-active .fs-icon {
+  color: inherit;
+}
+
+/*
  * Scrollbars.
  *
  * A dark designer showed the platform's light scrollbars, because nothing here

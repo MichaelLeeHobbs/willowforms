@@ -48,6 +48,8 @@ export type IconName =
   | 'box'
   | 'card'
   | 'screen'
+  | 'tablet'
+  | 'mobile'
   | 'repeat'
   | 'alert'
   | 'tabs'
