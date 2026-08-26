@@ -82,6 +82,16 @@ long time, declared from the first commit and never built; `Text` is the first c
 Every row also carries its binding mode picker when the property offers more than one. See
 [07-bindings.md](07-bindings.md).
 
+**Known defect: the mode picker is squeezed.** A property row is a three-column grid,
+`108px 1fr auto`, with the picker in the flexible column and the control in the automatic one. That is
+backwards. At the pane's 288px the picker gets about 38px, which clips "Value" and "Expression" to
+nothing, so a working control reads as an empty box. The control should take the space and the picker
+its natural width.
+
+It is labelled correctly, by a visually-hidden `<label for>`, so this is layout and not accessibility,
+which is why axe has never had anything to say about it. The fix is a change to the shared row layout
+and wants a look at every property type at once rather than a quick swap of two track sizes.
+
 ### The JSON editor is controlled
 
 **Status: built**, and the reason is a bug worth remembering. It was uncontrolled, reading its value once
