@@ -291,7 +291,9 @@ describe('form settings', () => {
     ])
     await openTab('Form')
 
-    const french = screen.getByText('French').closest('li')
+    // Scoped to the panel: the toolbar's canvas-language select names every
+    // language too, so an unscoped query now matches twice.
+    const french = within(screen.getByRole('tabpanel')).getByText('French').closest('li')
     if (!french) throw new Error('no row for French')
     await user.click(within(french).getByRole('radio'))
 

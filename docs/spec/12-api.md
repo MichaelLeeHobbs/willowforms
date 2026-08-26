@@ -33,6 +33,7 @@ import '@formsmith/designer/styles.css'
 | `kit`             | `Kit`                              | yes      | Palette metadata                  |
 | `rendererKit`     | `RendererKit`                      | yes      | Canvas renderers for the same kit |
 | `onChange`        | `(document: FormDocument) => void` | no       | Fires on every change             |
+| `onSave`          | `(document: FormDocument) => void` | no       | Shows a Save button when passed   |
 
 `initialDocument` is a starting value, not a controlled prop. The designer owns the document from mount,
 and observing it means `onChange`; passing a different `initialDocument` later does nothing. A host that
@@ -41,7 +42,8 @@ needs to replace the document from outside needs an API that does not exist yet.
 The stylesheet is a separate import so a host theming by token override can load it once, in its own
 order. See [11-theming.md](11-theming.md).
 
-**Planned:** `onSave`, which is what makes the toolbar show a Save button. See
+`onSave` is what makes the toolbar show a Save button, and its absence is why there is no button by
+default: Formsmith does not persist, and one it cannot honour is worse than none. See
 [04-shell.md](04-shell.md#toolbar).
 
 ## Rendering a form

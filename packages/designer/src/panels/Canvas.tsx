@@ -38,6 +38,8 @@ export interface CanvasProps {
    * someone had open.
    */
   viewport: Viewport
+  /** Language tag the canvas renders in. Omitted means the document's default. */
+  language?: string
 }
 
 /**
@@ -75,7 +77,14 @@ interface Snapshot {
  * in the capture phase before the kit's components see them. Preview mode hands
  * the form back its own events untouched.
  */
-export function Canvas({ api, kit, rendererKit, drag, viewport }: CanvasProps): ReactNode {
+export function Canvas({
+  api,
+  kit,
+  rendererKit,
+  drag,
+  viewport,
+  language,
+}: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
@@ -302,6 +311,7 @@ export function Canvas({ api, kit, rendererKit, drag, viewport }: CanvasProps): 
             data={data}
             errors={errors}
             onChange={onChange}
+            {...(language ? { language } : {})}
           />
         </div>
 

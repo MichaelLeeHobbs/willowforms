@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { languageTag } from '@formsmith/core'
 import type { FormDocument, IconName, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -32,13 +33,34 @@ export interface DesignerProps {
   /** Canvas renderers for the same kit. */
   rendererKit: RendererKit
   onChange?: (document: FormDocument) => void
+  /**
+   * Save the current document. The toolbar shows a Save button only when this
+   * is passed.
+   *
+   * Formsmith does not persist, so a Save button that appeared unconditionally
+   * would promise something the designer cannot deliver. Its absence is the
+   * honest default: `onChange` already emits every version, and many hosts save
+   * from that.
+   */
+  onSave?: (document: FormDocument) => void
 }
+
+/**
+ * How the designer's chrome is themed.
+ *
+ * `system` is the absence of the attribute, not a third palette: the stylesheet
+ * already answers `prefers-color-scheme`, and the two explicit values exist so a
+ * host managing its own theme can force either. See
+ * [11-theming.md](../../../docs/spec/11-theming.md).
+ */
+type Theme = 'system' | 'light' | 'dark'
 
 export function Designer({
   initialDocument,
   kit,
   rendererKit,
   onChange,
+  onSave,
 }: DesignerProps): ReactNode {
   const api = useDesigner(initialDocument)
 
@@ -102,14 +124,40 @@ export function Designer({
    * them last looked at it on a phone.
    */
   const [viewport, setViewport] = useState<Viewport>('desktop')
+  const [theme, setTheme] = useState<Theme>('system')
+
+  /*
+   * Which language the canvas renders in. Undefined means the document's own
+   * default, which is what the renderer already falls back to, so this stays out
+   * of the way until someone picks a language.
+   */
+  const [language, setLanguage] = useState<string | undefined>(undefined)
+
+  /*
+   * A language can be removed while the canvas is showing it, which would leave
+   * the canvas rendering every translation as its raw key. Derived rather than
+   * corrected in an effect, so there is no frame where that is on screen.
+   */
+  const languages = api.document.languages
+  const activeLanguage =
+    language && languages.some((l) => languageTag(l) === language) ? language : undefined
 
   return (
-    <div className="fs-shell" data-testid="formsmith-designer">
+    <div
+      className="fs-shell"
+      data-testid="formsmith-designer"
+      {...(theme === 'system' ? {} : { 'data-fs-theme': theme })}
+    >
       <Toolbar
         api={api}
         onOpenJson={() => setJsonOpen(true)}
         viewport={viewport}
         onViewport={setViewport}
+        theme={theme}
+        onTheme={setTheme}
+        language={activeLanguage}
+        onLanguage={setLanguage}
+        {...(onSave ? { onSave: () => onSave(api.document) } : {})}
       />
       <div className="fs-body">
         <aside className="fs-panel fs-panel--left" aria-label="Components and structure">
@@ -141,6 +189,7 @@ export function Designer({
             rendererKit={rendererKit}
             drag={drag}
             viewport={viewport}
+            {...(activeLanguage ? { language: activeLanguage } : {})}
           />
         </main>
 
@@ -189,14 +238,25 @@ const VIEWPORTS: { id: Viewport; label: string; icon: IconName }[] = [
 function Toolbar({
   api,
   onOpenJson,
+  onSave,
   viewport,
   onViewport,
+  theme,
+  onTheme,
+  language,
+  onLanguage,
 }: {
   api: DesignerApi
   onOpenJson: () => void
+  onSave?: () => void
   viewport: Viewport
   onViewport: (next: Viewport) => void
+  theme: Theme
+  onTheme: (next: Theme) => void
+  language: string | undefined
+  onLanguage: (next: string | undefined) => void
 }): ReactNode {
+  const languages = api.document.languages
   return (
     <header className="fs-toolbar">
       <h1 className="fs-toolbar__title">{api.document.name}</h1>
@@ -210,6 +270,57 @@ function Toolbar({
         <button type="button" onClick={onOpenJson}>
           JSON
         </button>
+
+        {/*
+         * Only when the host can honour it. A Save button the designer cannot
+         * deliver on is worse than none, and onChange already emits every
+         * version for hosts that save from that.
+         */}
+        {onSave && (
+          <button type="button" onClick={onSave}>
+            Save
+          </button>
+        )}
+
+        {/*
+         * Selects rather than toggle groups. Both of these are set once and
+         * left, unlike the viewport, and the language list is as long as the
+         * document says it is.
+         */}
+        {languages.length > 1 && (
+          <div className="fs-toolbar__field">
+            <label className="fs-visually-hidden" htmlFor="fs-toolbar-language">
+              Canvas language
+            </label>
+            <select
+              id="fs-toolbar-language"
+              value={language ?? ''}
+              onChange={(e) => onLanguage(e.target.value || undefined)}
+            >
+              <option value="">Default language</option>
+              {languages.map((entry) => (
+                <option key={languageTag(entry)} value={languageTag(entry)}>
+                  {entry.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="fs-toolbar__field">
+          <label className="fs-visually-hidden" htmlFor="fs-toolbar-theme">
+            Designer theme
+          </label>
+          <select
+            id="fs-toolbar-theme"
+            value={theme}
+            onChange={(e) => onTheme(e.target.value as Theme)}
+          >
+            <option value="system">System theme</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
 
         {/*
          * A group of toggles rather than a select: three options that are set

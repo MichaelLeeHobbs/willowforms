@@ -1,8 +1,8 @@
 # Theming
 
-**Status: partial.** Both stylesheets are token-driven and both themes clear WCAG AA in CI. The designer
-has no theme toggle, its tokens are not documented for consumers outside this file, and the kit
-stylesheet does not style a scrollbar.
+**Status: partial.** Both stylesheets are token-driven and both themes clear WCAG AA in CI, and the
+toolbar can force either. The designer's tokens are not documented for consumers outside this file, and
+the kit stylesheet does not style a scrollbar.
 
 Two independent theme systems, deliberately. The designer's chrome and the form on the canvas are
 different things owned by different people, and a host that restyles its builder has not thereby restyled
@@ -69,8 +69,9 @@ explicit attribute, so a host managing its own theme can force either:
 }
 ```
 
-**Missing:** the designer has no control to set that attribute. A toggle belongs in the toolbar. See
-[04-shell.md](04-shell.md#toolbar).
+The toolbar sets that attribute. **System is the absence of it**, not a third palette: the stylesheet
+already answers `prefers-color-scheme`, so writing an explicit value would override the media query with
+nothing. See [04-shell.md](04-shell.md#toolbar).
 
 ## Contrast is enforced, not intended
 

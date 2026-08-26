@@ -1,7 +1,7 @@
 # Designer shell
 
-**Status: partial.** The three-pane layout, the toolbar, the keyboard map, and the scrollbars are built.
-Panels do not collapse, the left pane is not tabbed, and there is no viewport simulation.
+**Status: partial.** The layout, the toolbar, the keyboard map, the scrollbars, and viewport simulation
+are built. Panels do not collapse and the left pane is not tabbed.
 
 The shell is everything around the canvas: the panes, the toolbar, and the rules for what has focus.
 
@@ -94,20 +94,32 @@ here: `e2e/viewport.spec.ts` selects and drags at 390px wide.
 
 **Status: partial.**
 
-| Control     | Status  | Does                                                              |
-| ----------- | ------- | ----------------------------------------------------------------- |
-| Form name   | Built   | Shown; edited on the Settings tab                                 |
-| Undo / Redo | Built   | Disabled when there is nothing to undo                            |
-| JSON        | Built   | Opens the document dialog                                         |
-| Preview     | Built   | On the canvas bar, not the toolbar                                |
-| Save        | Planned | Calls a new `onSave` prop; hidden when the host does not pass one |
-| Viewport    | Built   | Desktop / tablet / mobile                                         |
-| Language    | Planned | Which language the canvas renders in                              |
-| Theme       | Planned | Light / dark for the designer chrome                              |
+| Control     | Status | Does                                                             |
+| ----------- | ------ | ---------------------------------------------------------------- |
+| Form name   | Built  | Shown; edited on the Settings tab                                |
+| Undo / Redo | Built  | Disabled when there is nothing to undo                           |
+| JSON        | Built  | Opens the document dialog                                        |
+| Preview     | Built  | On the canvas bar, not the toolbar                               |
+| Save        | Built  | Calls the `onSave` prop; hidden when the host does not pass one  |
+| Viewport    | Built  | Desktop / tablet / mobile                                        |
+| Language    | Built  | Which language the canvas renders in; hidden below two languages |
+| Theme       | Built  | System / light / dark for the designer chrome                    |
 
 **Save needs care.** Formsmith does not persist, so a Save button that appears unconditionally promises
 something the designer cannot deliver. It renders only when the host passes `onSave`, and its absence is
 the honest default: `onChange` already emits every version, and many hosts save from that.
+
+**Theme, language and viewport are view state.** None of them touches the document, and there are tests
+saying so, because the temptation to store the author's last choice in the form they were editing is
+real and the consequence is two people disagreeing about what a form is.
+
+`system` is the absence of `data-fs-theme`, not a third palette: the stylesheet already answers
+`prefers-color-scheme`, so writing an explicit value would override the media query with nothing.
+
+The language select is hidden below two languages, where it is furniture. If the language the canvas is
+showing is removed from the document, the canvas falls back to the default. That is derived during
+render rather than corrected afterwards, so there is no frame in which the canvas points at a language
+the document does not have and draws every translation as its raw key.
 
 ## Scrollbars
 

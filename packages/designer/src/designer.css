@@ -746,6 +746,11 @@
   overflow: hidden;
 }
 
+.fs-toolbar__field {
+  display: flex;
+  align-items: center;
+}
+
 .fs-toolbar__group {
   display: flex;
   gap: 2px;
