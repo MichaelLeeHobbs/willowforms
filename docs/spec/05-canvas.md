@@ -98,9 +98,12 @@ drag-and-drop was rejected: no control over the drag image, and close to unusabl
 | From    | To     | Result                 |
 | ------- | ------ | ---------------------- |
 | Palette | Canvas | Insert a new component |
-| Palette | Tree   | Insert a new component |
 | Canvas  | Canvas | Move                   |
 | Tree    | Tree   | Reorder or reparent    |
+
+Palette to tree used to work and no longer can: the two are on separate tabs in the left pane, so they
+are never on screen at the same time. The drop zone still exists and would resolve correctly if they
+were. See [04-shell.md](04-shell.md#tabbed-left-pane).
 
 ### The threshold
 

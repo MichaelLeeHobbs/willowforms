@@ -11,7 +11,7 @@
  * is lost if nobody checks it stays that way.
  */
 
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
@@ -99,6 +99,10 @@ function setup(validations: ValidationRule[] = []): Harness {
     />,
   )
 
+  // The structure tree is behind a tab in the left pane. Opened here so every
+  // test starts where it used to, rather than repeating the click in each.
+  fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
+
   const selectRow = async (key: string): Promise<void> => {
     const row = view.container.querySelector<HTMLElement>(`[data-fs-row="${key}"]`)
     if (!row) throw new Error(`no tree row for ${key}`)
@@ -122,13 +126,17 @@ describe('inspector tabs', () => {
 
     const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
     const tabs = within(tablist).getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Rules', 'Form'])
+    // Form settings moved to the left pane: it belongs to the document, not to
+    // whatever is selected.
+    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Rules'])
 
     const selected = tabs.find((t) => t.getAttribute('aria-selected') === 'true')
     expect(selected?.textContent).toBe('Properties')
 
     // The panel points back at the tab that controls it, in both directions.
-    const panel = view.container.querySelector('[role="tabpanel"]')
+    // Scoped to the inspector: the left pane is a tablist too, and its panel
+    // comes first in the DOM.
+    const panel = view.container.querySelector('.fs-inspector [role="tabpanel"]')
     expect(panel?.getAttribute('aria-labelledby')).toBe(selected?.id)
     expect(selected?.getAttribute('aria-controls')).toBe(panel?.id)
   })
@@ -139,7 +147,9 @@ describe('inspector tabs', () => {
     // Only the selected panel is in the DOM. Every tab used to claim one, so
     // two of the three named an id nothing resolved to. An unresolved IDREF is
     // not an axe violation, which is how this survived an accessibility suite.
-    for (const tab of within(screen.getByRole('tablist')).getAllByRole('tab')) {
+    // Named: the left pane is a tablist too now.
+    const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
+    for (const tab of within(tablist).getAllByRole('tab')) {
       const controls = tab.getAttribute('aria-controls')
       if (controls === null) continue
       expect(
@@ -151,8 +161,9 @@ describe('inspector tabs', () => {
 
   it('keeps exactly one tab in the tab order', () => {
     setup()
-    const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')
-    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
+    const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
+    const tabs = within(tablist).getAllByRole('tab')
+    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1'])
   })
 
   it('moves between tabs with the arrow keys', async () => {
@@ -165,19 +176,16 @@ describe('inspector tabs', () => {
     expect(focused()).toBe('Rules')
     expect(screen.getByRole('tab', { name: 'Rules' }).getAttribute('aria-selected')).toBe('true')
 
-    await user.keyboard('{ArrowRight}')
-    expect(focused()).toBe('Form')
-
     // Wraps around rather than stopping at the end.
     await user.keyboard('{ArrowRight}')
     expect(focused()).toBe('Properties')
     await user.keyboard('{ArrowLeft}')
-    expect(focused()).toBe('Form')
+    expect(focused()).toBe('Rules')
 
     await user.keyboard('{Home}')
     expect(focused()).toBe('Properties')
     await user.keyboard('{End}')
-    expect(focused()).toBe('Form')
+    expect(focused()).toBe('Rules')
   })
 })
 

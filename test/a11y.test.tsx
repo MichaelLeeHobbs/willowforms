@@ -147,6 +147,7 @@ describe('axe audit of the designer', () => {
     const user = userEvent.setup()
     const container = renderDesigner()
 
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
     const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
@@ -158,6 +159,7 @@ describe('axe audit of the designer', () => {
     const user = userEvent.setup()
     const container = renderDesigner()
 
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
     const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
@@ -166,11 +168,11 @@ describe('axe audit of the designer', () => {
     expect(await audit(container)).toEqual([])
   }, 20000)
 
-  it('has none on the Form tab', async () => {
+  it('has none on the Settings tab', async () => {
     const user = userEvent.setup()
     const container = renderDesigner()
 
-    await user.click(screen.getByRole('tab', { name: 'Form' }))
+    await user.click(screen.getByRole('tab', { name: 'Settings' }))
 
     expect(await audit(container)).toEqual([])
   }, 20000)

@@ -20,8 +20,7 @@ import { Canvas } from './panels/Canvas.js'
 import type { Viewport } from './panels/Canvas.js'
 import { DocumentDialog } from './panels/DocumentDialog.js'
 import { Inspector } from './panels/Inspector.js'
-import { Palette } from './panels/Palette.js'
-import { Tree } from './panels/Tree.js'
+import { LeftPane } from './panels/LeftPane.js'
 import { useDesigner } from './store.js'
 import type { DesignerApi } from './store.js'
 
@@ -177,24 +176,16 @@ export function Designer({
           aria-label="Components and structure"
           hidden={collapsed.left}
         >
-          <Palette
+          <LeftPane
+            api={api}
             kit={kit}
+            drag={drag}
+            announce={announce}
             onAdd={(def) => {
               api.addComponent(def, api.selectedKey)
               announce(def.label + ' added.')
             }}
             onDragStart={(def, event) => drag.begin({ kind: 'new', def }, event)}
-          />
-          <Tree
-            root={api.document.root}
-            kit={kit}
-            selectedKey={api.selectedKey}
-            onSelect={api.select}
-            onRemove={api.removeComponent}
-            onDuplicate={api.duplicateComponent}
-            onMove={api.moveComponent}
-            announce={announce}
-            drag={drag}
           />
         </aside>
 

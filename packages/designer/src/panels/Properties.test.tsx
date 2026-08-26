@@ -11,7 +11,7 @@
  * meaning anything.
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
@@ -98,6 +98,10 @@ function setup(node: ComponentNode): Harness {
       }}
     />,
   )
+
+  // The structure tree is behind a tab in the left pane. Opened here so every
+  // test starts where it used to, rather than repeating the click in each.
+  fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   return {
     user,

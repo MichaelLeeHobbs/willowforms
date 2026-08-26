@@ -16,7 +16,7 @@
  * browser check, not a unit-test one.
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
@@ -113,6 +113,10 @@ function setup(): Harness {
   const view = render(
     <Designer initialDocument={makeDocument()} kit={kit} rendererKit={rendererKit} />,
   )
+
+  // The structure tree is behind a tab in the left pane. Opened here so every
+  // test starts where it used to, rather than repeating the click in each.
+  fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
   const node = (key: string): HTMLElement => {
     const el = view.container.querySelector<HTMLElement>(`[data-fs-key="${key}"]`)
     if (!el) throw new Error(`no rendered node for key ${key}`)
@@ -120,10 +124,17 @@ function setup(): Harness {
   }
   const frame = (): HTMLElement | null => view.container.querySelector('.fs-selection--active')
   const hoverFrame = (): HTMLElement | null => view.container.querySelector('.fs-selection--hover')
-  const keys = (): string[] =>
-    Array.from(view.container.querySelectorAll('[data-fs-row]'))
+  /*
+   * Reads the tree, and makes sure it is showing first. It has to be the tree
+   * rather than the canvas: a node hidden by `renderWhen` is a row here and no
+   * element there, so the two lists are not the same list.
+   */
+  const keys = (): string[] => {
+    fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
+    return Array.from(view.container.querySelectorAll('[data-fs-row]'))
       .map((el) => (el as HTMLElement).dataset['fsRow'])
       .filter((key): key is string => Boolean(key) && key !== 'root')
+  }
   return { user, view, node, frame, hoverFrame, keys }
 }
 
@@ -269,6 +280,8 @@ describe('drag and drop wiring', () => {
 
   it('leaves the document alone when a drag lands nowhere', async () => {
     const { user, view, keys } = setup()
+    // Back to the palette: setup() opens the Tree tab, which most tests want.
+    await user.click(screen.getByRole('tab', { name: 'Components' }))
 
     const paletteItem = screen.getByTitle('Add Field, or drag it onto the canvas')
     await user.pointer([
@@ -283,6 +296,8 @@ describe('drag and drop wiring', () => {
   it('still adds from the palette on a plain click', async () => {
     const { user, keys } = setup()
 
+    // Back to the palette: setup() opens the Tree tab, which most tests want.
+    await user.click(screen.getByRole('tab', { name: 'Components' }))
     await user.click(screen.getByTitle('Add Field, or drag it onto the canvas'))
 
     expect(keys()).toHaveLength(4)

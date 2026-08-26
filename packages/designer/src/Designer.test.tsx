@@ -186,7 +186,7 @@ describe('the canvas language control', () => {
     await user.selectOptions(screen.getByLabelText('Canvas language'), 'fr')
     expect(screen.getByText('Courriel')).toBeTruthy()
 
-    await user.click(screen.getByRole('tab', { name: 'Form' }))
+    await user.click(screen.getByRole('tab', { name: 'Settings' }))
     await user.click(screen.getByRole('button', { name: 'Remove French' }))
 
     expect(screen.getByText('Email')).toBeTruthy()

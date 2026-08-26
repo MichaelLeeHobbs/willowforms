@@ -1,7 +1,7 @@
 # Designer shell
 
-**Status: partial.** The layout, the toolbar, the keyboard map, the scrollbars, viewport simulation and
-collapsible panes are built. The left pane is not tabbed.
+**Status: built.** The layout, the toolbar, the keyboard map, the scrollbars, viewport simulation,
+collapsible panes and the tabbed left pane are all built.
 
 The shell is everything around the canvas: the panes, the toolbar, and the rules for what has focus.
 
@@ -46,8 +46,9 @@ a zero-width region a keyboard can still land in. `test/a11y.test.tsx` audits th
 
 ### Tabbed left pane
 
-**Status: planned.** Today the palette and the structure tree are stacked in one scrolling column, so a
-form with thirty components pushes the palette out of reach. They become tabs:
+**Status: built.** The palette and the structure tree were stacked in one scrolling column, so a form
+with thirty components pushed the palette out of reach: the thing you reach for most often was the thing
+furthest from the top. They are tabs:
 
 | Tab        | Holds                                  |
 | ---------- | -------------------------------------- |
@@ -55,13 +56,20 @@ form with thirty components pushes the palette out of reach. They become tabs:
 | Tree       | The structure tree                     |
 | Settings   | Form name, languages, default language |
 
-The tab is called **Form** in the code and everywhere a test selects it. It is called Settings here
-because that is what it becomes when it moves; rename it when it moves, not before, or the spec and the
-suite disagree about a string a user can read.
+Settings has moved out of the inspector, where it was a third tab called Form. It belongs to the
+document, not to whatever is selected, and putting it beside per-component properties was a convenience
+that made the panel mean two things.
 
-Settings moves out of the inspector, where it currently sits as a third tab. It is a property of the
-document, not of the selected component, and putting it beside per-component properties was a
-mistake of convenience.
+**One consequence, and it is a real loss.** A component could be dragged from the palette straight into
+the tree, which is how you put something inside a container the canvas has made hard to aim at. The two
+are never on screen together now, so that route is gone; palette to canvas and tree to tree both still
+work. See [05-canvas.md](05-canvas.md#what-can-be-dragged-where). Switching to the Tree tab when a
+palette drag begins would bring it back, at the cost of the palette vanishing after every drop, which is
+worse for the common case of adding three fields in a row.
+
+The tablist is the same component the inspector uses. It was extracted rather than copied: roving
+tabindex, arrow keys, Home and End, and panels naming their tab is fifteen lines that are easy to get
+subtly wrong twice, and the inspector's copy had already been wrong once.
 
 ## The canvas and the wasted space
 

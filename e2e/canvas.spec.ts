@@ -64,6 +64,7 @@ test('clicking a select does not open its dropdown', async ({ designer }) => {
 })
 
 test('dragging from the palette drops the component where the bar showed', async ({ designer }) => {
+  await designer.openTab('Components')
   const before = await designer.rootChildren()
   expect(before).not.toContain('checkbox')
 
@@ -87,6 +88,7 @@ test('dragging a component on the canvas moves it', async ({ designer }) => {
 })
 
 test('dropping into a row container infers the horizontal axis', async ({ designer }) => {
+  await designer.openTab('Components')
   // `name` lays its children out in a row, so the insertion point comes from x.
   const first = await designer.node('firstName').boundingBox()
   if (!first) throw new Error('nothing to measure')
@@ -110,6 +112,7 @@ test('dropping into a row container infers the horizontal axis', async ({ design
 })
 
 test('a plain click is still a click, not a swallowed drag', async ({ designer }) => {
+  await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Checkbox', exact: true }).click()
 
   // Clicking a palette entry adds under the selection rather than doing nothing.
@@ -136,6 +139,7 @@ test('Escape abandons a drag without changing the document', async ({ designer }
 })
 
 test('the palette does not offer the root component', async ({ designer }) => {
+  await designer.openTab('Components')
   /*
    * Screen is the document root and every kit declares it, so the palette
    * showed it alongside everything else: it could be clicked or dragged onto
@@ -151,6 +155,7 @@ test('the palette does not offer the root component', async ({ designer }) => {
 })
 
 test('every palette entry carries an icon beside its label', async ({ designer }) => {
+  await designer.openTab('Components')
   const items = designer.page.locator('.fs-palette__item')
   const count = await items.count()
   expect(count).toBeGreaterThan(5)
