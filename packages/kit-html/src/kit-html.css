@@ -176,3 +176,308 @@
   outline: 2px solid var(--fsh-accent);
   outline-offset: 2px;
 }
+
+/*
+ * Layout and display components.
+ *
+ * Every value below comes from a token or from the component's own props, so a
+ * host restyles by overriding tokens rather than by fighting these rules.
+ */
+.fsh-grid {
+  display: grid;
+}
+
+.fsh-box {
+  min-width: 0;
+}
+
+.fsh-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--fsh-radius);
+  background: var(--fsh-surface);
+}
+
+.fsh-card--outlined {
+  border: 1px solid var(--fsh-border);
+}
+
+.fsh-card--elevated {
+  box-shadow: 0 1px 8px rgb(0 0 0 / 16%);
+}
+
+.fsh-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fsh-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.fsh-card__subtitle {
+  margin: 0;
+  color: var(--fsh-muted);
+  font-size: 0.875rem;
+}
+
+.fsh-text {
+  margin: 0;
+  color: var(--fsh-text);
+}
+
+.fsh-text--small {
+  font-size: 0.875rem;
+}
+
+.fsh-text--caption {
+  color: var(--fsh-muted);
+  font-size: 0.8125rem;
+}
+
+.fsh-divider {
+  margin: 0;
+  border: 0;
+  border-block-start: 1px solid var(--fsh-border);
+}
+
+/*
+ * A vertical rule needs a height to be visible at all, and `stretch` only works
+ * inside a flex row. Outside one it falls back to its own line, which is wrong
+ * but visible, and visible is what an author can correct.
+ */
+.fsh-divider--vertical {
+  align-self: stretch;
+  border-block-start: 0;
+  border-inline-start: 1px solid var(--fsh-border);
+}
+
+.fsh-image {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--fsh-radius);
+}
+
+/* Selection and grouping components. */
+.fsh-button-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fsh-button-group--vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.fsh-radios {
+  display: flex;
+  gap: 8px;
+}
+
+.fsh-radios--column {
+  flex-direction: column;
+}
+
+.fsh-radios--row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.fsh-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fsh-text);
+}
+
+/*
+ * The switch is a checkbox wearing a track. The input keeps its own size and
+ * position so it stays the hit target and the focus target; only its paint is
+ * replaced, which is what keeps the keyboard behaviour the platform's.
+ */
+.fsh-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fsh-text);
+}
+
+.fsh-switch__input {
+  position: absolute;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  opacity: 0;
+}
+
+.fsh-switch__track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--fsh-border);
+  transition: background 120ms;
+}
+
+.fsh-switch__track::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--fsh-surface);
+  transition: translate 120ms;
+}
+
+.fsh-switch__input:checked + .fsh-switch__track {
+  background: var(--fsh-accent);
+}
+
+.fsh-switch__input:checked + .fsh-switch__track::after {
+  translate: 16px 0;
+}
+
+.fsh-switch__input:focus-visible + .fsh-switch__track {
+  outline: 2px solid var(--fsh-accent);
+  outline-offset: 2px;
+}
+
+.fsh-switch__input:disabled + .fsh-switch__track {
+  opacity: 0.6;
+}
+
+/* A fieldset carries browser defaults that fight the field layout. */
+fieldset.fsh-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/*
+ * Feedback and navigation.
+ *
+ * Severity is carried by a border and never by the text colour, so every alert
+ * reads at the same contrast as body text and needs no palette of its own. It
+ * also means severity is not the only signal: an author who cannot distinguish
+ * the four colours still has the title and the words.
+ */
+.fsh-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--fsh-border);
+  border-inline-start: 4px solid var(--fsh-muted);
+  border-radius: var(--fsh-radius);
+  color: var(--fsh-text);
+  background: var(--fsh-surface);
+}
+
+.fsh-alert__title {
+  font-weight: 600;
+}
+
+.fsh-alert--info {
+  border-inline-start-color: var(--fsh-accent);
+}
+
+.fsh-alert--success {
+  border-inline-start-color: #2e7d32;
+}
+
+.fsh-alert--warning {
+  border-inline-start-color: #b26a00;
+}
+
+.fsh-alert--error {
+  border-inline-start-color: var(--fsh-danger);
+}
+
+.fsh-progress {
+  position: relative;
+  block-size: 6px;
+  inline-size: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--fsh-field);
+}
+
+.fsh-progress__fill {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+  border-radius: inherit;
+  background: var(--fsh-accent);
+}
+
+/* Indeterminate: no width was set, so it sweeps instead of filling. */
+.fsh-progress__fill:not([style]) {
+  inline-size: 40%;
+  animation: fsh-progress-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes fsh-progress-sweep {
+  from {
+    translate: -100% 0;
+  }
+
+  to {
+    translate: 250% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fsh-progress__fill:not([style]) {
+    animation: none;
+    inline-size: 100%;
+    opacity: 0.5;
+  }
+}
+
+.fsh-progress--circular {
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: 50%;
+}
+
+.fsh-link {
+  color: var(--fsh-accent);
+  text-decoration: underline;
+}
+
+/* An address the kit refused. It is text, and it does not pretend otherwise. */
+.fsh-link.is-inert {
+  color: var(--fsh-muted);
+  text-decoration: none;
+}
+
+.fsh-link:focus-visible {
+  outline: 2px solid var(--fsh-accent);
+  outline-offset: 2px;
+}
+
+.fsh-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--fsh-muted);
+}
+
+.fsh-breadcrumbs li + li::before {
+  content: '/';
+  margin-inline-end: 8px;
+  color: var(--fsh-border);
+}

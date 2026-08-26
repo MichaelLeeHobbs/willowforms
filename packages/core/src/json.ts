@@ -45,3 +45,53 @@ export function optionValue(options: readonly JsonValue[], submitted: string): J
   }
   return submitted
 }
+
+/**
+ * A link address that is safe to put in `href`, or undefined.
+ *
+ * A document is data, and a form author is not always the person deploying the
+ * form. `javascript:` in an `href` runs on click with the page's full
+ * privileges, which is the same code-execution boundary this project refuses to
+ * cross anywhere else: core ships no evaluator, so it must not ship one by
+ * accident in a URL.
+ *
+ * Allowed: http, https, mailto, tel, and anything relative. Relative addresses
+ * cannot name a scheme, so they cannot smuggle one.
+ */
+const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
+
+export function safeHref(value: JsonValue | undefined): string | undefined {
+  const raw = jsonToString(value).trim()
+  if (!raw) return undefined
+
+  /*
+   * A leading control character is stripped by the URL parser and by browsers,
+   * so "java\tscript:alert(1)" parses as javascript: after the fact. Rejecting
+   * them outright is simpler than reasoning about which ones survive.
+   */
+  // eslint-disable-next-line no-control-regex -- matching them is the point
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return undefined
+
+  /*
+   * A network-path reference. `//evil.com` names no scheme, so the scheme check
+   * below waves it through, and the browser then borrows the page's own scheme
+   * and navigates off-origin. Backslashes count, because browsers normalise
+   * them to forward slashes, so `\\evil.com` and `/\evil.com` reach the same
+   * place.
+   *
+   * This is the case that made the rest of this function worth nothing. The
+   * comment that used to sit below said a relative address cannot escape the
+   * origin, which is true, and missed that this was never a relative address.
+   */
+  if (/^[/\\]{2}/.test(raw)) return undefined
+
+  // Relative: no scheme to borrow and no authority to name, so it stays here.
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return raw
+
+  const parsed = URL.parse ? URL.parse(raw) : null
+  if (parsed) return SAFE_SCHEMES.has(parsed.protocol) ? raw : undefined
+
+  // Older runtimes: fall back to matching the scheme directly.
+  const scheme = raw.slice(0, raw.indexOf(':') + 1).toLowerCase()
+  return SAFE_SCHEMES.has(scheme) ? raw : undefined
+}

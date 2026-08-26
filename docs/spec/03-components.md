@@ -72,9 +72,9 @@ Twenty-six components. **Built** means both kits implement it and the contract t
 | ---------- | ------- | --------- | ------------------------------------------------- |
 | `Screen`   | Built   | yes       | `maxWidth`, `gap`                                 |
 | `Stack`    | Built   | yes       | `direction`, `gap`                                |
-| `Grid`     | Planned | yes       | `columns`, `gap`, `minColumnWidth`                |
-| `Box`      | Planned | yes       | `padding`, `background`, `radius`                 |
-| `Card`     | Planned | yes       | `title`, `subtitle`, `variant`                    |
+| `Grid`     | Built   | yes       | `columns`, `gap`, `minColumnWidth`                |
+| `Box`      | Built   | yes       | `padding`, `background`, `radius`                 |
+| `Card`     | Built   | yes       | `title`, `subtitle`, `variant`                    |
 | `Repeater` | Planned | yes       | `minItems`, `maxItems`, `addLabel`, `removeLabel` |
 
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
@@ -89,27 +89,39 @@ array" rather than a name at the top level. `dataKey` does not do that and was n
 
 ### Display
 
-| Component | Status  | Data-bound | Properties                   |
-| --------- | ------- | ---------- | ---------------------------- |
-| `Heading` | Built   | no         | `text`, `level`              |
-| `Text`    | Planned | no         | `text`, `variant`, `align`   |
-| `Divider` | Planned | no         | `orientation`                |
-| `Image`   | Planned | no         | `src`, `alt`, `fit`, `width` |
+| Component | Status | Data-bound | Properties                   |
+| --------- | ------ | ---------- | ---------------------------- |
+| `Heading` | Built  | no         | `text`, `level`              |
+| `Text`    | Built  | no         | `text`, `variant`, `align`   |
+| `Divider` | Built  | no         | `orientation`                |
+| `Image`   | Built  | no         | `src`, `alt`, `fit`, `width` |
+
+**`FileUpload` reports a file name, not a file.** A file input is uncontrolled by design, and turning
+bytes into form data is an upload protocol this project does not own: the host reads the input when it
+submits. The value is the selected name, or an array of them, which is enough for `required` to mean
+"a file was chosen" and for the schema to describe the field. `maxSize` is advisory until a host enforces
+it. This is the one place the catalogue promises less than the type suggests.
+
+**`Link` refuses an address it does not recognise.** `href` comes from a document, and a form author is
+not always the person deploying the form, so `javascript:` in an `href` is the same code-execution
+boundary core refuses to cross anywhere else. `safeHref` allows http, https, mailto, tel and relative
+addresses, and strips nothing: an address that fails renders as plain text rather than as a link that
+does nothing.
 
 `Image` requires `alt`. A decorative image passes an empty string deliberately, which is a different
 statement from having forgotten.
 
 ### Inputs
 
-| Component     | Status  | Data type | Properties                                                         |
-| ------------- | ------- | --------- | ------------------------------------------------------------------ |
-| `TextField`   | Built   | `string`  | `label`, `placeholder`, `helperText`, `multiline`, `disabled`      |
-| `TextArea`    | Planned | `string`  | `label`, `placeholder`, `helperText`, `rows`, `disabled`           |
-| `NumberField` | Built   | `number`  | `label`, `helperText`, `disabled`                                  |
-| `DatePicker`  | Planned | `date`    | `label`, `helperText`, `min`, `max`, `disabled`                    |
-| `FileUpload`  | Planned | `file`    | `label`, `helperText`, `accept`, `multiple`, `maxSize`, `disabled` |
-| `Button`      | Built   | no        | `text`, `variant`, `disabled`                                      |
-| `ButtonGroup` | Planned | no        | `orientation`, `variant`                                           |
+| Component     | Status | Data type | Properties                                                         |
+| ------------- | ------ | --------- | ------------------------------------------------------------------ |
+| `TextField`   | Built  | `string`  | `label`, `placeholder`, `helperText`, `multiline`, `disabled`      |
+| `TextArea`    | Built  | `string`  | `label`, `placeholder`, `helperText`, `rows`, `disabled`           |
+| `NumberField` | Built  | `number`  | `label`, `helperText`, `disabled`                                  |
+| `DatePicker`  | Built  | `date`    | `label`, `helperText`, `min`, `max`, `disabled`                    |
+| `FileUpload`  | Built  | `file`    | `label`, `helperText`, `accept`, `multiple`, `maxSize`, `disabled` |
+| `Button`      | Built  | no        | `text`, `variant`, `disabled`                                      |
+| `ButtonGroup` | Built  | no        | `orientation`, `variant`                                           |
 
 `TextArea` exists separately rather than as `TextField` with `multiline`, because the two have different
 properties (`rows` versus nothing) and a palette entry that changes shape based on a checkbox is harder
@@ -120,13 +132,13 @@ posted somewhere would be a backend, which is a non-goal.
 
 ### Selection
 
-| Component    | Status  | Data type | Properties                                                |
-| ------------ | ------- | --------- | --------------------------------------------------------- |
-| `Select`     | Built   | `string`  | `label`, `options`, `helperText`, `disabled`              |
-| `Checkbox`   | Built   | `boolean` | `label`, `disabled`                                       |
-| `RadioGroup` | Planned | `string`  | `label`, `options`, `direction`, `helperText`, `disabled` |
-| `RadioItem`  | Planned | no        | `label`, `value`, `disabled`                              |
-| `Switch`     | Planned | `boolean` | `label`, `disabled`                                       |
+| Component    | Status | Data type | Properties                                                |
+| ------------ | ------ | --------- | --------------------------------------------------------- |
+| `Select`     | Built  | `string`  | `label`, `options`, `helperText`, `disabled`              |
+| `Checkbox`   | Built  | `boolean` | `label`, `disabled`                                       |
+| `RadioGroup` | Built  | `string`  | `label`, `options`, `direction`, `helperText`, `disabled` |
+| `RadioItem`  | Built  | no        | `label`, `value`, `disabled`                              |
+| `Switch`     | Built  | `boolean` | `label`, `disabled`                                       |
 
 `options` is a `json` editor taking `{ label, value }[]`. Option values keep their type: a numeric value
 stays a number, and choosing that option submits the number. An earlier version replaced any non-string
@@ -140,20 +152,20 @@ A required `Checkbox` or `Switch` must be checked. See
 
 ### Feedback
 
-| Component  | Status  | Properties                  |
-| ---------- | ------- | --------------------------- |
-| `Alert`    | Planned | `text`, `severity`, `title` |
-| `Progress` | Planned | `variant`, `value`, `label` |
+| Component  | Status | Properties                  |
+| ---------- | ------ | --------------------------- |
+| `Alert`    | Built  | `text`, `severity`, `title` |
+| `Progress` | Built  | `variant`, `value`, `label` |
 
 Both are display-only and never data-bound. `Progress` covers linear and circular through `variant`
 rather than being two components, because they are one idea with two shapes.
 
 ### Navigation
 
-| Component     | Status  | Properties               |
-| ------------- | ------- | ------------------------ |
-| `Link`        | Planned | `text`, `href`, `target` |
-| `Breadcrumbs` | Planned | `items`                  |
+| Component     | Status | Properties               |
+| ------------- | ------ | ------------------------ |
+| `Link`        | Built  | `text`, `href`, `target` |
+| `Breadcrumbs` | Built  | `items`                  |
 
 ## Events
 

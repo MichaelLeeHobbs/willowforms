@@ -1,6 +1,6 @@
 # Inspector
 
-**Status: partial.** Properties and Rules are built. Style and Actions do not exist. Four of the nine
+**Status: partial.** Properties and Rules are built. Style and Actions do not exist. Three of the nine
 property editors are unimplemented, and `PropSchema.section` is declared but ignored.
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
@@ -61,12 +61,12 @@ panel silently began editing a different node.
 
 ### Property editors
 
-`PropEditor` declares nine. Five exist.
+`PropEditor` declares nine. Six exist.
 
 | Editor      | Status  | Control                                                 |
 | ----------- | ------- | ------------------------------------------------------- |
 | `string`    | Built   | Single-line text                                        |
-| `multiline` | Planned | Textarea                                                |
+| `multiline` | Built   | Textarea                                                |
 | `number`    | Built   | Number input; clearing it clears the property           |
 | `boolean`   | Built   | Checkbox                                                |
 | `select`    | Built   | Picker; options come from the schema                    |
@@ -76,11 +76,21 @@ panel silently began editing a different node.
 | `code`      | Planned | Monospace editor with a line count; no language service |
 
 An editor with no branch of its own falls back to a single-line text input rather than failing, so an
-unimplemented editor is invisible until someone notices the control is wrong. `multiline` is the one that
-can bite today: a kit declaring it gets a one-line box and no warning.
+unimplemented editor is invisible until someone notices the control is wrong. `multiline` was that for a
+long time, declared from the first commit and never built; `Text` is the first component to want it.
 
 Every row also carries its binding mode picker when the property offers more than one. See
 [07-bindings.md](07-bindings.md).
+
+**Known defect: the mode picker is squeezed.** A property row is a three-column grid,
+`108px 1fr auto`, with the picker in the flexible column and the control in the automatic one. That is
+backwards. At the pane's 288px the picker gets about 38px, which clips "Value" and "Expression" to
+nothing, so a working control reads as an empty box. The control should take the space and the picker
+its natural width.
+
+It is labelled correctly, by a visually-hidden `<label for>`, so this is layout and not accessibility,
+which is why axe has never had anything to say about it. The fix is a change to the shared row layout
+and wants a look at every property type at once rather than a quick swap of two track sizes.
 
 ### The JSON editor is controlled
 

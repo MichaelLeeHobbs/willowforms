@@ -15,14 +15,18 @@ The core, the renderer, the two kits, and the drag-and-drop canvas work. The des
 you can compose a form, edit its properties, write validation rules, bind properties to expressions or
 translations, preview it, and export it.
 
-It is not a product yet. The component catalogue is eight entries against the two dozen a form builder
-needs, the inspector has two of its four tabs, there is no Style tab and no way to author actions, and
-the panes do not collapse. See [docs/spec/03-components.md](spec/03-components.md),
-[docs/spec/06-inspector.md](spec/06-inspector.md), and [docs/spec/04-shell.md](spec/04-shell.md).
+The shell is there: tabbed panes that collapse, viewport simulation, a selection toolbar, and a catalogue
+of twenty-five components in both kits.
+
+What is left is behaviour. The inspector has two of its four tabs, so there is no Style tab and no way to
+author actions, and nothing fires an event. `Repeater` is the one catalogue entry still unbuilt, blocked
+on a document model that can express a repeated scope. See
+[docs/spec/06-inspector.md](spec/06-inspector.md), [docs/spec/09-actions.md](spec/09-actions.md), and
+[docs/spec/03-components.md](spec/03-components.md).
 
 ## Verification
 
-`pnpm test` runs 540 tests; `pnpm e2e` runs 55 in a real browser. Both gate CI, along with lint,
+`pnpm test` runs 612 tests; `pnpm e2e` runs 55 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
 computed from the stylesheets and axe runs over the designer in six states. See
 [accessibility.md](accessibility.md).

@@ -27,7 +27,7 @@ export type {
 } from './kit.js'
 export { groupKit, indexKit } from './kit.js'
 
-export { jsonToString, optionValue } from './json.js'
+export { jsonToString, optionValue, safeHref } from './json.js'
 
 export { isVisible } from './visibility.js'
 

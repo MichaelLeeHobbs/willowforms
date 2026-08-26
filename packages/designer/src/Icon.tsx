@@ -161,6 +161,13 @@ const GLYPHS: Record<IconName, ReactNode> = {
       <path d="M10 11v6M14 11v6" />
     </>
   ),
+  progress: (
+    <>
+      <path d="M4 12h16" opacity="0.35" />
+      <path d="M4 12h9" />
+      <circle cx="13" cy="12" r="2.5" />
+    </>
+  ),
   chevron: (
     <>
       <path d="m9 5 7 7-7 7" />

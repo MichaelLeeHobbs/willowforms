@@ -182,8 +182,15 @@ describe('the kit contract table', () => {
     const table = spec.slice(spec.indexOf('| Rule'))
     const rows = [...table.matchAll(/^\| [A-Z][^|]*\|/gm)].length - 1
 
+    /*
+     * Only the rules, meaning the tests inside the per-kit block. The file also
+     * holds checks that are not obligations on a kit at all, such as the two
+     * kits in this repository agreeing with each other, and counting those
+     * would demand rows for rules that do not exist.
+     */
     const suite = read('test/kit-contract.test.tsx')
-    const cases = [...suite.matchAll(/^\s+it(?:\.each)?\(/gm)].length
+    const rules = suite.slice(suite.indexOf('describe.each(KITS)'))
+    const cases = [...rules.matchAll(/^\s+it(?:\.each)?\(/gm)].length
 
     expect(rows, 'the rule table and the contract suite disagree').toBe(cases)
   })
