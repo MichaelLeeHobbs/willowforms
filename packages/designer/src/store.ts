@@ -18,7 +18,9 @@ import type {
   PropValue,
 } from '@formsmith/core'
 import {
+  duplicateNode,
   findNode,
+  findParent,
   insertNode,
   instantiate,
   languageTag,
@@ -128,7 +130,23 @@ export interface DesignerApi {
    */
   setLanguages: (languages: Language[], defaultLanguage?: string) => void
   renameKey: (key: string, nextKey: string) => RenameResult
+  /**
+   * Rename the value this component submits, without touching its identity.
+   *
+   * An empty string, or one matching the component's own key, removes the
+   * override rather than storing a redundant copy of the key. Data keys are
+   * allowed to collide, so nothing is refused here.
+   */
+  setDataKey: (key: string, dataKey: string) => void
   moveComponent: (key: string, parentKey: string, index?: number) => void
+  /**
+   * Copy a component and its subtree in beside it, and select the copy.
+   *
+   * Returns the new key, or undefined when there is nothing to copy: the root
+   * has no siblings to sit among, so duplicating it is refused rather than
+   * silently doing nothing.
+   */
+  duplicateComponent: (key: string) => string | undefined
   removeComponent: (key: string) => void
   replaceDocument: (next: FormDocument) => void
   undo: () => void
@@ -301,6 +319,51 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply],
   )
 
+  const duplicateComponent = useCallback(
+    (key: string): string | undefined => {
+      const parent = findParent(history.present.root, key)
+      if (!parent) return undefined
+
+      const copy = duplicateNode(history.present.root, key)
+      if (!copy) return undefined
+
+      const index = parent.children?.findIndex((child) => child.key === key) ?? -1
+      if (index === -1) return undefined
+
+      // Directly after the original, which is where a duplicate belongs and
+      // where the eye is already looking.
+      apply((doc) => ({
+        ...doc,
+        root: insertNode(doc.root, parent.key, copy, index + 1),
+      }))
+      setSelectedKey(copy.key)
+      return copy.key
+    },
+    [apply, history],
+  )
+
+  const setDataKey = useCallback(
+    (key: string, dataKey: string) => {
+      const trimmed = dataKey.trim()
+      apply(
+        (doc) => ({
+          ...doc,
+          root: updateNode(doc.root, key, (node) => {
+            if (!trimmed || trimmed === key) {
+              // exactOptionalPropertyTypes: no override is an absent key, not a
+              // key holding undefined.
+              const { dataKey: _dropped, ...rest } = node
+              return rest
+            }
+            return { ...node, dataKey: trimmed }
+          }),
+        }),
+        'dataKey:' + key,
+      )
+    },
+    [apply],
+  )
+
   const replaceDocument = useCallback((next: FormDocument) => {
     setHistory((h) => commit(h, next))
     setSelectedKey(undefined)
@@ -325,7 +388,9 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     setTranslation,
     setLanguages,
     renameKey,
+    setDataKey,
     moveComponent,
+    duplicateComponent,
     removeComponent,
     replaceDocument,
     undo: () => setHistory(undo),

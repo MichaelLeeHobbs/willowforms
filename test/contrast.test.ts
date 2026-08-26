@@ -99,6 +99,18 @@ describe.each(palettes(designerCss, '.fs-shell', ".fs-shell[data-fs-theme='dark'
     it('the drop indicator is distinguishable from the panel it is drawn over', () => {
       expect(on('--fs-accent', '--fs-bg-panel')).toBeGreaterThanOrEqual(AA_LARGE)
     })
+
+    it('the scrollbar thumb is visible on every surface that scrolls', () => {
+      /*
+       * The track is transparent, so the thumb is drawn straight onto the
+       * surface underneath and has to hold up against all three: panes are
+       * bg-panel, the canvas is bg-app, the preview data block is bg-well. A
+       * scrollbar is a user interface component, so 3:1.
+       */
+      expect(on('--fs-scrollbar-thumb', '--fs-bg-panel')).toBeGreaterThanOrEqual(AA_LARGE)
+      expect(on('--fs-scrollbar-thumb', '--fs-bg-app')).toBeGreaterThanOrEqual(AA_LARGE)
+      expect(on('--fs-scrollbar-thumb', '--fs-bg-well')).toBeGreaterThanOrEqual(AA_LARGE)
+    })
   },
 )
 

@@ -113,6 +113,8 @@ rules are:
   over inside it.
 - **Escape clears the selection**, or abandons a drag if one is in progress.
 - **Undo and redo** are `Ctrl`/`Cmd` + `Z`, `Shift+Z`, and `Y`.
+- **`Ctrl`/`Cmd` + `D` duplicates** the focused tree row, in beside itself, and moves focus to the copy.
+  It is refused on the root, which has no siblings to sit among.
 - **Shortcuts do not fire while typing.** A handler that undid the document because someone typed `z`
   in a label would be worse than no shortcut.
 

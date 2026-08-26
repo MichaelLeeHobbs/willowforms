@@ -35,6 +35,20 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
         onRename={(next) => api.renameKey(node.key, next)}
       />
 
+      {/*
+       * Only where there is a value to name. A layout component submits
+       * nothing, so a data key on one would be a control with no effect.
+       */}
+      {node.schema && (
+        <DataKeyField
+          key={node.key + ':dataKey'}
+          nodeKey={node.key}
+          value={node.dataKey ?? node.key}
+          overridden={node.dataKey !== undefined}
+          onCommit={(next) => api.setDataKey(node.key, next)}
+        />
+      )}
+
       {!def && <p className="fs-empty">Type {node.type} is not in the active kit.</p>}
 
       {def?.props.map((schema) => (
@@ -55,6 +69,71 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
         />
       ))}
     </section>
+  )
+}
+
+/**
+ * The name the component's value is submitted under.
+ *
+ * Separate from the key because the two answer different questions: the key is
+ * identity and has to be unique, while this is what the payload calls the
+ * answer and is allowed to repeat. Two fields behind opposite `renderWhen`
+ * guards writing one value is the case that needs it.
+ *
+ * Clearing it, or typing the component's own key, removes the override rather
+ * than storing a second copy of the key that then has to be kept in step.
+ */
+function DataKeyField({
+  nodeKey,
+  value,
+  overridden,
+  onCommit,
+}: {
+  nodeKey: string
+  value: string
+  overridden: boolean
+  onCommit: (next: string) => void
+}): ReactNode {
+  const [draft, setDraft] = useState(value)
+
+  const commit = (): void => {
+    /*
+     * Normalised first, then compared. Comparing the trimmed draft while
+     * leaving the field untrimmed meant typing " email " over `email` stored
+     * nothing and displayed the padded string, so the panel showed a value the
+     * document did not have.
+     */
+    const trimmed = draft.trim()
+    if (trimmed !== draft) setDraft(trimmed)
+    if (trimmed === value) return
+    onCommit(trimmed)
+  }
+
+  return (
+    <div className="fs-prop-row">
+      <label htmlFor="fs-prop-datakey">Data key</label>
+      <input
+        id="fs-prop-datakey"
+        type="text"
+        value={draft}
+        placeholder={nodeKey}
+        aria-describedby="fs-prop-datakey-hint"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          }
+          if (e.key === 'Escape') setDraft(value)
+        }}
+      />
+      <p id="fs-prop-datakey-hint" className="fs-prop-row__hint">
+        {overridden
+          ? 'Submitted as ' + value + ' rather than ' + nodeKey + '.'
+          : 'The name this answer takes in submitted data. Defaults to the key.'}
+      </p>
+    </div>
   )
 }
 

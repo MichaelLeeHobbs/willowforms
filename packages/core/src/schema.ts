@@ -11,7 +11,7 @@
  * components nest.
  */
 
-import { walk } from './tree.js'
+import { dataKeyOf, walk } from './tree.js'
 import type { ComponentNode, FieldSchema, FormDocument, ValidationRule } from './types.js'
 
 export interface JsonSchemaProperty {
@@ -132,6 +132,9 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
     const title = titleOf(node)
     if (title) property = { ...property, title }
 
+    // The submitted name, which is the node's key unless the author renamed it.
+    const name = dataKeyOf(node)
+
     for (const rule of field.validations) {
       property = applyRule(property, rule)
       /*
@@ -139,12 +142,12 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
        * applies sometimes, and JSON Schema's `required` is unconditional, so
        * exporting it would reject payloads the form itself accepts.
        */
-      if (rule.key === 'required' && !rule.when && !required.includes(node.key)) {
-        required.push(node.key)
+      if (rule.key === 'required' && !rule.when && !required.includes(name)) {
+        required.push(name)
       }
     }
 
-    properties[node.key] = property
+    properties[name] = property
   })
 
   const schema: JsonSchema = { $schema: DRAFT, type: 'object', properties }

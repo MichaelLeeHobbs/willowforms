@@ -94,6 +94,7 @@ obligation missed.
 | The message carries `role="alert"` when it errors                | A silent failure is announced to nobody                            |
 | Every control describes itself by an element that already exists | A description added with the error is announced late or not at all |
 | Exactly one component is the root, and it is not in the palette  | The root exists already; a second one nests a screen in a screen   |
+| Every palette entry declares an icon                             | Half a palette with icons reads as a bug rather than a choice      |
 | The palette index has no colliding types                         | The type is how a node finds its renderer                          |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that

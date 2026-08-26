@@ -278,3 +278,50 @@ describe('autoValidateKeys', () => {
     )
   })
 })
+
+describe('dataKey in validation', () => {
+  const node = (key: string, dataKey?: string): ComponentNode => ({
+    key,
+    ...(dataKey ? { dataKey } : {}),
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'required' }] },
+  })
+
+  const root = (children: ComponentNode[]): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children,
+  })
+
+  it('reads the value under the data key', () => {
+    // The answer is in the payload under `email`, so the field is satisfied
+    // even though the component is called emailField.
+    const errors = validateForm(root([node('emailField', 'email')]), { email: 'a@b.com' })
+    expect(errors).toEqual({})
+  })
+
+  it('does not find the value under the component key', () => {
+    const errors = validateForm(root([node('emailField', 'email')]), { emailField: 'a@b.com' })
+    expect(errors['emailField']).toBe(DEFAULT_MESSAGES.required)
+  })
+
+  it('reports the error against the component key, not the data key', () => {
+    /*
+     * Two components may share a data key and still fail for different
+     * reasons, so an error belongs to the component rather than the answer.
+     */
+    const errors = validateForm(root([node('emailField', 'email')]), {})
+    expect(Object.keys(errors)).toEqual(['emailField'])
+  })
+
+  it('keeps both errors when two components share a data key', () => {
+    const errors = validateForm(root([node('personal', 'email'), node('work', 'email')]), {})
+    expect(Object.keys(errors).sort()).toEqual(['personal', 'work'])
+  })
+
+  it('falls back to the component key when no data key is set', () => {
+    expect(validateForm(root([node('email')]), { email: 'a@b.com' })).toEqual({})
+  })
+})

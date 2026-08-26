@@ -93,12 +93,65 @@ export function collectKeys(root: ComponentNode): string[] {
  * textField3. Matches the convention users already expect from other builders.
  */
 export function generateKey(root: ComponentNode, type: string): string {
-  const base = type.charAt(0).toLowerCase() + type.slice(1)
-  const taken = new Set(collectKeys(root))
+  return freeKey(new Set(collectKeys(root)), type.charAt(0).toLowerCase() + type.slice(1))
+}
+
+/**
+ * The first key starting from `base` that nothing has taken.
+ *
+ * Shared, so the two callers cannot drift on how a numbered key is formed. What
+ * they differ on is the base, and deliberately: a new component has only its
+ * type to be named after, while a copy has the original's name, which is worth
+ * far more. Duplicating `emailAddress` should not produce `textField7`.
+ */
+function freeKey(taken: Set<string>, base: string): string {
   if (!taken.has(base)) return base
   let n = 2
   while (taken.has(base + String(n))) n += 1
   return base + String(n)
+}
+
+/** A key's name with any trailing number removed, so `website2` copies to `website3`. */
+function baseOf(key: string): string {
+  return key.replace(/\d+$/, '') || key
+}
+
+/**
+ * A copy of the subtree at `key`, with every key in it replaced by a free one.
+ *
+ * Keys are unique within a document, so a copy cannot keep the originals. Each
+ * is re-keyed from the original's own name rather than its type, because the
+ * name is the part worth keeping: `website` copies to `website2`, not to
+ * `textField7`.
+ *
+ * Every key generated is reserved before the next is chosen. Without that, a
+ * container holding two `textField` children produces a copy whose children are
+ * both named `textField3`, and the document fails its own validation.
+ *
+ * The copy is returned rather than inserted. Where a duplicate belongs is a
+ * question about the tree the caller is holding, not about the node.
+ *
+ * Property values and rules are shared by reference, not cloned. Tree operations
+ * are immutable, so an edit to either copy replaces the value rather than
+ * writing through to the other.
+ */
+export function duplicateNode(root: ComponentNode, key: string): ComponentNode | undefined {
+  const source = findNode(root, key)
+  if (!source) return undefined
+
+  const taken = new Set(collectKeys(root))
+
+  const copy = (node: ComponentNode): ComponentNode => {
+    const nextKey = freeKey(taken, baseOf(node.key))
+    taken.add(nextKey)
+
+    const next: ComponentNode = { ...node, key: nextKey, props: { ...node.props } }
+    if (node.schema) next.schema = { ...node.schema, validations: [...node.schema.validations] }
+    if (node.children) next.children = node.children.map(copy)
+    return next
+  }
+
+  return copy(source)
 }
 
 /** Replace the node matching key, returning a new tree. */
@@ -186,8 +239,27 @@ export function moveNode(
   return insertNode(removeNode(root, key), newParentKey, node, index)
 }
 
+/**
+ * The name a node's value is stored under.
+ *
+ * One helper, used everywhere data is read or written, so `key` and `dataKey`
+ * cannot be used interchangeably by accident. That mistake has been made once
+ * already in this codebase, between a language's code and its tag, and it was
+ * invisible in both directions: the writer and the reader each looked correct
+ * on their own.
+ */
+export function dataKeyOf(node: ComponentNode): string {
+  return node.dataKey ?? node.key
+}
+
 export interface StructuralError {
-  code: 'duplicate-key' | 'unknown-action' | 'empty-key' | 'unknown-language' | 'malformed'
+  code:
+    | 'duplicate-key'
+    | 'unknown-action'
+    | 'empty-key'
+    | 'empty-data-key'
+    | 'unknown-language'
+    | 'malformed'
   message: string
   key?: string
 }
@@ -250,6 +322,21 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
         errors.push({ code: 'duplicate-key', message: 'Duplicate key: ' + key, key })
       }
       seen.add(key)
+
+      /*
+       * A present dataKey has to be usable as a name. It is not checked for
+       * uniqueness: sharing one is legal, and it is what lets two guarded
+       * fields write the same answer.
+       */
+      const dataKey = value['dataKey']
+      if (dataKey !== undefined && (typeof dataKey !== 'string' || !dataKey.trim())) {
+        errors.push({
+          code: 'empty-data-key',
+          message: 'Component ' + key + ' has an empty data key.',
+          key,
+        })
+      }
+
       visitEvents(value['events'], key, path)
     }
 

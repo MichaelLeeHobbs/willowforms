@@ -20,6 +20,7 @@
   --fs-danger: #b3261e;
   --fs-radius: 6px;
   --fs-panel-width: 288px;
+  --fs-scrollbar-thumb: #7c838d;
   --fs-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --fs-font-size: 14px;
 
@@ -45,6 +46,7 @@
     --fs-primary-text: #0b1116;
     --fs-accent: #e879d6;
     --fs-danger: #f2705f;
+    --fs-scrollbar-thumb: #767e8a;
   }
 }
 
@@ -58,6 +60,7 @@
   --fs-primary: #2f9fd8;
   --fs-primary-text: #0b1116;
   --fs-accent: #e879d6;
+  --fs-scrollbar-thumb: #767e8a;
   --fs-danger: #f2705f;
 }
 
@@ -204,7 +207,20 @@
 }
 
 .fs-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-align: start;
+}
+
+/*
+ * The glyph must not shrink when the label wraps: a two-column palette at 288px
+ * puts "Number field" on two lines, and a flex child with no floor squashes the
+ * icon into a sliver rather than letting the text wrap around it.
+ */
+.fs-icon {
+  flex: 0 0 auto;
+  color: var(--fs-text-muted);
 }
 
 .fs-tree__list {
@@ -703,6 +719,63 @@
 .fs-tree__row.is-drop-inside {
   outline: 2px dashed var(--fs-accent);
   outline-offset: -2px;
+}
+
+/*
+ * Scrollbars.
+ *
+ * A dark designer showed the platform's light scrollbars, because nothing here
+ * styled one. The track stays transparent so the thumb is measured against
+ * whichever surface it is drawn over, and every one of those clears 3:1 in
+ * test/contrast.test.ts. `thin` is the standard keyword; the -webkit- rules say
+ * the same thing to browsers that never implemented it.
+ */
+.fs-panel,
+.fs-tabs__panel,
+.fs-canvas__surface,
+.fs-canvas__data pre {
+  scrollbar-width: thin;
+  scrollbar-color: var(--fs-scrollbar-thumb) transparent;
+}
+
+.fs-panel::-webkit-scrollbar,
+.fs-tabs__panel::-webkit-scrollbar,
+.fs-canvas__surface::-webkit-scrollbar,
+.fs-canvas__data pre::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.fs-panel::-webkit-scrollbar-track,
+.fs-tabs__panel::-webkit-scrollbar-track,
+.fs-canvas__surface::-webkit-scrollbar-track,
+.fs-canvas__data pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fs-panel::-webkit-scrollbar-thumb,
+.fs-tabs__panel::-webkit-scrollbar-thumb,
+.fs-canvas__surface::-webkit-scrollbar-thumb,
+.fs-canvas__data pre::-webkit-scrollbar-thumb {
+  background: var(--fs-scrollbar-thumb);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+/*
+ * The second rule that touches a kit component, and it exists to stop the
+ * designer touching one. `scrollbar-color` and `scrollbar-width` inherit, so
+ * styling the canvas surface would push the designer's chrome scrollbars into
+ * any scrollable region the kit renders inside the form. A dark builder around
+ * a light form would have given that form dark scrollbars.
+ *
+ * This hands them back to the platform. Like the rule below it, it sets nothing
+ * a kit did not already have.
+ */
+.fs-canvas__surface [data-fs-key] {
+  scrollbar-color: auto;
+  scrollbar-width: auto;
 }
 
 /*

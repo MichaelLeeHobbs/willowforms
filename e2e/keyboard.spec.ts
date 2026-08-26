@@ -131,3 +131,33 @@ test('the JSON dialog traps focus and closes on Escape', async ({ designer }) =>
   await designer.page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
 })
+
+test('Control+D duplicates a component in beside itself and focuses the copy', async ({
+  designer,
+}) => {
+  await designer.row('website').focus()
+  await designer.page.keyboard.press('Control+d')
+
+  const children = await designer.rootChildren()
+  expect(children).toContain('website')
+  expect(children.filter((key) => key.startsWith('website'))).toHaveLength(2)
+
+  // Directly after the original, not appended at the end.
+  const original = children.indexOf('website')
+  expect(children[original + 1]).toMatch(/^website\d$/)
+
+  await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/website duplicated as/)
+  await expect(designer.page.locator('[data-fs-row][tabindex="0"]')).toHaveAttribute(
+    'data-fs-row',
+    children[original + 1] as string,
+  )
+})
+
+test('Control+D refuses the root rather than nesting a screen in itself', async ({ designer }) => {
+  const before = await designer.rootChildren()
+  await designer.row('root').focus()
+  await designer.page.keyboard.press('Control+d')
+
+  await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/root cannot be/i)
+  expect(await designer.rootChildren()).toEqual(before)
+})

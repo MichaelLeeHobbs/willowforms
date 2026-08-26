@@ -9,7 +9,7 @@
 
 import { createContext, useCallback, useContext, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { isVisible } from '@formsmith/core'
+import { dataKeyOf, isVisible } from '@formsmith/core'
 import type {
   ComponentNode,
   Evaluator,
@@ -133,9 +133,13 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     [node, translations, data, evaluate],
   )
 
+  // On the derived string, not on the node. Depending on the node re-creates
+  // this on any edit to it, which defeats memoisation in every kit component
+  // that compares props by identity.
+  const dataKey = dataKeyOf(node)
   const handleChange = useCallback(
-    (value: JsonValue) => onChange(node.key, value),
-    [onChange, node.key],
+    (value: JsonValue) => onChange(dataKey, value),
+    [onChange, dataKey],
   )
 
   const nodeProps = useMemo<NodeAttributes>(
@@ -156,7 +160,9 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       node={node}
       props={props}
       nodeProps={nodeProps}
-      value={data[node.key]}
+      // Value by data key, error by node key. Two components may share a data
+      // key; they can still fail for different reasons.
+      value={data[dataKey]}
       error={errors[node.key]}
       onChange={handleChange}
     >

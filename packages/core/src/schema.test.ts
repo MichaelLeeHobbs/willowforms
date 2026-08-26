@@ -168,3 +168,38 @@ describe('unexportableRules', () => {
     expect(unexportableRules(document)).toEqual([{ key: 'a', rule: 'custom' }])
   })
 })
+
+describe('dataKey in the export', () => {
+  it('names the property after the data key, not the component key', () => {
+    const node = { ...field('emailField', 'string'), dataKey: 'email' }
+    const schema = toJsonSchema(doc([node]))
+
+    expect(Object.keys(schema.properties)).toEqual(['email'])
+    expect(Object.keys(schema.properties)).not.toContain('emailField')
+  })
+
+  it('names a required entry after the data key too', () => {
+    // Otherwise the schema requires a property it never declared.
+    const node = { ...field('emailField', 'string', [{ key: 'required' }]), dataKey: 'email' }
+    const schema = toJsonSchema(doc([node]))
+
+    expect(schema.required).toEqual(['email'])
+  })
+
+  it('falls back to the component key when no data key is set', () => {
+    const schema = toJsonSchema(doc([field('email', 'string')]))
+    expect(Object.keys(schema.properties)).toEqual(['email'])
+  })
+
+  it('collapses two components sharing a data key into one property', () => {
+    /*
+     * Legal, and the reason data keys may repeat: two fields behind opposite
+     * renderWhen guards write one answer. The payload has one slot for it.
+     */
+    const a = { ...field('personalEmail', 'string'), dataKey: 'email' }
+    const b = { ...field('workEmail', 'string'), dataKey: 'email' }
+    const schema = toJsonSchema(doc([a, b]))
+
+    expect(Object.keys(schema.properties)).toEqual(['email'])
+  })
+})

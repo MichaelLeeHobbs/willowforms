@@ -1,11 +1,12 @@
 # Document model
 
 **Status: partial.** The tree, property values, and validation rules are built and tested. The format has
-no version migration path, and six fields the types declare have nothing reading them: `ComponentNode.css`
-and `ComponentNode.events` (see [06-inspector.md](06-inspector.md#style) and
-[09-actions.md](09-actions.md)), `ComponentDef.icon` (see [11-theming.md](11-theming.md#icons)),
-`FormDocument.version`, and both members of `FormSettings`. `FieldSchema.autoValidate` was a seventh
-until the canvas preview began reading it.
+no version migration path, and five fields the types declare have nothing reading them:
+`ComponentNode.css` and `ComponentNode.events` (see [06-inspector.md](06-inspector.md#style) and
+[09-actions.md](09-actions.md)), `FormDocument.version`, and both members of `FormSettings`.
+
+That list was six. `FieldSchema.autoValidate` came off it when the canvas preview began reading it, and
+`ComponentDef.icon` when the palette began drawing it.
 
 A form is a recursive tree of `ComponentNode`. The tree is the source of truth. Everything else —
 JSON Schema, submitted data, the palette, the properties panel — is derived from it or projected out
@@ -83,17 +84,33 @@ collision and says which component holds the name, rather than silently doing no
 
 ### dataKey
 
-**Status: planned.** Agreed; not yet written. `key` currently doubles as the key a component's value appears under in submitted
-data. The type has documented it as _"doubles as the data key unless overridden"_ since the first commit,
-and there has never been a field to override it with.
+**Status: built.** `dataKey?: string`, defaulting to `key`. `FormData`, `validateForm`, `toJsonSchema`
+and the renderer all address values through `dataKeyOf(node)`, which is the one helper that decides,
+so the two names cannot be used interchangeably by accident.
 
-Two things need it. A component's identity in the tree and its identity in the payload are not the same
-concern: renaming a field for clarity should not change the shape of what the server receives. And a
-component that renders but submits nothing — a heading, a layout box — has a key today and no way to say
-it has no data.
+The reason for two names is that a component's identity in the tree and the name of its answer in the
+payload are different concerns. Renaming a field for clarity should not change the shape of what the
+server receives.
 
-Adding `dataKey?: string`, defaulting to `key`, resolves both. `FormData`, `validateForm`, and
-`toJsonSchema` all key on it.
+**Keys are unique. Data keys are not.** Two fields behind opposite `renderWhen` guards writing one answer
+is a real pattern, and forbidding it would buy nothing: the payload has one slot for that answer either
+way. `validateDocument` checks that a data key, if present, is a non-empty string, and checks nothing
+else about it.
+
+**Errors stay keyed by `key`.** This follows from the line above and is the part worth stating, because
+the obvious thing to do is key everything the same way. An error belongs to a component on screen, and
+two components sharing a data key still need to be able to say different things. So `FormData` is keyed
+by data key and `FormErrors` by component key, and they are deliberately not parallel.
+
+`data-fs-key` stays the component key too. It is how the canvas finds a node from a DOM element, which is
+identity, not data. See [02-kit-contract.md](02-kit-contract.md#the-one-obligation).
+
+**No migration.** The field is optional and absent means `key`, so every document written before it
+existed is already correct.
+
+**What this does not do.** It does not express a repeated scope, which is what `Repeater` needs, and it
+does not let a component say it submits nothing: that is what an absent `schema` says. An earlier draft
+of this section claimed both. See [03-components.md](03-components.md#layout).
 
 ### children
 

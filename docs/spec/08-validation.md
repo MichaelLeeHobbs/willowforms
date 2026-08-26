@@ -137,7 +137,9 @@ applyRule(rule, value, data, evaluate?): string | undefined
 `validateForm` returns the first failing message per component, not every failure. Showing one problem at
 a time per field is what a form does; the full list is available by calling `applyRule` directly.
 
-`FormErrors` is keyed by component key today and will be keyed by `dataKey` once that exists.
+`FormErrors` is keyed by component key, and stays that way now `dataKey` exists. Data keys may repeat,
+so keying errors by one would let two components collide over a single message. See
+[01-document-model.md](01-document-model.md#datakey).
 
 ## Authoring: the Rules tab
 

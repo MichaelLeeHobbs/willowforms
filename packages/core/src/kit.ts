@@ -13,6 +13,45 @@ import type { EventName, FieldSchema, JsonValue } from './types.js'
 export type PaletteGroup =
   'inputs' | 'selection' | 'layout' | 'display' | 'feedback' | 'navigation' | 'custom'
 
+/**
+ * The closed set of icons a kit may ask for.
+ *
+ * Core names them, the designer draws them, and a kit picks from the list. That
+ * ordering is forced: the designer imports no component library and therefore no
+ * icon library, so the drawings have to be its own. Making the vocabulary a
+ * union rather than a string is what gives two kits the same visual language and
+ * turns a typo into a compile error.
+ *
+ * A kit needing an icon outside this set has to ask for one. That is the cost of
+ * the approach and it is deliberate: the alternative, letting a kit supply its
+ * own path data, ends with every kit reinventing the same twenty glyphs and the
+ * metadata half no longer being plain data.
+ */
+export type IconName =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'date'
+  | 'file'
+  | 'checkbox'
+  | 'radio'
+  | 'select'
+  | 'switch'
+  | 'button'
+  | 'heading'
+  | 'paragraph'
+  | 'image'
+  | 'link'
+  | 'divider'
+  | 'stack'
+  | 'grid'
+  | 'box'
+  | 'card'
+  | 'screen'
+  | 'repeat'
+  | 'alert'
+  | 'tabs'
+
 /** Which editor the properties panel renders for a prop. */
 export type PropEditor =
   'string' | 'multiline' | 'number' | 'boolean' | 'select' | 'color' | 'icon' | 'code' | 'json'
@@ -44,8 +83,8 @@ export interface ComponentDef {
   /** Palette display name. */
   label: string
   group: PaletteGroup
-  /** Icon id resolved by the kit's renderer. */
-  icon?: string
+  /** Palette icon, from the vocabulary core declares. */
+  icon?: IconName
   /** Accepts children. */
   container?: boolean
   /**

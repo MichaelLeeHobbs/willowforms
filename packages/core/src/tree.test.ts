@@ -4,6 +4,8 @@ import { createDocument, emptyRoot, prop } from './factory.js'
 import type { ComponentNode, FormDocument } from './types.js'
 import {
   collectKeys,
+  dataKeyOf,
+  duplicateNode,
   findNode,
   findParent,
   generateKey,
@@ -348,5 +350,185 @@ describe('structural sharing', () => {
     expect(moveNode(before, 'left', 'a'), 'a container moved into its own child').toBe(before)
     expect(moveNode(before, 'missing', 'root')).toBe(before)
     expect(moveNode(before, 'root', 'left'), 'the root cannot move').toBe(before)
+  })
+})
+
+describe('duplicateNode', () => {
+  const tree = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'stack',
+        type: 'Stack',
+        props: { direction: { kind: 'static', value: 'row' } },
+        children: [
+          { key: 'textField', type: 'TextField', props: {} },
+          { key: 'textField2', type: 'TextField', props: {} },
+        ],
+      },
+    ],
+  })
+
+  it('re-keys the copied node', () => {
+    const copy = duplicateNode(tree(), 'stack')
+    expect(copy?.key).toBe('stack2')
+    expect(copy?.type).toBe('Stack')
+  })
+
+  it('re-keys every descendant, reserving each key as it goes', () => {
+    /*
+     * Both children are TextFields and textField/textField2 are taken, so a
+     * generator reading only the original tree would name both copies
+     * textField3 and produce a document that fails its own validation.
+     */
+    const copy = duplicateNode(tree(), 'stack')
+    const keys = copy?.children?.map((child) => child.key)
+    expect(keys).toEqual(['textField3', 'textField4'])
+    expect(new Set(keys).size).toBe(2)
+  })
+
+  it('produces a subtree whose keys are all free in the original', () => {
+    const original = tree()
+    const copy = duplicateNode(original, 'stack')
+    const taken = new Set(collectKeys(original))
+
+    expect(copy).toBeDefined()
+    for (const key of collectKeys(copy as ComponentNode)) {
+      expect(taken.has(key), key + ' collides with a key already in the document').toBe(false)
+    }
+  })
+
+  it('validates once inserted', () => {
+    const original = tree()
+    const copy = duplicateNode(original, 'stack')
+    const next = insertNode(original, 'root', copy as ComponentNode, 1)
+    const document = { ...createDocument('Duplicated', 'doc'), root: next }
+
+    // Duplicate keys are the failure this whole function exists to avoid, and
+    // validateDocument is what would report them.
+    expect(validateDocument(document)).toEqual([])
+  })
+
+  it('copies props and rules without sharing the records that hold them', () => {
+    const original = tree()
+    const withRules: ComponentNode = {
+      ...original,
+      children: [
+        {
+          key: 'email',
+          type: 'TextField',
+          props: { label: { kind: 'static', value: 'Email' } },
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(withRules, 'email')
+    expect(copy?.props['label']).toEqual({ kind: 'static', value: 'Email' })
+    expect(copy?.schema?.validations).toEqual([{ key: 'required' }])
+    expect(copy?.schema?.validations).not.toBe(withRules.children?.[0]?.schema?.validations)
+    expect(copy?.props).not.toBe(withRules.children?.[0]?.props)
+  })
+
+  it('copies a leaf with no children as a leaf', () => {
+    const copy = duplicateNode(tree(), 'textField')
+    expect(copy?.key).toBe('textField3')
+    expect(copy?.children).toBeUndefined()
+  })
+
+  it('names a copy after the original rather than after its type', () => {
+    const named: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'emailAddress', type: 'TextField', props: {} }],
+    }
+
+    // Keying off the type would call this textField, throwing away the only
+    // part of the name a form author chose.
+    expect(duplicateNode(named, 'emailAddress')?.key).toBe('emailAddress2')
+  })
+
+  it('does not stack digits when a copy is copied', () => {
+    const named: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        { key: 'website', type: 'TextField', props: {} },
+        { key: 'website2', type: 'TextField', props: {} },
+      ],
+    }
+
+    expect(duplicateNode(named, 'website2')?.key).toBe('website3')
+  })
+
+  it('returns undefined for a key the tree does not hold', () => {
+    expect(duplicateNode(tree(), 'nope')).toBeUndefined()
+  })
+
+  it('leaves the original untouched', () => {
+    const original = tree()
+    const before = JSON.stringify(original)
+    duplicateNode(original, 'stack')
+    expect(JSON.stringify(original)).toBe(before)
+  })
+})
+
+describe('dataKeyOf', () => {
+  it('is the component key when nothing overrides it', () => {
+    expect(dataKeyOf({ key: 'email', type: 'TextField', props: {} })).toBe('email')
+  })
+
+  it('is the override when there is one', () => {
+    expect(dataKeyOf({ key: 'emailField', dataKey: 'email', type: 'TextField', props: {} })).toBe(
+      'email',
+    )
+  })
+})
+
+describe('validateDocument and data keys', () => {
+  const withDataKey = (dataKey: unknown): FormDocument =>
+    ({
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'email', dataKey, type: 'TextField', props: {} }],
+      },
+    }) as unknown as FormDocument
+
+  it('accepts a data key shared by two components', () => {
+    const document = {
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          { key: 'personal', dataKey: 'email', type: 'TextField', props: {} },
+          { key: 'work', dataKey: 'email', type: 'TextField', props: {} },
+        ],
+      },
+    }
+
+    // Deliberately legal. Uniqueness is a property of keys, not of answers.
+    expect(validateDocument(document)).toEqual([])
+  })
+
+  it('rejects a data key that is present but blank', () => {
+    const errors = validateDocument(withDataKey('   '))
+    expect(errors.map((e) => e.code)).toEqual(['empty-data-key'])
+  })
+
+  it('rejects a data key that is not a string', () => {
+    expect(validateDocument(withDataKey(7)).map((e) => e.code)).toEqual(['empty-data-key'])
+  })
+
+  it('accepts an absent data key', () => {
+    expect(validateDocument(withDataKey(undefined))).toEqual([])
   })
 })

@@ -22,6 +22,8 @@ export interface TreeProps {
   onSelect: (key: string) => void
   onRemove: (key: string) => void
   onMove: (key: string, parentKey: string, index: number) => void
+  /** Copy a component in beside itself. Returns the new key, or nothing if refused. */
+  onDuplicate: (key: string) => string | undefined
   /** Text for the live region, so a keyboard move is not silent. */
   announce: (message: string) => void
   drag: DragController
@@ -50,6 +52,7 @@ export function Tree({
   selectedKey,
   onSelect,
   onRemove,
+  onDuplicate,
   onMove,
   announce,
   drag,
@@ -183,6 +186,24 @@ export function Tree({
         return
       }
 
+      if ((event.key === 'd' || event.key === 'D') && (event.ctrlKey || event.metaKey)) {
+        // The browser's own Ctrl+D is a bookmark, and this is the only place a
+        // component can be duplicated without a pointer.
+        event.preventDefault()
+        if (node.key === root.key) {
+          announce('The root cannot be duplicated.')
+          return
+        }
+        const copy = onDuplicate(node.key)
+        if (!copy) {
+          announce(node.key + ' cannot be duplicated.')
+          return
+        }
+        announce(node.key + ' duplicated as ' + copy + '.')
+        requestAnimationFrame(() => focusRow(copy))
+        return
+      }
+
       if ((event.key === 'Delete' || event.key === 'Backspace') && node.key !== root.key) {
         event.preventDefault()
         // The shell also listens for Delete on the window. Without this the same
@@ -193,7 +214,7 @@ export function Tree({
         announce(node.key + ' removed.')
       }
     },
-    [announce, focusRow, kit, onMove, onRemove, onSelect, root],
+    [announce, focusRow, kit, onDuplicate, onMove, onRemove, onSelect, root],
   )
 
   /*

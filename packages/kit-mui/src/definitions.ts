@@ -37,6 +37,7 @@ export const muiKit: Kit = {
     {
       type: 'Screen',
       label: 'Screen',
+      icon: 'screen',
       group: 'layout',
       container: true,
       root: true,
@@ -50,9 +51,9 @@ export const muiKit: Kit = {
     {
       type: 'Stack',
       label: 'Stack',
+      icon: 'stack',
       group: 'layout',
       container: true,
-      icon: 'view-column',
       defaultProps: { direction: 'column', gap: 2 },
       props: [
         {
@@ -71,6 +72,7 @@ export const muiKit: Kit = {
     {
       type: 'Heading',
       label: 'Heading',
+      icon: 'heading',
       group: 'display',
       defaultProps: { text: 'Heading', level: 'h5' },
       props: [
@@ -90,8 +92,8 @@ export const muiKit: Kit = {
     {
       type: 'TextField',
       label: 'Text field',
+      icon: 'text',
       group: 'inputs',
-      icon: 'text-field',
       dataBound: true,
       dataType: 'string',
       defaultProps: { label: 'Label', placeholder: '', helperText: '', multiline: false },
@@ -107,6 +109,7 @@ export const muiKit: Kit = {
     {
       type: 'NumberField',
       label: 'Number field',
+      icon: 'number',
       group: 'inputs',
       dataBound: true,
       dataType: 'number',
@@ -117,6 +120,7 @@ export const muiKit: Kit = {
     {
       type: 'Checkbox',
       label: 'Checkbox',
+      icon: 'checkbox',
       group: 'selection',
       dataBound: true,
       dataType: 'boolean',
@@ -127,6 +131,7 @@ export const muiKit: Kit = {
     {
       type: 'Select',
       label: 'Select',
+      icon: 'select',
       group: 'selection',
       dataBound: true,
       dataType: 'string',
@@ -147,6 +152,7 @@ export const muiKit: Kit = {
     {
       type: 'Button',
       label: 'Button',
+      icon: 'button',
       group: 'inputs',
       defaultProps: { text: 'Submit', variant: 'contained' },
       props: [
