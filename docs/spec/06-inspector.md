@@ -1,6 +1,6 @@
 # Inspector
 
-**Status: partial.** Properties and Rules are built. Style and Actions do not exist. Three of the nine
+**Status: partial.** Properties and Rules are built. Style and Actions do not exist. Four of the nine
 property editors are unimplemented, and `PropSchema.section` is declared but ignored.
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
@@ -57,12 +57,12 @@ panel silently began editing a different node.
 
 ### Property editors
 
-`PropEditor` declares nine. Six exist.
+`PropEditor` declares nine. Five exist.
 
 | Editor      | Status  | Control                                                 |
 | ----------- | ------- | ------------------------------------------------------- |
 | `string`    | Built   | Single-line text                                        |
-| `multiline` | Built   | Textarea                                                |
+| `multiline` | Planned | Textarea                                                |
 | `number`    | Built   | Number input; clearing it clears the property           |
 | `boolean`   | Built   | Checkbox                                                |
 | `select`    | Built   | Picker; options come from the schema                    |
@@ -70,6 +70,10 @@ panel silently began editing a different node.
 | `color`     | Planned | Swatch plus a text field, so a token name is typeable   |
 | `icon`      | Planned | Picker over the shared icon vocabulary                  |
 | `code`      | Planned | Monospace editor with a line count; no language service |
+
+An editor with no branch of its own falls back to a single-line text input rather than failing, so an
+unimplemented editor is invisible until someone notices the control is wrong. `multiline` is the one that
+can bite today: a kit declaring it gets a one-line box and no warning.
 
 Every row also carries its binding mode picker when the property offers more than one. See
 [07-bindings.md](07-bindings.md).

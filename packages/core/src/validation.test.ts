@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ComponentNode, FormData, ValidationRule } from './types.js'
-import { applyRule, DEFAULT_MESSAGES, validateField, validateForm } from './validation.js'
+import {
+  applyRule,
+  autoValidateKeys,
+  DEFAULT_MESSAGES,
+  validateField,
+  validateForm,
+} from './validation.js'
 
 const NO_DATA: FormData = {}
 
@@ -216,5 +222,54 @@ describe('required on a boolean', () => {
     // Requiredness is one rule's job; nothing else changes meaning.
     const node = box([{ key: 'minLength', value: 3 }])
     expect(validateField(node, { terms: false })).toBeUndefined()
+  })
+})
+
+describe('autoValidateKeys', () => {
+  /*
+   * The Rules tab wrote `autoValidate` and nothing anywhere read it, so the
+   * checkbox was decoration for the whole of the tab's life.
+   */
+  const tree: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      { key: 'eager', type: 'Field', props: {}, schema: { type: 'string', autoValidate: true } },
+      { key: 'patient', type: 'Field', props: {}, schema: { type: 'string' } },
+      {
+        key: 'explicit',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', autoValidate: false },
+      },
+      {
+        key: 'group',
+        type: 'Stack',
+        props: {},
+        children: [
+          {
+            key: 'nested',
+            type: 'Field',
+            props: {},
+            schema: { type: 'string', autoValidate: true },
+          },
+        ],
+      },
+    ],
+  }
+
+  it('names only the fields that asked for it', () => {
+    expect(autoValidateKeys(tree)).toEqual(new Set(['eager', 'nested']))
+  })
+
+  it('reaches fields nested inside containers', () => {
+    expect(autoValidateKeys(tree).has('nested')).toBe(true)
+  })
+
+  it('is empty for a tree where nobody asked', () => {
+    expect(autoValidateKeys({ key: 'root', type: 'Screen', props: {}, children: [] })).toEqual(
+      new Set(),
+    )
   })
 })

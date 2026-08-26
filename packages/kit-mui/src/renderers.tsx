@@ -16,9 +16,10 @@ import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
+import { useId } from 'react'
 import type { ReactNode } from 'react'
 
-import { jsonToString } from '@formsmith/core'
+import { jsonToString, optionValue } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -27,6 +28,20 @@ type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
 const bool = (v: unknown): boolean => v === true
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback)
+
+/*
+ * The message a field is described by.
+ *
+ * MUI only wires `aria-describedby` when the field has an explicit `id` and
+ * renders helper text, so an empty helper meant no description at all and a
+ * field that gained one only when it failed. A non-breaking space keeps the
+ * element in the DOM, which is what the kit contract asks for, and it reserves
+ * the line so nothing shifts when an error appears.
+ */
+const message = (error: string | undefined, helper: string): string => error ?? (helper || ' ')
+
+const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
+  error ? { role: 'alert' } : {}
 
 function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // Children need spacing of their own: MUI's outlined label sits on the border
@@ -57,9 +72,13 @@ function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
 }
 
 function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+  // MUI derives the helper text's id, and the input's aria-describedby, from
+  // this one. Without it there is no description at all.
+  const id = useId()
   return (
     <TextField
       {...nodeProps}
+      id={id}
       fullWidth
       label={str(props['label'])}
       placeholder={str(props['placeholder'])}
@@ -67,7 +86,8 @@ function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendere
       disabled={bool(props['disabled'])}
       value={str(value)}
       error={Boolean(error)}
-      helperText={error ?? str(props['helperText'])}
+      helperText={message(error, str(props['helperText']))}
+      slotProps={{ formHelperText: alertWhenError(error) }}
       onChange={(e) => onChange(e.target.value)}
     />
   )
@@ -80,16 +100,19 @@ function NumberFieldNode({
   error,
   onChange,
 }: NodeRendererProps): ReactNode {
+  const id = useId()
   return (
     <TextField
       {...nodeProps}
+      id={id}
       fullWidth
       type="number"
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
       value={jsonToString(value)}
       error={Boolean(error)}
-      helperText={error ?? str(props['helperText'])}
+      helperText={message(error, str(props['helperText']))}
+      slotProps={{ formHelperText: alertWhenError(error) }}
       onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
     />
   )
@@ -99,13 +122,22 @@ function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRenderer
   // Every other field in this kit shows its error. This one used to drop it on
   // the floor, so a required checkbox failed a submit while saying nothing. The
   // kit contract test caught it.
+  const messageId = useId()
   return (
     <FormControl {...nodeProps} error={Boolean(error)} disabled={bool(props['disabled'])}>
       <FormControlLabel
         label={str(props['label'])}
-        control={<Checkbox checked={bool(value)} onChange={(e) => onChange(e.target.checked)} />}
+        control={
+          <Checkbox
+            checked={bool(value)}
+            inputProps={{ 'aria-describedby': messageId }}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+        }
       />
-      {error && <FormHelperText>{error}</FormHelperText>}
+      <FormHelperText id={messageId} {...alertWhenError(error)}>
+        {message(error, str(props['helperText']))}
+      </FormHelperText>
     </FormControl>
   )
 }
@@ -113,17 +145,20 @@ function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRenderer
 function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
   const raw = props['options']
   const options = Array.isArray(raw) ? raw : []
+  const id = useId()
   return (
     <TextField
       {...nodeProps}
+      id={id}
       select
       fullWidth
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
       value={str(value)}
       error={Boolean(error)}
-      helperText={error ?? str(props['helperText'])}
-      onChange={(e) => onChange(e.target.value)}
+      helperText={message(error, str(props['helperText']))}
+      slotProps={{ formHelperText: alertWhenError(error) }}
+      onChange={(e) => onChange(optionValue(options, e.target.value))}
     >
       {options.map((option, i) => {
         const o = option as { label?: unknown; value?: JsonValue }

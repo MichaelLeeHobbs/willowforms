@@ -19,7 +19,7 @@
 
 import { createElement, useId } from 'react'
 import type { ReactNode } from 'react'
-import { jsonToString } from '@formsmith/core'
+import { jsonToString, optionValue } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -211,7 +211,7 @@ function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
           value={jsonToString(value)}
           aria-invalid={error ? true : undefined}
           aria-describedby={id + '-message'}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(optionValue(options, e.target.value))}
         >
           <option value="">Choose…</option>
           {options.map((option, i) => {

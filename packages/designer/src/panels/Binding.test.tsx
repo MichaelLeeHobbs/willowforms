@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 import type { ComponentNode, FormDocument, Kit, Language } from '@formsmith/core'
+import { languageTag } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
@@ -64,7 +65,7 @@ function makeDocument(
     root: { key: 'root', type: 'Screen', props: {}, children: [field] },
     actions: {},
     languages,
-    defaultLanguage: languages[0]?.code ?? 'en',
+    defaultLanguage: languages[0] ? languageTag(languages[0]) : 'en',
     translations: {},
     settings: {},
   }
@@ -310,6 +311,58 @@ describe('form settings', () => {
     // translation as its raw key.
     expect(latest().languages).toHaveLength(1)
     expect(latest().defaultLanguage).toBe('fr')
+  })
+
+  /*
+   * Every test above builds languages with no dialect, which is not what
+   * createDocument produces: the shipped default is en-US. A tag and a code are
+   * different strings, and the remove button was passing the code to a filter
+   * comparing tags, so removing the default language did nothing at all.
+   */
+  it('removes a language whose tag carries a region', async () => {
+    const { user, openTab, latest } = setup([
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'fr', name: 'French', bidi: 'ltr' },
+    ])
+    await openTab('Form')
+
+    await user.click(screen.getByRole('button', { name: 'Remove English' }))
+
+    expect(latest().languages).toEqual([{ code: 'fr', name: 'French', bidi: 'ltr' }])
+    expect(latest().defaultLanguage).toBe('fr')
+  })
+
+  it('splits a region subtag out of the code it was typed with', async () => {
+    const { user, openTab, latest } = setup()
+    await openTab('Form')
+
+    await user.type(screen.getByLabelText('Code'), 'pt-BR')
+    await user.type(screen.getByLabelText('Name'), 'Portuguese')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    // The panel's own hint says to type pt-BR. Lowercasing the whole string
+    // into `code` made the language "pt-br", which no dialect could be read
+    // back out of and which the renderer never looked a translation up by.
+    expect(latest().languages[1]).toEqual({
+      code: 'pt',
+      dialect: 'BR',
+      name: 'Portuguese',
+      bidi: 'ltr',
+    })
+    expect(languageTag(latest().languages[1] as Language)).toBe('pt-BR')
+  })
+
+  it('refuses a duplicate that differs only in case', async () => {
+    const { user, openTab, latest } = setup([
+      { code: 'pt', dialect: 'BR', name: 'PT', bidi: 'ltr' },
+    ])
+    await openTab('Form')
+
+    await user.type(screen.getByLabelText('Code'), 'pt-br')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    expect(screen.getByRole('alert').textContent).toMatch(/already in the list/)
+    expect(latest().languages).toHaveLength(1)
   })
 
   it('will not remove the last language', async () => {

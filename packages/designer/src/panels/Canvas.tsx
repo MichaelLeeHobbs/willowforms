@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
-import { indexKit, validateForm } from '@formsmith/core'
+import { autoValidateKeys, indexKit, validateForm } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -44,6 +44,8 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
   const [preview, setPreview] = useState(false)
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
+  /** Fields the user has changed. A field validates while typing only after it is touched. */
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [hoverKey, setHoverKey] = useState<string | undefined>(undefined)
 
   const surfaceRef = useRef<HTMLDivElement>(null)
@@ -62,13 +64,29 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
    * form. Validation also runs on the whole tree, so recomputing it per render
    * meant doing that on every keystroke in preview.
    */
-  const errors = useMemo(
-    () => (validated ? validateForm(api.document.root, data) : NO_ERRORS),
-    [validated, api.document.root, data],
-  )
+  const errors = useMemo(() => {
+    const all = validateForm(api.document.root, data)
+    if (validated) return all
+
+    /*
+     * Before a submit, only the fields that asked for it. A field validates
+     * while typing when its schema says so and the user has actually touched
+     * it: showing "This field is required" on a field nobody has reached yet
+     * is how a form greets someone with a wall of red.
+     */
+    const eager = autoValidateKeys(api.document.root)
+    let shown: FormErrors | undefined
+    for (const key of Object.keys(all)) {
+      if (!eager.has(key) || !touched.has(key)) continue
+      shown ??= {}
+      shown[key] = all[key] as string
+    }
+    return shown ?? NO_ERRORS
+  }, [validated, api.document.root, data, touched])
 
   const onChange = useCallback((key: string, value: JsonValue) => {
     setData((d) => ({ ...d, [key]: value }))
+    setTouched((t) => (t.has(key) ? t : new Set(t).add(key)))
   }, [])
 
   const { select } = api
@@ -199,6 +217,7 @@ export function Canvas({ api, kit, rendererKit, drag }: CanvasProps): ReactNode 
               type="button"
               onClick={() => {
                 setData({})
+                setTouched(new Set())
                 setValidated(false)
               }}
             >

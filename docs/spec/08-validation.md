@@ -73,7 +73,7 @@ supplied value, because requiredness is one rule's job.
 
 This paragraph is the reason to write specifications. The prose here said an unchecked required box was
 caught; the code treated `false` as an answer and let a consent checkbox pass while unticked. The prose
-was right about what should happen and the code was wrong, and neither the type checker nor 345 tests had
+was right about what should happen and the code was wrong, and neither the type checker nor the tests had
 an opinion, because nothing had ever asked.
 
 ### Every failure degrades rather than throws

@@ -18,7 +18,7 @@
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
-import { indexKit, instantiate } from '@formsmith/core'
+import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
@@ -198,6 +198,84 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         ).toContain('Something is wrong.')
       }
     })
+
+    /*
+     * The two rules below were written down as kit obligations long before
+     * anything ran them, and @formsmith/kit-mui had never satisfied either.
+     * A contract nothing executes is a wish.
+     */
+
+    it('marks the message as an alert when it holds an error', () => {
+      for (const def of kit.components.filter((c) => c.dataBound)) {
+        const node = instantiate(def, { key: 'r', type: 'r', props: {} })
+        node.key = 'field'
+
+        const { container: dom } = render(
+          <FormRenderer
+            document={documentOf(node)}
+            kit={renderers}
+            data={{}}
+            errors={{ field: 'Something is wrong.' }}
+            onChange={() => undefined}
+          />,
+        )
+
+        const alert = dom.querySelector('[role="alert"]')
+        expect(
+          alert?.textContent,
+          `${def.type} shows its error without role="alert", so a screen reader ` +
+            'never announces a validation failure the user did not cause.',
+        ).toContain('Something is wrong.')
+      }
+    })
+
+    it('points every data-bound control at a message element that already exists', () => {
+      for (const def of kit.components.filter((c) => c.dataBound)) {
+        const node = instantiate(def, { key: 'r', type: 'r', props: {} })
+        node.key = 'field'
+
+        // No error. The element still has to be there, or the description is
+        // attached only at the moment it changes and is announced twice or not
+        // at all depending on the screen reader.
+        const { container: dom } = render(
+          <FormRenderer
+            document={documentOf(node)}
+            kit={renderers}
+            data={{}}
+            onChange={() => undefined}
+          />,
+        )
+
+        const host = dom.querySelector('[data-fs-key="field"]')
+        const described = host?.matches('[aria-describedby]')
+          ? host
+          : (host?.querySelector('[aria-describedby]') ?? null)
+
+        expect(described, `${def.type} has no control carrying aria-describedby`).not.toBeNull()
+
+        for (const id of (described?.getAttribute('aria-describedby') ?? '').split(/\s+/)) {
+          expect(
+            dom.querySelector('[id="' + id + '"]'),
+            `${def.type} points aria-describedby at #${id}, which is not in the DOM`,
+          ).not.toBeNull()
+        }
+      }
+    })
+  })
+
+  it('declares exactly one root component and keeps it out of the palette', () => {
+    // The root already exists in every document. Offering it in the palette
+    // let a screen be dropped inside a screen, which it did until this ran.
+    const roots = kit.components.filter((c) => c.root === true)
+    expect(
+      roots.map((c) => c.type),
+      'a kit declares exactly one root, and it is the type emptyRoot() produces',
+    ).toEqual([emptyRoot().type])
+
+    const offered = groupKit(kit).flatMap((g) => g.components.map((c) => c.type))
+    expect(offered, 'the root must not be draggable out of the palette').not.toContain(
+      emptyRoot().type,
+    )
   })
 
   it('builds a palette index without collisions', () => {

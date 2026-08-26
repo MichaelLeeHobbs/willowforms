@@ -19,7 +19,7 @@ export type {
 export type { ComponentDef, Kit, PaletteGroup, PropEditor, PropOption, PropSchema } from './kit.js'
 export { groupKit, indexKit } from './kit.js'
 
-export { jsonToString } from './json.js'
+export { jsonToString, optionValue } from './json.js'
 
 export { isVisible } from './visibility.js'
 
@@ -45,6 +45,12 @@ export {
 } from './tree.js'
 
 export type { Evaluator } from './validation.js'
-export { applyRule, DEFAULT_MESSAGES, validateField, validateForm } from './validation.js'
+export {
+  applyRule,
+  autoValidateKeys,
+  DEFAULT_MESSAGES,
+  validateField,
+  validateForm,
+} from './validation.js'
 
 export { createDocument, emptyRoot, instantiate, prop } from './factory.js'

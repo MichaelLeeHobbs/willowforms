@@ -12,6 +12,7 @@
  */
 
 import { jsonToString } from './json.js'
+import { flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
   ComponentNode,
@@ -186,4 +187,23 @@ export function validateForm(
 
   visit(root)
   return errors
+}
+
+/**
+ * The fields that asked to be validated while they are being typed into.
+ *
+ * `FieldSchema.autoValidate` is a per-field hint, and the host decides what to
+ * do with it: Formsmith never owns the form's data, so it cannot own the moment
+ * validation runs either. The designer's preview reads this, and a host that
+ * wants the same behaviour reads it the same way.
+ *
+ * It was written by the Rules tab and read by nothing at all for the whole of
+ * the tab's life, so the checkbox looked like a setting and was decoration.
+ */
+export function autoValidateKeys(root: ComponentNode): Set<string> {
+  const keys = new Set<string>()
+  for (const { node } of flatten(root)) {
+    if (node.schema?.autoValidate === true) keys.add(node.key)
+  }
+  return keys
 }
