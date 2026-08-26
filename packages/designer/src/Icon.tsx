@@ -143,6 +143,11 @@ const GLYPHS: Record<IconName, ReactNode> = {
       <path d="M9 21h6M12 17v4" />
     </>
   ),
+  chevron: (
+    <>
+      <path d="m9 5 7 7-7 7" />
+    </>
+  ),
   tablet: (
     <>
       <rect x="4" y="2" width="16" height="20" rx="2" />

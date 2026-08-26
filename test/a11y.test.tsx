@@ -187,6 +187,18 @@ describe('axe audit of the designer', () => {
     expect(await audit(container)).toEqual([])
   }, 20000)
 
+  it('has none with both panes collapsed', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner()
+
+    // A collapsed pane is hidden, and hiding a region that still contains the
+    // focused element is one of the ways this goes wrong quietly.
+    await user.click(screen.getByRole('button', { name: /Hide Components and structure/ }))
+    await user.click(screen.getByRole('button', { name: /Hide Component properties/ }))
+
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+
   it('has none with the JSON dialog open', async () => {
     const user = userEvent.setup()
     const container = renderDesigner()

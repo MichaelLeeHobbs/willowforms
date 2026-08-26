@@ -1,7 +1,7 @@
 # Designer shell
 
-**Status: partial.** The layout, the toolbar, the keyboard map, the scrollbars, and viewport simulation
-are built. Panels do not collapse and the left pane is not tabbed.
+**Status: partial.** The layout, the toolbar, the keyboard map, the scrollbars, viewport simulation and
+collapsible panes are built. The left pane is not tabbed.
 
 The shell is everything around the canvas: the panes, the toolbar, and the rules for what has focus.
 
@@ -31,9 +31,18 @@ Both side panes are `--fs-panel-width` (288px) and fixed. The canvas takes what 
 
 ### Collapsible panes
 
-**Status: planned.** A handle on the inner edge of each pane collapses it, and the canvas takes the
-space. Collapse state is per-pane and is not part of the document — it is a view preference, and putting
-it in the document would mean two people editing the same form disagree about what it looks like.
+**Status: built.** A grip on the inner edge of each pane collapses it, and the canvas takes the space.
+Collapse state is per pane and is not part of the document: it is a view preference, and putting it in
+the document would mean two people editing the same form disagree about what it looks like.
+
+Per pane rather than one shared flag, because hiding the palette to see a wide form and hiding the
+inspector to see the tree are different intentions.
+
+**The grip sits outside the pane it controls.** Inside, it would be a one-way door: collapsing the pane
+would take the control that reopens it with it. The chevron points the way the pane will move.
+
+A collapsed pane is `hidden`, so it leaves the accessibility tree and the tab order rather than becoming
+a zero-width region a keyboard can still land in. `test/a11y.test.tsx` audits that state.
 
 ### Tabbed left pane
 

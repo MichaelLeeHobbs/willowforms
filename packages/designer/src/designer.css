@@ -746,6 +746,47 @@
   overflow: hidden;
 }
 
+/*
+ * The pane grips.
+ *
+ * Outside the pane they control, so a collapsed pane can still be reopened.
+ * They are full-height strips rather than small buttons because the edge of a
+ * pane is a large, easy target and a 16px handle in the middle of it is not.
+ */
+.fs-pane-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--fs-text-muted);
+  background: var(--fs-bg-panel);
+}
+
+.fs-pane-handle--left {
+  border-inline-end: 1px solid var(--fs-border);
+}
+
+.fs-pane-handle--right {
+  border-inline-start: 1px solid var(--fs-border);
+}
+
+.fs-pane-handle:hover {
+  color: var(--fs-text);
+  background: var(--fs-bg-well);
+}
+
+.fs-pane-handle__glyph {
+  display: flex;
+}
+
+.fs-pane-handle__glyph.is-flipped {
+  transform: rotate(180deg);
+}
+
 .fs-toolbar__field {
   display: flex;
   align-items: center;

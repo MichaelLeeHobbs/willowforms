@@ -53,6 +53,7 @@ export type IconName =
   | 'repeat'
   | 'alert'
   | 'tabs'
+  | 'chevron'
 
 /** Which editor the properties panel renders for a prop. */
 export type PropEditor =

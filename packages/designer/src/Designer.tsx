@@ -127,6 +127,16 @@ export function Designer({
   const [theme, setTheme] = useState<Theme>('system')
 
   /*
+   * Which panes are collapsed. A view preference like the two above, and per
+   * pane rather than one shared flag: hiding the palette to see a wide form and
+   * hiding the inspector to see the tree are different intentions.
+   */
+  const [collapsed, setCollapsed] = useState({ left: false, right: false })
+  const toggle = useCallback((side: 'left' | 'right') => {
+    setCollapsed((current) => ({ ...current, [side]: !current[side] }))
+  }, [])
+
+  /*
    * Which language the canvas renders in. Undefined means the document's own
    * default, which is what the renderer already falls back to, so this stays out
    * of the way until someone picks a language.
@@ -160,7 +170,13 @@ export function Designer({
         {...(onSave ? { onSave: () => onSave(api.document) } : {})}
       />
       <div className="fs-body">
-        <aside className="fs-panel fs-panel--left" aria-label="Components and structure">
+        <PaneHandle side="left" collapsed={collapsed.left} onToggle={() => toggle('left')} />
+
+        <aside
+          className="fs-panel fs-panel--left"
+          aria-label="Components and structure"
+          hidden={collapsed.left}
+        >
           <Palette
             kit={kit}
             onAdd={(def) => {
@@ -193,9 +209,15 @@ export function Designer({
           />
         </main>
 
-        <aside className="fs-panel fs-panel--right" aria-label="Component properties">
+        <aside
+          className="fs-panel fs-panel--right"
+          aria-label="Component properties"
+          hidden={collapsed.right}
+        >
           <Inspector api={api} kit={kit} />
         </aside>
+
+        <PaneHandle side="right" collapsed={collapsed.right} onToggle={() => toggle('right')} />
       </div>
 
       <div className="fs-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
@@ -219,6 +241,41 @@ export function Designer({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * The grip that collapses a pane.
+ *
+ * It sits outside the pane it controls rather than inside it, because a control
+ * inside a collapsed pane is a control nobody can reach. The chevron points the
+ * way the pane will move, which is the only thing about it worth learning.
+ */
+function PaneHandle({
+  side,
+  collapsed,
+  onToggle,
+}: {
+  side: 'left' | 'right'
+  collapsed: boolean
+  onToggle: () => void
+}): ReactNode {
+  const label = side === 'left' ? 'Components and structure' : 'Component properties'
+  // Collapsed points inward, expanded points outward, in both directions.
+  const pointsStart = side === 'left' ? collapsed : !collapsed
+  return (
+    <button
+      type="button"
+      className={'fs-pane-handle fs-pane-handle--' + side}
+      aria-expanded={!collapsed}
+      aria-label={(collapsed ? 'Show ' : 'Hide ') + label}
+      title={(collapsed ? 'Show ' : 'Hide ') + label}
+      onClick={onToggle}
+    >
+      <span className={'fs-pane-handle__glyph' + (pointsStart ? ' is-flipped' : '')}>
+        <Icon name="chevron" size={14} />
+      </span>
+    </button>
   )
 }
 

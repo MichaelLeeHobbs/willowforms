@@ -212,3 +212,55 @@ describe('the Save button', () => {
     expect(onSave).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('collapsing a pane', () => {
+  const handle = (side: 'left' | 'right'): HTMLElement =>
+    screen.getByRole('button', {
+      name: new RegExp(side === 'left' ? 'Components and structure' : 'Component properties'),
+    })
+
+  it('shows both panes to begin with', () => {
+    setup()
+    expect(handle('left').getAttribute('aria-expanded')).toBe('true')
+    expect(handle('right').getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByLabelText('Components and structure').hidden).toBe(false)
+  })
+
+  it('hides a pane and says so', async () => {
+    const { user } = setup()
+    await user.click(handle('left'))
+
+    expect(handle('left').getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByLabelText('Components and structure').hidden).toBe(true)
+  })
+
+  it('leaves the grip reachable once the pane is gone', async () => {
+    // The grip sits outside the pane it controls. Inside it, collapsing would
+    // be a one-way door.
+    const { user } = setup()
+    await user.click(handle('left'))
+
+    expect(handle('left').hidden).toBe(false)
+    await user.click(handle('left'))
+    expect(screen.getByLabelText('Components and structure').hidden).toBe(false)
+  })
+
+  it('collapses each pane independently', async () => {
+    const { user } = setup()
+    await user.click(handle('right'))
+
+    expect(handle('right').getAttribute('aria-expanded')).toBe('false')
+    expect(handle('left').getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByLabelText('Components and structure').hidden).toBe(false)
+  })
+
+  it('does not touch the document', async () => {
+    const { user, latest } = setup()
+    const before = JSON.stringify(latest())
+
+    await user.click(handle('left'))
+    await user.click(handle('right'))
+
+    expect(JSON.stringify(latest())).toBe(before)
+  })
+})
