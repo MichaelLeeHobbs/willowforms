@@ -149,3 +149,16 @@ test('the palette does not offer the root component', async ({ designer }) => {
   // not an empty palette.
   await expect(panel.getByRole('button', { name: 'Stack', exact: true })).toBeVisible()
 })
+
+test('every palette entry carries an icon beside its label', async ({ designer }) => {
+  const items = designer.page.locator('.fs-palette__item')
+  const count = await items.count()
+  expect(count).toBeGreaterThan(5)
+
+  // An icon that renders no geometry is a blank square, which looks like a bug.
+  for (let i = 0; i < count; i++) {
+    const glyph = items.nth(i).locator('svg.fs-icon')
+    await expect(glyph).toHaveCount(1)
+    expect(await glyph.locator('*').count()).toBeGreaterThan(0)
+  }
+})

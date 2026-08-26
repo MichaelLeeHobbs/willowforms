@@ -207,7 +207,20 @@
 }
 
 .fs-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-align: start;
+}
+
+/*
+ * The glyph must not shrink when the label wraps: a two-column palette at 288px
+ * puts "Number field" on two lines, and a flex child with no floor squashes the
+ * icon into a sliver rather than letting the text wrap around it.
+ */
+.fs-icon {
+  flex: 0 0 auto;
+  color: var(--fs-text-muted);
 }
 
 .fs-tree__list {

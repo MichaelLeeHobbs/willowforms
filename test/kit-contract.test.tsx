@@ -263,6 +263,18 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     })
   })
 
+  it('gives every palette entry an icon', () => {
+    /*
+     * `ComponentDef.icon` is optional in the type, because a kit is allowed to
+     * ship without one. It is required of the kits in this repository, because
+     * these two are what a kit author copies: a palette of unadorned text is
+     * the thing the vocabulary exists to fix, and half a palette with icons
+     * looks like a bug rather than a choice.
+     */
+    const bare = kit.components.filter((c) => !c.icon).map((c) => c.type)
+    expect(bare).toEqual([])
+  })
+
   it('declares exactly one root component and keeps it out of the palette', () => {
     // The root already exists in every document. Offering it in the palette
     // let a screen be dropped inside a screen, which it did until this ran.

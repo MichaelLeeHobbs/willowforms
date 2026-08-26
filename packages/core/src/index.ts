@@ -16,7 +16,15 @@ export type {
   ValidationRule,
 } from './types.js'
 
-export type { ComponentDef, Kit, PaletteGroup, PropEditor, PropOption, PropSchema } from './kit.js'
+export type {
+  ComponentDef,
+  IconName,
+  Kit,
+  PaletteGroup,
+  PropEditor,
+  PropOption,
+  PropSchema,
+} from './kit.js'
 export { groupKit, indexKit } from './kit.js'
 
 export { jsonToString, optionValue } from './json.js'

@@ -106,22 +106,32 @@ declare, so neither can quietly grow a `background`.
 
 ## Icons
 
-**Status: undecided.** `ComponentDef.icon` exists and nothing renders it, so the palette is a wall of
-text.
+**Status: built.** Option 1 below, as recommended.
 
-The constraint is real: **the designer cannot import an icon library**, because it imports no component
-library at all and a lint rule enforces that. Three options:
+`IconName` in `@formsmith/core` is a closed union of 23 names. `packages/designer/src/Icon.tsx` draws
+each one as an inline 24x24 stroke glyph on `currentColor`, and a kit picks names from the list. The
+palette renders them beside the label, decoratively: the label already says the same word, so naming the
+glyph would have a screen reader read every entry twice.
 
-1. **A shared vocabulary.** Core declares a closed set of icon names; the designer ships inline SVGs for
-   them; kits pick names from the list. Keeps the designer dependency-free and gives every kit the same
-   visual language. A kit needing an icon outside the set has to ask for one.
-2. **The kit supplies the SVG.** `ComponentDef.icon` becomes path data rather than a name. Fully flexible,
-   but the metadata half stops being pure data in spirit, and every kit reinvents the same twenty icons.
-3. **The host supplies a renderer.** `<Designer iconRenderer={...} />`. Most flexible, most work for
-   every consumer, and the palette looks broken until someone does it.
+Three things fall out of the vocabulary being a union rather than a string:
 
-**Recommendation: option 1.** The set of things a form component can be is small and well understood, and
-a closed vocabulary is what makes two kits look like one product.
+- A kit's typo is a compile error rather than a blank square.
+- `Record<IconName, ReactNode>` makes adding a name to core fail to compile until it is drawn.
+- Two kits cannot invent two names for the same idea. Before this existed, `@formsmith/kit-mui` carried
+  `view-column` and `text-field` while `@formsmith/kit-html` carried nothing, and no palette rendered
+  either. That is the failure the closed set prevents.
+
+The constraint that forced it: **the designer cannot import an icon library**, because it imports no
+component library at all and a lint rule enforces that. The alternatives were a kit supplying its own
+path data, which makes the metadata half stop being plain data and has every kit redraw the same twenty
+glyphs, and a host-supplied renderer, which leaves the palette looking broken until someone writes one.
+
+`ComponentDef.icon` stays optional, because a third-party kit is allowed to ship without icons. The
+contract test requires one of the kits in this repository, since those are what a kit author copies.
+
+**Missing:** `Icon` is not exported from `@formsmith/designer`, and the `icon` property editor named in
+[06-inspector.md](06-inspector.md#property-editors) still does not exist. Both wait for something that
+needs to pick an icon rather than declare one.
 
 ## What is not themeable
 

@@ -3,6 +3,8 @@ import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { ComponentDef, Kit, PaletteGroup } from '@formsmith/core'
 import { groupKit } from '@formsmith/core'
 
+import { Icon } from '../Icon.js'
+
 const GROUP_LABELS: Record<PaletteGroup, string> = {
   inputs: 'Inputs',
   selection: 'Selection',
@@ -69,7 +71,13 @@ export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
                   onPointerDown={(event) => onDragStart(def, event)}
                   title={'Add ' + def.label + ', or drag it onto the canvas'}
                 >
-                  {def.label}
+                  {/*
+                   * Decorative: the label it sits beside says the same thing, so
+                   * naming it would have a screen reader read the entry twice.
+                   * A kit that declares no icon simply gets none.
+                   */}
+                  {def.icon ? <Icon name={def.icon} /> : null}
+                  <span>{def.label}</span>
                 </button>
               ))}
             </div>
