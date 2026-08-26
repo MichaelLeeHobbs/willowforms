@@ -169,9 +169,15 @@ export function Designer({
         {...(onSave ? { onSave: () => onSave(api.document) } : {})}
       />
       <div className="fs-body">
-        <PaneHandle side="left" collapsed={collapsed.left} onToggle={() => toggle('left')} />
+        <PaneHandle
+          side="left"
+          controls={LEFT_PANE_ID}
+          collapsed={collapsed.left}
+          onToggle={() => toggle('left')}
+        />
 
         <aside
+          id={LEFT_PANE_ID}
           className="fs-panel fs-panel--left"
           aria-label="Components and structure"
           hidden={collapsed.left}
@@ -201,6 +207,7 @@ export function Designer({
         </main>
 
         <aside
+          id={RIGHT_PANE_ID}
           className="fs-panel fs-panel--right"
           aria-label="Component properties"
           hidden={collapsed.right}
@@ -208,7 +215,12 @@ export function Designer({
           <Inspector api={api} kit={kit} />
         </aside>
 
-        <PaneHandle side="right" collapsed={collapsed.right} onToggle={() => toggle('right')} />
+        <PaneHandle
+          side="right"
+          controls={RIGHT_PANE_ID}
+          collapsed={collapsed.right}
+          onToggle={() => toggle('right')}
+        />
       </div>
 
       <div className="fs-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
@@ -235,6 +247,14 @@ export function Designer({
   )
 }
 
+/*
+ * Fixed ids rather than useId, because only one Designer is ever on a page: it
+ * is a whole-screen application, and two would fight over the window-level
+ * keyboard shortcuts long before they collided over an id.
+ */
+const LEFT_PANE_ID = 'fs-pane-left'
+const RIGHT_PANE_ID = 'fs-pane-right'
+
 /**
  * The grip that collapses a pane.
  *
@@ -244,10 +264,13 @@ export function Designer({
  */
 function PaneHandle({
   side,
+  controls,
   collapsed,
   onToggle,
 }: {
   side: 'left' | 'right'
+  /** Id of the pane this opens and closes. */
+  controls: string
   collapsed: boolean
   onToggle: () => void
 }): ReactNode {
@@ -259,6 +282,12 @@ function PaneHandle({
       type="button"
       className={'fs-pane-handle fs-pane-handle--' + side}
       aria-expanded={!collapsed}
+      /*
+       * The pane is `hidden` rather than unmounted, so this always resolves.
+       * Together with aria-expanded it is the disclosure pattern: without it a
+       * screen reader is told something is expanded and not what.
+       */
+      aria-controls={controls}
       aria-label={(collapsed ? 'Show ' : 'Hide ') + label}
       title={(collapsed ? 'Show ' : 'Hide ') + label}
       onClick={onToggle}

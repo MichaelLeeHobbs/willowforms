@@ -197,6 +197,7 @@ describe('documentation links', () => {
     'docs/ARCHITECTURE.md',
     'docs/accessibility.md',
     'docs/prior-art/README.md',
+    'docs/ideas.md',
   ]
 
   it.each(files)('%s links only to files that exist', (file) => {

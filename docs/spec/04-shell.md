@@ -65,7 +65,9 @@ the tree, which is how you put something inside a container the canvas has made 
 are never on screen together now, so that route is gone; palette to canvas and tree to tree both still
 work. See [05-canvas.md](05-canvas.md#what-can-be-dragged-where). Switching to the Tree tab when a
 palette drag begins would bring it back, at the cost of the palette vanishing after every drop, which is
-worse for the common case of adding three fields in a row.
+worse for the common case of adding three fields in a row. A third option, splitting the pane so the tree
+sits collapsible beneath the palette, is recorded in [../ideas.md](../ideas.md) against the day the drop
+is actually missed.
 
 The tablist is the same component the inspector uses. It was extracted rather than copied: roving
 tabindex, arrow keys, Home and End, and panels naming their tab is fifteen lines that are easy to get

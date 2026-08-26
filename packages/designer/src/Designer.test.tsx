@@ -263,4 +263,24 @@ describe('collapsing a pane', () => {
 
     expect(JSON.stringify(latest())).toBe(before)
   })
+
+  it('names the pane it controls, in both states', async () => {
+    /*
+     * aria-expanded without aria-controls tells a screen reader that something
+     * is expanded and not what. The pane is `hidden` rather than unmounted, so
+     * the reference resolves either way; an unresolved one would be invisible
+     * to axe, which is how the inspector's tabs shipped two of them.
+     */
+    const { user, shell } = setup()
+
+    for (const side of ['left', 'right'] as const) {
+      const controls = handle(side).getAttribute('aria-controls')
+      expect(controls, side + ' grip names no pane').toBeTruthy()
+      expect(shell.querySelector('[id="' + controls + '"]')).not.toBeNull()
+    }
+
+    await user.click(handle('left'))
+    const controls = handle('left').getAttribute('aria-controls')
+    expect(shell.querySelector('[id="' + controls + '"]')).not.toBeNull()
+  })
 })

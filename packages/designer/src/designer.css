@@ -75,12 +75,31 @@
   white-space: nowrap;
 }
 
-/* Every chrome control gets a visible ring. The canvas keeps the kit's own. */
+/*
+ * Every chrome control gets a visible ring. The canvas keeps the kit's own.
+ *
+ * The last two are named individually because they are the designer's only
+ * controls that live outside a panel or a bar: the pane grips sit between the
+ * panes so a collapsed pane can still be reopened, and the selection toolbar
+ * sits on the canvas so it can be positioned against the frame. Both were
+ * falling back to the browser's default ring, which is not guaranteed to have
+ * any contrast against these surfaces.
+ */
 .fs-toolbar :focus-visible,
 .fs-panel :focus-visible,
-.fs-canvas__bar :focus-visible {
+.fs-canvas__bar :focus-visible,
+.fs-pane-handle:focus-visible,
+.fs-selection__toolbar button:focus-visible {
   outline: 2px solid var(--fs-primary);
   outline-offset: 2px;
+}
+
+/*
+ * Inset, because the grip is a 14px strip flush against its neighbours: a ring
+ * offset outwards would be drawn underneath the pane and the canvas.
+ */
+.fs-pane-handle:focus-visible {
+  outline-offset: -3px;
 }
 
 .fs-toolbar {
