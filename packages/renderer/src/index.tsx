@@ -9,7 +9,7 @@
 
 import { createContext, useCallback, useContext, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { isVisible } from '@formsmith/core'
+import { dataKeyOf, isVisible } from '@formsmith/core'
 import type {
   ComponentNode,
   Evaluator,
@@ -134,8 +134,8 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   )
 
   const handleChange = useCallback(
-    (value: JsonValue) => onChange(node.key, value),
-    [onChange, node.key],
+    (value: JsonValue) => onChange(dataKeyOf(node), value),
+    [onChange, node],
   )
 
   const nodeProps = useMemo<NodeAttributes>(
@@ -156,7 +156,9 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       node={node}
       props={props}
       nodeProps={nodeProps}
-      value={data[node.key]}
+      // Value by data key, error by node key. Two components may share a data
+      // key; they can still fail for different reasons.
+      value={data[dataKeyOf(node)]}
       error={errors[node.key]}
       onChange={handleChange}
     >

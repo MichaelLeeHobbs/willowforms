@@ -40,6 +40,7 @@ export type { FlatNode, StructuralError } from './tree.js'
 export {
   flatten,
   collectKeys,
+  dataKeyOf,
   duplicateNode,
   findNode,
   findParent,

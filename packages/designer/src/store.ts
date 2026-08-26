@@ -130,6 +130,14 @@ export interface DesignerApi {
    */
   setLanguages: (languages: Language[], defaultLanguage?: string) => void
   renameKey: (key: string, nextKey: string) => RenameResult
+  /**
+   * Rename the value this component submits, without touching its identity.
+   *
+   * An empty string, or one matching the component's own key, removes the
+   * override rather than storing a redundant copy of the key. Data keys are
+   * allowed to collide, so nothing is refused here.
+   */
+  setDataKey: (key: string, dataKey: string) => void
   moveComponent: (key: string, parentKey: string, index?: number) => void
   /**
    * Copy a component and its subtree in beside it, and select the copy.
@@ -334,6 +342,28 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply, history],
   )
 
+  const setDataKey = useCallback(
+    (key: string, dataKey: string) => {
+      const trimmed = dataKey.trim()
+      apply(
+        (doc) => ({
+          ...doc,
+          root: updateNode(doc.root, key, (node) => {
+            if (!trimmed || trimmed === key) {
+              // exactOptionalPropertyTypes: no override is an absent key, not a
+              // key holding undefined.
+              const { dataKey: _dropped, ...rest } = node
+              return rest
+            }
+            return { ...node, dataKey: trimmed }
+          }),
+        }),
+        'dataKey:' + key,
+      )
+    },
+    [apply],
+  )
+
   const replaceDocument = useCallback((next: FormDocument) => {
     setHistory((h) => commit(h, next))
     setSelectedKey(undefined)
@@ -358,6 +388,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     setTranslation,
     setLanguages,
     renameKey,
+    setDataKey,
     moveComponent,
     duplicateComponent,
     removeComponent,

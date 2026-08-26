@@ -12,7 +12,7 @@
  */
 
 import { jsonToString } from './json.js'
-import { flatten } from './tree.js'
+import { dataKeyOf, flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
   ComponentNode,
@@ -154,7 +154,7 @@ export function validateField(
 ): string | undefined {
   if (!node.schema) return undefined
   for (const rule of node.schema.validations) {
-    const error = applyRule(rule, data[node.key], data, evaluate)
+    const error = applyRule(rule, data[dataKeyOf(node)], data, evaluate)
     if (error) return error
   }
   return undefined

@@ -78,6 +78,20 @@ export type ValidationKey = ValidationRule['key']
 export interface ComponentNode {
   /** Unique within the document. Doubles as the data key unless overridden. */
   key: string
+  /**
+   * The name this component's value takes in submitted data. Defaults to `key`.
+   *
+   * `key` is identity: unique within the document, the link from a DOM element
+   * back to a node, and what an error is reported against. `dataKey` is the name
+   * a form author chose for the value, and it is allowed to repeat: two fields
+   * behind opposite `renderWhen` guards writing one answer is a real pattern,
+   * and forbidding it would buy nothing.
+   *
+   * That split is why errors stay keyed by `key`. An error belongs to a
+   * component on screen, and two components sharing a `dataKey` still need to be
+   * able to say different things.
+   */
+  dataKey?: string
   /** Kit-scoped component id, e.g. `TextField`, `Stack`. */
   type: string
   props: Record<string, PropValue>

@@ -4,6 +4,7 @@ import { createDocument, emptyRoot, prop } from './factory.js'
 import type { ComponentNode, FormDocument } from './types.js'
 import {
   collectKeys,
+  dataKeyOf,
   duplicateNode,
   findNode,
   findParent,
@@ -473,5 +474,61 @@ describe('duplicateNode', () => {
     const before = JSON.stringify(original)
     duplicateNode(original, 'stack')
     expect(JSON.stringify(original)).toBe(before)
+  })
+})
+
+describe('dataKeyOf', () => {
+  it('is the component key when nothing overrides it', () => {
+    expect(dataKeyOf({ key: 'email', type: 'TextField', props: {} })).toBe('email')
+  })
+
+  it('is the override when there is one', () => {
+    expect(dataKeyOf({ key: 'emailField', dataKey: 'email', type: 'TextField', props: {} })).toBe(
+      'email',
+    )
+  })
+})
+
+describe('validateDocument and data keys', () => {
+  const withDataKey = (dataKey: unknown): FormDocument =>
+    ({
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'email', dataKey, type: 'TextField', props: {} }],
+      },
+    }) as unknown as FormDocument
+
+  it('accepts a data key shared by two components', () => {
+    const document = {
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          { key: 'personal', dataKey: 'email', type: 'TextField', props: {} },
+          { key: 'work', dataKey: 'email', type: 'TextField', props: {} },
+        ],
+      },
+    }
+
+    // Deliberately legal. Uniqueness is a property of keys, not of answers.
+    expect(validateDocument(document)).toEqual([])
+  })
+
+  it('rejects a data key that is present but blank', () => {
+    const errors = validateDocument(withDataKey('   '))
+    expect(errors.map((e) => e.code)).toEqual(['empty-data-key'])
+  })
+
+  it('rejects a data key that is not a string', () => {
+    expect(validateDocument(withDataKey(7)).map((e) => e.code)).toEqual(['empty-data-key'])
+  })
+
+  it('accepts an absent data key', () => {
+    expect(validateDocument(withDataKey(undefined))).toEqual([])
   })
 })

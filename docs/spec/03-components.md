@@ -82,8 +82,10 @@ twelve-column system: a form author thinks "two side by side", not "six of twelv
 
 `Repeater` is the one structurally interesting component here. It renders its children once per item in
 an array value, which makes it the only data-bound container, and it is how a form expresses "add another
-address". It needs the document model to express a repeated `dataKey` scope, so it is specified here and
-blocked on [01-document-model.md](01-document-model.md#datakey).
+address". It needs the document model to express a repeated scope: a data key that means "index 2 of this
+array" rather than a name at the top level. `dataKey` does not do that and was never going to, so
+`Repeater` is still blocked, on a design that has not been written. See
+[01-document-model.md](01-document-model.md#datakey) for what data keys do cover.
 
 ### Display
 

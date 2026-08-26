@@ -239,8 +239,27 @@ export function moveNode(
   return insertNode(removeNode(root, key), newParentKey, node, index)
 }
 
+/**
+ * The name a node's value is stored under.
+ *
+ * One helper, used everywhere data is read or written, so `key` and `dataKey`
+ * cannot be used interchangeably by accident. That mistake has been made once
+ * already in this codebase, between a language's code and its tag, and it was
+ * invisible in both directions: the writer and the reader each looked correct
+ * on their own.
+ */
+export function dataKeyOf(node: ComponentNode): string {
+  return node.dataKey ?? node.key
+}
+
 export interface StructuralError {
-  code: 'duplicate-key' | 'unknown-action' | 'empty-key' | 'unknown-language' | 'malformed'
+  code:
+    | 'duplicate-key'
+    | 'unknown-action'
+    | 'empty-key'
+    | 'empty-data-key'
+    | 'unknown-language'
+    | 'malformed'
   message: string
   key?: string
 }
@@ -303,6 +322,21 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
         errors.push({ code: 'duplicate-key', message: 'Duplicate key: ' + key, key })
       }
       seen.add(key)
+
+      /*
+       * A present dataKey has to be usable as a name. It is not checked for
+       * uniqueness: sharing one is legal, and it is what lets two guarded
+       * fields write the same answer.
+       */
+      const dataKey = value['dataKey']
+      if (dataKey !== undefined && (typeof dataKey !== 'string' || !dataKey.trim())) {
+        errors.push({
+          code: 'empty-data-key',
+          message: 'Component ' + key + ' has an empty data key.',
+          key,
+        })
+      }
+
       visitEvents(value['events'], key, path)
     }
 
