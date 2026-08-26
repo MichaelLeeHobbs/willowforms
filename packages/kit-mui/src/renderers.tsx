@@ -8,7 +8,11 @@
 
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import CardHeader from '@mui/material/CardHeader'
 import Checkbox from '@mui/material/Checkbox'
+import Divider from '@mui/material/Divider'
 import FormControl from '@mui/material/FormControl'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import FormHelperText from '@mui/material/FormHelperText'
@@ -186,6 +190,106 @@ function ButtonNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
+function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  const minWidth = num(props['minColumnWidth'], 200)
+  return (
+    <Box
+      {...nodeProps}
+      sx={{
+        display: 'grid',
+        // auto-fit with a floor: columns collapse when they cannot fit, so the
+        // author never writes a breakpoint.
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
+        gap: num(props['gap'], 16) / 8,
+      }}
+    >
+      {children}
+    </Box>
+  )
+}
+
+function BoxNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  return (
+    <Box
+      {...nodeProps}
+      sx={{
+        padding: num(props['padding'], 16) / 8,
+        background: str(props['background']) || undefined,
+        borderRadius: num(props['radius'], 0) / 8,
+      }}
+    >
+      {children}
+    </Box>
+  )
+}
+
+function CardNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  const title = str(props['title'])
+  const subtitle = str(props['subtitle'])
+  const elevated = props['variant'] === 'elevated'
+  return (
+    <Card {...nodeProps} variant={elevated ? 'elevation' : 'outlined'} elevation={elevated ? 2 : 0}>
+      {(title || subtitle) && (
+        <CardHeader
+          {...(title ? { title } : {})}
+          {...(subtitle ? { subheader: subtitle } : {})}
+          titleTypographyProps={{ variant: 'h6', component: 'h3' }}
+        />
+      )}
+      <CardContent>{children}</CardContent>
+    </Card>
+  )
+}
+
+function TextNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const raw = props['variant']
+  const variant = raw === 'small' ? 'body2' : raw === 'caption' ? 'caption' : 'body1'
+  /*
+   * MUI's `align` predates logical properties and takes left/right, so the
+   * document's start/end are mapped here rather than passed through. The HTML
+   * kit uses `text-align: start` directly and is correct in RTL for free; this
+   * one is correct in LTR, which is what MUI's own API allows.
+   */
+  const rawAlign = props['align']
+  const align = rawAlign === 'center' ? 'center' : rawAlign === 'end' ? 'right' : 'inherit'
+  return (
+    <Typography {...nodeProps} variant={variant} align={align}>
+      {str(props['text'])}
+    </Typography>
+  )
+}
+
+function DividerNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const vertical = props['orientation'] === 'vertical'
+  return (
+    <Divider
+      {...nodeProps}
+      orientation={vertical ? 'vertical' : 'horizontal'}
+      {...(vertical ? { flexItem: true } : {})}
+    />
+  )
+}
+
+function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const width = num(props['width'], 0)
+  const rawFit = props['fit']
+  const fit = rawFit === 'contain' || rawFit === 'fill' ? rawFit : 'cover'
+  /*
+   * `alt` is always present, never omitted. An empty string is the platform's
+   * way of saying decorative, and it is a different statement from a missing
+   * attribute, which leaves a screen reader reading out the file name.
+   */
+  return (
+    <Box
+      {...nodeProps}
+      component="img"
+      src={str(props['src'])}
+      alt={str(props['alt'])}
+      sx={{ objectFit: fit, width: width > 0 ? width : '100%', display: 'block' }}
+    />
+  )
+}
+
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack: StackNode,
@@ -195,6 +299,12 @@ const renderers: Record<string, NodeRenderer> = {
   Checkbox: CheckboxNode,
   Select: SelectNode,
   Button: ButtonNode,
+  Grid,
+  Box: BoxNode,
+  Card: CardNode,
+  Text: TextNode,
+  Divider: DividerNode,
+  Image: ImageNode,
 }
 
 export const muiRendererKit: RendererKit = { id: 'mui', renderers }

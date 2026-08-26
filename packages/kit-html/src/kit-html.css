@@ -176,3 +176,88 @@
   outline: 2px solid var(--fsh-accent);
   outline-offset: 2px;
 }
+
+/*
+ * Layout and display components.
+ *
+ * Every value below comes from a token or from the component's own props, so a
+ * host restyles by overriding tokens rather than by fighting these rules.
+ */
+.fsh-grid {
+  display: grid;
+}
+
+.fsh-box {
+  min-width: 0;
+}
+
+.fsh-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--fsh-radius);
+  background: var(--fsh-surface);
+}
+
+.fsh-card--outlined {
+  border: 1px solid var(--fsh-border);
+}
+
+.fsh-card--elevated {
+  box-shadow: 0 1px 8px rgb(0 0 0 / 16%);
+}
+
+.fsh-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fsh-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.fsh-card__subtitle {
+  margin: 0;
+  color: var(--fsh-muted);
+  font-size: 0.875rem;
+}
+
+.fsh-text {
+  margin: 0;
+  color: var(--fsh-text);
+}
+
+.fsh-text--small {
+  font-size: 0.875rem;
+}
+
+.fsh-text--caption {
+  color: var(--fsh-muted);
+  font-size: 0.8125rem;
+}
+
+.fsh-divider {
+  margin: 0;
+  border: 0;
+  border-block-start: 1px solid var(--fsh-border);
+}
+
+/*
+ * A vertical rule needs a height to be visible at all, and `stretch` only works
+ * inside a flex row. Outside one it falls back to its own line, which is wrong
+ * but visible, and visible is what an author can correct.
+ */
+.fsh-divider--vertical {
+  align-self: stretch;
+  border-block-start: 0;
+  border-inline-start: 1px solid var(--fsh-border);
+}
+
+.fsh-image {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--fsh-radius);
+}

@@ -250,6 +250,110 @@ function ButtonNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
+function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  const columns = num(props['columns'], 2)
+  const minWidth = num(props['minColumnWidth'], 200)
+  return (
+    <div
+      {...nodeProps}
+      className="fsh-grid"
+      style={{
+        // `auto-fit` with a floor is what makes this responsive without asking
+        // the author for breakpoints: columns collapse when they cannot fit.
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
+        gap: num(props['gap'], 16),
+        maxWidth: columns > 0 ? columns * (minWidth + num(props['gap'], 16)) : undefined,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function Box({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  return (
+    <div
+      {...nodeProps}
+      className="fsh-box"
+      style={{
+        padding: num(props['padding'], 16),
+        background: str(props['background']) || undefined,
+        borderRadius: num(props['radius'], 0),
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function Card({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  const title = str(props['title'])
+  const subtitle = str(props['subtitle'])
+  const variant = props['variant'] === 'elevated' ? 'elevated' : 'outlined'
+  return (
+    <section {...nodeProps} className={'fsh-card fsh-card--' + variant}>
+      {(title || subtitle) && (
+        <header className="fsh-card__header">
+          {title && <h3 className="fsh-card__title">{title}</h3>}
+          {subtitle && <p className="fsh-card__subtitle">{subtitle}</p>}
+        </header>
+      )}
+      {children}
+    </section>
+  )
+}
+
+function Text({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const variant = str(props['variant'], 'body')
+  // Narrowed rather than cast: the value comes from a document, which a person
+  // can hand-edit, so `align: "javascript:"` has to land somewhere harmless.
+  const raw = props['align']
+  const align = raw === 'center' || raw === 'end' ? raw : 'start'
+  return (
+    <p {...nodeProps} className={'fsh-text fsh-text--' + variant} style={{ textAlign: align }}>
+      {str(props['text'])}
+    </p>
+  )
+}
+
+function Divider({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const vertical = props['orientation'] === 'vertical'
+  /*
+   * `<hr>` is the semantic element for a thematic break and carries an implicit
+   * role of separator, so a screen reader is told the same thing the eye is.
+   */
+  return (
+    <hr
+      {...nodeProps}
+      className={'fsh-divider' + (vertical ? ' fsh-divider--vertical' : '')}
+      {...(vertical ? { 'aria-orientation': 'vertical' as const } : {})}
+    />
+  )
+}
+
+function Image({ props, nodeProps }: NodeRendererProps): ReactNode {
+  const width = num(props['width'], 0)
+  const rawFit = props['fit']
+  const fit = rawFit === 'contain' || rawFit === 'fill' ? rawFit : 'cover'
+  /*
+   * `alt` is always present, never omitted. An empty string is the platform's
+   * way of saying decorative, and it is a different statement from a missing
+   * attribute, which leaves a screen reader reading out the file name.
+   */
+  return (
+    <img
+      {...nodeProps}
+      className="fsh-image"
+      src={str(props['src'])}
+      alt={str(props['alt'])}
+      style={{
+        objectFit: fit,
+        width: width > 0 ? width : '100%',
+      }}
+    />
+  )
+}
+
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack,
@@ -259,6 +363,12 @@ const renderers: Record<string, NodeRenderer> = {
   Checkbox: CheckboxNode,
   Select: SelectNode,
   Button: ButtonNode,
+  Grid,
+  Box,
+  Card,
+  Text,
+  Divider,
+  Image,
 }
 
 export const htmlRendererKit: RendererKit = { id: 'html', renderers }

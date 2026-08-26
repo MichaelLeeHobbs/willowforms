@@ -43,6 +43,50 @@ function documentOf(root: ComponentNode): FormDocument {
   }
 }
 
+/*
+ * The two kits in this repository deliberately share component types, so a
+ * document authored against one renders against the other and the playground
+ * can switch between them live. Nothing in the contract requires that of a
+ * third-party kit; it is a courtesy these two keep, and 03-components.md says
+ * "Built means both kits implement it".
+ *
+ * A courtesy nothing checks is a courtesy that lapses. These two had already
+ * drifted once: kit-mui carried icon names kit-html did not, and no palette
+ * drew either, so nobody noticed until the vocabulary was closed.
+ */
+describe('the two kits in this repository agree', () => {
+  const html = new Map(htmlKit.components.map((c) => [c.type, c]))
+  const mui = new Map(muiKit.components.map((c) => [c.type, c]))
+
+  it('offers the same component types', () => {
+    expect([...html.keys()].sort()).toEqual([...mui.keys()].sort())
+  })
+
+  it.each([...new Set([...html.keys(), ...mui.keys()])].sort())(
+    '%s is described identically by both',
+    (type) => {
+      const a = html.get(type)
+      const b = mui.get(type)
+      expect(a, type + ' is missing from @formsmith/kit-html').toBeDefined()
+      expect(b, type + ' is missing from @formsmith/kit-mui').toBeDefined()
+      if (!a || !b) return
+
+      // Everything a form author sees or a document stores. Not defaultProps:
+      // a kit is entitled to a different sensible default.
+      expect(a.label).toBe(b.label)
+      expect(a.icon).toBe(b.icon)
+      expect(a.group).toBe(b.group)
+      expect(a.container ?? false).toBe(b.container ?? false)
+      expect(a.root ?? false).toBe(b.root ?? false)
+      expect(a.dataBound ?? false).toBe(b.dataBound ?? false)
+      expect(a.dataType).toBe(b.dataType)
+      expect(a.props.map((prop) => prop.name)).toEqual(b.props.map((prop) => prop.name))
+      expect(a.props.map((prop) => prop.editor)).toEqual(b.props.map((prop) => prop.editor))
+      expect([...a.events].sort()).toEqual([...b.events].sort())
+    },
+  )
+})
+
 describe.each(KITS)('$name', ({ kit, renderers }) => {
   const container = kit.components.find((c) => c.container)
 

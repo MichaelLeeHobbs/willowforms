@@ -72,9 +72,9 @@ Twenty-six components. **Built** means both kits implement it and the contract t
 | ---------- | ------- | --------- | ------------------------------------------------- |
 | `Screen`   | Built   | yes       | `maxWidth`, `gap`                                 |
 | `Stack`    | Built   | yes       | `direction`, `gap`                                |
-| `Grid`     | Planned | yes       | `columns`, `gap`, `minColumnWidth`                |
-| `Box`      | Planned | yes       | `padding`, `background`, `radius`                 |
-| `Card`     | Planned | yes       | `title`, `subtitle`, `variant`                    |
+| `Grid`     | Built   | yes       | `columns`, `gap`, `minColumnWidth`                |
+| `Box`      | Built   | yes       | `padding`, `background`, `radius`                 |
+| `Card`     | Built   | yes       | `title`, `subtitle`, `variant`                    |
 | `Repeater` | Planned | yes       | `minItems`, `maxItems`, `addLabel`, `removeLabel` |
 
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
@@ -89,12 +89,12 @@ array" rather than a name at the top level. `dataKey` does not do that and was n
 
 ### Display
 
-| Component | Status  | Data-bound | Properties                   |
-| --------- | ------- | ---------- | ---------------------------- |
-| `Heading` | Built   | no         | `text`, `level`              |
-| `Text`    | Planned | no         | `text`, `variant`, `align`   |
-| `Divider` | Planned | no         | `orientation`                |
-| `Image`   | Planned | no         | `src`, `alt`, `fit`, `width` |
+| Component | Status | Data-bound | Properties                   |
+| --------- | ------ | ---------- | ---------------------------- |
+| `Heading` | Built  | no         | `text`, `level`              |
+| `Text`    | Built  | no         | `text`, `variant`, `align`   |
+| `Divider` | Built  | no         | `orientation`                |
+| `Image`   | Built  | no         | `src`, `alt`, `fit`, `width` |
 
 `Image` requires `alt`. A decorative image passes an empty string deliberately, which is a different
 statement from having forgotten.

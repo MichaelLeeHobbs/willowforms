@@ -285,7 +285,19 @@ function PropRow({
       </label>
       {mode}
 
-      {schema.editor === 'boolean' ? (
+      {schema.editor === 'multiline' ? (
+        /*
+         * Declared in `PropEditor` from the first commit and never implemented,
+         * so a kit asking for it got the single-line fallback and no warning.
+         * Found by writing the specification down and checking it.
+         */
+        <textarea
+          id={id}
+          rows={3}
+          value={typeof raw === 'string' ? raw : ''}
+          onChange={(e) => set(e.target.value)}
+        />
+      ) : schema.editor === 'boolean' ? (
         <input
           id={id}
           type="checkbox"
