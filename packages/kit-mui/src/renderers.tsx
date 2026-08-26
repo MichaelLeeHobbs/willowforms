@@ -16,6 +16,10 @@ import Divider from '@mui/material/Divider'
 import FormControl from '@mui/material/FormControl'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import FormHelperText from '@mui/material/FormHelperText'
+import FormLabel from '@mui/material/FormLabel'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import Switch from '@mui/material/Switch'
 import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
@@ -290,6 +294,131 @@ function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
+function TextAreaNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+  const id = useId()
+  return (
+    <TextField
+      {...nodeProps}
+      id={id}
+      fullWidth
+      multiline
+      rows={num(props['rows'], 4)}
+      label={str(props['label'])}
+      placeholder={str(props['placeholder'])}
+      disabled={bool(props['disabled'])}
+      value={str(value)}
+      error={Boolean(error)}
+      helperText={message(error, str(props['helperText']))}
+      slotProps={{ formHelperText: alertWhenError(error) }}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
+function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  const vertical = props['orientation'] === 'vertical'
+  return (
+    <Stack
+      {...nodeProps}
+      role="group"
+      direction={vertical ? 'column' : 'row'}
+      gap={1}
+      sx={{ alignItems: vertical ? 'stretch' : 'center' }}
+    >
+      {children}
+    </Stack>
+  )
+}
+
+function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+  const messageId = useId()
+  return (
+    <FormControl {...nodeProps} error={Boolean(error)} disabled={bool(props['disabled'])}>
+      <FormControlLabel
+        label={str(props['label'])}
+        control={
+          <Switch
+            checked={bool(value)}
+            inputProps={{ 'aria-describedby': messageId }}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+        }
+      />
+      <FormHelperText id={messageId} {...alertWhenError(error)}>
+        {message(error, str(props['helperText']))}
+      </FormHelperText>
+    </FormControl>
+  )
+}
+
+function RadioGroupNode({
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+  children,
+}: NodeRendererProps): ReactNode {
+  const messageId = useId()
+  const raw = props['options']
+  const options = Array.isArray(raw) ? raw : []
+  const row = props['direction'] === 'row'
+
+  return (
+    <FormControl
+      {...nodeProps}
+      component="fieldset"
+      error={Boolean(error)}
+      disabled={bool(props['disabled'])}
+    >
+      {/* A legend, not a label: one question, many answers. */}
+      <FormLabel component="legend">{str(props['label'])}</FormLabel>
+      <RadioGroup
+        row={row}
+        value={jsonToString(value)}
+        aria-describedby={messageId}
+        onChange={(e) => onChange(optionValue(options, e.target.value))}
+      >
+        {options.map((option, i) => {
+          const o = option as { label?: unknown; value?: JsonValue }
+          const v = o.value === undefined ? String(i) : jsonToString(o.value)
+          return (
+            <FormControlLabel
+              key={v || String(i)}
+              value={v}
+              control={<Radio />}
+              label={typeof o.label === 'string' ? o.label : v}
+            />
+          )
+        })}
+        {/* Children are RadioItems, for options that need their own layout. */}
+        {children}
+      </RadioGroup>
+      <FormHelperText id={messageId} {...alertWhenError(error)}>
+        {message(error, str(props['helperText']))}
+      </FormHelperText>
+    </FormControl>
+  )
+}
+
+function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  /*
+   * Deliberately not wired to the group's value. A RadioItem is a slot for an
+   * option that needs its own layout, and the group owns selection; making this
+   * self-controlling would give one question two sources of truth.
+   */
+  return (
+    <Box {...nodeProps}>
+      <FormControlLabel
+        value={str(props['value'])}
+        disabled={bool(props['disabled'])}
+        control={<Radio />}
+        label={str(props['label'])}
+      />
+    </Box>
+  )
+}
+
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack: StackNode,
@@ -305,6 +434,11 @@ const renderers: Record<string, NodeRenderer> = {
   Text: TextNode,
   Divider: DividerNode,
   Image: ImageNode,
+  TextArea: TextAreaNode,
+  ButtonGroup: ButtonGroupNode,
+  Switch: SwitchNode,
+  RadioGroup: RadioGroupNode,
+  RadioItem: RadioItemNode,
 }
 
 export const muiRendererKit: RendererKit = { id: 'mui', renderers }

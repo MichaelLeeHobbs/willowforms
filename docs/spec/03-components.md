@@ -104,12 +104,12 @@ statement from having forgotten.
 | Component     | Status  | Data type | Properties                                                         |
 | ------------- | ------- | --------- | ------------------------------------------------------------------ |
 | `TextField`   | Built   | `string`  | `label`, `placeholder`, `helperText`, `multiline`, `disabled`      |
-| `TextArea`    | Planned | `string`  | `label`, `placeholder`, `helperText`, `rows`, `disabled`           |
+| `TextArea`    | Built   | `string`  | `label`, `placeholder`, `helperText`, `rows`, `disabled`           |
 | `NumberField` | Built   | `number`  | `label`, `helperText`, `disabled`                                  |
 | `DatePicker`  | Planned | `date`    | `label`, `helperText`, `min`, `max`, `disabled`                    |
 | `FileUpload`  | Planned | `file`    | `label`, `helperText`, `accept`, `multiple`, `maxSize`, `disabled` |
 | `Button`      | Built   | no        | `text`, `variant`, `disabled`                                      |
-| `ButtonGroup` | Planned | no        | `orientation`, `variant`                                           |
+| `ButtonGroup` | Built   | no        | `orientation`, `variant`                                           |
 
 `TextArea` exists separately rather than as `TextField` with `multiline`, because the two have different
 properties (`rows` versus nothing) and a palette entry that changes shape based on a checkbox is harder
@@ -120,13 +120,13 @@ posted somewhere would be a backend, which is a non-goal.
 
 ### Selection
 
-| Component    | Status  | Data type | Properties                                                |
-| ------------ | ------- | --------- | --------------------------------------------------------- |
-| `Select`     | Built   | `string`  | `label`, `options`, `helperText`, `disabled`              |
-| `Checkbox`   | Built   | `boolean` | `label`, `disabled`                                       |
-| `RadioGroup` | Planned | `string`  | `label`, `options`, `direction`, `helperText`, `disabled` |
-| `RadioItem`  | Planned | no        | `label`, `value`, `disabled`                              |
-| `Switch`     | Planned | `boolean` | `label`, `disabled`                                       |
+| Component    | Status | Data type | Properties                                                |
+| ------------ | ------ | --------- | --------------------------------------------------------- |
+| `Select`     | Built  | `string`  | `label`, `options`, `helperText`, `disabled`              |
+| `Checkbox`   | Built  | `boolean` | `label`, `disabled`                                       |
+| `RadioGroup` | Built  | `string`  | `label`, `options`, `direction`, `helperText`, `disabled` |
+| `RadioItem`  | Built  | no        | `label`, `value`, `disabled`                              |
+| `Switch`     | Built  | `boolean` | `label`, `disabled`                                       |
 
 `options` is a `json` editor taking `{ label, value }[]`. Option values keep their type: a numeric value
 stays a number, and choosing that option submits the number. An earlier version replaced any non-string

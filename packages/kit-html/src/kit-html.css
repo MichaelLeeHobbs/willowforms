@@ -261,3 +261,104 @@
   max-width: 100%;
   border-radius: var(--fsh-radius);
 }
+
+/* Selection and grouping components. */
+.fsh-button-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fsh-button-group--vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.fsh-radios {
+  display: flex;
+  gap: 8px;
+}
+
+.fsh-radios--column {
+  flex-direction: column;
+}
+
+.fsh-radios--row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.fsh-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fsh-text);
+}
+
+/*
+ * The switch is a checkbox wearing a track. The input keeps its own size and
+ * position so it stays the hit target and the focus target; only its paint is
+ * replaced, which is what keeps the keyboard behaviour the platform's.
+ */
+.fsh-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fsh-text);
+}
+
+.fsh-switch__input {
+  position: absolute;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  opacity: 0;
+}
+
+.fsh-switch__track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--fsh-border);
+  transition: background 120ms;
+}
+
+.fsh-switch__track::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--fsh-surface);
+  transition: translate 120ms;
+}
+
+.fsh-switch__input:checked + .fsh-switch__track {
+  background: var(--fsh-accent);
+}
+
+.fsh-switch__input:checked + .fsh-switch__track::after {
+  translate: 16px 0;
+}
+
+.fsh-switch__input:focus-visible + .fsh-switch__track {
+  outline: 2px solid var(--fsh-accent);
+  outline-offset: 2px;
+}
+
+.fsh-switch__input:disabled + .fsh-switch__track {
+  opacity: 0.6;
+}
+
+/* A fieldset carries browser defaults that fight the field layout. */
+fieldset.fsh-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

@@ -354,6 +354,153 @@ function Image({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
+function TextAreaNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+  const id = useId()
+  return (
+    <div {...nodeProps}>
+      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
+        <textarea
+          id={id}
+          className="fsh-input"
+          rows={num(props['rows'], 4)}
+          placeholder={str(props['placeholder'])}
+          disabled={bool(props['disabled'])}
+          value={str(value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={id + '-message'}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </Field>
+    </div>
+  )
+}
+
+function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  const vertical = props['orientation'] === 'vertical'
+  /*
+   * `role="group"` rather than `toolbar`: toolbar implies arrow-key navigation
+   * between its controls, which this does not provide, and claiming a keyboard
+   * pattern that is not there is worse than claiming nothing.
+   */
+  return (
+    <div
+      {...nodeProps}
+      role="group"
+      className={'fsh-button-group' + (vertical ? ' fsh-button-group--vertical' : '')}
+    >
+      {children}
+    </div>
+  )
+}
+
+function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+  const id = useId()
+  const messageId = id + '-message'
+  /*
+   * A checkbox with `role="switch"`, which is the platform pattern: the input
+   * carries the state and the keyboard behaviour, and the role changes only
+   * what a screen reader calls it.
+   */
+  return (
+    <div {...nodeProps} className="fsh-field">
+      <label className="fsh-switch" htmlFor={id}>
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          className="fsh-switch__input"
+          checked={bool(value)}
+          disabled={bool(props['disabled'])}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={messageId}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="fsh-switch__track" aria-hidden="true" />
+        <span>{str(props['label'])}</span>
+      </label>
+      <p
+        id={messageId}
+        className={'fsh-field__message' + (error ? ' is-error' : '')}
+        {...(error ? { role: 'alert' } : {})}
+      >
+        {error ?? str(props['helperText'])}
+      </p>
+    </div>
+  )
+}
+
+function RadioGroupNode({
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+  children,
+}: NodeRendererProps): ReactNode {
+  const id = useId()
+  const messageId = id + '-message'
+  const raw = props['options']
+  const options = Array.isArray(raw) ? raw : []
+
+  /*
+   * A fieldset with a legend, not a div with a label: a group of radios has one
+   * question and many answers, and `aria-labelledby` on a div is the workaround
+   * for markup that cannot say that. `role="radiogroup"` is implicit here.
+   */
+  return (
+    <fieldset
+      {...nodeProps}
+      className="fsh-field"
+      disabled={bool(props['disabled'])}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={messageId}
+    >
+      <legend className="fsh-field__label">{str(props['label'])}</legend>
+      <div className={'fsh-radios fsh-radios--' + str(props['direction'], 'column')}>
+        {options.map((option, i) => {
+          const o = option as { label?: unknown; value?: JsonValue }
+          const v = o.value === undefined ? String(i) : jsonToString(o.value)
+          return (
+            <label key={v || String(i)} className="fsh-radio">
+              <input
+                type="radio"
+                name={id}
+                value={v}
+                checked={jsonToString(value) === v}
+                onChange={() => onChange(optionValue(options, v))}
+              />
+              <span>{typeof o.label === 'string' ? o.label : v}</span>
+            </label>
+          )
+        })}
+        {/* Children are RadioItems, for options that need their own layout. */}
+        {children}
+      </div>
+      <p
+        id={messageId}
+        className={'fsh-field__message' + (error ? ' is-error' : '')}
+        {...(error ? { role: 'alert' } : {})}
+      >
+        {error ?? str(props['helperText'])}
+      </p>
+    </fieldset>
+  )
+}
+
+function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+  /*
+   * Deliberately not wired to the group's value. A RadioItem is a slot for an
+   * option that needs its own layout, and the group owns selection; making this
+   * self-controlling would give one question two sources of truth.
+   */
+  return (
+    <label {...nodeProps} className="fsh-radio">
+      <input type="radio" value={str(props['value'])} disabled={bool(props['disabled'])} readOnly />
+      <span>{str(props['label'])}</span>
+    </label>
+  )
+}
+
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack,
@@ -369,6 +516,11 @@ const renderers: Record<string, NodeRenderer> = {
   Text,
   Divider,
   Image,
+  TextArea: TextAreaNode,
+  ButtonGroup: ButtonGroupNode,
+  Switch: SwitchNode,
+  RadioGroup: RadioGroupNode,
+  RadioItem: RadioItemNode,
 }
 
 export const htmlRendererKit: RendererKit = { id: 'html', renderers }
