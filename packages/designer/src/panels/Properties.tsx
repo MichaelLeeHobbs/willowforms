@@ -238,8 +238,10 @@ function PropRow({
     return (
       <div className="fs-prop-row is-set is-binding">
         <label htmlFor={id}>{schema.label}</label>
-        {mode}
-        <ComputedEditor id={id} value={value} onChange={onChange} />
+        <div className="fs-prop-row__control">
+          {mode}
+          <ComputedEditor id={id} value={value} onChange={onChange} />
+        </div>
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
       </div>
     )
@@ -249,16 +251,18 @@ function PropRow({
     return (
       <div className="fs-prop-row is-set is-binding">
         <label htmlFor={id}>{schema.label}</label>
-        {mode}
-        <TranslationEditor
-          id={id}
-          value={value}
-          languages={languages}
-          defaultLanguage={defaultLanguage}
-          translations={translations}
-          onChange={onChange}
-          onTranslate={onTranslate}
-        />
+        <div className="fs-prop-row__control">
+          {mode}
+          <TranslationEditor
+            id={id}
+            value={value}
+            languages={languages}
+            defaultLanguage={defaultLanguage}
+            translations={translations}
+            onChange={onChange}
+            onTranslate={onTranslate}
+          />
+        </div>
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
       </div>
     )
@@ -283,59 +287,71 @@ function PropRow({
           </>
         )}
       </label>
-      {mode}
 
-      {schema.editor === 'multiline' ? (
-        /*
-         * Declared in `PropEditor` from the first commit and never implemented,
-         * so a kit asking for it got the single-line fallback and no warning.
-         * Found by writing the specification down and checking it.
-         */
-        <textarea
-          id={id}
-          rows={3}
-          value={typeof raw === 'string' ? raw : ''}
-          onChange={(e) => set(e.target.value)}
-        />
-      ) : schema.editor === 'boolean' ? (
-        <input
-          id={id}
-          type="checkbox"
-          checked={raw === true}
-          onChange={(e) => set(e.target.checked)}
-        />
-      ) : schema.editor === 'number' ? (
-        <input
-          id={id}
-          type="number"
-          value={typeof raw === 'number' ? raw : ''}
-          onChange={(e) =>
-            e.target.value === '' ? onChange(undefined) : set(Number(e.target.value))
-          }
-        />
-      ) : schema.editor === 'select' ? (
-        <select
-          id={id}
-          value={typeof raw === 'string' ? raw : ''}
-          onChange={(e) => set(e.target.value)}
-        >
-          <option value="">(default)</option>
-          {schema.options?.map((o) => (
-            <option key={jsonToString(o.value)} value={jsonToString(o.value)}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ) : schema.editor === 'json' ? (
-        <JsonEditor id={id} value={raw} onChange={set} onClear={() => onChange(undefined)} />
-      ) : (
-        <input
-          id={id}
-          type="text"
-          value={typeof raw === 'string' ? raw : ''}
-          onChange={(e) => set(e.target.value)}
-        />
-      )}
+      {/*
+        A checkbox is small enough to sit beside the mode picker. Everything
+        else needs the width, so it goes underneath.
+      */}
+      <div
+        className={
+          'fs-prop-row__control' +
+          (schema.editor === 'boolean' ? ' fs-prop-row__control--inline' : '')
+        }
+      >
+        {mode}
+
+        {schema.editor === 'multiline' ? (
+          /*
+           * Declared in `PropEditor` from the first commit and never implemented,
+           * so a kit asking for it got the single-line fallback and no warning.
+           * Found by writing the specification down and checking it.
+           */
+          <textarea
+            id={id}
+            rows={3}
+            value={typeof raw === 'string' ? raw : ''}
+            onChange={(e) => set(e.target.value)}
+          />
+        ) : schema.editor === 'boolean' ? (
+          <input
+            id={id}
+            type="checkbox"
+            checked={raw === true}
+            onChange={(e) => set(e.target.checked)}
+          />
+        ) : schema.editor === 'number' ? (
+          <input
+            id={id}
+            type="number"
+            value={typeof raw === 'number' ? raw : ''}
+            onChange={(e) =>
+              e.target.value === '' ? onChange(undefined) : set(Number(e.target.value))
+            }
+          />
+        ) : schema.editor === 'select' ? (
+          <select
+            id={id}
+            value={typeof raw === 'string' ? raw : ''}
+            onChange={(e) => set(e.target.value)}
+          >
+            <option value="">(default)</option>
+            {schema.options?.map((o) => (
+              <option key={jsonToString(o.value)} value={jsonToString(o.value)}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : schema.editor === 'json' ? (
+          <JsonEditor id={id} value={raw} onChange={set} onClear={() => onChange(undefined)} />
+        ) : (
+          <input
+            id={id}
+            type="text"
+            value={typeof raw === 'string' ? raw : ''}
+            onChange={(e) => set(e.target.value)}
+          />
+        )}
+      </div>
 
       {isSet && <ClearButton label={schema.label} onClear={() => onChange(undefined)} />}
       {schema.hint && <p className="fs-prop-row__hint">{schema.hint}</p>}

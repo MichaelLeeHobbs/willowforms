@@ -82,15 +82,16 @@ long time, declared from the first commit and never built; `Text` is the first c
 Every row also carries its binding mode picker when the property offers more than one. See
 [07-bindings.md](07-bindings.md).
 
-**Known defect: the mode picker is squeezed.** A property row is a three-column grid,
-`108px 1fr auto`, with the picker in the flexible column and the control in the automatic one. That is
-backwards. At the pane's 288px the picker gets about 38px, which clips "Value" and "Expression" to
-nothing, so a working control reads as an empty box. The control should take the space and the picker
-its natural width.
+**The picker sits above the control, not beside it.** A property row is `108px minmax(0, 1fr) auto`:
+label, control, and whatever follows. The picker shares the control's cell.
 
-It is labelled correctly, by a visually-hidden `<label for>`, so this is layout and not accessibility,
-which is why axe has never had anything to say about it. The fix is a change to the shared row layout
-and wants a look at every property type at once rather than a quick swap of two track sizes.
+Inline was tried and does not fit. At the pane's 288px, a label, a readable picker and a usable text box
+cannot share one line, and the first attempt gave the picker the flexible column and the control its
+natural width, which collapsed the picker to about 38px and clipped "Value" to nothing. A working
+control that reads as an empty box is worse than one that is obviously absent.
+
+A boolean is the exception: a checkbox needs almost no width, so it sits beside the picker, and the
+picker is told not to shrink there. Shrinking is exactly what clipped it the first time.
 
 ### The JSON editor is controlled
 
