@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { Device, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
-import { autoValidateKeys, indexKit, validateForm } from '@formsmith/core'
+import { autoValidateKeys, findParent, indexKit, validateForm } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -94,6 +94,39 @@ export function Canvas({
 
   const frameWidth = FRAME_WIDTH[viewport]
 
+  /*
+   * Omitted for the root, which has no siblings to sit among and cannot be
+   * removed. Passing handlers that refuse would put three dead buttons on the
+   * frame, which is worse than no toolbar.
+   */
+  const selected = api.selectedNode
+  const selectedKey = api.selectedKey
+  const parent =
+    selectedKey && selectedKey !== api.document.root.key
+      ? findParent(api.document.root, selectedKey)
+      : undefined
+
+  const { addComponent, duplicateComponent, removeComponent } = api
+  const selectionActions = useMemo(() => {
+    if (!selected || !selectedKey || !parent) return undefined
+    const index = parent.children?.findIndex((child) => child.key === selectedKey) ?? -1
+    if (index === -1) return undefined
+
+    return {
+      onDuplicate: () => duplicateComponent(selectedKey),
+      /*
+       * A fresh component of the same type, not a copy. Duplicate is for "another
+       * one configured like this"; this is for "another one of these", which is
+       * the commoner intent and the one the palette makes you aim for.
+       */
+      onAddSibling: () => {
+        const def = indexKit(kit).get(selected.type)
+        if (def) addComponent(def, parent.key, index + 1)
+      },
+      onRemove: () => removeComponent(selectedKey),
+    }
+  }, [selected, selectedKey, parent, kit, addComponent, duplicateComponent, removeComponent])
+
   const surfaceRef = useRef<HTMLDivElement>(null)
   /*
    * Measured once when a drag begins, and held in state rather than a ref.
@@ -175,13 +208,27 @@ export function Canvas({
    * one carrying data-fs-key, and cancelling the default does nothing to a
    * React handler that has already been given the event.
    */
+  /*
+   * The canvas cancels pointer events in the capture phase so a click selects a
+   * component instead of operating it. That rule is about the kit's components,
+   * and the designer has chrome of its own inside the surface: the selection
+   * toolbar sits there so it can be positioned against the frame.
+   *
+   * Without this exemption the canvas swallowed its own toolbar's clicks, and
+   * the buttons read as dead rather than broken.
+   */
+  const isOwnChrome = (target: EventTarget | null): boolean =>
+    target instanceof Element && target.closest('.fs-selection') !== null
+
   const onMouseDownCapture = useCallback((event: MouseEvent) => {
+    if (isOwnChrome(event.target)) return
     event.preventDefault()
     event.stopPropagation()
   }, [])
 
   const onPointerDownCapture = useCallback(
     (event: ReactPointerEvent) => {
+      if (isOwnChrome(event.target)) return
       const key = keyFromEventTarget(event.target)
       // The root is the canvas itself; dragging it has nowhere to go.
       if (!key || key === api.document.root.key) return
@@ -192,6 +239,7 @@ export function Canvas({
 
   const onClickCapture = useCallback(
     (event: MouseEvent) => {
+      if (isOwnChrome(event.target)) return
       event.stopPropagation()
       if (consumeClick()) return
       select(keyFromEventTarget(event.target))
@@ -322,6 +370,7 @@ export function Canvas({
             selectedKey={api.selectedKey}
             selectedType={api.selectedNode?.type}
             hoverKey={dragState ? undefined : hoverKey}
+            {...(selectionActions ? { actions: selectionActions } : {})}
           />
         )}
 

@@ -908,6 +908,51 @@
   outline-offset: 2px;
 }
 
+/*
+ * The selection toolbar.
+ *
+ * The frame it sits on is pointer-events: none, so a click meant for the
+ * component underneath passes through it. The toolbar has to opt back in or its
+ * own buttons are unclickable, which is the sort of thing that looks like a
+ * dead control rather than a CSS mistake.
+ */
+.fs-selection__toolbar {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-end: -2px;
+  display: flex;
+  gap: 2px;
+  margin-block-end: 4px;
+  padding: 2px;
+  border-radius: var(--fs-radius);
+  background: var(--fs-bg-panel);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 22%);
+  pointer-events: auto;
+}
+
+.fs-selection__toolbar button {
+  display: flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--fs-text-muted);
+  background: transparent;
+}
+
+.fs-selection__toolbar button:hover {
+  color: var(--fs-text);
+  background: var(--fs-bg-well);
+}
+
+.fs-selection__toolbar button.is-danger:hover {
+  color: var(--fs-primary-text);
+  background: var(--fs-danger);
+}
+
+.fs-selection__toolbar .fs-icon {
+  color: inherit;
+}
+
 .fs-selection__label {
   position: absolute;
   inset-block-end: 100%;

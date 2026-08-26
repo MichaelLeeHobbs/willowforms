@@ -162,3 +162,56 @@ test('every palette entry carries an icon beside its label', async ({ designer }
     expect(await glyph.locator('*').count()).toBeGreaterThan(0)
   }
 })
+
+test('the selection frame carries a toolbar, and the root does not', async ({ designer }) => {
+  await designer.node('email').click()
+  await expect(designer.page.locator('.fs-selection__toolbar')).toBeVisible()
+
+  // The root has no siblings to sit among and cannot be removed, so three
+  // buttons that refused would be worse than no toolbar.
+  await designer.row('root').click()
+  await expect(designer.page.locator('.fs-selection__toolbar')).toHaveCount(0)
+})
+
+test('the toolbar is clickable, despite sitting on a frame that is not', async ({ designer }) => {
+  /*
+   * The selection frame is pointer-events: none so a click meant for the
+   * component passes through it. The toolbar opts back in. Without that these
+   * buttons look dead rather than broken, which is why this is worth a test in
+   * a real browser.
+   */
+  await designer.node('email').click()
+  const before = await designer.rootChildren()
+
+  await designer.page.getByRole('button', { name: 'Duplicate email' }).click()
+
+  const after = await designer.rootChildren()
+  expect(after.length).toBe(before.length + 1)
+  expect(after[after.indexOf('email') + 1]).toBe('email2')
+})
+
+test('add a sibling makes a fresh component, not a copy', async ({ designer }) => {
+  await designer.node('email').click()
+  await designer.page.getByRole('button', { name: 'Add a sibling after email' }).click()
+
+  const doc = await designer.document()
+  const children = doc.root.children ?? []
+  const added = children[children.findIndex((child) => child.key === 'email') + 1]
+
+  // Same type, default props: "another one of these", not "another one
+  // configured like this".
+  expect(added?.type).toBe('TextField')
+  expect(added?.key).not.toBe('email2')
+  expect(added?.props['label']).toEqual({ kind: 'static', value: 'Label' })
+})
+
+test('the toolbar removes the selected component', async ({ designer }) => {
+  await designer.node('website').click()
+
+  // Scoped: the tree row offers a Remove with the same name, which is correct
+  // for a screen reader and ambiguous for a locator.
+  const toolbar = designer.page.locator('.fs-selection__toolbar')
+  await toolbar.getByRole('button', { name: 'Remove website' }).click()
+
+  expect(await designer.rootChildren()).not.toContain('website')
+})
