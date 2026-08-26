@@ -60,9 +60,16 @@ the designer marked. It sets no visual property, which is the bar any future exc
 
 **Status: planned.** A small toolbar on the selection frame: duplicate, delete, and add a sibling.
 
-Duplicating needs `duplicateNode` in core, which does not exist. It must re-key the copied subtree —
-every key is unique within a document — and the natural rule is the same one `instantiate` uses for a new
-component.
+Duplicating is the one of the three that already works. `duplicateNode` is in core and `Ctrl`/`Cmd` + `D`
+reaches it from the tree; what is missing is the toolbar, which is the pointer route to the same thing.
+
+It re-keys the copied subtree, because every key is unique within a document. An earlier draft of this
+section guessed it would key a copy the way `instantiate` keys a new component, from the type. That is
+wrong for a copy: it renames `emailAddress` to `textField7` and throws away the only part of the name a
+form author chose. A copy is keyed from the original's name instead, with a trailing number stripped
+first so a copy of `website2` is `website3` rather than `website22`. Each key is reserved as it is
+generated, or a container holding two `textField` children produces a copy whose children collide with
+each other.
 
 ## Drag and drop
 

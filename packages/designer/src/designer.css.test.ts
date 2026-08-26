@@ -48,11 +48,20 @@ function declarationsFor(selector: string): string[] {
 }
 
 /**
- * The single sanctioned exception, documented in ARCHITECTURE.md. It restores
- * hit-testing on a kit component that set `pointer-events: none`, and sets no
- * visual property. Anything added here needs the same justification.
+ * The sanctioned exceptions, documented in ARCHITECTURE.md, each pinned to the
+ * exact properties it may set.
+ *
+ * Both give a kit component back something the designer took from it, and
+ * neither makes an appearance decision on the kit's behalf. That is the bar
+ * anything added here has to clear, and listing the properties is what stops an
+ * exception quietly growing a `background` once it exists.
  */
-const ALLOWED_CANVAS_REACH = ['.fs-canvas__surface:not(.is-preview) [data-fs-key]']
+const ALLOWED_CANVAS_REACH: Record<string, string[]> = {
+  // Restores hit-testing on a kit component that set `pointer-events: none`.
+  '.fs-canvas__surface:not(.is-preview) [data-fs-key]': ['pointer-events'],
+  // Undoes the scrollbar inheritance the surface would otherwise push inward.
+  '.fs-canvas__surface [data-fs-key]': ['scrollbar-color', 'scrollbar-width'],
+}
 
 /** Does the selector reach past `base` into a descendant? */
 function reachesPast(selector: string, base: string): boolean {
@@ -82,17 +91,15 @@ describe('designer.css isolation', () => {
 
   it('only reaches into the canvas through the sanctioned exception', () => {
     const reaching = all.filter(
-      (s) => reachesPast(s, '.fs-canvas__surface') && !ALLOWED_CANVAS_REACH.includes(s),
+      (s) => reachesPast(s, '.fs-canvas__surface') && !(s in ALLOWED_CANVAS_REACH),
     )
     expect(reaching).toEqual([])
   })
 
-  it('keeps the sanctioned exception to interaction, never appearance', () => {
-    for (const selector of ALLOWED_CANVAS_REACH) {
+  it('keeps every sanctioned exception to exactly what it was allowed', () => {
+    for (const [selector, allowed] of Object.entries(ALLOWED_CANVAS_REACH)) {
       const declared = declarationsFor(selector)
-      expect(declared, `${selector} is allowlisted but missing from the file`).toEqual([
-        'pointer-events',
-      ])
+      expect(declared, `${selector} is allowlisted but missing from the file`).toEqual(allowed)
     }
   })
 })

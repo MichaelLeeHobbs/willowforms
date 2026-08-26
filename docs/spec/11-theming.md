@@ -1,7 +1,8 @@
 # Theming
 
 **Status: partial.** Both stylesheets are token-driven and both themes clear WCAG AA in CI. The designer
-has no theme toggle, tokens are not documented for consumers, and there is no icon vocabulary.
+has no theme toggle, its tokens are not documented for consumers outside this file, and the kit
+stylesheet does not style a scrollbar.
 
 Two independent theme systems, deliberately. The designer's chrome and the form on the canvas are
 different things owned by different people, and a host that restyles its builder has not thereby restyled
@@ -44,6 +45,7 @@ fighting specificity.
 | `--fs-danger`                 | Errors and destructive actions                      |
 | `--fs-radius`                 | Corner radius                                       |
 | `--fs-panel-width`            | Side pane width                                     |
+| `--fs-scrollbar-thumb`        | Scrollbar thumb; the track is transparent           |
 | `--fs-font`, `--fs-font-size` | Type                                                |
 
 ## HTML kit tokens
@@ -87,9 +89,20 @@ dark palette and never once against the light one.
 
 ## Scrollbars
 
-**Status: planned.** Neither stylesheet styles a scrollbar, so a dark theme shows the platform's light
-ones. `scrollbar-width` and `scrollbar-color` from the existing tokens, plus the `::-webkit-scrollbar`
-equivalents, on both panes and the canvas.
+**Status: built** for the designer. The kit's stylesheet still does not style one.
+
+Thin scrollbars on both panes, the inspector's tab panel, the canvas, and the preview data block, with a
+transparent track so the thumb sits directly on the surface below it. `scrollbar-width` and
+`scrollbar-color` carry it, and the `::-webkit-scrollbar` rules say the same thing to browsers that never
+shipped those. `test/contrast.test.ts` holds the thumb at 3:1 against all three surfaces it can land on.
+
+The interesting part is what it took to stay inside invariant 3. Both standard properties **inherit**, so
+setting them on the canvas surface pushes the designer's scrollbars into any scrollable region the kit
+renders inside the form: a dark builder wrapped around a light form would have given that form dark
+scrollbars. `.fs-canvas__surface [data-fs-key]` resets both to `auto`, which is the second rule in the
+stylesheet that reaches into a kit component and, like the first, exists to give the component something
+back rather than to style it. `designer.css.test.ts` pins each exception to the exact properties it may
+declare, so neither can quietly grow a `background`.
 
 ## Icons
 

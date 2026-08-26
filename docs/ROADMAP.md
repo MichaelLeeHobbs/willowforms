@@ -22,7 +22,7 @@ the panes do not collapse. See [docs/spec/03-components.md](spec/03-components.m
 
 ## Verification
 
-`pnpm test` runs 418 tests; `pnpm e2e` runs 41 in a real browser. Both gate CI, along with lint,
+`pnpm test` runs 430 tests; `pnpm e2e` runs 43 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
 computed from the stylesheets and axe runs over the designer in six states. See
 [accessibility.md](accessibility.md).

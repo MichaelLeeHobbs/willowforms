@@ -113,6 +113,7 @@ export function Designer({
             selectedKey={api.selectedKey}
             onSelect={api.select}
             onRemove={api.removeComponent}
+            onDuplicate={api.duplicateComponent}
             onMove={api.moveComponent}
             announce={announce}
             drag={drag}

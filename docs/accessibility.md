@@ -52,6 +52,7 @@ The whole builder is reachable without a pointer.
 | Alt + arrow left                                    | Move out one level, landing after the parent              |
 | Enter / Space                                       | Select the focused row                                    |
 | Delete / Backspace                                  | Remove the focused component                              |
+| Ctrl or Cmd + D                                     | Duplicate the focused component in beside itself          |
 | Ctrl or Cmd + Z, Shift + Z, Y                       | Undo and redo                                             |
 | Escape                                              | Clear the selection, or abandon a drag                    |
 | Arrow left / right, Home, End on the inspector tabs | Move between tabs                                         |
