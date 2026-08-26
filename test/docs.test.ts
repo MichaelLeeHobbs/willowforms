@@ -117,12 +117,23 @@ describe('the specification index', () => {
   })
 
   it.each(files)('%s opens with a status', (name) => {
-    // The status is what makes this document also the roadmap. A section with
-    // none is a claim with no accountability. 00-product is a statement of
-    // intent with no code to match, so it deliberately carries none.
+    /*
+     * The status is what makes this document also the roadmap. A section with
+     * none is a claim with no accountability. 00-product is a statement of
+     * intent with no code to match, so it deliberately carries none.
+     *
+     * Only the preamble counts, meaning everything before the first H2. The
+     * regex used to run against the whole file, so a status buried in the last
+     * section satisfied a test named "opens with a status".
+     */
     if (name === '00-product.md') return
     const text = read('docs/spec/' + name)
-    expect(text).toMatch(/\*\*Status: (built|partial|planned|undecided)/i)
+    const end = text.indexOf('\n## ')
+    const preamble = end === -1 ? text : text.slice(0, end)
+
+    expect(preamble, name + ' has no status before its first section').toMatch(
+      /\*\*Status: (built|partial|planned|undecided)/i,
+    )
   })
 
   it('links to no specification file that does not exist', () => {
