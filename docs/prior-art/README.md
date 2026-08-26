@@ -50,8 +50,12 @@ mature commercial tool to be.
 Reimplementing a feature set from a black-box study is ordinary competitive engineering. Copying a
 product's distinctive appearance or its interface copy is a different thing and a worse argument to have.
 
-- Formsmith has its own design tokens, in `designer.css` and `kit-html.css`, and its own copy.
-- Feature ideas, information architecture, and the shape of the data model are fair game.
+- Formsmith has its own design tokens, in `designer.css` and `kit-html.css`, and writes its own strings.
+- Feature ideas, information architecture, the shape of the data model, and the vocabulary of component
+  properties are all fair game. A label, a placeholder, a disabled state and a gap are universal ideas;
+  arriving at the same ones is getting the domain right, not copying.
+- The narrow rule is about expression: no verbatim interface copy, no measured pixel metrics, no palette
+  lifted wholesale.
 - No code from any competitor is in this repository, and none was ever read.
 
 ## Refreshing this

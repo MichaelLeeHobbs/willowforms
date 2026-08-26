@@ -3,6 +3,11 @@
 Honest status. The point of this file is that nobody, including future us, mistakes the scaffold for a
 product.
 
+> **The specification is the roadmap now.** [docs/spec](spec/README.md) carries a status on every
+> section — built, partial, planned, or undecided — so what is committed to and what exists live in one
+> place rather than two that drift. This file is the summary; the spec is the detail, and where they
+> disagree the spec is right.
+
 ## Works today, verified
 
 - `@formsmith/core`: document model, immutable tree operations, structural document validation, the
@@ -46,7 +51,7 @@ product.
   the designer in six states, so both fail CI rather than a review. **59 tests.**
 - `apps/demo-server`: 5 routes over a JSON file, sharing `validateForm` with the browser.
 - Repo gates: eslint with the architectural invariants as lint errors, prettier, a typecheck pass that
-  covers the test files, and CI running all of it on every PR. **345 tests.**
+  covers the test files, and CI running all of it on every PR. **379 tests.**
 - End-to-end coverage in a real browser: drop geometry, selection frames, keyboard operation, the rules
   and localization round trips, the JSON gate against malformed input, and one document rendered through
   both kits. **40 tests.**
@@ -100,6 +105,8 @@ the tree's grouping semantics are still the thinnest areas. jsdom has no layout 
 geometry stays a browser check no matter how far the component tests grow.
 
 ## Sequence
+
+Tracked in detail per contract in [docs/spec](spec/README.md). The summary:
 
 1. ~~Canvas selection plus a selection overlay.~~ Done.
 2. ~~Drag and drop from palette to canvas, and reordering in the tree.~~ Done.

@@ -65,6 +65,21 @@ function isEmpty(value: JsonValue | undefined): boolean {
   return false
 }
 
+/**
+ * Requiredness is stricter than emptiness, and only for booleans.
+ *
+ * An unchecked box is a non-answer, not a value of false. "I accept the terms"
+ * is the canonical required checkbox and it has to be checked, which is exactly
+ * what the platform's own `<input type="checkbox" required>` means. Treating
+ * `false` as a supplied value let a required consent box pass while unticked.
+ *
+ * Every other rule keeps using `isEmpty`, where `false` is a value: requiredness
+ * is one rule's job.
+ */
+function isMissing(value: JsonValue | undefined): boolean {
+  return value === false || isEmpty(value)
+}
+
 function asString(value: JsonValue | undefined): string {
   return jsonToString(value)
 }
@@ -104,7 +119,7 @@ export function applyRule(
 
   const fail = (): string => rule.message ?? DEFAULT_MESSAGES[rule.key]
 
-  if (rule.key === 'required') return isEmpty(value) ? fail() : undefined
+  if (rule.key === 'required') return isMissing(value) ? fail() : undefined
   if (isEmpty(value)) return undefined
 
   switch (rule.key) {

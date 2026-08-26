@@ -75,8 +75,45 @@ describe('the README package table', () => {
   })
 })
 
+describe('the specification index', () => {
+  const index = read('docs/spec/README.md')
+
+  const files = readdirSync(fileURLToPath(new URL('docs/spec', root)))
+    .filter((name) => name.endsWith('.md') && name !== 'README.md')
+    .sort()
+
+  it('finds the specification', () => {
+    expect(files.length).toBeGreaterThan(5)
+  })
+
+  it.each(files)('lists %s', (name) => {
+    // A contract nobody can find from the index may as well not be written.
+    expect(index).toContain('(' + name + ')')
+  })
+
+  it.each(files)('%s opens with a status', (name) => {
+    // The status is what makes this document also the roadmap. A section with
+    // none is a claim with no accountability.
+    const text = read('docs/spec/' + name)
+    expect(text).toMatch(/\*\*Status: (built|partial|planned|undecided)/i)
+  })
+
+  it('links to no specification file that does not exist', () => {
+    const linked = [...index.matchAll(/\]\((\d\d-[a-z-]+\.md)\)/g)].map((match) => match[1])
+    const missing = [...new Set(linked)].filter((name) => !files.includes(name as string))
+    expect(missing).toEqual([])
+  })
+})
+
 describe('documentation links', () => {
-  const files = ['README.md', 'CLAUDE.md', 'docs/ROADMAP.md', 'docs/ARCHITECTURE.md']
+  const files = [
+    'README.md',
+    'CLAUDE.md',
+    'docs/ROADMAP.md',
+    'docs/ARCHITECTURE.md',
+    'docs/accessibility.md',
+    'docs/prior-art/README.md',
+  ]
 
   it.each(files)('%s links only to files that exist', (file) => {
     const text = read(file)

@@ -16,9 +16,18 @@ describe('required', () => {
     }
   })
 
-  it('accepts false and 0, which are values rather than absences', () => {
-    expect(check({ key: 'required' }, false)).toBeUndefined()
+  it('accepts 0, which is a value rather than an absence', () => {
     expect(check({ key: 'required' }, 0)).toBeUndefined()
+  })
+
+  it('rejects false, because an unchecked box is a non-answer', () => {
+    /*
+     * This assertion used to say the opposite, and the opposite was wrong: it
+     * let a required consent checkbox pass while unticked. `false` stays a
+     * value for every other rule; requiredness alone is stricter, matching
+     * `<input type="checkbox" required>`.
+     */
+    expect(check({ key: 'required' }, false)).toBe(DEFAULT_MESSAGES.required)
   })
 
   it('uses a custom message when supplied', () => {
@@ -166,5 +175,46 @@ describe('validateForm', () => {
       first: DEFAULT_MESSAGES.required,
       age: DEFAULT_MESSAGES.min,
     })
+  })
+})
+
+/**
+ * Requiredness on a boolean.
+ *
+ * Found by writing docs/spec/08-validation.md: the prose said an unchecked
+ * required box was caught, the code said otherwise, and the code was wrong. A
+ * consent checkbox that passes while unticked is the whole reason the rule
+ * exists.
+ */
+describe('required on a boolean', () => {
+  const box = (validations: ValidationRule[]): ComponentNode => ({
+    key: 'terms',
+    type: 'Checkbox',
+    props: {},
+    schema: { type: 'boolean', validations },
+  })
+
+  it('fails when the box has never been touched', () => {
+    expect(validateField(box([{ key: 'required' }]), {})).toBeDefined()
+  })
+
+  it('fails when the box is explicitly unchecked', () => {
+    // Matches <input type="checkbox" required>, which is invalid unless checked.
+    expect(validateField(box([{ key: 'required' }]), { terms: false })).toBeDefined()
+  })
+
+  it('passes when the box is checked', () => {
+    expect(validateField(box([{ key: 'required' }]), { terms: true })).toBeUndefined()
+  })
+
+  it('leaves an unrequired box alone either way', () => {
+    expect(validateField(box([]), { terms: false })).toBeUndefined()
+    expect(validateField(box([]), {})).toBeUndefined()
+  })
+
+  it('does not make false empty for every other rule', () => {
+    // Requiredness is one rule's job; nothing else changes meaning.
+    const node = box([{ key: 'minLength', value: 3 }])
+    expect(validateField(node, { terms: false })).toBeUndefined()
   })
 })

@@ -8,6 +8,8 @@ renderer, because every competitor paywalls exactly that piece.
 
 ## Read first
 
+- `docs/spec/README.md` — the specification, one file per contract, each section carrying a status.
+  It is also the roadmap. Read the relevant contract before changing behaviour it describes.
 - `docs/ARCHITECTURE.md` — the kit seam, the document model, why the tree is the source of truth. Read
   before changing anything in `core`.
 - `docs/ROADMAP.md` — honest status. Most of the designer is not built. Check here before assuming a
@@ -50,7 +52,7 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 345 tests
+pnpm test          # vitest, 379 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
