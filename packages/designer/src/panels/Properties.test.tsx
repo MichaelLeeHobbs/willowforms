@@ -80,13 +80,13 @@ interface Harness {
   select: () => Promise<void>
 }
 
-function setup(node: ComponentNode): Harness {
+function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
   const user = userEvent.setup()
   let current: FormDocument = {
     version: '1',
     id: 'doc',
     name: 'Contact',
-    root: { key: 'root', type: 'Screen', props: {}, children: [node] },
+    root: { key: 'root', type: 'Screen', props: {}, children: [node, ...siblings] },
     actions: {},
     languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en',
@@ -328,5 +328,102 @@ describe('the multiline editor', () => {
     await harness.select()
 
     expect(screen.getByLabelText('Notes').tagName).toBe('TEXTAREA')
+  })
+})
+
+describe('the visibility row', () => {
+  /** A document with two data-bound fields, so one can test the other. */
+  const pair = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  const withSibling = async (): Promise<Harness> => {
+    const harness = setup(pair(), [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+    return harness
+  }
+
+  it('starts at Always, which is what an absent renderWhen means', async () => {
+    const harness = await withSibling()
+
+    expect(screen.getByLabelText('Show when')).toHaveProperty('value', 'always')
+    expect(harness.latest()?.renderWhen).toBeUndefined()
+  })
+
+  it('builds a condition against another field', async () => {
+    const harness = await withSibling()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'firstName' } },
+    })
+  })
+
+  it('edits the operator through the picker', async () => {
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    await harness.user.selectOptions(screen.getByLabelText('Comparison'), 'empty')
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'empty', value: { kind: 'ref', dataKey: 'firstName' } },
+    })
+  })
+
+  it('removes renderWhen when set back to Always', async () => {
+    // Absent is not the same as a condition that is false: absent means shown.
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+    expect(harness.latest()?.renderWhen).toBeDefined()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'always')
+
+    expect(harness.latest()?.renderWhen).toBeUndefined()
+  })
+
+  it('switches to an expression for what a condition cannot say', async () => {
+    const harness = await withSibling()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'computed')
+
+    expect(harness.latest()?.renderWhen).toEqual({ kind: 'computed', expression: '' })
+  })
+
+  it('refuses a condition when there is no other field to test', async () => {
+    /*
+     * A condition naming no field evaluates to false, so offering it here would
+     * hide the component the moment it was chosen and give the author no field
+     * that could bring it back.
+     */
+    const harness = setup(pair())
+    await harness.select()
+
+    const option = screen
+      .getByLabelText('Show when')
+      .querySelector<HTMLOptionElement>('option[value="condition"]')
+
+    expect(option?.disabled).toBe(true)
+    expect(screen.getByText(/nothing to test against/)).toBeTruthy()
+  })
+
+  it('does not offer the component its own field', async () => {
+    // Hiding a component when its own value is empty hides the only control
+    // that could fill it.
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
+      (o) => o.value,
+    )
+    expect(options).toContain('firstName')
+    expect(options).not.toContain('website')
   })
 })

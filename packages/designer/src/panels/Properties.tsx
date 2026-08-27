@@ -30,10 +30,19 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
    * Every data key in the document, so a condition can only name a field that
    * exists. Taken from the tree rather than the kit, because a data key is a
    * property of the document and may have been renamed away from its node key.
+   *
+   * Deduplicated, because data keys are allowed to repeat: two fields behind
+   * opposite guards can write one answer. As a list of things to test they are
+   * one entry, and leaving the duplicate in gave two identical options with the
+   * same React key.
    */
-  const dataKeys = flatten(api.document.root)
-    .filter((row) => row.node.schema)
-    .map((row) => dataKeyOf(row.node))
+  const dataKeys = [
+    ...new Set(
+      flatten(api.document.root)
+        .filter((row) => row.node.schema)
+        .map((row) => dataKeyOf(row.node)),
+    ),
+  ]
 
   return (
     <section className="fs-properties">
@@ -256,11 +265,19 @@ function VisibilityRow({
           onChange={(e) => {
             if (e.target.value === 'always') return onChange(undefined)
             if (e.target.value === 'computed') return onChange({ kind: 'computed', expression: '' })
-            onChange({ kind: 'condition', condition: emptyCondition(dataKeys[0] ?? '') })
+            const first = dataKeys[0]
+            if (first) onChange({ kind: 'condition', condition: emptyCondition(first) })
           }}
         >
           <option value="always">Always</option>
-          <option value="condition">A condition</option>
+          {/*
+            Disabled when there is nothing to test. A condition naming no field
+            evaluates to false, so choosing it would hide the component
+            immediately and offer no field that could bring it back.
+          */}
+          <option value="condition" disabled={dataKeys.length === 0}>
+            A condition
+          </option>
           <option value="computed">An expression</option>
         </select>
 
@@ -278,7 +295,7 @@ function VisibilityRow({
         )}
       </div>
 
-      {dataKeys.length === 0 && value?.kind === 'condition' && (
+      {dataKeys.length === 0 && (
         <p className="fs-prop-row__hint">
           No other component holds data yet, so there is nothing to test against.
         </p>
