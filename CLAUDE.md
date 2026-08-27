@@ -52,7 +52,7 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 612 tests
+pnpm test          # vitest, 613 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
@@ -80,4 +80,7 @@ plain string alias also rewrites `@formsmith/designer/styles.css` and breaks the
   vitest environment, deliberately, so core keeps proving it runs without a DOM; a component test opts
   into jsdom with an `@vitest-environment jsdom` docblock. jsdom has no layout engine, so anything
   measuring geometry has to be checked in a real browser instead.
+  **Read [.claude/skills/write-tests/SKILL.md](.claude/skills/write-tests/SKILL.md) before writing one.**
+  It is the list of ways a test here has passed while proving nothing, each one taken from a real
+  incident in this repository.
 - This is a public MIT repo. No proprietary references, no employer material.
