@@ -18,11 +18,30 @@ translations, preview it, and export it.
 The shell is there: tabbed panes that collapse, viewport simulation, a selection toolbar, and a catalogue
 of twenty-five components in both kits.
 
-What is left is behaviour. The inspector has two of its four tabs, so there is no Style tab and no way to
-author actions, and nothing fires an event. `Repeater` is the one catalogue entry still unbuilt, blocked
-on a document model that can express a repeated scope. See
-[docs/spec/06-inspector.md](spec/06-inspector.md), [docs/spec/09-actions.md](spec/09-actions.md), and
-[docs/spec/03-components.md](spec/03-components.md).
+What is left is behaviour, and the order changed once we looked at what real forms actually do.
+
+**Conditions come first.** `renderWhen` accepts only an expression, and it has no authoring UI, so
+conditional visibility — the most common dynamic behaviour a form has — needs a JavaScript sandbox _and_
+a hand-edited document. A closed structured condition type fixes both and would do more for "most forms
+need no JavaScript" than the entire actions feature.
+See [docs/spec/01-document-model.md](spec/01-document-model.md#conditions).
+
+**Then the three gaps that block real forms**, none of which is an action:
+
+- **Ephemeral state.** "Three addresses found", "checking", "uploading". Nowhere to put it, and half of
+  what an action would want to do has nowhere to write to until there is.
+  See [docs/spec/12-api.md](spec/12-api.md#there-is-nowhere-to-put-ephemeral-state).
+- **Steps.** No Step component, so no per-step validation, no branching, no progress. That is onboarding
+  and surveys. See [docs/spec/03-components.md](spec/03-components.md#what-is-deliberately-absent).
+- **Repeated scope.** Already known, still blocking `Repeater` and every "add another" button.
+
+**Actions come after those**, not before. Two of their open questions are now settled — an action returns
+effects rather than changing data, and one vocabulary serves both built-in and `code` actions — but the
+vocabulary itself waits, because actions sit one layer above what is blocking forms.
+See [docs/spec/09-actions.md](spec/09-actions.md).
+
+The Style tab is still owed from the inspector, and is unblocked.
+See [docs/spec/06-inspector.md](spec/06-inspector.md#style).
 
 ## Verification
 

@@ -189,6 +189,12 @@ lifecycle events are declared only by `Screen`. Settle them when something reads
   Planned as a shared trait instead.
 - **Modal and Dialog layout.** A form builder composes a form; where that form appears is the host's
   layout problem.
+- **A Step or Wizard component**, which is absent rather than rejected. `Screen` is a container, not a
+  sequence, so there is no per-step validation scope, no branch-to-question, and no progress. That is the
+  defining feature of onboarding flows and branching surveys, and it blocks more real forms than any
+  component in the Planned list above. It needs a design: where the current step lives given the renderer
+  holds no state, and what a step means to `validateForm`. See
+  [09-actions.md](09-actions.md#why-this-is-not-next).
 - **Embedded form and Slot.** These are form composition, which is a feature that needs its own design
   rather than arriving by analogy. See [01-document-model.md](01-document-model.md#one-form-per-document).
 - **Typography as a raw wrapper.** `Heading` and `Text` cover what a form needs. A component whose whole

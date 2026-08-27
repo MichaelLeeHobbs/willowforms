@@ -143,6 +143,46 @@ a submit with an error the user could not see or fix. Hiding a container hides e
 With no evaluator injected, a computed condition resolves to hidden, because that is what the renderer
 does and validation follows the renderer.
 
+## Conditions
+
+**Status: planned**, and the highest-value thing on this list.
+
+`renderWhen` is a `PropValue`, so the only conditional form it has is `computed`, which needs the
+injected evaluator. It also has no authoring UI. Put those together and **conditional visibility, the most
+common dynamic behaviour a form has, today requires a JavaScript sandbox and a hand-edited JSON
+document.**
+
+That makes the claim in [09-actions.md](09-actions.md) — that most forms should need no JavaScript —
+already false, and no set of actions can rescue it. A form that cannot show its second field without a
+sandbox has needed one long before anyone pressed a button.
+
+The fix is a fourth kind, closed and structured:
+
+```ts
+type Condition =
+  | { op: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte'; left: Operand; right: Operand }
+  | { op: 'empty' | 'notEmpty' | 'truthy' | 'falsy'; value: Operand }
+  | { op: 'in' | 'notIn'; value: Operand; options: JsonValue[] }
+  | { op: 'and' | 'or'; conditions: Condition[] }
+  | { op: 'not'; condition: Condition }
+
+type Operand = { kind: 'literal'; value: JsonValue } | { kind: 'ref'; dataKey: string }
+```
+
+Closed on purpose. The set of comparisons a form author actually writes is small and finite, so it can be
+enumerated, given a picker in the panel, and evaluated by core with no sandbox at all. Expressions are
+neither small nor finite, which is why they stay the evaluator's job: this is a condition vocabulary, not
+a language, and the moment it grows arithmetic it has become one.
+
+Three things follow, and they are the reason this outranks the rest of the roadmap:
+
+- A form with branching visibility runs in a host that injected nothing.
+- Conditions become authorable in the panel, because a closed set is a UI and an expression is a text box.
+- The same type serves a rule's `when` guard and, later, an action's guard, so one editor covers all three.
+
+`computed` stays, for the conditions a vocabulary cannot express. It becomes the escape hatch rather than
+the only door.
+
 ## PropValue
 
 **Status: built.**

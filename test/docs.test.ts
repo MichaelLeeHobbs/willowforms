@@ -207,21 +207,33 @@ describe('documentation links', () => {
     'docs/ideas.md',
   ]
 
-  it.each(files)('%s links only to files that exist', (file) => {
+  /*
+   * Anchors included. This used to exclude any link containing a `#`, so every
+   * link that named a heading was unchecked, which is the half most likely to
+   * rot: a heading gets reworded and the link still resolves to a file.
+   */
+  it.each(files)('%s links only to files and headings that exist', (file) => {
     const text = read(file)
     const base = file.includes('/') ? file.slice(0, file.lastIndexOf('/') + 1) : ''
+    const broken: string[] = []
 
-    const broken = [...text.matchAll(/\]\((?!https?:)([^)#]+)\)/g)]
-      .map((match) => (match[1] ?? '').trim())
-      .filter((target) => {
-        const path = target.startsWith('docs/') || base === '' ? target : base + target
+    for (const match of text.matchAll(/\]\((?!https?:)([^)\s]+)\)/g)) {
+      const target = (match[1] ?? '').trim()
+      const [file_, anchor] = target.split('#')
+
+      // A bare "#anchor" points inside this same document.
+      let body = text
+      if (file_) {
+        const path = file_.startsWith('docs/') || base === '' ? file_ : base + file_
         try {
-          readFileSync(fileURLToPath(new URL(path, root)))
-          return false
+          body = readFileSync(fileURLToPath(new URL(path, root)), 'utf8')
         } catch {
-          return true
+          broken.push(target + ' (no such file)')
+          continue
         }
-      })
+      }
+      if (anchor && !headings(body).includes(anchor)) broken.push(target + ' (no such heading)')
+    }
 
     expect(broken).toEqual([])
   })
