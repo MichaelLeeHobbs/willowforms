@@ -20,10 +20,10 @@ of twenty-five components in both kits.
 
 What is left is behaviour, and the order changed once we looked at what real forms actually do.
 
-**Conditions come first.** `renderWhen` accepts only an expression, and it has no authoring UI, so
-conditional visibility — the most common dynamic behaviour a form has — needs a JavaScript sandbox _and_
-a hand-edited document. A closed structured condition type fixes both and would do more for "most forms
-need no JavaScript" than the entire actions feature.
+**Conditions are built.** `renderWhen` used to accept only an expression and had no authoring UI, so
+conditional visibility — the most common dynamic behaviour a form has — needed a JavaScript sandbox _and_
+a hand-edited document. A closed structured condition, evaluated in core, fixes both: a form that shows a
+field only when another is answered now runs in a host that injected nothing.
 See [docs/spec/01-document-model.md](spec/01-document-model.md#conditions).
 
 **Then the three gaps that block real forms**, none of which is an action:
