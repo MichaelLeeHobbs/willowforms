@@ -1055,11 +1055,6 @@
   align-self: center;
 }
 
-/* The hint belongs under the whole row, not beside the control. */
-.fs-prop-row__hint {
-  grid-column: 1 / -1;
-}
-
 .fs-prop-row label {
   display: flex;
   align-items: center;

@@ -226,7 +226,7 @@ describe('documentation links', () => {
       if (file_) {
         const path = file_.startsWith('docs/') || base === '' ? file_ : base + file_
         try {
-          body = readFileSync(fileURLToPath(new URL(path, root)), 'utf8')
+          body = read(path)
         } catch {
           broken.push(target + ' (no such file)')
           continue
