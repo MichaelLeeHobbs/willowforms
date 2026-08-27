@@ -231,10 +231,17 @@ function OptionsField({
 
   /*
    * Re-sync when the document changes underneath, without losing an edit in
-   * progress: only the version this editor last saw is replaced. Undo, redo,
-   * and a document swapped in from the JSON dialog all reach here, and without
-   * this the box would keep showing the old text and write it back on blur.
-   * The same shape the JSON editor uses, for the same reason.
+   * progress: only the version this editor last saw is replaced. Undo, redo, a
+   * document swapped in from the JSON dialog, and a sibling row being removed
+   * all reach here; without this the box keeps showing the old text and writes
+   * it back on the next blur.
+   *
+   * Setting state during render is deliberate and is React's own advice for
+   * adjusting state when a prop changes — React discards the render and retries
+   * immediately, so nothing stale is ever committed. An effect would paint the
+   * old text for a frame first, which is the bug this is here to prevent. The
+   * JSON editor in Properties.tsx has done it this way since before conditions
+   * existed.
    */
   if (text !== committed) {
     setCommitted(text)
@@ -358,6 +365,16 @@ export function ConditionEditor({
 
       {'conditions' in value && (
         <div className="fs-condition__nested">
+          {/*
+           * Keyed by index, so removing a row shifts its neighbours into the
+           * mounted subtrees below. That is safe because the only local state
+           * down there is the options draft, and the re-sync above notices the
+           * props it now holds and re-reads them. Keying by content instead
+           * would remount on every keystroke and take focus with it.
+           *
+           * Two tests in Properties.test.tsx cover the removal, including one
+           * with an uncommitted draft in the row that survives.
+           */}
           {asList(value.conditions).map((inner, index) => (
             <div key={index} className="fs-condition__row">
               <ConditionEditor

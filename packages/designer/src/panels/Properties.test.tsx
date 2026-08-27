@@ -612,3 +612,57 @@ describe('membership options', () => {
     expect(screen.getByLabelText('Options, one per line')).toHaveProperty('value', '')
   })
 })
+
+describe('removing a nested condition', () => {
+  /*
+   * Nested rows are keyed by index, so removing the first shifts the second
+   * into its slot and React reuses the mounted subtree. Anything holding local
+   * state there — the options box holds a draft — could end up attached to the
+   * wrong condition. This is the test that says whether it does.
+   */
+  const twoLists = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'or',
+        conditions: [
+          { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['first'] },
+          { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['second'] },
+        ],
+      },
+    },
+  })
+
+  it('leaves the surviving row showing its own options', async () => {
+    const harness = setup(twoLists())
+    await harness.select()
+
+    const boxes = screen.getAllByLabelText('Options, one per line')
+    expect(boxes.map((b) => (b as HTMLTextAreaElement).value)).toEqual(['first', 'second'])
+
+    await harness.user.click(screen.getByRole('button', { name: 'Remove condition 1' }))
+
+    const remaining = screen.getAllByLabelText('Options, one per line')
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]).toHaveProperty('value', 'second')
+  })
+
+  it('does not carry an uncommitted draft onto the surviving row', async () => {
+    const harness = setup(twoLists())
+    await harness.select()
+
+    // Type into the first row without blurring, then remove that row.
+    const boxes = screen.getAllByLabelText('Options, one per line')
+    await harness.user.clear(boxes[0] as HTMLElement)
+    await harness.user.type(boxes[0] as HTMLElement, 'typed-but-not-committed')
+
+    await harness.user.click(screen.getByRole('button', { name: 'Remove condition 1' }))
+
+    const remaining = screen.getAllByLabelText('Options, one per line')
+    expect(remaining[0]).toHaveProperty('value', 'second')
+  })
+})
