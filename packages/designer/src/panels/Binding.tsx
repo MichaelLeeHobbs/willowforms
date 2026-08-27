@@ -90,13 +90,19 @@ export function BindingMode({
            * nothing, which is the dead-control failure this project treats as
            * worst. It is reachable only for a property whose schema opts in.
            */
-          if (kind === 'condition') {
-            onChange({ kind: 'condition', condition: emptyCondition(firstDataKey ?? '') })
+          if (kind === 'condition' && firstDataKey) {
+            onChange({ kind: 'condition', condition: emptyCondition(firstDataKey) })
           }
         }}
       >
         {modes.map((mode) => (
-          <option key={mode} value={mode}>
+          /*
+           * A condition needs a field to test. With none on the document it
+           * would be seeded with an empty key, evaluate to false, and leave a
+           * control that cannot be corrected: the same refusal the visibility
+           * row makes, and this path had been left without it.
+           */
+          <option key={mode} value={mode} disabled={mode === 'condition' && !firstDataKey}>
             {MODE_LABELS[mode]}
           </option>
         ))}

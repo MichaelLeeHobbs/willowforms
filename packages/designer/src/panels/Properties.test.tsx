@@ -58,6 +58,7 @@ const kit: Kit = {
         { name: 'glyph', label: 'Glyph', editor: 'icon' },
         { name: 'script', label: 'Script', editor: 'code' },
         { name: 'notes', label: 'Notes', editor: 'multiline' },
+        { name: 'locked', label: 'Locked', editor: 'boolean', conditional: true },
       ],
       events: ['onChange'],
     },
@@ -425,5 +426,58 @@ describe('the visibility row', () => {
     )
     expect(options).toContain('firstName')
     expect(options).not.toContain('website')
+  })
+})
+
+describe('the condition binding mode', () => {
+  /*
+   * A property whose schema opts in with `conditional: true`. No kit ships one
+   * yet, so this is the only place the path is exercised — and it shipped as a
+   * dead option once already, offered in the list and doing nothing when
+   * chosen.
+   */
+  const field = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  const sibling: ComponentNode = {
+    key: 'firstName',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  }
+
+  it('binds the property to a condition when chosen', async () => {
+    const harness = setup(field(), [sibling])
+    await harness.select()
+
+    await harness.user.selectOptions(screen.getByLabelText('Locked binding'), 'condition')
+
+    /*
+     * Seeded with the first field on the document, which here is the selected
+     * component's own. Unlike `renderWhen`, a property may test its own value:
+     * hiding a component on its own emptiness removes the control that would
+     * fill it, but disabling one on its own value is a real thing to want.
+     */
+    expect(harness.latest()?.props['locked']).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'website' } },
+    })
+  })
+
+  it('refuses the mode when no field is available to seed it', async () => {
+    // No component on the document carries a schema, so there is no data key
+    // anywhere to test. A hand-authored document can look like this.
+    const harness = setup({ key: 'website', type: 'Field', props: {} })
+    await harness.select()
+
+    const option = screen
+      .getByLabelText('Locked binding')
+      .querySelector<HTMLOptionElement>('option[value="condition"]')
+
+    expect(option?.disabled).toBe(true)
   })
 })

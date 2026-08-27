@@ -338,6 +338,7 @@ function PropRow({
       schema={schema}
       value={value}
       componentKey={componentKey}
+      {...(dataKeys[0] ? { firstDataKey: dataKeys[0] } : {})}
       onChange={onChange}
     />
   )
