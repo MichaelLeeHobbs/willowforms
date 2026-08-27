@@ -12,6 +12,7 @@
  * shown by indentation and nothing else.
  */
 
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { jsonToString } from '@formsmith/core'
 import type { Condition, JsonValue, Operand } from '@formsmith/core'
@@ -191,6 +192,60 @@ function coerce(text: string): JsonValue {
   return text.trim() !== '' && !Number.isNaN(asNumber) ? asNumber : text
 }
 
+/**
+ * The list of values a membership test compares against.
+ *
+ * Holds its own draft and commits on blur, which it has to: the stored value is
+ * a parsed list, so re-deriving the text on every keystroke normalised away the
+ * newline the moment it was typed and `18` then Enter then `21` arrived as
+ * `1821`. The same shape as the key field and the JSON editor, and the same
+ * reason.
+ */
+function OptionsField({
+  id,
+  options,
+  onCommit,
+}: {
+  id: string
+  options: JsonValue[]
+  onCommit: (next: JsonValue[]) => void
+}): ReactNode {
+  const text = options.map((option) => jsonToString(option)).join('\n')
+  const [draft, setDraft] = useState(text)
+
+  const commit = (): void => {
+    /*
+     * Trimmed per line, and blank lines dropped. A line of spaces kept as an
+     * option is a value no form data can ever equal.
+     */
+    const parsed = draft
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '')
+      .map(coerce)
+
+    onCommit(parsed)
+    // Show what was stored, so the box stops disagreeing with the document.
+    setDraft(parsed.map((option) => jsonToString(option)).join('\n'))
+  }
+
+  return (
+    <>
+      <label className="fs-visually-hidden" htmlFor={id}>
+        Options, one per line
+      </label>
+      <textarea
+        id={id}
+        rows={3}
+        placeholder="One value per line"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+      />
+    </>
+  )
+}
+
 export interface ConditionEditorProps {
   id: string
   value: Condition
@@ -262,22 +317,10 @@ export function ConditionEditor({
 
       {'options' in value && (
         <div className="fs-condition__options">
-          <label className="fs-visually-hidden" htmlFor={id + '-options'}>
-            Options, one per line
-          </label>
-          <textarea
+          <OptionsField
             id={id + '-options'}
-            rows={3}
-            placeholder="One value per line"
-            value={asList(value.options)
-              .map((option) => jsonToString(option))
-              .join('\n')}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                options: e.target.value.split('\n').filter(Boolean).map(coerce),
-              })
-            }
+            options={asList(value.options)}
+            onCommit={(options) => onChange({ ...value, options })}
           />
         </div>
       )}

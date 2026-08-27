@@ -524,3 +524,67 @@ describe('the condition editor survives a hand-edited document', () => {
     },
   )
 })
+
+describe('membership options', () => {
+  const listy = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: [] },
+    },
+  })
+
+  it('lets a newline be typed at all', async () => {
+    /*
+     * The box holds a draft and commits on blur. Deriving its text from the
+     * parsed list on every keystroke normalised the newline away the instant it
+     * was typed, so `18` Enter `21` arrived as `1821` and a multi-line list
+     * could not be entered.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'a{enter}b')
+
+    expect(box).toHaveProperty('value', 'a\nb')
+  })
+
+  it('drops blank lines and trims the rest', async () => {
+    /*
+     * A line of spaces is not an option. Kept, it becomes a value no form data
+     * can ever equal, so the condition silently never matches.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, ' GB {enter}   {enter}IE{enter}')
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['GB', 'IE'] },
+    })
+  })
+
+  it('reads a number as a number, so an ordering test can work', async () => {
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, '18{enter}21')
+    await harness.user.tab()
+
+    const condition = harness.latest()?.renderWhen
+    expect(condition?.kind === 'condition' && condition.condition).toMatchObject({
+      options: [18, 21],
+    })
+  })
+})
