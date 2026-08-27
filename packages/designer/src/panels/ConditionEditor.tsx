@@ -57,13 +57,32 @@ function asList<T>(value: T[] | undefined): T[] {
   return Array.isArray(value) ? value : []
 }
 
+/**
+ * An operand, whatever the document holds in its place.
+ *
+ * Same reasoning as `asList`, and the shape I missed the first time: guarding
+ * the lists and not the operands left `left: null` throwing on the first read
+ * of `.kind`. An unreadable operand becomes an empty literal, which is what a
+ * fresh one is, so the row renders and the author can retype it.
+ */
+function asOperand(value: Operand | undefined): Operand {
+  if (!value || typeof value !== 'object') return literal('')
+  if (value.kind === 'ref') return typeof value.dataKey === 'string' ? value : literal('')
+  if (value.kind === 'literal') return value
+  return literal('')
+}
+
 /** A condition of the requested shape, keeping whatever the old one can spare. */
 function morph(current: Condition, op: Condition['op']): Condition {
   const firstOperand: Operand =
-    'left' in current ? current.left : 'value' in current ? current.value : literal('')
+    'left' in current
+      ? asOperand(current.left)
+      : 'value' in current
+        ? asOperand(current.value)
+        : literal('')
 
   if ((COMPARISONS as readonly string[]).includes(op)) {
-    const right: Operand = 'right' in current ? current.right : literal('')
+    const right: Operand = 'right' in current ? asOperand(current.right) : literal('')
     return { op: op as (typeof COMPARISONS)[number], left: firstOperand, right }
   }
   if ((UNARY as readonly string[]).includes(op)) {
@@ -102,7 +121,8 @@ interface OperandFieldProps {
  * first one, because quietly changing which field a rule tests is worse than
  * showing something unfamiliar.
  */
-function OperandField({ id, label, value, dataKeys, onChange }: OperandFieldProps): ReactNode {
+function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFieldProps): ReactNode {
+  const value = asOperand(raw)
   const isRef = value.kind === 'ref'
   const known = isRef && dataKeys.includes(value.dataKey)
 
