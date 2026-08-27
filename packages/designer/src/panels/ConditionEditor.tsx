@@ -100,6 +100,21 @@ function morph(current: Condition, op: Condition['op']): Condition {
   return { op: 'not', condition: 'condition' in current ? current.condition : current }
 }
 
+/**
+ * A condition this editor can draw, whatever the document holds.
+ *
+ * The guards so far covered the lists and the operands and not the conditions
+ * inside them, so `conditions: [null]` still threw on the first `'left' in
+ * value`. An unreadable one is drawn as a fresh comparison, which the author
+ * can then set to whatever they meant; nothing is written until they touch it.
+ */
+function asCondition(value: Condition | undefined): Condition {
+  if (!value || typeof value !== 'object' || typeof value.op !== 'string') {
+    return { op: 'truthy', value: literal('') }
+  }
+  return value
+}
+
 /** The default a fresh condition starts from: the commonest thing anyone writes. */
 export function emptyCondition(dataKey: string): Condition {
   return { op: 'truthy', value: { kind: 'ref', dataKey } }
@@ -273,11 +288,12 @@ export interface ConditionEditorProps {
 
 export function ConditionEditor({
   id,
-  value,
+  value: raw,
   dataKeys,
   onChange,
   depth = 0,
 }: ConditionEditorProps): ReactNode {
+  const value = asCondition(raw)
   const hasLeft = 'left' in value
   const hasValue = 'value' in value
 

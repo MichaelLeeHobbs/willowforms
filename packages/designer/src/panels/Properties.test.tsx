@@ -510,6 +510,10 @@ describe('the condition editor survives a hand-edited document', () => {
     { op: 'eq', left: 'nonsense', right: null },
     { op: 'truthy', value: null },
     { op: 'in', value: { kind: 'ref' }, options: [] },
+    { op: 'and', conditions: [null] },
+    { op: 'or', conditions: [{ op: 'truthy', value: { kind: 'ref', dataKey: 'a' } }, 'nonsense'] },
+    { op: 'not', condition: null },
+    { op: 'and', conditions: [{ op: 'and', conditions: [null] }] },
   ]
 
   it.each(malformed.map((c) => [JSON.stringify(c), c] as const))(
