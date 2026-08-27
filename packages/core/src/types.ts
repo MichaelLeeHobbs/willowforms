@@ -25,6 +25,32 @@ export type PropValue =
   | { kind: 'computed'; expression: string }
   /** A lookup into the active language's translation bundle. */
   | { kind: 'i18n'; key: string }
+  /**
+   * A structured condition, evaluated by core with no sandbox.
+   *
+   * Resolves to a boolean, so it is meant for `renderWhen`, a rule's `when`
+   * guard, and properties that take one. Nothing stops it being set on a label,
+   * where it renders as `true` or `false`; the panel only offers it where it
+   * makes sense, which is the same way `i18n` is offered only on copy.
+   */
+  | { kind: 'condition'; condition: Condition }
+
+/**
+ * The closed set of comparisons a document can express.
+ *
+ * Closed on purpose. This is a vocabulary, not a language: it can be
+ * enumerated, drawn as a picker, and evaluated without executing anything. See
+ * `evaluateCondition`, and [01-document-model.md](../../../docs/spec/01-document-model.md).
+ */
+export type Condition =
+  | { op: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte'; left: Operand; right: Operand }
+  | { op: 'empty' | 'notEmpty' | 'truthy' | 'falsy'; value: Operand }
+  | { op: 'in' | 'notIn'; value: Operand; options: JsonValue[] }
+  | { op: 'and' | 'or'; conditions: Condition[] }
+  | { op: 'not'; condition: Condition }
+
+/** One side of a comparison: a fixed value, or whatever a field holds. */
+export type Operand = { kind: 'literal'; value: JsonValue } | { kind: 'ref'; dataKey: string }
 
 export interface ActionRef {
   /** Name of a {@link CodeAction} on the document, or a built-in. */

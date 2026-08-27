@@ -80,6 +80,15 @@ export interface PropSchema {
   computable?: boolean
   /** May be bound to a translation key. Set this on user-facing copy. */
   localizable?: boolean
+  /**
+   * May be bound to a structured condition. Set this on properties that take a
+   * boolean, since a condition resolves to one.
+   *
+   * Opt-in rather than inferred from the editor, because `boolean` covers both
+   * "is this disabled" and "did the user tick it", and only the first is worth
+   * making conditional.
+   */
+  conditional?: boolean
   /** Which properties-panel tab this row belongs to. Defaults to 'main'. */
   section?: 'main' | 'style' | 'advanced'
 }

@@ -138,6 +138,14 @@ export interface DesignerApi {
    * allowed to collide, so nothing is refused here.
    */
   setDataKey: (key: string, dataKey: string) => void
+  /**
+   * Set or clear a component's visibility condition.
+   *
+   * Separate from `setProp` because `renderWhen` is a field on the node rather
+   * than an entry in `props`. Passing undefined removes it, which is not the
+   * same as setting it to false: absent means always shown.
+   */
+  setRenderWhen: (key: string, value: PropValue | undefined) => void
   moveComponent: (key: string, parentKey: string, index?: number) => void
   /**
    * Copy a component and its subtree in beside it, and select the copy.
@@ -342,6 +350,27 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply, history],
   )
 
+  const setRenderWhen = useCallback(
+    (key: string, value: PropValue | undefined) => {
+      apply(
+        (doc) => ({
+          ...doc,
+          root: updateNode(doc.root, key, (node) => {
+            if (!value) {
+              // exactOptionalPropertyTypes: absent is an absent key, not a key
+              // holding undefined.
+              const { renderWhen: _dropped, ...rest } = node
+              return rest
+            }
+            return { ...node, renderWhen: value }
+          }),
+        }),
+        'renderWhen:' + key,
+      )
+    },
+    [apply],
+  )
+
   const setDataKey = useCallback(
     (key: string, dataKey: string) => {
       const trimmed = dataKey.trim()
@@ -389,6 +418,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     setLanguages,
     renameKey,
     setDataKey,
+    setRenderWhen,
     moveComponent,
     duplicateComponent,
     removeComponent,

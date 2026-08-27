@@ -2,6 +2,7 @@ export type {
   ActionRef,
   CodeAction,
   ComponentNode,
+  Condition,
   Device,
   EventName,
   FieldSchema,
@@ -11,6 +12,7 @@ export type {
   FormSettings,
   JsonValue,
   Language,
+  Operand,
   PropValue,
   ValidationKey,
   ValidationRule,
@@ -27,7 +29,9 @@ export type {
 } from './kit.js'
 export { groupKit, indexKit } from './kit.js'
 
-export { jsonToString, optionValue, safeHref } from './json.js'
+export { isEmpty, jsonToString, optionValue, safeHref } from './json.js'
+
+export { evaluateCondition } from './condition.js'
 
 export { isVisible } from './visibility.js'
 

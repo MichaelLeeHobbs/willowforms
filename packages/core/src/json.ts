@@ -95,3 +95,21 @@ export function safeHref(value: JsonValue | undefined): string | undefined {
   const scheme = raw.slice(0, raw.indexOf(':') + 1).toLowerCase()
   return SAFE_SCHEMES.has(scheme) ? raw : undefined
 }
+
+/**
+ * Whether a value counts as no answer.
+ *
+ * Shared, because "empty" has to mean one thing. Validation uses it for the
+ * rule that everything except `required` passes on an empty value, and
+ * conditions use it for `empty` and `notEmpty`. Two definitions would let a
+ * field be empty enough to skip a `minLength` rule and not empty enough to
+ * satisfy a visibility condition, and nobody would find that quickly.
+ *
+ * `false` and `0` are answers, not absences.
+ */
+export function isEmpty(value: JsonValue | undefined): boolean {
+  if (value === undefined || value === null) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  return false
+}

@@ -199,8 +199,11 @@ A component that holds no form data says so instead of showing an empty rule lis
 
 **Status: planned.** Two things a kit cannot anticipate:
 
-- **`renderWhen`.** Conditional visibility works everywhere except in the panel, so it is JSON-only
-  today. It is a `PropValue` and wants the same editor as any other binding.
+- **`renderWhen`.** **Built.** A Show when row offering Always, a condition, or an expression. A
+  component cannot test its own field: hiding a component when its own value is empty hides the only
+  control that could fill it. The field list comes from the document, so a condition cannot name a key
+  that does not exist, and a hand-edited one that does is shown rather than silently reassigned.
+  See [01-document-model.md](01-document-model.md#conditions).
 - **HTML attributes.** A passthrough for `id`, `data-*`, `aria-*`. Needs an allowlist rather than an open
   door: letting an author set arbitrary attributes on a kit's root element includes `style` and
   `onclick`, and this project already draws the code-execution boundary elsewhere.

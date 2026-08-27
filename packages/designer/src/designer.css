@@ -1166,3 +1166,74 @@
   font-size: 11px;
   text-align: end;
 }
+
+/*
+ * The condition editor.
+ *
+ * Stacked, not tabular. A comparison is three or four controls and the pane is
+ * 288px, so a row would clip every one of them; the same arithmetic that put
+ * the binding mode picker above its control rather than beside it.
+ */
+.fs-condition {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fs-condition__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/*
+ * Stacked, like everything else in this pane. Side by side, the source picker
+ * and the field select shared 121px and got about 59 each, which is not enough
+ * for either. The labels between them are visually hidden and absolutely
+ * positioned, so they are out of flow and `:first-child` was quietly matching a
+ * label rather than the control it looked like it named.
+ */
+.fs-condition__operand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fs-condition__operand > select,
+.fs-condition__operand > input {
+  min-width: 0;
+}
+
+.fs-condition__op {
+  align-self: start;
+}
+
+/*
+ * Nesting is shown by an indent and a rule, because a 288px pane cannot draw a
+ * tree and a half-drawn one is worse than an honest indent.
+ */
+.fs-condition__nested {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-inline-start: 8px;
+  padding-inline-start: 8px;
+  border-inline-start: 2px solid var(--fs-border);
+}
+
+.fs-condition__row {
+  display: flex;
+  align-items: start;
+  gap: 4px;
+}
+
+.fs-condition__row > .fs-condition {
+  flex: 1 1 auto;
+}
+
+.fs-condition__remove {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+}

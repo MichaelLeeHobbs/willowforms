@@ -9,7 +9,7 @@
 
 import { createContext, useCallback, useContext, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { dataKeyOf, isVisible } from '@formsmith/core'
+import { dataKeyOf, evaluateCondition, isVisible } from '@formsmith/core'
 import type {
   ComponentNode,
   Evaluator,
@@ -93,6 +93,9 @@ export function resolveProp(
       return value.value
     case 'i18n':
       return translations[value.key] ?? value.key
+    // Resolves to a boolean. Meant for renderWhen, and harmless anywhere else.
+    case 'condition':
+      return evaluateCondition(value.condition, data)
     case 'computed':
       // No sandbox means no evaluation. Render the field rather than crash the form.
       return evaluate ? evaluate(value.expression, data) : null

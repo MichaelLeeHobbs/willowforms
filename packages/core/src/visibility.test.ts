@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ComponentNode, Evaluator } from './index.js'
+import type { ComponentNode, Condition, Evaluator } from './index.js'
 import { isVisible, validateForm } from './index.js'
 
 const required = { type: 'string' as const, validations: [{ key: 'required' as const }] }
@@ -87,5 +87,48 @@ describe('validateForm and visibility', () => {
     expect(validateForm(conditional, { other: 'yes' }, evaluate)['why']).toBe(
       'This field is required.',
     )
+  })
+})
+
+describe('a structured condition needs no sandbox', () => {
+  const node = (condition: Condition): ComponentNode => ({
+    key: 'extra',
+    type: 'TextField',
+    props: {},
+    renderWhen: { kind: 'condition', condition },
+  })
+
+  it('decides visibility with no evaluator injected at all', () => {
+    /*
+     * The whole reason the vocabulary exists. Before this, the only conditional
+     * form of renderWhen was an expression, so a form that hid its second field
+     * until the first was answered required the host to stand up a JavaScript
+     * sandbox. Note the absent third argument.
+     */
+    const when: Condition = {
+      op: 'eq',
+      left: { kind: 'ref', dataKey: 'country' },
+      right: { kind: 'literal', value: 'GB' },
+    }
+
+    expect(isVisible(node(when), { country: 'GB' })).toBe(true)
+    expect(isVisible(node(when), { country: 'FR' })).toBe(false)
+  })
+
+  it('ignores an evaluator when one is present, rather than preferring it', () => {
+    const explode = (): never => {
+      throw new Error('a structured condition must not reach the sandbox')
+    }
+    const when: Condition = { op: 'truthy', value: { kind: 'ref', dataKey: 'consent' } }
+
+    expect(isVisible(node(when), { consent: true }, explode)).toBe(true)
+  })
+
+  it('hides rather than throws on a condition the document got wrong', () => {
+    // isVisible is called by the renderer and by validateForm, so a throw here
+    // takes the form off screen for someone who cannot edit the document.
+    const broken = { op: 'nonsense' } as unknown as Condition
+    expect(() => isVisible(node(broken), {})).not.toThrow()
+    expect(isVisible(node(broken), {})).toBe(false)
   })
 })

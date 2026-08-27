@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { IconName, JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
-import { indexKit, jsonToString } from '@formsmith/core'
+import { dataKeyOf, flatten, indexKit, jsonToString } from '@formsmith/core'
 
 import { Icon, ICON_NAMES } from '../Icon.js'
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
+import { ConditionEditor, emptyCondition } from './ConditionEditor.js'
 import type { DesignerApi, RenameResult } from '../store.js'
 
 export interface PropertiesProps {
@@ -24,6 +25,15 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
   }
 
   const def = indexKit(kit).get(node.type)
+
+  /*
+   * Every data key in the document, so a condition can only name a field that
+   * exists. Taken from the tree rather than the kit, because a data key is a
+   * property of the document and may have been renamed away from its node key.
+   */
+  const dataKeys = flatten(api.document.root)
+    .filter((row) => row.node.schema)
+    .map((row) => dataKeyOf(row.node))
 
   return (
     <section className="fs-properties">
@@ -49,6 +59,19 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
         />
       )}
 
+      {/*
+       * Visibility is a property of the node rather than an entry in `props`,
+       * so it gets its own row rather than coming from the kit's schema. It was
+       * authorable only by editing the document JSON until the condition
+       * vocabulary existed to give it a picker.
+       */}
+      <VisibilityRow
+        key={node.key + ':renderWhen'}
+        value={node.renderWhen}
+        dataKeys={dataKeys.filter((key) => key !== dataKeyOf(node))}
+        onChange={(next) => api.setRenderWhen(node.key, next)}
+      />
+
       {!def && <p className="fs-empty">Type {node.type} is not in the active kit.</p>}
 
       {def?.props.map((schema) => (
@@ -61,6 +84,7 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
           schema={schema}
           value={node.props[schema.name]}
           componentKey={node.key}
+          dataKeys={dataKeys}
           languages={api.document.languages}
           defaultLanguage={api.document.defaultLanguage}
           translations={api.document.translations}
@@ -198,10 +222,77 @@ function KeyField({
   )
 }
 
+/**
+ * When a component is shown.
+ *
+ * Three modes rather than the usual four: a condition, an expression for what a
+ * condition cannot say, and nothing at all. There is no static or translated
+ * mode, because "always show this unless it says false" is what an absent
+ * `renderWhen` already means, and a translation key is not a condition.
+ *
+ * A component cannot test its own field. Hiding a component when its own value
+ * is empty hides the only control that could fill it, which reads as the form
+ * being broken.
+ */
+function VisibilityRow({
+  value,
+  dataKeys,
+  onChange,
+}: {
+  value: PropValue | undefined
+  dataKeys: string[]
+  onChange: (next: PropValue | undefined) => void
+}): ReactNode {
+  const mode = value?.kind === 'computed' ? 'computed' : value ? 'condition' : 'always'
+
+  return (
+    <div className={'fs-prop-row' + (value ? ' is-set is-binding' : '')}>
+      <label htmlFor="fs-prop-renderwhen-mode">Show when</label>
+      <div className="fs-prop-row__control">
+        <select
+          id="fs-prop-renderwhen-mode"
+          className="fs-binding__mode"
+          value={mode}
+          onChange={(e) => {
+            if (e.target.value === 'always') return onChange(undefined)
+            if (e.target.value === 'computed') return onChange({ kind: 'computed', expression: '' })
+            onChange({ kind: 'condition', condition: emptyCondition(dataKeys[0] ?? '') })
+          }}
+        >
+          <option value="always">Always</option>
+          <option value="condition">A condition</option>
+          <option value="computed">An expression</option>
+        </select>
+
+        {value?.kind === 'condition' && (
+          <ConditionEditor
+            id="fs-prop-renderwhen"
+            value={value.condition}
+            dataKeys={dataKeys}
+            onChange={(condition) => onChange({ kind: 'condition', condition })}
+          />
+        )}
+
+        {value?.kind === 'computed' && (
+          <ComputedEditor id="fs-prop-renderwhen" value={value} onChange={onChange} />
+        )}
+      </div>
+
+      {dataKeys.length === 0 && value?.kind === 'condition' && (
+        <p className="fs-prop-row__hint">
+          No other component holds data yet, so there is nothing to test against.
+        </p>
+      )}
+    </div>
+  )
+}
+
 interface PropRowProps {
   schema: PropSchema
   value: PropValue | undefined
   componentKey: string
+  /** Every data key in the document, so a condition can only name a real field. */
+  dataKeys: string[]
   languages: Language[]
   defaultLanguage: string
   translations: Record<string, Record<string, string>>
@@ -213,6 +304,7 @@ function PropRow({
   schema,
   value,
   componentKey,
+  dataKeys,
   languages,
   defaultLanguage,
   translations,
@@ -262,6 +354,24 @@ function PropRow({
             translations={translations}
             onChange={onChange}
             onTranslate={onTranslate}
+          />
+        </div>
+        <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
+      </div>
+    )
+  }
+
+  if (value?.kind === 'condition') {
+    return (
+      <div className="fs-prop-row is-set is-binding">
+        <label htmlFor={id + '-op'}>{schema.label}</label>
+        <div className="fs-prop-row__control">
+          {mode}
+          <ConditionEditor
+            id={id}
+            value={value.condition}
+            dataKeys={dataKeys}
+            onChange={(condition) => onChange({ kind: 'condition', condition })}
           />
         </div>
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />

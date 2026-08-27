@@ -28,6 +28,7 @@ export function modesFor(schema: PropSchema): BindingKind[] {
   const modes: BindingKind[] = ['static']
   if (schema.computable !== false) modes.push('computed')
   if (schema.localizable) modes.push('i18n')
+  if (schema.conditional) modes.push('condition')
   return modes
 }
 
@@ -35,6 +36,7 @@ const MODE_LABELS: Record<BindingKind, string> = {
   static: 'Value',
   computed: 'Expression',
   i18n: 'Translation',
+  condition: 'Condition',
 }
 
 export interface BindingModeProps {

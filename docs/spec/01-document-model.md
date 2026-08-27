@@ -145,7 +145,7 @@ does and validation follows the renderer.
 
 ## Conditions
 
-**Status: planned**, and the highest-value thing on this list.
+**Status: built.** `evaluateCondition` in core, a fourth `PropValue` kind, and a picker in the panel.
 
 `renderWhen` is a `PropValue`, so the only conditional form it has is `computed`, which needs the
 injected evaluator. It also has no authoring UI. Put those together and **conditional visibility, the most
@@ -156,7 +156,7 @@ That makes the claim in [09-actions.md](09-actions.md) — that most forms shoul
 already false, and no set of actions can rescue it. A form that cannot show its second field without a
 sandbox has needed one long before anyone pressed a button.
 
-The fix is a fourth kind, closed and structured:
+A fourth kind fixes both, closed and structured:
 
 ```ts
 type Condition =
@@ -180,8 +180,24 @@ Three things follow, and they are the reason this outranks the rest of the roadm
 - Conditions become authorable in the panel, because a closed set is a UI and an expression is a text box.
 - The same type serves a rule's `when` guard and, later, an action's guard, so one editor covers all three.
 
-`computed` stays, for the conditions a vocabulary cannot express. It becomes the escape hatch rather than
+`computed` stays, for the conditions a vocabulary cannot express. It is the escape hatch now rather than
 the only door.
+
+**It is total.** `isVisible` is called by the renderer and by `validateForm`, so a condition that throws
+takes the form off screen for the person filling it in, who cannot edit the document. Anything
+`evaluateCondition` cannot read is false, which is what a computed condition does without an evaluator,
+so hidden stays the answer to every question it cannot answer.
+
+Malformed and empty are told apart, which is subtler than it sounds. An empty `and` is true and an empty
+`or` is false, because that is what those operations mean over no arguments and it lets a half-built
+condition in the panel behave. But a `conditions` that is not a list is malformed, and routing it through
+an empty array would make `and` true and **show** a component whose visibility rule is broken. The same
+applies to `notIn` with a malformed option list. Both are false.
+
+`empty` and `truthy` are different questions and the vocabulary keeps them apart: `0` and `false` are
+answers, so they are not empty, and both are falsy. `isEmpty` is shared with validation, because "empty"
+meaning two things would let a field be empty enough to skip a `minLength` rule and not empty enough to
+satisfy a condition.
 
 ## PropValue
 
