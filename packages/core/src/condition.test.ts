@@ -153,6 +153,37 @@ describe('a document is data, so it can be malformed', () => {
     expect(check({ op: 'sorcery' } as unknown as Condition)).toBe(false)
   })
 
+  it('does not turn a rule it cannot read into a reason to show', () => {
+    /*
+     * `not` is the only operator that inverts, so it is the only one that can
+     * turn "cannot read this" into true. It did: `not({op:'nonsense'})` came
+     * back true and showed a component whose rule the code could not read,
+     * which is the opposite of the stated default.
+     */
+    expect(check({ op: 'not', condition: { op: 'sorcery' } } as unknown as Condition)).toBe(false)
+    expect(check({ op: 'not', condition: null } as unknown as Condition)).toBe(false)
+    expect(
+      check({
+        op: 'not',
+        condition: { op: 'and', conditions: 'not-a-list' },
+      } as unknown as Condition),
+    ).toBe(false)
+
+    // A readable inner condition still inverts, which is the whole point of it.
+    expect(check({ op: 'not', condition: { op: 'falsy', value: ref('consent') } })).toBe(true)
+  })
+
+  it('treats a group holding something unreadable as unreadable', () => {
+    // Answering from the remainder would be guessing at a document nobody can
+    // fully read, and `or` would then show on partial evidence.
+    const bad = { op: 'sorcery' } as unknown as Condition
+    const good: Condition = { op: 'truthy', value: ref('consent') }
+
+    expect(check({ op: 'or', conditions: [good, bad] })).toBe(false)
+    expect(check({ op: 'and', conditions: [good, bad] })).toBe(false)
+    expect(check({ op: 'or', conditions: [good, good] })).toBe(true)
+  })
+
   it('never throws, whatever it is handed', () => {
     /*
      * isVisible calls this from both the renderer and validateForm, so a throw

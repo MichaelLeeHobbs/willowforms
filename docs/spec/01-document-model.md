@@ -188,7 +188,14 @@ takes the form off screen for the person filling it in, who cannot edit the docu
 `evaluateCondition` cannot read is false, which is what a computed condition does without an evaluator,
 so hidden stays the answer to every question it cannot answer.
 
-Malformed and empty are told apart, which is subtler than it sounds. An empty `and` is true and an empty
+Malformed and empty are told apart, and so are malformed and false. `not` is the only operator that
+inverts, so it is the only one that can turn "cannot read this" into a reason to **show** a component:
+`not` of an unrecognised operator came back true. Internally the evaluator answers true, false, or
+nothing, and only the boundary collapses nothing to false, so the inversion happens where the difference
+is still visible. A group holding an unreadable part is unreadable too, because answering from the
+remainder would be guessing at a document nobody can fully read.
+
+The empty case is subtler than it sounds. An empty `and` is true and an empty
 `or` is false, because that is what those operations mean over no arguments and it lets a half-built
 condition in the panel behave. But a `conditions` that is not a list is malformed, and routing it through
 an empty array would make `and` true and **show** a component whose visibility rule is broken. The same

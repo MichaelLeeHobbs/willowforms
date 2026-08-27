@@ -76,7 +76,24 @@ function order(a: JsonValue | undefined, b: JsonValue | undefined): number | und
  * "hidden" the answer to every question this cannot answer.
  */
 export function evaluateCondition(condition: Condition, data: FormData): boolean {
-  if (!condition || typeof condition !== 'object') return false
+  return evaluate(condition, data) ?? false
+}
+
+/**
+ * The same question, with "cannot read this" told apart from "false".
+ *
+ * The distinction exists for `not`, and only for `not`. Negating a malformed
+ * condition turned false into true and **showed** a component whose rule the
+ * code could not read, which is the opposite of the invariant above. Collapsing
+ * unreadable to false at the boundary and inverting it inside is exactly the
+ * bug, so the inversion has to happen where the difference is still visible.
+ *
+ * Unreadable propagates through `and` and `or` too. A group containing a part
+ * nobody can read is a group nobody can read, and answering from the remainder
+ * would be guessing.
+ */
+function evaluate(condition: Condition, data: FormData): boolean | undefined {
+  if (!condition || typeof condition !== 'object') return undefined
 
   switch (condition.op) {
     case 'eq':
@@ -130,19 +147,22 @@ export function evaluateCondition(condition: Condition, data: FormData): boolean
      *
      * A `conditions` that is not a list at all is a different thing, and it has
      * to be told apart: routing it through an empty array would make `and` true
-     * and show a component whose visibility rule is broken. Malformed is false,
-     * the same as every other shape this cannot read.
+     * and show a component whose visibility rule is broken.
      */
     case 'and':
-      if (!Array.isArray(condition.conditions)) return false
-      return condition.conditions.every((inner) => evaluateCondition(inner, data))
-    case 'or':
-      if (!Array.isArray(condition.conditions)) return false
-      return condition.conditions.some((inner) => evaluateCondition(inner, data))
-    case 'not':
-      return condition.condition ? !evaluateCondition(condition.condition, data) : false
+    case 'or': {
+      if (!Array.isArray(condition.conditions)) return undefined
+      const answers = condition.conditions.map((inner) => evaluate(inner, data))
+      if (answers.includes(undefined)) return undefined
+      return condition.op === 'and' ? answers.every(Boolean) : answers.some(Boolean)
+    }
+
+    case 'not': {
+      const inner = condition.condition ? evaluate(condition.condition, data) : undefined
+      return inner === undefined ? undefined : !inner
+    }
 
     default:
-      return false
+      return undefined
   }
 }

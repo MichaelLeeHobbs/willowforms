@@ -587,4 +587,24 @@ describe('membership options', () => {
       options: [18, 21],
     })
   })
+
+  it('re-syncs when the document changes underneath', async () => {
+    /*
+     * Undo, redo, and a document replaced from the JSON dialog all change the
+     * options without touching this box. Holding a draft and never re-reading
+     * would leave the old text on screen and write it back on the next blur.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'GB{enter}IE')
+    await harness.user.tab()
+    expect(box).toHaveProperty('value', 'GB\nIE')
+
+    await harness.user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(screen.getByLabelText('Options, one per line')).toHaveProperty('value', '')
+  })
 })

@@ -212,6 +212,19 @@ function OptionsField({
 }): ReactNode {
   const text = options.map((option) => jsonToString(option)).join('\n')
   const [draft, setDraft] = useState(text)
+  const [committed, setCommitted] = useState(text)
+
+  /*
+   * Re-sync when the document changes underneath, without losing an edit in
+   * progress: only the version this editor last saw is replaced. Undo, redo,
+   * and a document swapped in from the JSON dialog all reach here, and without
+   * this the box would keep showing the old text and write it back on blur.
+   * The same shape the JSON editor uses, for the same reason.
+   */
+  if (text !== committed) {
+    setCommitted(text)
+    setDraft(text)
+  }
 
   const commit = (): void => {
     /*
@@ -226,7 +239,9 @@ function OptionsField({
 
     onCommit(parsed)
     // Show what was stored, so the box stops disagreeing with the document.
-    setDraft(parsed.map((option) => jsonToString(option)).join('\n'))
+    const stored = parsed.map((option) => jsonToString(option)).join('\n')
+    setCommitted(stored)
+    setDraft(stored)
   }
 
   return (
