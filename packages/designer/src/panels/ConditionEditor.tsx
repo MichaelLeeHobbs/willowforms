@@ -44,6 +44,19 @@ const ORDER: Condition['op'][] = [...COMPARISONS, ...UNARY, ...MEMBERSHIP, ...GR
 
 const literal = (value: JsonValue): Operand => ({ kind: 'literal', value })
 
+/**
+ * A list, whatever the document actually holds.
+ *
+ * `evaluateCondition` was made total against a hand-edited document and this
+ * editor was not, so `options: "not-a-list"` rendered fine in the form and
+ * crashed the designer the moment the panel tried to map over it. The panel is
+ * where someone goes to fix a broken document, so it is the last place that can
+ * afford to fall over on one.
+ */
+function asList<T>(value: T[] | undefined): T[] {
+  return Array.isArray(value) ? value : []
+}
+
 /** A condition of the requested shape, keeping whatever the old one can spare. */
 function morph(current: Condition, op: Condition['op']): Condition {
   const firstOperand: Operand =
@@ -57,12 +70,12 @@ function morph(current: Condition, op: Condition['op']): Condition {
     return { op: op as (typeof UNARY)[number], value: firstOperand }
   }
   if ((MEMBERSHIP as readonly string[]).includes(op)) {
-    const options = 'options' in current ? current.options : []
+    const options = 'options' in current ? asList(current.options) : []
     return { op: op as (typeof MEMBERSHIP)[number], value: firstOperand, options }
   }
   if ((GROUPS as readonly string[]).includes(op)) {
-    const conditions = 'conditions' in current ? current.conditions : [current]
-    return { op: op as (typeof GROUPS)[number], conditions }
+    const carried = 'conditions' in current ? asList(current.conditions) : [current]
+    return { op: op as (typeof GROUPS)[number], conditions: carried }
   }
   return { op: 'not', condition: 'condition' in current ? current.condition : current }
 }
@@ -236,7 +249,9 @@ export function ConditionEditor({
             id={id + '-options'}
             rows={3}
             placeholder="One value per line"
-            value={value.options.map((option) => jsonToString(option)).join('\n')}
+            value={asList(value.options)
+              .map((option) => jsonToString(option))
+              .join('\n')}
             onChange={(e) =>
               onChange({
                 ...value,
@@ -249,7 +264,7 @@ export function ConditionEditor({
 
       {'conditions' in value && (
         <div className="fs-condition__nested">
-          {value.conditions.map((inner, index) => (
+          {asList(value.conditions).map((inner, index) => (
             <div key={index} className="fs-condition__row">
               <ConditionEditor
                 id={id + '-' + String(index)}
@@ -259,7 +274,7 @@ export function ConditionEditor({
                 onChange={(next) =>
                   onChange({
                     ...value,
-                    conditions: value.conditions.map((c, i) => (i === index ? next : c)),
+                    conditions: asList(value.conditions).map((c, i) => (i === index ? next : c)),
                   })
                 }
               />
@@ -270,7 +285,7 @@ export function ConditionEditor({
                 onClick={() =>
                   onChange({
                     ...value,
-                    conditions: value.conditions.filter((_, i) => i !== index),
+                    conditions: asList(value.conditions).filter((_, i) => i !== index),
                   })
                 }
               >
@@ -283,7 +298,7 @@ export function ConditionEditor({
             onClick={() =>
               onChange({
                 ...value,
-                conditions: [...value.conditions, emptyCondition(dataKeys[0] ?? '')],
+                conditions: [...asList(value.conditions), emptyCondition(dataKeys[0] ?? '')],
               })
             }
           >

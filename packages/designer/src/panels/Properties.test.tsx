@@ -15,7 +15,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
+import type { ComponentNode, FormDocument, Kit, PropValue } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
@@ -480,4 +480,43 @@ describe('the condition binding mode', () => {
 
     expect(option?.disabled).toBe(true)
   })
+})
+
+describe('the condition editor survives a hand-edited document', () => {
+  /*
+   * `evaluateCondition` was made total against these shapes and the editor was
+   * not, so a document with `options: "not-a-list"` rendered fine on the canvas
+   * and took the designer down when the panel tried to map over it. The panel
+   * is where someone goes to fix a broken document, so it is the last place
+   * that can afford to fall over on one.
+   */
+  const withRenderWhen = (condition: unknown): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    // Cast at the boundary: the point of the test is a shape the type forbids
+    // and a hand-edited document can still hold.
+    renderWhen: { kind: 'condition', condition } as PropValue,
+  })
+
+  const malformed: unknown[] = [
+    { op: 'in', value: { kind: 'ref', dataKey: 'a' }, options: 'not-a-list' },
+    { op: 'and', conditions: 'not-a-list' },
+    { op: 'or', conditions: null },
+    { op: 'not' },
+    { op: 'eq' },
+  ]
+
+  it.each(malformed.map((c) => [JSON.stringify(c), c] as const))(
+    'renders %s without crashing',
+    async (_label, condition) => {
+      const harness = setup(withRenderWhen(condition))
+      await expect(harness.select()).resolves.toBeUndefined()
+
+      // The row is on screen, so the author can pick a different operator and
+      // repair it rather than being left with a blank panel.
+      expect(screen.getByLabelText('Show when')).toHaveProperty('value', 'condition')
+    },
+  )
 })
