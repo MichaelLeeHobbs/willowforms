@@ -1,7 +1,7 @@
 # Inspector
 
-**Status: partial.** Properties and Rules are built. Style and Actions do not exist. Three of the nine
-property editors are unimplemented, and `PropSchema.section` is declared but ignored.
+**Status: partial.** Properties and Rules are built, and so is every property editor. Style and Actions
+do not exist, and `PropSchema.section` is declared but ignored.
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
 never knows what a `TextField` is, only that something declared a `label` property with a `string`
@@ -61,23 +61,32 @@ panel silently began editing a different node.
 
 ### Property editors
 
-`PropEditor` declares nine. Six exist.
+`PropEditor` declares nine. All nine exist.
 
-| Editor      | Status  | Control                                                 |
-| ----------- | ------- | ------------------------------------------------------- |
-| `string`    | Built   | Single-line text                                        |
-| `multiline` | Built   | Textarea                                                |
-| `number`    | Built   | Number input; clearing it clears the property           |
-| `boolean`   | Built   | Checkbox                                                |
-| `select`    | Built   | Picker; options come from the schema                    |
-| `json`      | Built   | Textarea, committed on blur when it parses              |
-| `color`     | Planned | Swatch plus a text field, so a token name is typeable   |
-| `icon`      | Planned | Picker over the shared icon vocabulary                  |
-| `code`      | Planned | Monospace editor with a line count; no language service |
+| Editor      | Status | Control                                                 |
+| ----------- | ------ | ------------------------------------------------------- |
+| `string`    | Built  | Single-line text                                        |
+| `multiline` | Built  | Textarea                                                |
+| `number`    | Built  | Number input; clearing it clears the property           |
+| `boolean`   | Built  | Checkbox                                                |
+| `select`    | Built  | Picker; options come from the schema                    |
+| `json`      | Built  | Textarea, committed on blur when it parses              |
+| `color`     | Built  | Swatch plus a text field, so a token name is typeable   |
+| `icon`      | Built  | Picker over the shared icon vocabulary                  |
+| `code`      | Built  | Monospace editor with a line count; no language service |
 
-An editor with no branch of its own falls back to a single-line text input rather than failing, so an
-unimplemented editor is invisible until someone notices the control is wrong. `multiline` was that for a
-long time, declared from the first commit and never built; `Text` is the first component to want it.
+An editor with no branch of its own still falls back to a single-line text input rather than failing.
+Nothing reaches that fallback now, but it is worth knowing it is there: `multiline` sat behind it from
+the first commit until `Text` wanted one, and nothing failed, because a silently wrong control looks
+exactly like a right one.
+
+Three notes on the three newest. **The colour editor keeps the text as the value and the swatch as a
+convenience**, because `<input type="color">` holds only `#rrggbb` and the useful things to write are
+`var(--brand)`, `transparent` and `rgb(0 0 0 / 40%)`; a swatch that owned the value would rewrite every
+one of them on first touch. **The icon editor is a select**, not a grid: there are thirty names, the pane
+is 288px, and a name is what gets stored, so the preview is there only so nobody has to know what
+`paragraph` looks like. **The code editor has no syntax highlighting and no language service**, on
+purpose, because a half-working editor that lies about what it understands is worse than a plain one.
 
 Every row also carries its binding mode picker when the property offers more than one. See
 [07-bindings.md](07-bindings.md).

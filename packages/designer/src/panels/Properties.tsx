@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
+import type { IconName, JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
 import { indexKit, jsonToString } from '@formsmith/core'
 
+import { Icon, ICON_NAMES } from '../Icon.js'
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
 import type { DesignerApi, RenameResult } from '../store.js'
 
@@ -343,6 +344,12 @@ function PropRow({
           </select>
         ) : schema.editor === 'json' ? (
           <JsonEditor id={id} value={raw} onChange={set} onClear={() => onChange(undefined)} />
+        ) : schema.editor === 'color' ? (
+          <ColorEditor id={id} value={typeof raw === 'string' ? raw : ''} onChange={set} />
+        ) : schema.editor === 'icon' ? (
+          <IconEditor id={id} value={typeof raw === 'string' ? raw : ''} onChange={set} />
+        ) : schema.editor === 'code' ? (
+          <CodeEditor id={id} value={typeof raw === 'string' ? raw : ''} onChange={set} />
         ) : (
           <input
             id={id}
@@ -435,5 +442,117 @@ function JsonEditor({
         </p>
       )}
     </>
+  )
+}
+
+/**
+ * A colour, as a swatch beside a text field.
+ *
+ * The text is the value and the swatch is a convenience, never the other way
+ * round. `<input type="color">` can only hold `#rrggbb`, and the useful things
+ * to write here are `var(--brand)`, `transparent`, and `rgb(0 0 0 / 40%)`. A
+ * swatch that owned the value would quietly rewrite every one of them into the
+ * nearest hex the moment it was touched.
+ */
+function ColorEditor({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string
+  onChange: (next: string) => void
+}): ReactNode {
+  const hex = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
+  return (
+    <div className="fs-color">
+      <input
+        id={id}
+        type="text"
+        className="fs-color__text"
+        placeholder="var(--brand), #336699, transparent"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <input
+        type="color"
+        className="fs-color__swatch"
+        // Named, because it is a second control on the same row and the label
+        // above belongs to the text field.
+        aria-label={'Pick a colour'}
+        value={hex}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
+/**
+ * A name from the icon vocabulary, with the glyph beside it.
+ *
+ * A select rather than a grid of swatches: there are thirty names, the pane is
+ * 288px wide, and a name is what actually gets stored. The preview is there so
+ * the author does not have to know what `paragraph` looks like.
+ */
+function IconEditor({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string
+  onChange: (next: string) => void
+}): ReactNode {
+  const known = (ICON_NAMES as string[]).includes(value)
+  return (
+    <div className="fs-icon-picker">
+      <span className="fs-icon-picker__preview" aria-hidden="true">
+        {known ? <Icon name={value as IconName} /> : null}
+      </span>
+      <select id={id} value={known ? value : ''} onChange={(e) => onChange(e.target.value)}>
+        <option value="">(none)</option>
+        {ICON_NAMES.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+/**
+ * Source, in a monospace box that counts its lines.
+ *
+ * No syntax highlighting and no language service. This is a property editor in
+ * a 288px pane, not an IDE, and a half-working editor that lies about what it
+ * understands is worse than a plain one. The line count is there because the
+ * box is short and it is otherwise impossible to tell how much is scrolled out
+ * of sight.
+ */
+function CodeEditor({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string
+  onChange: (next: string) => void
+}): ReactNode {
+  const lines = value === '' ? 0 : value.split('\n').length
+  return (
+    <div className="fs-code">
+      <textarea
+        id={id}
+        className="fs-code__area"
+        rows={5}
+        spellCheck={false}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <p className="fs-code__count">
+        {lines} {lines === 1 ? 'line' : 'lines'}
+      </p>
+    </div>
   )
 }

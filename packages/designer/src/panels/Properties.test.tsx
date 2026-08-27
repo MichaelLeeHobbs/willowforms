@@ -52,7 +52,13 @@ const kit: Kit = {
       dataBound: true,
       dataType: 'string',
       defaultProps: {},
-      props: [{ name: 'label', label: 'Label', editor: 'string' }],
+      props: [
+        { name: 'label', label: 'Label', editor: 'string' },
+        { name: 'tint', label: 'Tint', editor: 'color' },
+        { name: 'glyph', label: 'Glyph', editor: 'icon' },
+        { name: 'script', label: 'Script', editor: 'code' },
+        { name: 'notes', label: 'Notes', editor: 'multiline' },
+      ],
       events: ['onChange'],
     },
     {
@@ -224,5 +230,103 @@ describe('the data key field', () => {
 
     // A layout component submits nothing, so naming its answer is meaningless.
     expect(screen.queryByLabelText('Data key')).toBeNull()
+  })
+})
+
+describe('the colour editor', () => {
+  const open = async (): Promise<ReturnType<typeof setup>> => {
+    const harness = setup(dataField())
+    await harness.select()
+    return harness
+  }
+
+  it('keeps the text as the value and the swatch as a convenience', async () => {
+    /*
+     * `<input type="color">` can only hold #rrggbb, and the useful things to
+     * write are var(--brand), transparent and rgb(...). A swatch that owned the
+     * value would rewrite every one of them to the nearest hex on first touch.
+     */
+    const { user, latest } = await open()
+    const text = screen.getByLabelText('Tint')
+
+    await user.type(text, 'var(--brand)')
+
+    expect(latest()?.props['tint']).toEqual({ kind: 'static', value: 'var(--brand)' })
+  })
+
+  it('shows black in the swatch for a value it cannot represent', async () => {
+    const { user } = await open()
+    await user.type(screen.getByLabelText('Tint'), 'transparent')
+
+    const swatch = screen.getByLabelText('Pick a colour')
+    expect(swatch).toHaveProperty('value', '#000000')
+  })
+
+  it('names the swatch, since the row label belongs to the text field', async () => {
+    await open()
+    expect(screen.getByLabelText('Pick a colour')).toBeTruthy()
+  })
+})
+
+describe('the icon editor', () => {
+  it('offers the vocabulary and stores a name', async () => {
+    const harness = setup(dataField())
+    await harness.select()
+
+    const select = screen.getByLabelText('Glyph')
+    await harness.user.selectOptions(select, 'checkbox')
+
+    expect(harness.latest()?.props['glyph']).toEqual({ kind: 'static', value: 'checkbox' })
+  })
+
+  it('previews the chosen glyph, and nothing for an unknown name', async () => {
+    const harness = setup({
+      ...dataField(),
+      props: { glyph: { kind: 'static', value: 'not-an-icon' } },
+    })
+    await harness.select()
+
+    // An unrecognised name is what a hand-edited document produces. It must not
+    // crash, and it must not draw something arbitrary.
+    const preview = document.querySelector('.fs-icon-picker__preview')
+    expect(preview?.querySelector('svg')).toBeNull()
+
+    // A property with a value set says so inside its own label, for a screen
+    // reader. /Glyph/ would also match the binding mode picker beside it.
+    await harness.user.selectOptions(screen.getByLabelText('Glyph (modified)'), 'text')
+    expect(document.querySelector('.fs-icon-picker__preview svg')).not.toBeNull()
+  })
+})
+
+describe('the code editor', () => {
+  it('counts its lines', async () => {
+    const harness = setup(dataField())
+    await harness.select()
+
+    const area = screen.getByLabelText('Script')
+    expect(screen.getByText('0 lines')).toBeTruthy()
+
+    await harness.user.type(area, 'a')
+    expect(screen.getByText('1 line')).toBeTruthy()
+  })
+
+  it('stores what was typed', async () => {
+    const harness = setup(dataField())
+    await harness.select()
+
+    await harness.user.type(screen.getByLabelText('Script'), 'return 1')
+
+    expect(harness.latest()?.props['script']).toEqual({ kind: 'static', value: 'return 1' })
+  })
+})
+
+describe('the multiline editor', () => {
+  it('is a textarea, not a one-line box', async () => {
+    // Declared in PropEditor from the first commit and unimplemented until
+    // Text wanted one, so a kit asking for it got the single-line fallback.
+    const harness = setup(dataField())
+    await harness.select()
+
+    expect(screen.getByLabelText('Notes').tagName).toBe('TEXTAREA')
   })
 })
