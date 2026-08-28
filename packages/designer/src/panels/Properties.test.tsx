@@ -543,7 +543,29 @@ describe('the condition editor survives a hand-edited document', () => {
     { op: 'or', conditions: [{ op: 'truthy', value: { kind: 'ref', dataKey: 'a' } }, 'nonsense'] },
     { op: 'not', condition: null },
     { op: 'and', conditions: [{ op: 'and', conditions: [null] }] },
+    { op: 'sorcery' },
+    { op: 'and', conditions: [{ op: 'sorcery' }] },
   ]
+
+  it('draws an operator it does not know as one it does', async () => {
+    /*
+     * A controlled select whose value matches no option renders blank, so the
+     * author sees a comparison with no name and cannot tell what the document
+     * says. Falling back to a real operator gives them something to change.
+     */
+    const harness = setup(withRenderWhen({ op: 'sorcery' }))
+    await harness.select()
+
+    /*
+     * Asserting on the select's value alone proves nothing: jsdom quietly
+     * falls back to the first option when the value matches none, so the
+     * broken and fixed states look identical from there. What differs is that
+     * a real operator draws its operands — `sorcery` has none, `truthy` has a
+     * subject — so that is the thing to check.
+     */
+    expect(screen.getByLabelText('Subject')).toBeTruthy()
+    expect(screen.getByLabelText('Comparison')).toHaveProperty('value', 'truthy')
+  })
 
   it.each(malformed.map((c) => [JSON.stringify(c), c] as const))(
     'renders %s without crashing',

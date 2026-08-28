@@ -41,9 +41,10 @@ const OP_LABELS: Record<Condition['op'], string> = {
   not: 'not',
 }
 
-const ORDER: Condition['op'][] = [...COMPARISONS, ...UNARY, ...MEMBERSHIP, ...GROUPS, 'not']
-
 const literal = (value: JsonValue): Operand => ({ kind: 'literal', value })
+
+/** Every operator, in the order the picker lists them. */
+const ORDER: Condition['op'][] = [...COMPARISONS, ...UNARY, ...MEMBERSHIP, ...GROUPS, 'not']
 
 /**
  * A list, whatever the document actually holds.
@@ -109,9 +110,14 @@ function morph(current: Condition, op: Condition['op']): Condition {
  * can then set to whatever they meant; nothing is written until they touch it.
  */
 function asCondition(value: Condition | undefined): Condition {
-  if (!value || typeof value !== 'object' || typeof value.op !== 'string') {
-    return { op: 'truthy', value: literal('') }
-  }
+  if (!value || typeof value !== 'object') return { op: 'truthy', value: literal('') }
+  /*
+   * The operator has to be one this editor can draw, not merely a string. An
+   * unknown one reached a controlled `<select>` with no matching option, which
+   * renders blank and leaves the author looking at a comparison with no name
+   * and no way to tell what the document actually says.
+   */
+  if (!(ORDER as string[]).includes(value.op)) return { op: 'truthy', value: literal('') }
   return value
 }
 
