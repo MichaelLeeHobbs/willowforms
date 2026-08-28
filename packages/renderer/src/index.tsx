@@ -9,13 +9,14 @@
 
 import { createContext, useCallback, useContext, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { dataKeyOf, evaluateCondition, isVisible, valueOf } from '@formsmith/core'
+import { dataKeyOf, evaluateCondition, isVisible, styleSheetFor, valueOf } from '@formsmith/core'
 import type {
   ComponentNode,
   Evaluator,
   FormData,
   FormDocument,
   FormErrors,
+  Device,
   JsonValue,
   PropValue,
 } from '@formsmith/core'
@@ -183,6 +184,15 @@ export interface FormRendererProps {
   language?: string
   /** Sandbox for computed bindings. Omit to render computed props as null. */
   evaluate?: Evaluator
+  /**
+   * Render per-component styling for one device instead of by media query.
+   *
+   * The designer's canvas simulates a device by sizing a frame, so a media
+   * query there would answer about the browser window and ignore the frame.
+   * A real page has no frame, so omitting this is what a host wants: every
+   * device becomes its own query and the viewport decides.
+   */
+  device?: Device
   onChange: (key: string, value: JsonValue) => void
 }
 
@@ -193,6 +203,7 @@ export function FormRenderer({
   errors = NO_ERRORS,
   language,
   evaluate,
+  device,
   onChange,
 }: FormRendererProps): ReactNode {
   const translations = useMemo(
@@ -205,8 +216,17 @@ export function FormRenderer({
     [kit, data, errors, translations, evaluate, onChange],
   )
 
+  /*
+   * One stylesheet for the whole document rather than a style attribute per
+   * node: a kit owns its components' `style`, and writing there would fight it.
+   * Every rule is scoped to a `data-fs-key`, which every renderer already
+   * spreads, so this reaches exactly the elements the document names.
+   */
+  const sheet = useMemo(() => styleSheetFor(document.root, device), [document.root, device])
+
   return (
     <Ctx.Provider value={ctx}>
+      {sheet && <style>{sheet}</style>}
       <RenderNode node={document.root} />
     </Ctx.Provider>
   )

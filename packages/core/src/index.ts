@@ -33,6 +33,8 @@ export { isEmpty, jsonToString, optionValue, safeHref, valueOf } from './json.js
 
 export { evaluateCondition } from './condition.js'
 
+export { DEVICE_QUERY, safeDeclarations, styleSheetFor } from './css.js'
+
 export { isVisible } from './visibility.js'
 
 export { findLanguage, languageTag } from './language.js'
@@ -62,6 +64,7 @@ export type { Evaluator } from './validation.js'
 export {
   applyRule,
   autoValidateKeys,
+  submittedData,
   DEFAULT_MESSAGES,
   validateField,
   validateForm,

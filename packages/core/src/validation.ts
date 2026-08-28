@@ -204,3 +204,38 @@ export function autoValidateKeys(root: ComponentNode): Set<string> {
   }
   return keys
 }
+
+/**
+ * The data a form is actually asking for, with answers to hidden questions left out.
+ *
+ * A value stays in `data` after the field that collected it is hidden. Tick
+ * "married", fill in a spouse's name, untick it: `validateForm` correctly stops
+ * checking that field, and the answer is still sitting in the payload. The form
+ * submits an answer to a question it is no longer asking, and in insurance,
+ * medical and legal forms that is a correctness problem rather than a tidiness
+ * one.
+ *
+ * Formsmith cannot clear it unilaterally, because the host owns `data` and
+ * hiding is often temporary — an accordion closing must not destroy what
+ * someone typed. So this is a projection the host applies when it submits,
+ * rather than something done to the value as it is held.
+ *
+ * Visibility is decided by the same `isVisible` the renderer and `validateForm`
+ * use, so all three agree about what is on screen.
+ */
+export function submittedData(root: ComponentNode, data: FormData, evaluate?: Evaluator): FormData {
+  const kept: FormData = {}
+
+  const visit = (node: ComponentNode): void => {
+    if (!isVisible(node, data, evaluate)) return
+    if (node.schema) {
+      const key = dataKeyOf(node)
+      const value = valueOf(data, key)
+      if (value !== undefined) kept[key] = value
+    }
+    for (const child of node.children ?? []) visit(child)
+  }
+
+  visit(root)
+  return kept
+}

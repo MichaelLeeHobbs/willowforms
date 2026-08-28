@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ComponentNode, FormData, ValidationRule } from './types.js'
+import type { ComponentNode, Condition, FormData, ValidationRule } from './types.js'
 import {
+  DEFAULT_MESSAGES,
   applyRule,
   autoValidateKeys,
-  DEFAULT_MESSAGES,
+  submittedData,
   validateField,
   validateForm,
 } from './validation.js'
@@ -323,5 +324,102 @@ describe('dataKey in validation', () => {
 
   it('falls back to the component key when no data key is set', () => {
     expect(validateForm(root([node('email')]), { email: 'a@b.com' })).toEqual({})
+  })
+})
+
+describe('submittedData', () => {
+  /*
+   * A value stays in `data` after its field is hidden, so the payload carries
+   * an answer to a question the form no longer asks. validateForm already
+   * stops checking it; this is the other half.
+   */
+  const married: Condition = { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } }
+
+  const form: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      { key: 'married', type: 'Checkbox', props: {}, schema: { type: 'boolean', validations: [] } },
+      {
+        key: 'spouse',
+        type: 'Stack',
+        props: {},
+        renderWhen: { kind: 'condition', condition: married },
+        children: [
+          {
+            key: 'spouseName',
+            type: 'Field',
+            props: {},
+            schema: { type: 'string', validations: [] },
+          },
+        ],
+      },
+    ],
+  }
+
+  it('keeps what the form is asking for', () => {
+    const data = { married: true, spouseName: 'Alex' }
+    expect(submittedData(form, data)).toEqual({ married: true, spouseName: 'Alex' })
+  })
+
+  it('drops an answer whose question is hidden', () => {
+    const data = { married: false, spouseName: 'Alex' }
+    expect(submittedData(form, data)).toEqual({ married: false })
+  })
+
+  it('drops everything beneath a hidden container, not just the container', () => {
+    const data = { married: false, spouseName: 'Alex' }
+    expect(submittedData(form, data)['spouseName']).toBeUndefined()
+  })
+
+  it('leaves the held data alone, because hiding is often temporary', () => {
+    // An accordion closing must not destroy what someone typed. This is a
+    // projection applied at submit, not an edit to the value.
+    const data = { married: false, spouseName: 'Alex' }
+    submittedData(form, data)
+    expect(data['spouseName']).toBe('Alex')
+  })
+
+  it('omits a key nobody answered rather than sending undefined', () => {
+    expect(Object.hasOwn(submittedData(form, { married: true }), 'spouseName')).toBe(false)
+  })
+
+  it('ignores components that hold no data', () => {
+    const withHeading: ComponentNode = {
+      ...form,
+      children: [...(form.children ?? []), { key: 'note', type: 'Heading', props: {} }],
+    }
+    expect(submittedData(withHeading, { married: true, note: 'stray' })['note']).toBeUndefined()
+  })
+
+  it('agrees with validateForm about what is on screen', () => {
+    /*
+     * The two must not disagree: a field validateForm checks and this drops
+     * would be required and unsendable, and the reverse sends an answer nobody
+     * checked.
+     */
+    const data = { married: false, spouseName: 'Alex' }
+    const required: ComponentNode = {
+      ...form,
+      children: (form.children ?? []).map((child) =>
+        child.key === 'spouse'
+          ? {
+              ...child,
+              children: [
+                {
+                  key: 'spouseName',
+                  type: 'Field',
+                  props: {},
+                  schema: { type: 'string', validations: [{ key: 'required' as const }] },
+                },
+              ],
+            }
+          : child,
+      ),
+    }
+
+    expect(validateForm(required, data)).toEqual({})
+    expect(submittedData(required, data)['spouseName']).toBeUndefined()
   })
 })
