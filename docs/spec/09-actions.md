@@ -1,8 +1,12 @@
 # Actions and events
 
-**Status: planned.** The model declares all of it. Nothing authors an action, nothing fires one, and no
-evaluator exists to run one. This is the largest gap between what the type system promises and what a
-user can reach.
+**Status: planned.** The model declares all of it. Nothing authors an action and nothing fires one.
+
+Two questions that used to be undecided here are settled: an action **returns effects** rather than
+changing data, and one vocabulary serves both built-in and `code` actions. What is not settled is the
+vocabulary itself, and that is deliberate. Working through what real forms do showed that actions sit one
+layer above what is actually blocking them, so this is no longer the next thing to build. See
+[why this is not next](#why-this-is-not-next).
 
 ## The boundary, first
 
@@ -71,48 +75,132 @@ on the component, so one can be reused — which is the point of naming them.
 `validateDocument` already checks that every `code` reference names an action that exists. That check has
 been running since the first commit against a feature nobody can use.
 
-## Built-in actions
+## An action returns effects
 
-**Status: undecided.** `ActionRef.type` allows `'builtin'` and no built-in exists.
+**Status: decided, not written.** This was two open questions, and they turned out to be one.
 
-This is the decision that matters most here, because **most forms need no JavaScript at all.** The common
-cases are:
+An action does **not** change form data. It returns an ordered list of effects, and the runner applies
+them. A built-in action and a `code` action return from the same vocabulary; the only difference between
+them is who wrote the body.
 
-- submit the form
-- reset the form
-- set another field's value
-- show or hide something
-- navigate somewhere
+### Why, and not the reason this document used to give
 
-Every one of those is expressible declaratively. If the built-ins cover them, the overwhelming majority
-of forms never touch the sandbox, and the sandbox becomes an advanced feature rather than a prerequisite
-for a working form. That is a much better shape than "install a sandbox or your buttons do nothing".
+The old wording said direct mutation "makes undo meaningless". That argument is wrong and has been
+removed: undo is a designer feature over documents, and runtime form data has no undo to make meaningless.
+Two better reasons survive.
 
-The recommendation is to specify a small, closed set of built-ins and treat `code` as the escape hatch,
-not the primary path.
+**The sandbox contract already forbids the thing mutation is good at.** `Evaluator` is
+`(expression: string, data: FormData) => JsonValue`: synchronous, pure, and networkless, sandboxed because
+author code is treated as remote code execution. Author code cannot `await`, cannot `fetch`, and has no
+handle on the host. An imperative `setValue` would have to be a message posted back across that boundary,
+which means adopting it is not a choice about action ergonomics. It is a decision to widen the sandbox
+into a permanent bidirectional write channel, open after the node unmounts and after the form is
+submitted. That is a much larger security decision than the one it looks like.
 
-## Firing
+**A superseded result cannot be discarded by the author.** Type a postcode, three lookups go out, they
+resolve out of order, and the answer to the first keystroke lands last. Fixing that needs state shared
+across runs, and Worker runs are isolated by design, so the author cannot reach it. Only a runner holding
+the returned value can drop a stale one. This is the common case, not the exotic one: it applies to every
+lookup, availability check and quote in a real form.
 
-**Status: undecided.** The renderer receives `onChange` from a data-bound component today and does
-nothing else with events. The open question at the end of this section is the semantics of the whole
-feature, so nothing here is buildable yet. It would need:
+The honest counter, worth recording because it is a good one: a capability model can emulate a returned
+list, and a returned list cannot emulate a capability. That asymmetry is real. It buys progressive results
+— a live upload percentage, a countdown — and those are conceded for now. They also need timers and
+ephemeral state, neither of which exists, so nothing is lost today that is not already lost.
 
-- an `onAction` prop, so the host decides what running an action means
-- lifecycle events, which means the renderer knows when a node mounts and unmounts
-- an ordering guarantee for a list of actions on one event: sequential, and a failure stops the rest
+### Effects, not a data patch
 
-**Undecided:** whether an action can change form data directly, or only return a value the renderer
-applies. Direct mutation is simpler to write and much harder to reason about, and it makes undo
-meaningless. Returning a patch is the safer design.
+The list is **effects**, not a diff of form data. Roughly a third of what real forms do on an event
+changes something other than data: move focus, scroll to an error, announce a result, navigate, download,
+hand off to the host. A data-shaped patch cannot express any of those, and a vocabulary that covers only
+the easy third would push everything else back into the escape hatch.
+
+```ts
+type Effect =
+  | { kind: 'setValue'; dataKey: string; value: JsonValue }
+  | { kind: 'clearValue'; dataKey: string }
+  | { kind: 'focus'; nodeKey: string }
+  | { kind: 'announce'; message: string }
+  | { kind: 'validate'; scope?: string }
+  | { kind: 'emit'; event: string; payload?: JsonValue }
+  | { kind: 'halt'; reason?: string }
+```
+
+Two namespaces, deliberately visible in the type. Data effects address `dataKey`, which may repeat;
+interface effects address `nodeKey`, which is unique. That is the same split `FormData` and `FormErrors`
+already make, and an imperative `set(key, value)` could not show it.
+
+An unknown effect kind rejects the whole list rather than applying part of it. A document authored in a
+newer designer must fail visibly in an older host, not half-apply.
+
+### `emit` is what makes the set closable
+
+Formsmith has no persistence and no backend opinion, so `submit`, `save draft`, `look up this postcode`
+and `send this to analytics` are all the same shape: a named event the host handles. One effect covers
+them, and it is the reason the vocabulary can stay small rather than growing an entry per integration.
+
+### Network access belongs to the host
+
+No action of either shape can make a network call, because the evaluator cannot. So an asynchronous
+behaviour is a **host-executed request**: the host performs the call, and the author's code is reduced to
+two pure evaluator calls, one shaping the body from `data` and one mapping the response to effects. The
+runner owns the in-flight token, the timeout, and the policy for what happens when a second request
+starts before the first returns.
+
+This falls out of the sandbox contract rather than being a preference, and it is why the mutation
+question never really touched async.
+
+### Degradation has three tiers, not one
+
+The table above says "action: does not run", which is too coarse. A `same as billing` checkbox that
+silently does nothing in a host with no evaluator is broken, not degraded.
+
+| Action                                | Without an evaluator                                     |
+| ------------------------------------- | -------------------------------------------------------- |
+| Built-in, literal parameters only     | runs                                                     |
+| Built-in with an expression parameter | that parameter resolves to `null`; the action still runs |
+| `code`                                | does not run                                             |
+
+### What is still open
+
+The vocabulary above is a sketch, not the specification. Settling it means answering what an ordered list
+does when one entry fails, whether a programmatic write re-fires the events of the field it wrote, and
+where the cycle stops when two fields legitimately set each other. None of that is worth settling before
+the gaps below are.
+
+## Why this is not next
+
+**Status: decided.** Actions are one layer above what is actually blocking real forms.
+
+Working through the behaviours of checkouts, insurance quotes, job applications, surveys and booking
+flows, the blockers sort into four groups, and the action model touches none of them:
+
+- **Ephemeral state that is not submitted.** "Three addresses found", "checking", "43 seconds left",
+  "uploading". `renderWhen` can only read `data`, and nobody wants `__addressCandidates` in the payload.
+  Half the effects above have nowhere to write to until this exists. See
+  [12-api.md](12-api.md#the-host-owns-the-data).
+- **Steps.** There is no Step component, so there is no per-step validation scope, no branch-to-question,
+  and no progress. That is the defining feature of onboarding and surveys.
+  See [03-components.md](03-components.md).
+- **Repeated scope.** Already known and already blocked. A Remove button inside row three has no way to
+  say "row three", which is a document-model gap rather than an action gap.
+  See [01-document-model.md](01-document-model.md#datakey).
+- **Timers.** No scheduled trigger, so no cooldown, no autosave, no session warning.
+
+**And the sandbox is already required for something more common than actions.** `renderWhen` is a
+`PropValue`, so its only conditional form is `computed`, which needs an evaluator, and it has no
+authoring UI. Conditional visibility — the most common dynamic behaviour a form has — today needs a
+sandbox _and_ hand-edited JSON. A closed structured condition would do more for "most forms need no
+JavaScript" than this entire document. See
+[01-document-model.md](01-document-model.md#conditions).
 
 ## Authoring
 
 **Status: planned.** See [06-inspector.md](06-inspector.md#actions).
 
 Two surfaces: a per-component Actions tab wiring events to references, and a document-level editor for
-the actions themselves. Both need the `code` property editor, which does not exist.
+the actions themselves. The `code` property editor they both need now exists.
 
-## Why this is last
-
-Its absence has a workaround the others do not: a host that needs behaviour can wire it outside the form
-through `onChange` on the whole document. It is also the only feature here that can make a form unsafe.
+Its absence also has a workaround the other gaps do not: a host that needs behaviour can wire it outside
+the form, through `onChange` on the whole document. And it is the only feature here that can make a form
+unsafe.

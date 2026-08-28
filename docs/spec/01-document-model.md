@@ -143,6 +143,69 @@ a submit with an error the user could not see or fix. Hiding a container hides e
 With no evaluator injected, a computed condition resolves to hidden, because that is what the renderer
 does and validation follows the renderer.
 
+## Conditions
+
+**Status: built.** `evaluateCondition` in core, a fourth `PropValue` kind, and a picker in the panel.
+
+`renderWhen` is a `PropValue`, so the only conditional form it has is `computed`, which needs the
+injected evaluator. It also has no authoring UI. Put those together and **conditional visibility, the most
+common dynamic behaviour a form has, today requires a JavaScript sandbox and a hand-edited JSON
+document.**
+
+That makes the claim in [09-actions.md](09-actions.md) — that most forms should need no JavaScript —
+already false, and no set of actions can rescue it. A form that cannot show its second field without a
+sandbox has needed one long before anyone pressed a button.
+
+A fourth kind fixes both, closed and structured:
+
+```ts
+type Condition =
+  | { op: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte'; left: Operand; right: Operand }
+  | { op: 'empty' | 'notEmpty' | 'truthy' | 'falsy'; value: Operand }
+  | { op: 'in' | 'notIn'; value: Operand; options: JsonValue[] }
+  | { op: 'and' | 'or'; conditions: Condition[] }
+  | { op: 'not'; condition: Condition }
+
+type Operand = { kind: 'literal'; value: JsonValue } | { kind: 'ref'; dataKey: string }
+```
+
+Closed on purpose. The set of comparisons a form author actually writes is small and finite, so it can be
+enumerated, given a picker in the panel, and evaluated by core with no sandbox at all. Expressions are
+neither small nor finite, which is why they stay the evaluator's job: this is a condition vocabulary, not
+a language, and the moment it grows arithmetic it has become one.
+
+Three things follow, and they are the reason this outranks the rest of the roadmap:
+
+- A form with branching visibility runs in a host that injected nothing.
+- Conditions become authorable in the panel, because a closed set is a UI and an expression is a text box.
+- The same type serves a rule's `when` guard and, later, an action's guard, so one editor covers all three.
+
+`computed` stays, for the conditions a vocabulary cannot express. It is the escape hatch now rather than
+the only door.
+
+**It is total.** `isVisible` is called by the renderer and by `validateForm`, so a condition that throws
+takes the form off screen for the person filling it in, who cannot edit the document. Anything
+`evaluateCondition` cannot read is false, which is what a computed condition does without an evaluator,
+so hidden stays the answer to every question it cannot answer.
+
+Malformed and empty are told apart, and so are malformed and false. `not` is the only operator that
+inverts, so it is the only one that can turn "cannot read this" into a reason to **show** a component:
+`not` of an unrecognised operator came back true. Internally the evaluator answers true, false, or
+nothing, and only the boundary collapses nothing to false, so the inversion happens where the difference
+is still visible. A group holding an unreadable part is unreadable too, because answering from the
+remainder would be guessing at a document nobody can fully read.
+
+The empty case is subtler than it sounds. An empty `and` is true and an empty
+`or` is false, because that is what those operations mean over no arguments and it lets a half-built
+condition in the panel behave. But a `conditions` that is not a list is malformed, and routing it through
+an empty array would make `and` true and **show** a component whose visibility rule is broken. The same
+applies to `notIn` with a malformed option list. Both are false.
+
+`empty` and `truthy` are different questions and the vocabulary keeps them apart: `0` and `false` are
+answers, so they are not empty, and both are falsy. `isEmpty` is shared with validation, because "empty"
+meaning two things would let a field be empty enough to skip a `minLength` rule and not empty enough to
+satisfy a condition.
+
 ## PropValue
 
 **Status: built.**

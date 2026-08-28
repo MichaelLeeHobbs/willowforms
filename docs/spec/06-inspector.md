@@ -1,7 +1,7 @@
 # Inspector
 
-**Status: partial.** Properties and Rules are built. Style and Actions do not exist. Three of the nine
-property editors are unimplemented, and `PropSchema.section` is declared but ignored.
+**Status: partial.** Properties and Rules are built, and so is every property editor. Style and Actions
+do not exist, and `PropSchema.section` is declared but ignored.
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
 never knows what a `TextField` is, only that something declared a `label` property with a `string`
@@ -61,36 +61,46 @@ panel silently began editing a different node.
 
 ### Property editors
 
-`PropEditor` declares nine. Six exist.
+`PropEditor` declares nine. All nine exist.
 
-| Editor      | Status  | Control                                                 |
-| ----------- | ------- | ------------------------------------------------------- |
-| `string`    | Built   | Single-line text                                        |
-| `multiline` | Built   | Textarea                                                |
-| `number`    | Built   | Number input; clearing it clears the property           |
-| `boolean`   | Built   | Checkbox                                                |
-| `select`    | Built   | Picker; options come from the schema                    |
-| `json`      | Built   | Textarea, committed on blur when it parses              |
-| `color`     | Planned | Swatch plus a text field, so a token name is typeable   |
-| `icon`      | Planned | Picker over the shared icon vocabulary                  |
-| `code`      | Planned | Monospace editor with a line count; no language service |
+| Editor      | Status | Control                                                 |
+| ----------- | ------ | ------------------------------------------------------- |
+| `string`    | Built  | Single-line text                                        |
+| `multiline` | Built  | Textarea                                                |
+| `number`    | Built  | Number input; clearing it clears the property           |
+| `boolean`   | Built  | Checkbox                                                |
+| `select`    | Built  | Picker; options come from the schema                    |
+| `json`      | Built  | Textarea, committed on blur when it parses              |
+| `color`     | Built  | Swatch plus a text field, so a token name is typeable   |
+| `icon`      | Built  | Picker over the shared icon vocabulary                  |
+| `code`      | Built  | Monospace editor with a line count; no language service |
 
-An editor with no branch of its own falls back to a single-line text input rather than failing, so an
-unimplemented editor is invisible until someone notices the control is wrong. `multiline` was that for a
-long time, declared from the first commit and never built; `Text` is the first component to want it.
+An editor with no branch of its own still falls back to a single-line text input rather than failing.
+Nothing reaches that fallback now, but it is worth knowing it is there: `multiline` sat behind it from
+the first commit until `Text` wanted one, and nothing failed, because a silently wrong control looks
+exactly like a right one.
+
+Three notes on the three newest. **The colour editor keeps the text as the value and the swatch as a
+convenience**, because `<input type="color">` holds only `#rrggbb` and the useful things to write are
+`var(--brand)`, `transparent` and `rgb(0 0 0 / 40%)`; a swatch that owned the value would rewrite every
+one of them on first touch. **The icon editor is a select**, not a grid: there are thirty names, the pane
+is 288px, and a name is what gets stored, so the preview is there only so nobody has to know what
+`paragraph` looks like. **The code editor has no syntax highlighting and no language service**, on
+purpose, because a half-working editor that lies about what it understands is worse than a plain one.
 
 Every row also carries its binding mode picker when the property offers more than one. See
 [07-bindings.md](07-bindings.md).
 
-**Known defect: the mode picker is squeezed.** A property row is a three-column grid,
-`108px 1fr auto`, with the picker in the flexible column and the control in the automatic one. That is
-backwards. At the pane's 288px the picker gets about 38px, which clips "Value" and "Expression" to
-nothing, so a working control reads as an empty box. The control should take the space and the picker
-its natural width.
+**The picker sits above the control, not beside it.** A property row is `108px minmax(0, 1fr) auto`:
+label, control, and whatever follows. The picker shares the control's cell.
 
-It is labelled correctly, by a visually-hidden `<label for>`, so this is layout and not accessibility,
-which is why axe has never had anything to say about it. The fix is a change to the shared row layout
-and wants a look at every property type at once rather than a quick swap of two track sizes.
+Inline was tried and does not fit. At the pane's 288px, a label, a readable picker and a usable text box
+cannot share one line, and the first attempt gave the picker the flexible column and the control its
+natural width, which collapsed the picker to about 38px and clipped "Value" to nothing. A working
+control that reads as an empty box is worse than one that is obviously absent.
+
+A boolean is the exception: a checkbox needs almost no width, so it sits beside the picker, and the
+picker is told not to shrink there. Shrinking is exactly what clipped it the first time.
 
 ### The JSON editor is controlled
 
@@ -189,8 +199,15 @@ A component that holds no form data says so instead of showing an empty rule lis
 
 **Status: planned.** Two things a kit cannot anticipate:
 
-- **`renderWhen`.** Conditional visibility works everywhere except in the panel, so it is JSON-only
-  today. It is a `PropValue` and wants the same editor as any other binding.
+- **`renderWhen`.** **Built.** A Show when row offering Always, Never, a condition, or an expression.
+  `renderWhen` is a `PropValue`, so a document can hold any of its kinds: a static falsy reads as
+  Never, and a static truthy or a translation key reads as Always, which is what `isVisible` does with
+  them. Reading anything truthy as a condition left the select saying so while rendering no editor,
+  which made a hand-edited document unfixable from the panel. A
+  component cannot test its own field: hiding a component when its own value is empty hides the only
+  control that could fill it. The field list comes from the document, so a condition cannot name a key
+  that does not exist, and a hand-edited one that does is shown rather than silently reassigned.
+  See [01-document-model.md](01-document-model.md#conditions).
 - **HTML attributes.** A passthrough for `id`, `data-*`, `aria-*`. Needs an allowlist rather than an open
   door: letting an author set arbitrary attributes on a kit's root element includes `style` and
   `onclick`, and this project already draws the code-execution boundary elsewhere.

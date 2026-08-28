@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
-import { indexKit, jsonToString } from '@formsmith/core'
+import type { IconName, JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
+import { dataKeyOf, flatten, indexKit, jsonToString } from '@formsmith/core'
 
+import { Icon, ICON_NAMES } from '../Icon.js'
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
+import { ConditionEditor, emptyCondition } from './ConditionEditor.js'
 import type { DesignerApi, RenameResult } from '../store.js'
 
 export interface PropertiesProps {
@@ -23,6 +25,24 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
   }
 
   const def = indexKit(kit).get(node.type)
+
+  /*
+   * Every data key in the document, so a condition can only name a field that
+   * exists. Taken from the tree rather than the kit, because a data key is a
+   * property of the document and may have been renamed away from its node key.
+   *
+   * Deduplicated, because data keys are allowed to repeat: two fields behind
+   * opposite guards can write one answer. As a list of things to test they are
+   * one entry, and leaving the duplicate in gave two identical options with the
+   * same React key.
+   */
+  const dataKeys = [
+    ...new Set(
+      flatten(api.document.root)
+        .filter((row) => row.node.schema)
+        .map((row) => dataKeyOf(row.node)),
+    ),
+  ]
 
   return (
     <section className="fs-properties">
@@ -48,6 +68,26 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
         />
       )}
 
+      {/*
+       * Visibility is a property of the node rather than an entry in `props`,
+       * so it gets its own row rather than coming from the kit's schema. It was
+       * authorable only by editing the document JSON until the condition
+       * vocabulary existed to give it a picker.
+       */}
+      <VisibilityRow
+        key={node.key + ':renderWhen'}
+        value={node.renderWhen}
+        /*
+         * A component cannot test its own field, because hiding it on its own
+         * emptiness removes the control that would fill it. Only a component
+         * that has a field, though: `dataKeyOf` falls back to the node key, so
+         * filtering unconditionally hid a real field from a container that
+         * happened to share its name.
+         */
+        dataKeys={node.schema ? dataKeys.filter((key) => key !== dataKeyOf(node)) : dataKeys}
+        onChange={(next) => api.setRenderWhen(node.key, next)}
+      />
+
       {!def && <p className="fs-empty">Type {node.type} is not in the active kit.</p>}
 
       {def?.props.map((schema) => (
@@ -60,6 +100,7 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
           schema={schema}
           value={node.props[schema.name]}
           componentKey={node.key}
+          dataKeys={dataKeys}
           languages={api.document.languages}
           defaultLanguage={api.document.defaultLanguage}
           translations={api.document.translations}
@@ -197,10 +238,104 @@ function KeyField({
   )
 }
 
+/**
+ * When a component is shown.
+ *
+ * Three modes rather than the usual four: a condition, an expression for what a
+ * condition cannot say, and nothing at all. There is no static or translated
+ * mode, because "always show this unless it says false" is what an absent
+ * `renderWhen` already means, and a translation key is not a condition.
+ *
+ * A component cannot test its own field. Hiding a component when its own value
+ * is empty hides the only control that could fill it, which reads as the form
+ * being broken.
+ */
+function VisibilityRow({
+  value,
+  dataKeys,
+  onChange,
+}: {
+  value: PropValue | undefined
+  dataKeys: string[]
+  onChange: (next: PropValue | undefined) => void
+}): ReactNode {
+  /*
+   * `renderWhen` is a `PropValue`, so a hand-edited document can hold a static
+   * boolean or a translation key as well as the two this row authors. Reading
+   * anything truthy as "a condition" left the select saying so while rendering
+   * no editor, which made those documents unfixable from the panel.
+   *
+   * A static false is the one that means something on its own: never shown.
+   * `isVisible` treats a static truthy and a translation key alike as no
+   * condition expressed, so both read as Always, which is what they do.
+   */
+  const mode =
+    value?.kind === 'computed'
+      ? 'computed'
+      : value?.kind === 'condition'
+        ? 'condition'
+        : value?.kind === 'static' && !value.value
+          ? 'never'
+          : 'always'
+
+  return (
+    <div className={'fs-prop-row' + (value ? ' is-set is-binding' : '')}>
+      <label htmlFor="fs-prop-renderwhen-mode">Show when</label>
+      <div className="fs-prop-row__control">
+        <select
+          id="fs-prop-renderwhen-mode"
+          className="fs-binding__mode"
+          value={mode}
+          onChange={(e) => {
+            if (e.target.value === 'always') return onChange(undefined)
+            if (e.target.value === 'never') return onChange({ kind: 'static', value: false })
+            if (e.target.value === 'computed') return onChange({ kind: 'computed', expression: '' })
+            const first = dataKeys[0]
+            if (first) onChange({ kind: 'condition', condition: emptyCondition(first) })
+          }}
+        >
+          <option value="always">Always</option>
+          <option value="never">Never</option>
+          {/*
+            Disabled when there is nothing to test. A condition naming no field
+            evaluates to false, so choosing it would hide the component
+            immediately and offer no field that could bring it back.
+          */}
+          <option value="condition" disabled={dataKeys.length === 0}>
+            A condition
+          </option>
+          <option value="computed">An expression</option>
+        </select>
+
+        {value?.kind === 'condition' && (
+          <ConditionEditor
+            id="fs-prop-renderwhen"
+            value={value.condition}
+            dataKeys={dataKeys}
+            onChange={(condition) => onChange({ kind: 'condition', condition })}
+          />
+        )}
+
+        {value?.kind === 'computed' && (
+          <ComputedEditor id="fs-prop-renderwhen" value={value} onChange={onChange} />
+        )}
+      </div>
+
+      {dataKeys.length === 0 && (
+        <p className="fs-prop-row__hint">
+          No other component holds data yet, so there is nothing to test against.
+        </p>
+      )}
+    </div>
+  )
+}
+
 interface PropRowProps {
   schema: PropSchema
   value: PropValue | undefined
   componentKey: string
+  /** Every data key in the document, so a condition can only name a real field. */
+  dataKeys: string[]
   languages: Language[]
   defaultLanguage: string
   translations: Record<string, Record<string, string>>
@@ -212,6 +347,7 @@ function PropRow({
   schema,
   value,
   componentKey,
+  dataKeys,
   languages,
   defaultLanguage,
   translations,
@@ -228,6 +364,7 @@ function PropRow({
       schema={schema}
       value={value}
       componentKey={componentKey}
+      {...(dataKeys[0] ? { firstDataKey: dataKeys[0] } : {})}
       onChange={onChange}
     />
   )
@@ -238,8 +375,10 @@ function PropRow({
     return (
       <div className="fs-prop-row is-set is-binding">
         <label htmlFor={id}>{schema.label}</label>
-        {mode}
-        <ComputedEditor id={id} value={value} onChange={onChange} />
+        <div className="fs-prop-row__control">
+          {mode}
+          <ComputedEditor id={id} value={value} onChange={onChange} />
+        </div>
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
       </div>
     )
@@ -249,16 +388,36 @@ function PropRow({
     return (
       <div className="fs-prop-row is-set is-binding">
         <label htmlFor={id}>{schema.label}</label>
-        {mode}
-        <TranslationEditor
-          id={id}
-          value={value}
-          languages={languages}
-          defaultLanguage={defaultLanguage}
-          translations={translations}
-          onChange={onChange}
-          onTranslate={onTranslate}
-        />
+        <div className="fs-prop-row__control">
+          {mode}
+          <TranslationEditor
+            id={id}
+            value={value}
+            languages={languages}
+            defaultLanguage={defaultLanguage}
+            translations={translations}
+            onChange={onChange}
+            onTranslate={onTranslate}
+          />
+        </div>
+        <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
+      </div>
+    )
+  }
+
+  if (value?.kind === 'condition') {
+    return (
+      <div className="fs-prop-row is-set is-binding">
+        <label htmlFor={id + '-op'}>{schema.label}</label>
+        <div className="fs-prop-row__control">
+          {mode}
+          <ConditionEditor
+            id={id}
+            value={value.condition}
+            dataKeys={dataKeys}
+            onChange={(condition) => onChange({ kind: 'condition', condition })}
+          />
+        </div>
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
       </div>
     )
@@ -283,59 +442,77 @@ function PropRow({
           </>
         )}
       </label>
-      {mode}
 
-      {schema.editor === 'multiline' ? (
-        /*
-         * Declared in `PropEditor` from the first commit and never implemented,
-         * so a kit asking for it got the single-line fallback and no warning.
-         * Found by writing the specification down and checking it.
-         */
-        <textarea
-          id={id}
-          rows={3}
-          value={typeof raw === 'string' ? raw : ''}
-          onChange={(e) => set(e.target.value)}
-        />
-      ) : schema.editor === 'boolean' ? (
-        <input
-          id={id}
-          type="checkbox"
-          checked={raw === true}
-          onChange={(e) => set(e.target.checked)}
-        />
-      ) : schema.editor === 'number' ? (
-        <input
-          id={id}
-          type="number"
-          value={typeof raw === 'number' ? raw : ''}
-          onChange={(e) =>
-            e.target.value === '' ? onChange(undefined) : set(Number(e.target.value))
-          }
-        />
-      ) : schema.editor === 'select' ? (
-        <select
-          id={id}
-          value={typeof raw === 'string' ? raw : ''}
-          onChange={(e) => set(e.target.value)}
-        >
-          <option value="">(default)</option>
-          {schema.options?.map((o) => (
-            <option key={jsonToString(o.value)} value={jsonToString(o.value)}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ) : schema.editor === 'json' ? (
-        <JsonEditor id={id} value={raw} onChange={set} onClear={() => onChange(undefined)} />
-      ) : (
-        <input
-          id={id}
-          type="text"
-          value={typeof raw === 'string' ? raw : ''}
-          onChange={(e) => set(e.target.value)}
-        />
-      )}
+      {/*
+        A checkbox is small enough to sit beside the mode picker. Everything
+        else needs the width, so it goes underneath.
+      */}
+      <div
+        className={
+          'fs-prop-row__control' +
+          (schema.editor === 'boolean' ? ' fs-prop-row__control--inline' : '')
+        }
+      >
+        {mode}
+
+        {schema.editor === 'multiline' ? (
+          /*
+           * Declared in `PropEditor` from the first commit and never implemented,
+           * so a kit asking for it got the single-line fallback and no warning.
+           * Found by writing the specification down and checking it.
+           */
+          <textarea
+            id={id}
+            rows={3}
+            value={typeof raw === 'string' ? raw : ''}
+            onChange={(e) => set(e.target.value)}
+          />
+        ) : schema.editor === 'boolean' ? (
+          <input
+            id={id}
+            type="checkbox"
+            checked={raw === true}
+            onChange={(e) => set(e.target.checked)}
+          />
+        ) : schema.editor === 'number' ? (
+          <input
+            id={id}
+            type="number"
+            value={typeof raw === 'number' ? raw : ''}
+            onChange={(e) =>
+              e.target.value === '' ? onChange(undefined) : set(Number(e.target.value))
+            }
+          />
+        ) : schema.editor === 'select' ? (
+          <select
+            id={id}
+            value={typeof raw === 'string' ? raw : ''}
+            onChange={(e) => set(e.target.value)}
+          >
+            <option value="">(default)</option>
+            {schema.options?.map((o) => (
+              <option key={jsonToString(o.value)} value={jsonToString(o.value)}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : schema.editor === 'json' ? (
+          <JsonEditor id={id} value={raw} onChange={set} onClear={() => onChange(undefined)} />
+        ) : schema.editor === 'color' ? (
+          <ColorEditor id={id} value={typeof raw === 'string' ? raw : ''} onChange={set} />
+        ) : schema.editor === 'icon' ? (
+          <IconEditor id={id} value={typeof raw === 'string' ? raw : ''} onChange={set} />
+        ) : schema.editor === 'code' ? (
+          <CodeEditor id={id} value={typeof raw === 'string' ? raw : ''} onChange={set} />
+        ) : (
+          <input
+            id={id}
+            type="text"
+            value={typeof raw === 'string' ? raw : ''}
+            onChange={(e) => set(e.target.value)}
+          />
+        )}
+      </div>
 
       {isSet && <ClearButton label={schema.label} onClear={() => onChange(undefined)} />}
       {schema.hint && <p className="fs-prop-row__hint">{schema.hint}</p>}
@@ -419,5 +596,117 @@ function JsonEditor({
         </p>
       )}
     </>
+  )
+}
+
+/**
+ * A colour, as a swatch beside a text field.
+ *
+ * The text is the value and the swatch is a convenience, never the other way
+ * round. `<input type="color">` can only hold `#rrggbb`, and the useful things
+ * to write here are `var(--brand)`, `transparent`, and `rgb(0 0 0 / 40%)`. A
+ * swatch that owned the value would quietly rewrite every one of them into the
+ * nearest hex the moment it was touched.
+ */
+function ColorEditor({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string
+  onChange: (next: string) => void
+}): ReactNode {
+  const hex = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
+  return (
+    <div className="fs-color">
+      <input
+        id={id}
+        type="text"
+        className="fs-color__text"
+        placeholder="var(--brand), #336699, transparent"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <input
+        type="color"
+        className="fs-color__swatch"
+        // Named, because it is a second control on the same row and the label
+        // above belongs to the text field.
+        aria-label={'Pick a colour'}
+        value={hex}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
+/**
+ * A name from the icon vocabulary, with the glyph beside it.
+ *
+ * A select rather than a grid of swatches: there are thirty names, the pane is
+ * 288px wide, and a name is what actually gets stored. The preview is there so
+ * the author does not have to know what `paragraph` looks like.
+ */
+function IconEditor({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string
+  onChange: (next: string) => void
+}): ReactNode {
+  const known = (ICON_NAMES as string[]).includes(value)
+  return (
+    <div className="fs-icon-picker">
+      <span className="fs-icon-picker__preview" aria-hidden="true">
+        {known ? <Icon name={value as IconName} /> : null}
+      </span>
+      <select id={id} value={known ? value : ''} onChange={(e) => onChange(e.target.value)}>
+        <option value="">(none)</option>
+        {ICON_NAMES.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+/**
+ * Source, in a monospace box that counts its lines.
+ *
+ * No syntax highlighting and no language service. This is a property editor in
+ * a 288px pane, not an IDE, and a half-working editor that lies about what it
+ * understands is worse than a plain one. The line count is there because the
+ * box is short and it is otherwise impossible to tell how much is scrolled out
+ * of sight.
+ */
+function CodeEditor({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string
+  onChange: (next: string) => void
+}): ReactNode {
+  const lines = value === '' ? 0 : value.split('\n').length
+  return (
+    <div className="fs-code">
+      <textarea
+        id={id}
+        className="fs-code__area"
+        rows={5}
+        spellCheck={false}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <p className="fs-code__count">
+        {lines} {lines === 1 ? 'line' : 'lines'}
+      </p>
+    </div>
   )
 }

@@ -18,6 +18,13 @@ import { describe, expect, it } from 'vitest'
 const root = new URL('../', import.meta.url)
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(path, root)), 'utf8')
 
+/*
+ * A link that names any scheme, or a network path, is somebody else's. The
+ * check used to exclude only http and https, so a `mailto:` or `tel:` link
+ * would have been chased as a relative file path and reported broken. None
+ * exists yet, which is exactly when a rule like this is cheap to get right.
+ */
+
 /** The anchors a markdown file offers, slugged the way GitHub slugs a heading. */
 function headings(text: string): string[] {
   return [...text.matchAll(/^#{1,6} +(.+?)\s*$/gm)].map((match) =>
@@ -151,7 +158,7 @@ describe('the specification index', () => {
     const text = read('docs/spec/' + name)
     const broken: string[] = []
 
-    for (const match of text.matchAll(/\]\((?!https?:)([^)\s]+)\)/g)) {
+    for (const match of text.matchAll(/\]\((?![a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)([^)\s]+)\)/g)) {
       const [file, anchor] = (match[1] ?? '').split('#')
 
       let body = text
@@ -208,21 +215,33 @@ describe('documentation links', () => {
     '.claude/skills/write-tests/SKILL.md',
   ]
 
-  it.each(files)('%s links only to files that exist', (file) => {
+  /*
+   * Anchors included. This used to exclude any link containing a `#`, so every
+   * link that named a heading was unchecked, which is the half most likely to
+   * rot: a heading gets reworded and the link still resolves to a file.
+   */
+  it.each(files)('%s links only to files and headings that exist', (file) => {
     const text = read(file)
     const base = file.includes('/') ? file.slice(0, file.lastIndexOf('/') + 1) : ''
+    const broken: string[] = []
 
-    const broken = [...text.matchAll(/\]\((?!https?:)([^)#]+)\)/g)]
-      .map((match) => (match[1] ?? '').trim())
-      .filter((target) => {
-        const path = target.startsWith('docs/') || base === '' ? target : base + target
+    for (const match of text.matchAll(/\]\((?![a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)([^)\s]+)\)/g)) {
+      const target = (match[1] ?? '').trim()
+      const [file_, anchor] = target.split('#')
+
+      // A bare "#anchor" points inside this same document.
+      let body = text
+      if (file_) {
+        const path = file_.startsWith('docs/') || base === '' ? file_ : base + file_
         try {
-          readFileSync(fileURLToPath(new URL(path, root)))
-          return false
+          body = read(path)
         } catch {
-          return true
+          broken.push(target + ' (no such file)')
+          continue
         }
-      })
+      }
+      if (anchor && !headings(body).includes(anchor)) broken.push(target + ' (no such heading)')
+    }
 
     expect(broken).toEqual([])
   })

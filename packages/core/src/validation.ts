@@ -11,7 +11,8 @@
  * sandbox degrades to permissive rather than throwing.
  */
 
-import { jsonToString } from './json.js'
+import { evaluateCondition } from './condition.js'
+import { isEmpty, jsonToString, valueOf } from './json.js'
 import { dataKeyOf, flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -59,13 +60,6 @@ function matchesPattern(pattern: string, value: string): boolean {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-function isEmpty(value: JsonValue | undefined): boolean {
-  if (value === undefined || value === null) return true
-  if (typeof value === 'string') return value.trim() === ''
-  if (Array.isArray(value)) return value.length === 0
-  return false
-}
-
 /**
  * Requiredness is stricter than emptiness, and only for booleans.
  *
@@ -100,6 +94,9 @@ function guardPasses(when: PropValue | undefined, data: FormData, evaluate?: Eva
       return evaluate ? Boolean(evaluate(when.expression, data)) : false
     case 'i18n':
       return true
+    // No sandbox needed, so a guarded rule works where an expression would not.
+    case 'condition':
+      return evaluateCondition(when.condition, data)
   }
 }
 
@@ -154,7 +151,7 @@ export function validateField(
 ): string | undefined {
   if (!node.schema) return undefined
   for (const rule of node.schema.validations) {
-    const error = applyRule(rule, data[dataKeyOf(node)], data, evaluate)
+    const error = applyRule(rule, valueOf(data, dataKeyOf(node)), data, evaluate)
     if (error) return error
   }
   return undefined

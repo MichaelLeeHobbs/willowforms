@@ -8,7 +8,7 @@
  * empty, and the rules already know what to do with empty.
  */
 
-import type { JsonValue } from './types.js'
+import type { FormData, JsonValue } from './types.js'
 
 export function jsonToString(value: JsonValue | undefined): string {
   if (value === undefined || value === null) return ''
@@ -94,4 +94,35 @@ export function safeHref(value: JsonValue | undefined): string | undefined {
   // Older runtimes: fall back to matching the scheme directly.
   const scheme = raw.slice(0, raw.indexOf(':') + 1).toLowerCase()
   return SAFE_SCHEMES.has(scheme) ? raw : undefined
+}
+
+/**
+ * Whether a value counts as no answer.
+ *
+ * Shared, because "empty" has to mean one thing. Validation uses it for the
+ * rule that everything except `required` passes on an empty value, and
+ * conditions use it for `empty` and `notEmpty`. Two definitions would let a
+ * field be empty enough to skip a `minLength` rule and not empty enough to
+ * satisfy a visibility condition, and nobody would find that quickly.
+ *
+ * `false` and `0` are answers, not absences.
+ */
+export function isEmpty(value: JsonValue | undefined): boolean {
+  if (value === undefined || value === null) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  return false
+}
+
+/**
+ * What a field holds, or nothing.
+ *
+ * An own-property read, because a plain lookup finds the prototype: a field
+ * whose data key is `toString` or `constructor` would come back holding a
+ * function, which is present and truthy and not an answer anyone gave. Shared,
+ * so validation, the renderer and conditions cannot disagree about whether a
+ * field is missing.
+ */
+export function valueOf(data: FormData, dataKey: string): JsonValue | undefined {
+  return Object.hasOwn(data, dataKey) ? data[dataKey] : undefined
 }

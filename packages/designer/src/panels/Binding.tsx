@@ -17,6 +17,8 @@ import type { ReactNode } from 'react'
 import { languageTag } from '@formsmith/core'
 import type { Language, PropSchema, PropValue } from '@formsmith/core'
 
+import { emptyCondition } from './ConditionEditor.js'
+
 export type BindingKind = PropValue['kind']
 
 /** The conventional key for a translated property, per ARCHITECTURE.md. */
@@ -28,6 +30,7 @@ export function modesFor(schema: PropSchema): BindingKind[] {
   const modes: BindingKind[] = ['static']
   if (schema.computable !== false) modes.push('computed')
   if (schema.localizable) modes.push('i18n')
+  if (schema.conditional) modes.push('condition')
   return modes
 }
 
@@ -35,6 +38,7 @@ const MODE_LABELS: Record<BindingKind, string> = {
   static: 'Value',
   computed: 'Expression',
   i18n: 'Translation',
+  condition: 'Condition',
 }
 
 export interface BindingModeProps {
@@ -42,6 +46,8 @@ export interface BindingModeProps {
   schema: PropSchema
   value: PropValue | undefined
   componentKey: string
+  /** A field the condition mode can start by testing. Empty means it cannot. */
+  firstDataKey?: string
   onChange: (value: PropValue | undefined) => void
 }
 
@@ -51,6 +57,7 @@ export function BindingMode({
   schema,
   value,
   componentKey,
+  firstDataKey,
   onChange,
 }: BindingModeProps): ReactNode {
   const modes = modesFor(schema)
@@ -78,10 +85,24 @@ export function BindingMode({
           if (kind === 'i18n') {
             onChange({ kind: 'i18n', key: translationKey(componentKey, schema.name) })
           }
+          /*
+           * Without this the option was in the list and selecting it did
+           * nothing, which is the dead-control failure this project treats as
+           * worst. It is reachable only for a property whose schema opts in.
+           */
+          if (kind === 'condition' && firstDataKey) {
+            onChange({ kind: 'condition', condition: emptyCondition(firstDataKey) })
+          }
         }}
       >
         {modes.map((mode) => (
-          <option key={mode} value={mode}>
+          /*
+           * A condition needs a field to test. With none on the document it
+           * would be seeded with an empty key, evaluate to false, and leave a
+           * control that cannot be corrected: the same refusal the visibility
+           * row makes, and this path had been left without it.
+           */
+          <option key={mode} value={mode} disabled={mode === 'condition' && !firstDataKey}>
             {MODE_LABELS[mode]}
           </option>
         ))}

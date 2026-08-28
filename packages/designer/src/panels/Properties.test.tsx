@@ -15,7 +15,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
+import type { ComponentNode, FormDocument, Kit, PropValue } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
@@ -52,7 +52,14 @@ const kit: Kit = {
       dataBound: true,
       dataType: 'string',
       defaultProps: {},
-      props: [{ name: 'label', label: 'Label', editor: 'string' }],
+      props: [
+        { name: 'label', label: 'Label', editor: 'string' },
+        { name: 'tint', label: 'Tint', editor: 'color' },
+        { name: 'glyph', label: 'Glyph', editor: 'icon' },
+        { name: 'script', label: 'Script', editor: 'code' },
+        { name: 'notes', label: 'Notes', editor: 'multiline' },
+        { name: 'locked', label: 'Locked', editor: 'boolean', conditional: true },
+      ],
       events: ['onChange'],
     },
     {
@@ -74,13 +81,13 @@ interface Harness {
   select: () => Promise<void>
 }
 
-function setup(node: ComponentNode): Harness {
+function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
   const user = userEvent.setup()
   let current: FormDocument = {
     version: '1',
     id: 'doc',
     name: 'Contact',
-    root: { key: 'root', type: 'Screen', props: {}, children: [node] },
+    root: { key: 'root', type: 'Screen', props: {}, children: [node, ...siblings] },
     actions: {},
     languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en',
@@ -224,5 +231,517 @@ describe('the data key field', () => {
 
     // A layout component submits nothing, so naming its answer is meaningless.
     expect(screen.queryByLabelText('Data key')).toBeNull()
+  })
+})
+
+describe('the colour editor', () => {
+  const open = async (): Promise<ReturnType<typeof setup>> => {
+    const harness = setup(dataField())
+    await harness.select()
+    return harness
+  }
+
+  it('keeps the text as the value and the swatch as a convenience', async () => {
+    /*
+     * `<input type="color">` can only hold #rrggbb, and the useful things to
+     * write are var(--brand), transparent and rgb(...). A swatch that owned the
+     * value would rewrite every one of them to the nearest hex on first touch.
+     */
+    const { user, latest } = await open()
+    const text = screen.getByLabelText('Tint')
+
+    await user.type(text, 'var(--brand)')
+
+    expect(latest()?.props['tint']).toEqual({ kind: 'static', value: 'var(--brand)' })
+  })
+
+  it('shows black in the swatch for a value it cannot represent', async () => {
+    const { user } = await open()
+    await user.type(screen.getByLabelText('Tint'), 'transparent')
+
+    const swatch = screen.getByLabelText('Pick a colour')
+    expect(swatch).toHaveProperty('value', '#000000')
+  })
+
+  it('names the swatch, since the row label belongs to the text field', async () => {
+    await open()
+    expect(screen.getByLabelText('Pick a colour')).toBeTruthy()
+  })
+})
+
+describe('the icon editor', () => {
+  it('offers the vocabulary and stores a name', async () => {
+    const harness = setup(dataField())
+    await harness.select()
+
+    const select = screen.getByLabelText('Glyph')
+    await harness.user.selectOptions(select, 'checkbox')
+
+    expect(harness.latest()?.props['glyph']).toEqual({ kind: 'static', value: 'checkbox' })
+  })
+
+  it('previews the chosen glyph, and nothing for an unknown name', async () => {
+    const harness = setup({
+      ...dataField(),
+      props: { glyph: { kind: 'static', value: 'not-an-icon' } },
+    })
+    await harness.select()
+
+    // An unrecognised name is what a hand-edited document produces. It must not
+    // crash, and it must not draw something arbitrary.
+    const preview = document.querySelector('.fs-icon-picker__preview')
+    expect(preview?.querySelector('svg')).toBeNull()
+
+    // A property with a value set says so inside its own label, for a screen
+    // reader. /Glyph/ would also match the binding mode picker beside it.
+    await harness.user.selectOptions(screen.getByLabelText('Glyph (modified)'), 'text')
+    expect(document.querySelector('.fs-icon-picker__preview svg')).not.toBeNull()
+  })
+})
+
+describe('the code editor', () => {
+  it('counts its lines', async () => {
+    const harness = setup(dataField())
+    await harness.select()
+
+    const area = screen.getByLabelText('Script')
+    expect(screen.getByText('0 lines')).toBeTruthy()
+
+    await harness.user.type(area, 'a')
+    expect(screen.getByText('1 line')).toBeTruthy()
+  })
+
+  it('stores what was typed', async () => {
+    const harness = setup(dataField())
+    await harness.select()
+
+    await harness.user.type(screen.getByLabelText('Script'), 'return 1')
+
+    expect(harness.latest()?.props['script']).toEqual({ kind: 'static', value: 'return 1' })
+  })
+})
+
+describe('the multiline editor', () => {
+  it('is a textarea, not a one-line box', async () => {
+    // Declared in PropEditor from the first commit and unimplemented until
+    // Text wanted one, so a kit asking for it got the single-line fallback.
+    const harness = setup(dataField())
+    await harness.select()
+
+    expect(screen.getByLabelText('Notes').tagName).toBe('TEXTAREA')
+  })
+})
+
+describe('the visibility row', () => {
+  /** A document with two data-bound fields, so one can test the other. */
+  const pair = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  const withSibling = async (): Promise<Harness> => {
+    const harness = setup(pair(), [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+    return harness
+  }
+
+  it('starts at Always, which is what an absent renderWhen means', async () => {
+    const harness = await withSibling()
+
+    expect(screen.getByLabelText('Show when')).toHaveProperty('value', 'always')
+    expect(harness.latest()?.renderWhen).toBeUndefined()
+  })
+
+  it('builds a condition against another field', async () => {
+    const harness = await withSibling()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'firstName' } },
+    })
+  })
+
+  it('edits the operator through the picker', async () => {
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    await harness.user.selectOptions(screen.getByLabelText('Comparison'), 'empty')
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'empty', value: { kind: 'ref', dataKey: 'firstName' } },
+    })
+  })
+
+  it('removes renderWhen when set back to Always', async () => {
+    // Absent is not the same as a condition that is false: absent means shown.
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+    expect(harness.latest()?.renderWhen).toBeDefined()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'always')
+
+    expect(harness.latest()?.renderWhen).toBeUndefined()
+  })
+
+  it('switches to an expression for what a condition cannot say', async () => {
+    const harness = await withSibling()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'computed')
+
+    expect(harness.latest()?.renderWhen).toEqual({ kind: 'computed', expression: '' })
+  })
+
+  it('refuses a condition when there is no other field to test', async () => {
+    /*
+     * A condition naming no field evaluates to false, so offering it here would
+     * hide the component the moment it was chosen and give the author no field
+     * that could bring it back.
+     */
+    const harness = setup(pair())
+    await harness.select()
+
+    const option = screen
+      .getByLabelText('Show when')
+      .querySelector<HTMLOptionElement>('option[value="condition"]')
+
+    expect(option?.disabled).toBe(true)
+    expect(screen.getByText(/nothing to test against/)).toBeTruthy()
+  })
+
+  it.each([
+    ['static true', { kind: 'static', value: true }, 'always'],
+    ['static false', { kind: 'static', value: false }, 'never'],
+    ['a translation key', { kind: 'i18n', key: 'x' }, 'always'],
+    ['an expression', { kind: 'computed', expression: 'a' }, 'computed'],
+  ])('reads %s out of a hand-edited document as %s', async (_label, renderWhen, expected) => {
+    /*
+     * `renderWhen` is a PropValue, so a document can hold any of its kinds.
+     * Reading anything truthy as "a condition" left the select saying so while
+     * rendering no editor, which made those documents unfixable from the panel.
+     * A static truthy and a translation key both behave as no condition, which
+     * is what isVisible does with them.
+     */
+    const harness = setup({ ...dataField(), renderWhen: renderWhen as PropValue }, [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+
+    expect(screen.getByLabelText('Show when')).toHaveProperty('value', expected)
+  })
+
+  it('sets a static false for Never, which is not the same as absent', async () => {
+    const harness = await withSibling()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'never')
+
+    expect(harness.latest()?.renderWhen).toEqual({ kind: 'static', value: false })
+  })
+
+  it('offers every field to a component that has none of its own', async () => {
+    /*
+     * `dataKeyOf` falls back to the node key, so filtering unconditionally hid
+     * a real field from a container that happened to share its name. Only a
+     * component that carries data has an own field to exclude.
+     */
+    // The sibling has to share the container's key, or the filter removes
+    // nothing and the test passes against the bug it was written for.
+    const container: ComponentNode = { key: 'country', type: 'Row', props: {}, children: [] }
+    const harness = setup(container, [
+      {
+        key: 'countryField',
+        dataKey: 'country',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [] },
+      },
+    ])
+    await harness.select()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
+      (o) => o.value,
+    )
+
+    expect(options).toContain('country')
+  })
+
+  it('does not offer the component its own field', async () => {
+    // Hiding a component when its own value is empty hides the only control
+    // that could fill it.
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
+      (o) => o.value,
+    )
+    expect(options).toContain('firstName')
+    expect(options).not.toContain('website')
+  })
+})
+
+describe('the condition binding mode', () => {
+  /*
+   * A property whose schema opts in with `conditional: true`. No kit ships one
+   * yet, so this is the only place the path is exercised — and it shipped as a
+   * dead option once already, offered in the list and doing nothing when
+   * chosen.
+   */
+  const field = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  const sibling: ComponentNode = {
+    key: 'firstName',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  }
+
+  it('binds the property to a condition when chosen', async () => {
+    const harness = setup(field(), [sibling])
+    await harness.select()
+
+    await harness.user.selectOptions(screen.getByLabelText('Locked binding'), 'condition')
+
+    /*
+     * Seeded with the first field on the document, which here is the selected
+     * component's own. Unlike `renderWhen`, a property may test its own value:
+     * hiding a component on its own emptiness removes the control that would
+     * fill it, but disabling one on its own value is a real thing to want.
+     */
+    expect(harness.latest()?.props['locked']).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'website' } },
+    })
+  })
+
+  it('refuses the mode when no field is available to seed it', async () => {
+    // No component on the document carries a schema, so there is no data key
+    // anywhere to test. A hand-authored document can look like this.
+    const harness = setup({ key: 'website', type: 'Field', props: {} })
+    await harness.select()
+
+    const option = screen
+      .getByLabelText('Locked binding')
+      .querySelector<HTMLOptionElement>('option[value="condition"]')
+
+    expect(option?.disabled).toBe(true)
+  })
+})
+
+describe('the condition editor survives a hand-edited document', () => {
+  /*
+   * `evaluateCondition` was made total against these shapes and the editor was
+   * not, so a document with `options: "not-a-list"` rendered fine on the canvas
+   * and took the designer down when the panel tried to map over it. The panel
+   * is where someone goes to fix a broken document, so it is the last place
+   * that can afford to fall over on one.
+   */
+  const withRenderWhen = (condition: unknown): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    // Cast at the boundary: the point of the test is a shape the type forbids
+    // and a hand-edited document can still hold.
+    renderWhen: { kind: 'condition', condition } as PropValue,
+  })
+
+  const malformed: unknown[] = [
+    { op: 'in', value: { kind: 'ref', dataKey: 'a' }, options: 'not-a-list' },
+    { op: 'and', conditions: 'not-a-list' },
+    { op: 'or', conditions: null },
+    { op: 'not' },
+    { op: 'eq' },
+    { op: 'eq', left: null, right: { kind: 'literal', value: 1 } },
+    { op: 'eq', left: 'nonsense', right: null },
+    { op: 'truthy', value: null },
+    { op: 'in', value: { kind: 'ref' }, options: [] },
+    { op: 'and', conditions: [null] },
+    { op: 'or', conditions: [{ op: 'truthy', value: { kind: 'ref', dataKey: 'a' } }, 'nonsense'] },
+    { op: 'not', condition: null },
+    { op: 'and', conditions: [{ op: 'and', conditions: [null] }] },
+    { op: 'sorcery' },
+    { op: 'and', conditions: [{ op: 'sorcery' }] },
+  ]
+
+  it('draws an operator it does not know as one it does', async () => {
+    /*
+     * A controlled select whose value matches no option renders blank, so the
+     * author sees a comparison with no name and cannot tell what the document
+     * says. Falling back to a real operator gives them something to change.
+     */
+    const harness = setup(withRenderWhen({ op: 'sorcery' }))
+    await harness.select()
+
+    /*
+     * Asserting on the select's value alone proves nothing: jsdom quietly
+     * falls back to the first option when the value matches none, so the
+     * broken and fixed states look identical from there. What differs is that
+     * a real operator draws its operands — `sorcery` has none, `truthy` has a
+     * subject — so that is the thing to check.
+     */
+    expect(screen.getByLabelText('Subject')).toBeTruthy()
+    expect(screen.getByLabelText('Comparison')).toHaveProperty('value', 'truthy')
+  })
+
+  it.each(malformed.map((c) => [JSON.stringify(c), c] as const))(
+    'renders %s without crashing',
+    async (_label, condition) => {
+      const harness = setup(withRenderWhen(condition))
+      await expect(harness.select()).resolves.toBeUndefined()
+
+      // The row is on screen, so the author can pick a different operator and
+      // repair it rather than being left with a blank panel.
+      expect(screen.getByLabelText('Show when')).toHaveProperty('value', 'condition')
+    },
+  )
+})
+
+describe('membership options', () => {
+  const listy = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: [] },
+    },
+  })
+
+  it('lets a newline be typed at all', async () => {
+    /*
+     * The box holds a draft and commits on blur. Deriving its text from the
+     * parsed list on every keystroke normalised the newline away the instant it
+     * was typed, so `18` Enter `21` arrived as `1821` and a multi-line list
+     * could not be entered.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'a{enter}b')
+
+    expect(box).toHaveProperty('value', 'a\nb')
+  })
+
+  it('drops blank lines and trims the rest', async () => {
+    /*
+     * A line of spaces is not an option. Kept, it becomes a value no form data
+     * can ever equal, so the condition silently never matches.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, ' GB {enter}   {enter}IE{enter}')
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['GB', 'IE'] },
+    })
+  })
+
+  it('reads a number as a number, so an ordering test can work', async () => {
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, '18{enter}21')
+    await harness.user.tab()
+
+    const condition = harness.latest()?.renderWhen
+    expect(condition?.kind === 'condition' && condition.condition).toMatchObject({
+      options: [18, 21],
+    })
+  })
+
+  it('re-syncs when the document changes underneath', async () => {
+    /*
+     * Undo, redo, and a document replaced from the JSON dialog all change the
+     * options without touching this box. Holding a draft and never re-reading
+     * would leave the old text on screen and write it back on the next blur.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'GB{enter}IE')
+    await harness.user.tab()
+    expect(box).toHaveProperty('value', 'GB\nIE')
+
+    await harness.user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(screen.getByLabelText('Options, one per line')).toHaveProperty('value', '')
+  })
+})
+
+describe('removing a nested condition', () => {
+  /*
+   * Nested rows are keyed by index, so removing the first shifts the second
+   * into its slot and React reuses the mounted subtree. Anything holding local
+   * state there — the options box holds a draft — could end up attached to the
+   * wrong condition. This is the test that says whether it does.
+   */
+  const twoLists = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'or',
+        conditions: [
+          { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['first'] },
+          { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['second'] },
+        ],
+      },
+    },
+  })
+
+  it('leaves the surviving row showing its own options', async () => {
+    const harness = setup(twoLists())
+    await harness.select()
+
+    const boxes = screen.getAllByLabelText('Options, one per line')
+    expect(boxes.map((b) => (b as HTMLTextAreaElement).value)).toEqual(['first', 'second'])
+
+    await harness.user.click(screen.getByRole('button', { name: 'Remove condition 1' }))
+
+    const remaining = screen.getAllByLabelText('Options, one per line')
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]).toHaveProperty('value', 'second')
+  })
+
+  it('does not carry an uncommitted draft onto the surviving row', async () => {
+    const harness = setup(twoLists())
+    await harness.select()
+
+    // Type into the first row without blurring, then remove that row.
+    const boxes = screen.getAllByLabelText('Options, one per line')
+    await harness.user.clear(boxes[0] as HTMLElement)
+    await harness.user.type(boxes[0] as HTMLElement, 'typed-but-not-committed')
+
+    await harness.user.click(screen.getByRole('button', { name: 'Remove condition 1' }))
+
+    const remaining = screen.getAllByLabelText('Options, one per line')
+    expect(remaining[0]).toHaveProperty('value', 'second')
   })
 })

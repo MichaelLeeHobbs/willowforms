@@ -203,9 +203,9 @@ export const muiKit: Kit = {
         {
           name: 'background',
           label: 'Background',
-          editor: 'string',
+          editor: 'color',
           section: 'style',
-          hint: 'Any CSS colour. A swatch arrives with the colour editor.',
+          hint: 'Any CSS colour, including a custom property.',
         },
         { name: 'radius', label: 'Corner radius', editor: 'number', section: 'style' },
       ],

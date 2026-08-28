@@ -12,6 +12,7 @@
  * visibility rule that will drift.
  */
 
+import { evaluateCondition } from './condition.js'
 import type { ComponentNode, FormData } from './types.js'
 import type { Evaluator } from './validation.js'
 
@@ -39,5 +40,13 @@ export function isVisible(node: ComponentNode, data: FormData, evaluate?: Evalua
      */
     case 'i18n':
       return true
+
+    /*
+     * The reason this kind exists. A structured condition needs no evaluator,
+     * so a form with conditional visibility works in a host that injected
+     * nothing at all.
+     */
+    case 'condition':
+      return evaluateCondition(when.condition, data)
   }
 }

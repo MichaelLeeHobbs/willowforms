@@ -90,6 +90,28 @@ See [08-validation.md](08-validation.md#server-parity).
 `FieldSchema.autoValidate` is the per-field hint that a field wants validating while it is typed into.
 The host decides whether to honour it, and `autoValidateKeys(root)` names the fields that asked.
 
+### There is nowhere to put ephemeral state
+
+**Status: undecided**, and it blocks more real forms than any other gap in this specification.
+
+"Three addresses found." "Checking availability." "43 seconds until you can resend." "Uploading, 40%."
+None of that belongs in `data`, because `data` is what the host submits and nobody wants
+`__addressCandidates` in the payload. But `renderWhen` can only read `data`, so today there is nowhere
+for it to live at all.
+
+Three ways out, none free:
+
+- **A second controlled pair**, `uiState` and `onUiStateChange`. Consistent with everything else here,
+  and it doubles the host's wiring for state the host does not care about.
+- **Let the renderer hold this, and only this.** Breaks "holds no state", and arguably in the right
+  place: whether a spinner is spinning is not the host's business.
+- **A reserved namespace inside `data` that the host strips.** Cheapest, and it leaks into the payload
+  the first time somebody forgets.
+
+The second is the likely answer. It needs writing down before the action vocabulary is settled, because
+half the effects an action would return have nowhere to write to until it exists. See
+[09-actions.md](09-actions.md#why-this-is-not-next).
+
 ### A type the kit does not have
 
 **Status: built.** A document can name a component its kit does not implement, and switching kits at

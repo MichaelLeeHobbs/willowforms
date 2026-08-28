@@ -490,6 +490,7 @@
 }
 
 .fs-binding__mode {
+  align-self: start;
   font-size: 12px;
 }
 
@@ -1005,12 +1006,53 @@
   border-radius: var(--fs-radius);
 }
 
+/*
+ * Label, control, and whatever sits after it. Two flexible things in one row at
+ * 288px is one too many: the grid was `108px 1fr auto`, which gave the binding
+ * mode picker the flexible column and the actual control its natural width, so
+ * the picker collapsed to about 38px and clipped "Value" to nothing. A working
+ * control that reads as an empty box is worse than one that is obviously absent.
+ *
+ * The picker now shares a cell with the control and sits above it, which is
+ * what its own bottom margin always assumed.
+ */
 .fs-prop-row {
   display: grid;
-  grid-template-columns: 108px 1fr auto;
+  grid-template-columns: 108px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   margin-block-end: 10px;
+}
+
+.fs-prop-row__control {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+/* A checkbox stretched to the cell is a very wide checkbox. */
+.fs-prop-row__control input[type='checkbox'] {
+  align-self: start;
+}
+
+.fs-prop-row__control--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/*
+ * The picker keeps its natural width; the checkbox beside it needs almost none.
+ * Letting it shrink is what clipped it to nothing in the first place, and a row
+ * is the one place it can happen again.
+ */
+.fs-prop-row__control--inline .fs-binding__modes {
+  flex: 0 0 auto;
+}
+
+.fs-prop-row__control--inline input[type='checkbox'] {
+  align-self: center;
 }
 
 .fs-prop-row label {
@@ -1050,4 +1092,148 @@
   font-size: 12px;
   font-style: italic;
   color: var(--fs-accent);
+}
+
+/*
+ * The colour, icon and code editors.
+ *
+ * All three sit in the control cell of a property row, which is about 139px
+ * wide, so every one of them is built to be legible at that size rather than
+ * to look good in a screenshot of a wider panel.
+ */
+.fs-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fs-color__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * The swatch keeps its size. It is the one control here that cannot usefully
+ * shrink: below about 28px a colour well is a coloured line.
+ */
+.fs-color__swatch {
+  flex: 0 0 auto;
+  inline-size: 28px;
+  block-size: 24px;
+  padding: 0;
+  border: 1px solid var(--fs-border);
+  border-radius: 4px;
+  background: none;
+}
+
+.fs-icon-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fs-icon-picker select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fs-icon-picker__preview {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  inline-size: 24px;
+  block-size: 24px;
+  border: 1px solid var(--fs-border);
+  border-radius: 4px;
+  color: var(--fs-text-muted);
+}
+
+.fs-code__area {
+  display: block;
+  inline-size: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+.fs-code__count {
+  margin: 2px 0 0;
+  color: var(--fs-text-muted);
+  font-size: 11px;
+  text-align: end;
+}
+
+/*
+ * The condition editor.
+ *
+ * Stacked, not tabular. A comparison is three or four controls and the pane is
+ * 288px, so a row would clip every one of them; the same arithmetic that put
+ * the binding mode picker above its control rather than beside it.
+ */
+.fs-condition {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fs-condition__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/*
+ * Stacked, like everything else in this pane. Side by side, the source picker
+ * and the field select shared 121px and got about 59 each, which is not enough
+ * for either. The labels between them are visually hidden and absolutely
+ * positioned, so they are out of flow and `:first-child` was quietly matching a
+ * label rather than the control it looked like it named.
+ */
+.fs-condition__operand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fs-condition__operand > select,
+.fs-condition__operand > input {
+  min-width: 0;
+}
+
+.fs-condition__op {
+  align-self: start;
+}
+
+/*
+ * Nesting is shown by an indent and a rule, because a 288px pane cannot draw a
+ * tree and a half-drawn one is worse than an honest indent.
+ */
+.fs-condition__nested {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-inline-start: 8px;
+  padding-inline-start: 8px;
+  border-inline-start: 2px solid var(--fs-border);
+}
+
+.fs-condition__row {
+  display: flex;
+  align-items: start;
+  gap: 4px;
+}
+
+.fs-condition__row > .fs-condition {
+  flex: 1 1 auto;
+}
+
+.fs-condition__remove {
+  flex: 0 0 auto;
+  padding: 2px 6px;
 }
