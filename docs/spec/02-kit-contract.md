@@ -41,10 +41,15 @@ function TextFieldNode({ nodeProps, props, value, error, onChange }: NodeRendere
 }
 ```
 
-That puts `data-fs-key` and `data-fs-type` in the output, which is the only thing tying a rendered
-element back to a document node. The designer's canvas selection, hover, and drop targeting are all
-built on `closest('[data-fs-key]')`; a kit that drops `nodeProps` still renders correctly but its
+That puts `data-fs-key`, `data-fs-type` and `data-fs-scope` in the output, which is the only thing tying
+a rendered element back to a document node. The designer's canvas selection, hover, and drop targeting
+are all built on `closest('[data-fs-key]')`; a kit that drops `nodeProps` still renders correctly but its
 components cannot be selected, moved, or dropped near.
+
+`data-fs-scope` says which rendered form the element belongs to, and it is per render rather than per
+document because the same document rendered twice has the same problem. A key is unique inside a document
+and nowhere else, so two forms on one page both have a `root` and usually an `email`. Per-component CSS
+is selected by key, so a kit that drops it lets the first form's styling reach into the second.
 
 The attributes ship at runtime too, not only in the designer, which gives anyone writing an end-to-end
 test against a live form a stable selector for free.
@@ -88,6 +93,7 @@ obligation missed.
 | Every prop schema has a name and a label                         | An unlabelled row in the panel is unusable                                   |
 | Every `select` editor supplies options                           | An empty picker is a dead end                                                |
 | Every renderer puts `data-fs-key` in the DOM                     | The designer cannot select it otherwise                                      |
+| Every renderer puts `data-fs-scope` in the DOM                   | Two forms on one page otherwise share a key namespace, and each other's CSS  |
 | Containers render children inside themselves                     | Rendering them outside breaks drop targeting                                 |
 | Data-bound components survive an absent value                    | A freshly dropped field has no data yet                                      |
 | Every data-bound component displays its error                    | A failed submit that says nothing is the worst outcome                       |

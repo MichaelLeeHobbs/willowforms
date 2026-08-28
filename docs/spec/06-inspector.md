@@ -1,7 +1,7 @@
 # Inspector
 
-**Status: partial.** Properties and Rules are built, and so is every property editor. Style and Actions
-do not exist, and `PropSchema.section` is declared but ignored.
+**Status: partial.** Properties, Style and Rules are built, and so is every property editor and the
+section routing. Actions do not exist.
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
 never knows what a `TextField` is, only that something declared a `label` property with a `string`
@@ -12,7 +12,7 @@ editor.
 | Tab        | Status  | Edits                                          |
 | ---------- | ------- | ---------------------------------------------- |
 | Properties | Built   | The selected component's `props`               |
-| Style      | Planned | The selected component's `css`, per breakpoint |
+| Style      | Built   | The selected component's `css`, per breakpoint |
 | Actions    | Planned | The selected component's `events`              |
 | Rules      | Built   | The selected component's `schema.validations`  |
 
@@ -41,11 +41,11 @@ component's key.
 
 ### Sections
 
-**Status: planned.** `PropSchema.section` is `'main' | 'style' | 'advanced'`, defaults to `'main'`, and
-nothing reads it. Every property appears in one flat list, so `disabled` sits between `label` and
-`placeholder` with equal weight.
+**Status: built.** `PropSchema.section` is `'main' | 'style' | 'advanced'` and defaults to `'main'`.
 
-`main` stays visible. `style` moves to the Style tab. `advanced` collapses behind a disclosure.
+`main` stays visible. `style` moves to the Style tab, beside the CSS it competes with. `advanced`
+collapses behind a disclosure, because giving `disabled` the same weight as `label` is what made the
+panel a flat list where nothing stood out.
 
 ### The key field
 
@@ -117,8 +117,8 @@ an element with no role, so it announced nothing at all while looking handled. a
 
 ## Style
 
-**Status: planned.** Nothing exists. The three questions this section used to leave open are answered
-below, so it is a commitment rather than a sketch.
+**Status: built.** The three questions this section used to leave open are answered below, and the answers
+are what was built.
 
 Writes `node.css`, which is `Partial<Record<Device, string>>`: raw CSS text per breakpoint. Editing is
 scoped to the viewport currently simulated on the canvas, so **viewport simulation has to come first**.
@@ -140,6 +140,15 @@ The structured set is deliberately small: padding, margin, alignment, width, bac
 Anything beyond that is the raw field's job. A property earns a control the same way a component property
 earns a row, by being something a form author changes rather than by existing.
 
+The structured set is `padding`, `margin`, `text-align`, `width`, `background`, `border` and
+`border-radius`. A control only ever touches its own declaration, so anything typed by hand survives
+sitting next to a widget, and a property with no widget is left alone rather than discarded. That is the
+property that lets one string have two editors.
+
+The kit's own styling properties — the ones whose `PropSchema.section` is `style` — appear above the CSS
+rather than on the Properties tab. A `Stack`'s `gap` is a better answer than a hand-written margin, and
+an author who writes the CSS first will never discover the property afterwards.
+
 ### It applies to the component's own element only
 
 Not to descendants. The rest of the designer treats a kit's internals as off-limits, and invariant 3 has
@@ -147,9 +156,24 @@ a test enforcing that for the designer's own stylesheet; a Style tab that let an
 `input { padding: 0 }` would hand every user the ability to make the same mistake the invariant exists to
 prevent, one form at a time.
 
-The text is applied scoped to the element carrying `data-fs-key`, and a selector in it cannot escape that
-scope. What an author can still do is style that one element, which is the blast radius they can reason
-about.
+The text is **declarations only**, applied scoped to the element carrying `data-fs-key`. `{`, `}`, `<`
+and `@` are refused: they are how a component's styling would end its own block and reach the page, leave
+CSS through `</style>`, or open an `@import`. Refused rather than escaped, because escaping invites an
+argument about which escape is sufficient, and refused rather than cleaned, because silently rewriting
+what an author typed is how a rule ends up meaning something nobody asked for. The panel says the text
+was refused; the renderer leaves it out.
+
+Keys are author-controlled too, and they are escaped rather than refused, because unlike the
+declarations they are not something an author is writing here and refusing one would break a document
+that already renders over a character in a name. `<` is escaped along with the quotes: a key holding
+`</style>` never has to be valid CSS to be a problem, since it closes the element the stylesheet sits in.
+
+Rules are confined to one rendered form as well as to one component. A key is unique inside a document
+and nowhere else, so two forms on a page both have a `root`, and without a scope the first one's styling
+reaches into the second. The renderer stamps a per-instance `data-fs-scope` on every node and compounds
+it into every selector.
+
+What an author can still do is style that one element, which is the blast radius they can reason about.
 
 ### `any` is the base layer
 
@@ -159,6 +183,16 @@ same everywhere, which is what an author who never opens the viewport switcher s
 
 Cascade order is `any`, then the device matching the simulated viewport. Two device entries never apply
 at once, so there is no ordering question between them.
+
+**On the canvas the device is named; in a page it is a media query.** The designer simulates a device by
+sizing a frame, so a media query there would answer about the browser window and ignore the frame
+entirely. `FormRenderer` takes an optional `device` for that case and emits only those rules, flat.
+Without it every device becomes its query and the viewport decides, which is what a host wants. Both
+paths come from one table in core.
+
+Choosing a device in the Style tab moves the canvas to it, and choosing a viewport in the toolbar moves
+what the Style tab edits. They are one choice made in two places, because a rule for a width you cannot
+see is written blind.
 
 ## Actions
 

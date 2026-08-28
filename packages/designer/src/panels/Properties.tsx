@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { IconName, JsonValue, Kit, Language, PropSchema, PropValue } from '@formsmith/core'
+import type {
+  ComponentNode,
+  IconName,
+  JsonValue,
+  Kit,
+  Language,
+  PropSchema,
+  PropValue,
+} from '@formsmith/core'
 import { dataKeyOf, flatten, indexKit, jsonToString } from '@formsmith/core'
 
 import { Icon, ICON_NAMES } from '../Icon.js'
@@ -25,6 +33,9 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
   }
 
   const def = indexKit(kit).get(node.type)
+  const props = def?.props ?? []
+  const main = props.filter((prop) => (prop.section ?? 'main') === 'main')
+  const advanced = props.filter((prop) => prop.section === 'advanced')
 
   /*
    * Every data key in the document, so a condition can only name a field that
@@ -90,24 +101,20 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
 
       {!def && <p className="fs-empty">Type {node.type} is not in the active kit.</p>}
 
-      {def?.props.map((schema) => (
-        <PropRow
-          // Keyed by component as well as property. Keyed by property alone,
-          // two components of the same type shared one instance, so an
-          // uncontrolled editor kept the previous component's value and could
-          // write it onto the new one.
-          key={node.key + ':' + schema.name}
-          schema={schema}
-          value={node.props[schema.name]}
-          componentKey={node.key}
-          dataKeys={dataKeys}
-          languages={api.document.languages}
-          defaultLanguage={api.document.defaultLanguage}
-          translations={api.document.translations}
-          onChange={(next) => api.setProp(node.key, schema.name, next)}
-          onTranslate={api.setTranslation}
-        />
-      ))}
+      {/*
+       * `section` routes a property to where it belongs. `style` is not here at
+       * all: it lives on the Style tab, beside the CSS it competes with, so an
+       * author choosing between a Stack's gap and a hand-written margin sees
+       * both at once.
+       */}
+      <PropRows api={api} node={node} schemas={main} />
+
+      {advanced.length > 0 && (
+        <details className="fs-advanced">
+          <summary>Advanced</summary>
+          <PropRows api={api} node={node} schemas={advanced} />
+        </details>
+      )}
     </section>
   )
 }
@@ -327,6 +334,54 @@ function VisibilityRow({
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * The rows for a set of property schemas.
+ *
+ * Shared, because the Style tab renders the same rows for the properties whose
+ * section says they are styling. Two copies would drift on the binding modes,
+ * the modified marker, and the row layout, all of which took several goes.
+ */
+export function PropRows({
+  api,
+  node,
+  schemas,
+}: {
+  api: DesignerApi
+  node: ComponentNode
+  schemas: PropSchema[]
+}): ReactNode {
+  const dataKeys = [
+    ...new Set(
+      flatten(api.document.root)
+        .filter((row) => row.node.schema)
+        .map((row) => dataKeyOf(row.node)),
+    ),
+  ]
+
+  return (
+    <>
+      {schemas.map((schema) => (
+        <PropRow
+          // Keyed by component as well as property. Keyed by property alone,
+          // two components of the same type shared one instance, so an
+          // uncontrolled editor kept the previous component's value and could
+          // write it onto the new one.
+          key={node.key + ':' + schema.name}
+          schema={schema}
+          value={node.props[schema.name]}
+          componentKey={node.key}
+          dataKeys={dataKeys}
+          languages={api.document.languages}
+          defaultLanguage={api.document.defaultLanguage}
+          translations={api.document.translations}
+          onChange={(next) => api.setProp(node.key, schema.name, next)}
+          onTranslate={api.setTranslation}
+        />
+      ))}
+    </>
   )
 }
 

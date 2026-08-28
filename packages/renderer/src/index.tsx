@@ -7,15 +7,16 @@
  * draws the result. That comes in as a RendererKit.
  */
 
-import { createContext, useCallback, useContext, useMemo } from 'react'
+import { createContext, useCallback, useContext, useId, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { dataKeyOf, evaluateCondition, isVisible, valueOf } from '@formsmith/core'
+import { dataKeyOf, evaluateCondition, isVisible, styleSheetFor, valueOf } from '@formsmith/core'
 import type {
   ComponentNode,
   Evaluator,
   FormData,
   FormDocument,
   FormErrors,
+  Device,
   JsonValue,
   PropValue,
 } from '@formsmith/core'
@@ -43,6 +44,16 @@ export interface NodeRendererProps {
 export interface NodeAttributes {
   'data-fs-key': string
   'data-fs-type': string
+  /**
+   * Which rendered form this element belongs to.
+   *
+   * A key identifies a node inside its document and nowhere else, so two forms
+   * on one page both have a `root` and usually an `email`. Per-component CSS is
+   * selected by key, so without this the first form's stylesheet styles the
+   * second. Per render rather than per document, because the same document
+   * rendered twice has the same problem.
+   */
+  'data-fs-scope': string
 }
 
 export type NodeRenderer = ComponentType<NodeRendererProps>
@@ -56,6 +67,7 @@ export interface RendererKit {
 }
 
 interface RenderContext {
+  scope: string
   kit: RendererKit
   data: FormData
   errors: FormErrors
@@ -129,7 +141,7 @@ function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
 
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
-  const { kit, data, errors, translations, evaluate, onChange } = ctx
+  const { scope, kit, data, errors, translations, evaluate, onChange } = ctx
 
   const props = useMemo(
     () => resolveProps(node, translations, data, evaluate),
@@ -146,8 +158,8 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   )
 
   const nodeProps = useMemo<NodeAttributes>(
-    () => ({ 'data-fs-key': node.key, 'data-fs-type': node.type }),
-    [node.key, node.type],
+    () => ({ 'data-fs-key': node.key, 'data-fs-type': node.type, 'data-fs-scope': scope }),
+    [node.key, node.type, scope],
   )
 
   // Shared with validateForm, so a hidden field is never validated behind the
@@ -183,6 +195,15 @@ export interface FormRendererProps {
   language?: string
   /** Sandbox for computed bindings. Omit to render computed props as null. */
   evaluate?: Evaluator
+  /**
+   * Render per-component styling for one device instead of by media query.
+   *
+   * The designer's canvas simulates a device by sizing a frame, so a media
+   * query there would answer about the browser window and ignore the frame.
+   * A real page has no frame, so omitting this is what a host wants: every
+   * device becomes its own query and the viewport decides.
+   */
+  device?: Device
   onChange: (key: string, value: JsonValue) => void
 }
 
@@ -193,6 +214,7 @@ export function FormRenderer({
   errors = NO_ERRORS,
   language,
   evaluate,
+  device,
   onChange,
 }: FormRendererProps): ReactNode {
   const translations = useMemo(
@@ -200,13 +222,29 @@ export function FormRenderer({
     [document.translations, document.defaultLanguage, language],
   )
 
+  // Stable across renders, unique per instance, and the same on the server and
+  // the client, which a counter or a random string would not be.
+  const scope = useId()
+
   const ctx = useMemo<RenderContext>(
-    () => ({ kit, data, errors, translations, evaluate, onChange }),
-    [kit, data, errors, translations, evaluate, onChange],
+    () => ({ scope, kit, data, errors, translations, evaluate, onChange }),
+    [scope, kit, data, errors, translations, evaluate, onChange],
+  )
+
+  /*
+   * One stylesheet for the whole document rather than a style attribute per
+   * node: a kit owns its components' `style`, and writing there would fight it.
+   * Every rule is scoped to a `data-fs-key`, which every renderer already
+   * spreads, so this reaches exactly the elements the document names.
+   */
+  const sheet = useMemo(
+    () => styleSheetFor(document.root, { device, scope }),
+    [document.root, device, scope],
   )
 
   return (
     <Ctx.Provider value={ctx}>
+      {sheet && <style>{sheet}</style>}
       <RenderNode node={document.root} />
     </Ctx.Provider>
   )

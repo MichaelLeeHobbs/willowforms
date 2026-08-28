@@ -40,12 +40,16 @@ effects rather than changing data, and one vocabulary serves both built-in and `
 vocabulary itself waits, because actions sit one layer above what is blocking forms.
 See [docs/spec/09-actions.md](spec/09-actions.md).
 
-The Style tab is still owed from the inspector, and is unblocked.
+**The Style tab is built.** Per-component CSS, per breakpoint, with structured controls and a raw field
+over one string. The text is declarations only and anything that would let it escape the component is
+refused rather than escaped, because a document is data and reaches the renderer from wherever the host
+kept it. `PropSchema.section` is read now too, so a kit's own styling properties sit beside the CSS they
+compete with instead of in a flat list.
 See [docs/spec/06-inspector.md](spec/06-inspector.md#style).
 
 ## Verification
 
-`pnpm test` runs 689 tests; `pnpm e2e` runs 55 in a real browser. Both gate CI, along with lint,
+`pnpm test` runs 787 tests; `pnpm e2e` runs 58 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
 computed from the stylesheets and axe runs over the designer in six states. See
 [accessibility.md](accessibility.md).

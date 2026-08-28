@@ -12,6 +12,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type {
   ComponentDef,
   ComponentNode,
+  Device,
   FieldSchema,
   FormDocument,
   Language,
@@ -146,6 +147,12 @@ export interface DesignerApi {
    * same as setting it to false: absent means always shown.
    */
   setRenderWhen: (key: string, value: PropValue | undefined) => void
+  /**
+   * Set a component's CSS for one device. Empty text removes that entry, and
+   * removing the last one removes `css` entirely, so a component nobody styled
+   * carries no key rather than an empty object.
+   */
+  setNodeCss: (key: string, device: Device, text: string) => void
   moveComponent: (key: string, parentKey: string, index?: number) => void
   /**
    * Copy a component and its subtree in beside it, and select the copy.
@@ -371,6 +378,31 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply],
   )
 
+  const setNodeCss = useCallback(
+    (key: string, device: Device, text: string) => {
+      apply(
+        (doc) => ({
+          ...doc,
+          root: updateNode(doc.root, key, (node) => {
+            const next = { ...(node.css ?? {}) }
+            if (text.trim()) next[device] = text
+            else delete next[device]
+
+            if (Object.keys(next).length === 0) {
+              // exactOptionalPropertyTypes: absent is an absent key.
+              const { css: _dropped, ...rest } = node
+              return rest
+            }
+            return { ...node, css: next }
+          }),
+        }),
+        // Coalesced per device, so typing a padding value is one undo entry.
+        'css:' + key + ':' + device,
+      )
+    },
+    [apply],
+  )
+
   const setDataKey = useCallback(
     (key: string, dataKey: string) => {
       const trimmed = dataKey.trim()
@@ -419,6 +451,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     renameKey,
     setDataKey,
     setRenderWhen,
+    setNodeCss,
     moveComponent,
     duplicateComponent,
     removeComponent,
