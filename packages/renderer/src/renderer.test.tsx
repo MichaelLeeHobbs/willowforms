@@ -198,6 +198,8 @@ describe('two forms on one page', () => {
     const sheet = container.querySelector('style')?.textContent ?? ''
     expect(sheet).toContain('][data-fs-key="root"]')
     expect(sheet).not.toContain('] [data-fs-key="root"]')
+  })
+})
 
 describe('the host context', () => {
   const gated = (key: string): ComponentNode => ({

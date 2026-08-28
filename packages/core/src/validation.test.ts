@@ -395,6 +395,44 @@ describe('submittedData', () => {
     expect(submittedData(withHeading, { married: true, note: 'stray' })['note']).toBeUndefined()
   })
 
+  it('reads the same context the renderer was given', () => {
+    /*
+     * This decides which answers leave. Given a different context than the
+     * renderer had, it strips answers to questions the user really was asked —
+     * the disagreement `isVisible` exists to prevent, arriving through an
+     * argument list rather than a second code path. It was reachable: the two
+     * halves of this were built on separate branches and `submittedData` kept a
+     * positional `evaluate` while everything else moved to the options bag.
+     */
+    const gated: ComponentNode = {
+      key: 'form',
+      type: 'Form',
+      props: {},
+      children: [
+        {
+          key: 'reason',
+          type: 'Field',
+          props: {},
+          schema: { type: 'string', validations: [] },
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'user.role' },
+              right: { kind: 'literal', value: 'admin' },
+            },
+          },
+        },
+      ],
+    }
+    const data: FormData = { reason: 'because' }
+
+    expect(submittedData(gated, data, { context: { user: { role: 'admin' } } })).toEqual({
+      reason: 'because',
+    })
+    expect(submittedData(gated, data, { context: { user: { role: 'guest' } } })).toEqual({})
+  })
+
   it('carries a field called __proto__ as an answer, not as a prototype', () => {
     /*
      * `out[key] = value` on an object literal runs the `__proto__` setter

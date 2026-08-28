@@ -246,8 +246,18 @@ export function autoValidateKeys(root: ComponentNode): Set<string> {
  * Visibility is decided by the same `isVisible` the renderer and `validateForm`
  * use, so all three agree about what is on screen.
  */
-export function submittedData(root: ComponentNode, data: FormData, evaluate?: Evaluator): FormData {
+export function submittedData(
+  root: ComponentNode,
+  data: FormData,
+  options: EvalOptions = {},
+): FormData {
   /*
+   * The same `EvalOptions` the renderer and `validateForm` were given, and it has
+   * to be: this decides which answers leave, using `isVisible`, so handing it a
+   * different context than the renderer had would strip answers to questions the
+   * user was actually asked. That is the disagreement `isVisible` exists to
+   * prevent, arriving through an argument list instead of a second code path.
+   *
    * Built on a null prototype, then copied into a plain object.
    *
    * `kept[key] = value` for a key of `__proto__` does not add a property to an
@@ -264,7 +274,7 @@ export function submittedData(root: ComponentNode, data: FormData, evaluate?: Ev
   const kept: FormData = Object.create(null) as FormData
 
   const visit = (node: ComponentNode): void => {
-    if (!isVisible(node, data, evaluate)) return
+    if (!isVisible(node, data, options)) return
     if (node.schema) {
       const key = dataKeyOf(node)
       const value = valueOf(data, key)
