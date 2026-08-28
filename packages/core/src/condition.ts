@@ -14,8 +14,8 @@
  * stay the evaluator's job, as the escape hatch rather than the only door.
  */
 
-import { isEmpty, valueOf } from './json.js'
-import type { Condition, FormData, JsonValue, Operand } from './types.js'
+import { isEmpty, readPath, valueOf } from './json.js'
+import type { Condition, FormContext, FormData, JsonValue, Operand } from './types.js'
 
 /** Deep equality over JSON, which is the only equality a document can express. */
 function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
@@ -49,12 +49,29 @@ function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
  * on screen, because a form that crashes cannot be fixed by the person filling
  * it in.
  */
-function operand(value: Operand | undefined, data: FormData): JsonValue | undefined {
+function operand(
+  value: Operand | undefined,
+  data: FormData,
+  context: FormContext | undefined,
+): JsonValue | undefined {
   if (!value || typeof value !== 'object') return undefined
   if (value.kind === 'literal') return value.value
   if (value.kind === 'ref') {
     if (typeof value.dataKey !== 'string') return undefined
     return valueOf(data, value.dataKey)
+  }
+  /*
+   * A context the host never supplied reads the same as a context that has no
+   * such key, and that is deliberate. Core cannot usefully tell "you forgot to
+   * wire this up" from "there is no such key" here, and guessing would make one
+   * of them behave differently for no reason a form author could see.
+   *
+   * Wiring is a boot-time question, so it gets a boot-time answer: `contextKeys`
+   * names every path a document reads, and a host asserts against it once.
+   */
+  if (value.kind === 'context') {
+    if (typeof value.path !== 'string') return undefined
+    return readPath(context, value.path)
   }
   return undefined
 }
@@ -83,8 +100,12 @@ function order(a: JsonValue | undefined, b: JsonValue | undefined): number | und
  * matches what a computed condition does without an evaluator, which keeps
  * "hidden" the answer to every question this cannot answer.
  */
-export function evaluateCondition(condition: Condition, data: FormData): boolean {
-  return evaluate(condition, data) ?? false
+export function evaluateCondition(
+  condition: Condition,
+  data: FormData,
+  context?: FormContext,
+): boolean {
+  return evaluate(condition, data, context) ?? false
 }
 
 /**
@@ -100,20 +121,26 @@ export function evaluateCondition(condition: Condition, data: FormData): boolean
  * nobody can read is a group nobody can read, and answering from the remainder
  * would be guessing.
  */
-function evaluate(condition: Condition, data: FormData): boolean | undefined {
+function evaluate(
+  condition: Condition,
+  data: FormData,
+  context: FormContext | undefined,
+): boolean | undefined {
   if (!condition || typeof condition !== 'object') return undefined
+
+  const read = (value: Operand | undefined): JsonValue | undefined => operand(value, data, context)
 
   switch (condition.op) {
     case 'eq':
-      return same(operand(condition.left, data), operand(condition.right, data))
+      return same(read(condition.left), read(condition.right))
     case 'ne':
-      return !same(operand(condition.left, data), operand(condition.right, data))
+      return !same(read(condition.left), read(condition.right))
 
     case 'gt':
     case 'gte':
     case 'lt':
     case 'lte': {
-      const delta = order(operand(condition.left, data), operand(condition.right, data))
+      const delta = order(read(condition.left), read(condition.right))
       if (delta === undefined) return false
       if (condition.op === 'gt') return delta > 0
       if (condition.op === 'gte') return delta >= 0
@@ -122,9 +149,9 @@ function evaluate(condition: Condition, data: FormData): boolean | undefined {
     }
 
     case 'empty':
-      return isEmpty(operand(condition.value, data))
+      return isEmpty(read(condition.value))
     case 'notEmpty':
-      return !isEmpty(operand(condition.value, data))
+      return !isEmpty(read(condition.value))
 
     /*
      * JavaScript truthiness, deliberately, because that is what an author who
@@ -132,9 +159,9 @@ function evaluate(condition: Condition, data: FormData): boolean | undefined {
      * string is falsy and empty, but `0` is falsy and an answer.
      */
     case 'truthy':
-      return Boolean(operand(condition.value, data))
+      return Boolean(read(condition.value))
     case 'falsy':
-      return !operand(condition.value, data)
+      return !read(condition.value)
 
     /*
      * An empty list is a real answer: nothing is in it, and everything is not
@@ -144,7 +171,7 @@ function evaluate(condition: Condition, data: FormData): boolean | undefined {
     case 'in':
     case 'notIn': {
       if (!Array.isArray(condition.options)) return false
-      const held = condition.options.some((option) => same(operand(condition.value, data), option))
+      const held = condition.options.some((option) => same(read(condition.value), option))
       return condition.op === 'in' ? held : !held
     }
 
@@ -160,13 +187,13 @@ function evaluate(condition: Condition, data: FormData): boolean | undefined {
     case 'and':
     case 'or': {
       if (!Array.isArray(condition.conditions)) return undefined
-      const answers = condition.conditions.map((inner) => evaluate(inner, data))
+      const answers = condition.conditions.map((inner) => evaluate(inner, data, context))
       if (answers.includes(undefined)) return undefined
       return condition.op === 'and' ? answers.every(Boolean) : answers.some(Boolean)
     }
 
     case 'not': {
-      const inner = condition.condition ? evaluate(condition.condition, data) : undefined
+      const inner = condition.condition ? evaluate(condition.condition, data, context) : undefined
       return inner === undefined ? undefined : !inner
     }
 

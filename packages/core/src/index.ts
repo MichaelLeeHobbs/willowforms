@@ -6,6 +6,7 @@ export type {
   Device,
   EventName,
   FieldSchema,
+  FormContext,
   FormData,
   FormDocument,
   FormErrors,
@@ -29,7 +30,7 @@ export type {
 } from './kit.js'
 export { groupKit, indexKit } from './kit.js'
 
-export { isEmpty, jsonToString, optionValue, safeHref, valueOf } from './json.js'
+export { isEmpty, jsonToString, optionValue, readPath, safeHref, valueOf } from './json.js'
 
 export { evaluateCondition } from './condition.js'
 
@@ -42,6 +43,8 @@ export {
   setDeclaration,
   styleSheetFor,
 } from './css.js'
+
+export { contextKeys, missingContext } from './context.js'
 
 export { isVisible } from './visibility.js'
 
@@ -68,7 +71,7 @@ export {
   walk,
 } from './tree.js'
 
-export type { Evaluator } from './validation.js'
+export type { EvalOptions, Evaluator } from './validation.js'
 export {
   applyRule,
   autoValidateKeys,

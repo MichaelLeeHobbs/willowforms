@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { jsonToString, optionValue, safeHref } from './json.js'
+import { jsonToString, optionValue, readPath, safeHref } from './json.js'
 
 describe('jsonToString', () => {
   it('passes strings through and renders primitives', () => {
@@ -134,5 +134,58 @@ describe('safeHref', () => {
     expect(safeHref(undefined)).toBeUndefined()
     expect(safeHref(null)).toBeUndefined()
     expect(safeHref({ href: 'https://example.com' })).toBeUndefined()
+  })
+})
+
+describe('readPath', () => {
+  const context = {
+    user: { role: 'admin', seats: 0, active: false },
+    flags: { beta: true },
+    plain: 'text',
+    list: [1, 2],
+  }
+
+  it('reads a nested value', () => {
+    expect(readPath(context, 'user.role')).toBe('admin')
+    expect(readPath(context, 'flags')).toEqual({ beta: true })
+  })
+
+  it('reads a falsy leaf as the value it is', () => {
+    // The same rule isEmpty follows: 0 and false are answers, and a condition
+    // asking `is the seat count zero` has to be able to see one.
+    expect(readPath(context, 'user.seats')).toBe(0)
+    expect(readPath(context, 'user.active')).toBe(false)
+  })
+
+  it('is nothing for a step that is not there', () => {
+    expect(readPath(context, 'user.email')).toBeUndefined()
+    expect(readPath(context, 'nobody')).toBeUndefined()
+    expect(readPath(context, 'user.role.deeper')).toBeUndefined()
+  })
+
+  it('does not walk the prototype', () => {
+    /*
+     * A path is authored in a picker and stored in a document, so these are
+     * strings somebody can type. A plain lookup returns a function, which is
+     * present and truthy and would make a condition true for a path the context
+     * does not hold.
+     */
+    for (const path of ['constructor', 'toString', 'user.constructor', '__proto__']) {
+      expect(readPath(context, path), path).toBeUndefined()
+    }
+  })
+
+  it('does not walk into a string or an array', () => {
+    expect(readPath(context, 'plain.length')).toBeUndefined()
+    expect(readPath(context, 'list.0')).toBeUndefined()
+    expect(readPath(context, 'list.length')).toBeUndefined()
+  })
+
+  it('is nothing for a path that is not one', () => {
+    expect(readPath(context, '')).toBeUndefined()
+    expect(readPath(context, '.')).toBeUndefined()
+    expect(readPath(context, 'user.')).toBeUndefined()
+    expect(readPath(undefined, 'user.role')).toBeUndefined()
+    expect(readPath(context, 42 as unknown as string)).toBeUndefined()
   })
 })

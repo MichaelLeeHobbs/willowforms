@@ -264,3 +264,77 @@ describe('object equality is about own properties', () => {
     expect(check({ op: 'eq', left: lit({ a: 1 }), right: lit({ a: 2 }) })).toBe(false)
   })
 })
+
+describe('what the host knows', () => {
+  const context = { user: { role: 'admin', seats: 0 }, country: 'FR' }
+  const ctx = (path: string) => ({ kind: 'context', path }) as const
+
+  it('compares against a path the host supplied', () => {
+    expect(
+      evaluateCondition({ op: 'eq', left: ctx('user.role'), right: lit('admin') }, data, context),
+    ).toBe(true)
+    expect(
+      evaluateCondition({ op: 'eq', left: ctx('user.role'), right: lit('viewer') }, data, context),
+    ).toBe(false)
+  })
+
+  it('keeps the context and the answers in separate namespaces', () => {
+    /*
+     * `country` is both a field and a context path here, holding different
+     * values on purpose. Merging the two would make which one a rule reads
+     * depend on what the host happened to name a key, and the form author who
+     * wrote the rule cannot see the host's names at all.
+     */
+    expect(
+      evaluateCondition({ op: 'eq', left: ref('country'), right: lit('GB') }, data, context),
+    ).toBe(true)
+    expect(
+      evaluateCondition({ op: 'eq', left: ctx('country'), right: lit('GB') }, data, context),
+    ).toBe(false)
+    expect(
+      evaluateCondition({ op: 'eq', left: ctx('country'), right: lit('FR') }, data, context),
+    ).toBe(true)
+  })
+
+  it('reads a zero the host supplied as a zero', () => {
+    expect(evaluateCondition({ op: 'empty', value: ctx('user.seats') }, data, context)).toBe(false)
+    expect(
+      evaluateCondition({ op: 'eq', left: ctx('user.seats'), right: lit(0) }, data, context),
+    ).toBe(true)
+  })
+
+  it('reads a context nobody supplied as missing, not as an error', () => {
+    // This is the quiet failure `contextKeys` and `missingContext` exist for:
+    // it is indistinguishable here from a context that has no such key, and a
+    // form still has to render for the person filling it in.
+    expect(evaluateCondition({ op: 'empty', value: ctx('user.role') }, data)).toBe(true)
+    expect(evaluateCondition({ op: 'truthy', value: ctx('user.role') }, data)).toBe(false)
+    expect(evaluateCondition({ op: 'notEmpty', value: ctx('nope') }, data, context)).toBe(false)
+  })
+
+  it('does not read a path that is not a string', () => {
+    expect(
+      evaluateCondition(
+        { op: 'truthy', value: { kind: 'context', path: 42 } } as unknown as Condition,
+        data,
+        context,
+      ),
+    ).toBe(false)
+  })
+
+  it('reaches a context inside a group and inside a not', () => {
+    // Nesting is where threading an extra argument usually gets dropped.
+    const isAdmin: Condition = { op: 'eq', left: ctx('user.role'), right: lit('admin') }
+    expect(evaluateCondition({ op: 'not', condition: isAdmin }, data, context)).toBe(false)
+    expect(evaluateCondition({ op: 'and', conditions: [isAdmin, isAdmin] }, data, context)).toBe(
+      true,
+    )
+    expect(
+      evaluateCondition(
+        { op: 'or', conditions: [{ op: 'not', condition: isAdmin }] },
+        data,
+        context,
+      ),
+    ).toBe(false)
+  })
+})

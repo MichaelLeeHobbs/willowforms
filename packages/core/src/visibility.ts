@@ -14,9 +14,9 @@
 
 import { evaluateCondition } from './condition.js'
 import type { ComponentNode, FormData } from './types.js'
-import type { Evaluator } from './validation.js'
+import type { EvalOptions } from './validation.js'
 
-export function isVisible(node: ComponentNode, data: FormData, evaluate?: Evaluator): boolean {
+export function isVisible(node: ComponentNode, data: FormData, options: EvalOptions = {}): boolean {
   const when = node.renderWhen
   if (!when) return true
 
@@ -31,7 +31,9 @@ export function isVisible(node: ComponentNode, data: FormData, evaluate?: Evalua
      * because agreeing with what the user sees matters more than guessing.
      */
     case 'computed':
-      return evaluate ? Boolean(evaluate(when.expression, data)) : false
+      return options.evaluate
+        ? Boolean(options.evaluate(when.expression, data, options.context))
+        : false
 
     /*
      * A translation key is not a condition. Treating it as one would hide a
@@ -47,6 +49,6 @@ export function isVisible(node: ComponentNode, data: FormData, evaluate?: Evalua
      * nothing at all.
      */
     case 'condition':
-      return evaluateCondition(when.condition, data)
+      return evaluateCondition(when.condition, data, options.context)
   }
 }

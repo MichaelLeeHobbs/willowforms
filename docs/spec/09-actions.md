@@ -106,7 +106,7 @@ lookup, availability check and quote in a real form.
 The honest counter, worth recording because it is a good one: a capability model can emulate a returned
 list, and a returned list cannot emulate a capability. That asymmetry is real. It buys progressive results
 — a live upload percentage, a countdown — and those are conceded for now. They also need timers and
-ephemeral state, neither of which exists, so nothing is lost today that is not already lost.
+timers, which do not exist, so nothing is lost today that is not already lost.
 
 ### Effects, not a data patch
 
@@ -121,17 +121,30 @@ type Effect =
   | { kind: 'clearValue'; dataKey: string }
   | { kind: 'focus'; nodeKey: string }
   | { kind: 'announce'; message: string }
+  | { kind: 'setContext'; path: string; value: JsonValue }
   | { kind: 'validate'; scope?: string }
   | { kind: 'emit'; event: string; payload?: JsonValue }
   | { kind: 'halt'; reason?: string }
 ```
 
-Two namespaces, deliberately visible in the type. Data effects address `dataKey`, which may repeat;
-interface effects address `nodeKey`, which is unique. That is the same split `FormData` and `FormErrors`
-already make, and an imperative `set(key, value)` could not show it.
+Three namespaces, deliberately visible in the type. Data effects address `dataKey`, which may repeat;
+interface effects address `nodeKey`, which is unique; `setContext` addresses a dot path in `FormContext`,
+which is the host's and never submitted. That is the same split `FormData` and `FormErrors` already make,
+extended by the one [12-api.md](12-api.md#state-that-is-not-an-answer) settled, and an imperative
+`set(key, value)` could not show any of it.
+
+`setContext` is what makes "three addresses found" authorable: the effect writes it, a condition reads
+it, and the same rule evaluates on the server, where the context is whatever the request supplied.
 
 An unknown effect kind rejects the whole list rather than applying part of it. A document authored in a
 newer designer must fail visibly in an older host, not half-apply.
+
+**Open: a batch that mixes namespaces is not atomic.** Rejecting an unknown kind up front is a check on
+the list, not a transaction over applying it. `setValue` goes through the host's `onChange`, `setContext`
+through whatever holds the context, and `focus` touches the DOM: three owners, no shared commit point, so
+an effect that throws halfway leaves the earlier ones applied. Either the runner collects every change
+and hands the host one commit, or the specification states that effects apply in order and may partially
+apply. The second is cheaper and worse, and neither should be decided before the vocabulary is.
 
 ### `emit` is what makes the set closable
 
@@ -175,10 +188,10 @@ the gaps below are.
 Working through the behaviours of checkouts, insurance quotes, job applications, surveys and booking
 flows, the blockers sort into four groups, and the action model touches none of them:
 
-- **Ephemeral state that is not submitted.** "Three addresses found", "checking", "43 seconds left",
-  "uploading". `renderWhen` can only read `data`, and nobody wants `__addressCandidates` in the payload.
-  Half the effects above have nowhere to write to until this exists. See
-  [12-api.md](12-api.md#the-host-owns-the-data).
+- ~~**Ephemeral state that is not submitted.**~~ **Settled.** An effect writes to `FormContext`, which
+  the host owns and supplies, and which a condition can read because it is JSON that survives a trip to
+  the server. What cannot survive that trip stays in the kit component and nothing authored may depend on
+  it. See [12-api.md](12-api.md#state-that-is-not-an-answer).
 - **Steps.** There is no Step component, so there is no per-step validation scope, no branch-to-question,
   and no progress. That is the defining feature of onboarding and surveys.
   See [03-components.md](03-components.md).

@@ -158,12 +158,27 @@ A rule that silently never fires is worse than one that visibly cannot run.
 only purpose is to prove that `validateForm` is the same function in both places.
 
 ```ts
-import { validateForm } from '@formsmith/core'
+import { missingContext, validateForm } from '@formsmith/core'
 
-const errors = validateForm(document.root, submitted)
+const context = { user: { role: session.role } }
+
+const errors = validateForm(document.root, submitted, { context })
 if (Object.keys(errors).length > 0) return respond(422, { errors })
 ```
 
 The server must inject the same evaluator as the client for `custom` rules and guards to behave
 identically. With none injected they pass, which means **a `custom` rule is not a security control**. A
 server that needs one must supply the sandbox.
+
+Parity now has a second half, and it fails more quietly than the first. A visibility rule reading
+`FormContext` decides whether a field is validated at all, so a server that does not supply the context
+does not reject the submit, it accepts one that skipped a required answer. Assert once at startup:
+
+```ts
+const missing = missingContext(document.root, context)
+if (missing.length) throw new Error('context missing: ' + missing.join(', '))
+```
+
+The context is the server's, never the request's. A payload carrying `user.role` is a claim from the
+browser, and the only way it cannot be believed is if the server never reads it from there. See
+[12-api.md](12-api.md#state-that-is-not-an-answer).

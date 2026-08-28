@@ -49,8 +49,21 @@ export type Condition =
   | { op: 'and' | 'or'; conditions: Condition[] }
   | { op: 'not'; condition: Condition }
 
-/** One side of a comparison: a fixed value, or whatever a field holds. */
-export type Operand = { kind: 'literal'; value: JsonValue } | { kind: 'ref'; dataKey: string }
+/**
+ * One side of a comparison: a fixed value, a field's answer, or the host's context.
+ *
+ * The three kinds are not interchangeable, and the difference is where the value
+ * comes from. `literal` is in the document. `ref` reads `FormData`, which the
+ * host owns and submits. `context` reads {@link FormContext}, which the host
+ * supplies and the form never writes.
+ *
+ * There is deliberately no fourth kind for a component's own passing state. See
+ * {@link FormContext}.
+ */
+export type Operand =
+  | { kind: 'literal'; value: JsonValue }
+  | { kind: 'ref'; dataKey: string }
+  | { kind: 'context'; path: string }
 
 export interface ActionRef {
   /** Name of a {@link CodeAction} on the document, or a built-in. */
@@ -155,5 +168,26 @@ export interface FormDocument {
 
 /** Runtime form data, keyed by component key. */
 export type FormData = Record<string, JsonValue>
+
+/**
+ * What the host knows that the form did not ask.
+ *
+ * The signed-in user's role, a feature flag, the tenant's country, how many
+ * addresses a lookup returned. A condition can read it, and it is never part of
+ * the payload, because it is not an answer to anything.
+ *
+ * It is JSON, and that is a rule rather than a convenience. `renderWhen` gates
+ * validation, so a server running `validateForm` on the same document has to
+ * reach the same answer as the browser did. A value the server cannot be handed
+ * is a value the two will disagree about, and they disagree silently: the field
+ * is simply not checked. So anything a condition can read has to survive being
+ * sent to Node, which means JSON and nothing else.
+ *
+ * That is also why a `File`, an `AbortController` or a spinner's own boolean
+ * does not live here. Those belong to the component holding them, they are the
+ * kit's business, and no condition can read them. See
+ * [12-api.md](../../../docs/spec/12-api.md#state-that-is-not-an-answer).
+ */
+export type FormContext = Record<string, JsonValue>
 /** Runtime validation errors, keyed by component key. */
 export type FormErrors = Record<string, string>

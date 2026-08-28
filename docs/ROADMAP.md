@@ -26,11 +26,17 @@ a hand-edited document. A closed structured condition, evaluated in core, fixes 
 field only when another is answered now runs in a host that injected nothing.
 See [docs/spec/01-document-model.md](spec/01-document-model.md#conditions).
 
-**Then the three gaps that block real forms**, none of which is an action:
+**State that is not an answer is built.** "Three addresses found", "checking", "uploading" had nowhere
+to live, because `renderWhen` could only read `data` and `data` is what gets submitted. It turned out to
+be two things. What a condition reads has to be reproducible in Node, or the browser and the server
+disagree about what the form asked and disagree silently, so JSON the host supplies became `FormContext`
+with its own operand kind, and everything that cannot survive that trip stayed in the kit component where
+it already was. `missingContext(root, context)` is the boot-time check that catches an unwired host,
+because nothing at evaluation time can.
+See [docs/spec/12-api.md](spec/12-api.md#state-that-is-not-an-answer).
 
-- **Ephemeral state.** "Three addresses found", "checking", "uploading". Nowhere to put it, and half of
-  what an action would want to do has nowhere to write to until there is.
-  See [docs/spec/12-api.md](spec/12-api.md#there-is-nowhere-to-put-ephemeral-state).
+**Then the two gaps that block real forms**, neither of which is an action:
+
 - **Steps.** No Step component, so no per-step validation, no branching, no progress. That is onboarding
   and surveys. See [docs/spec/03-components.md](spec/03-components.md#what-is-deliberately-absent).
 - **Repeated scope.** Already known, still blocking `Repeater` and every "add another" button.
@@ -49,7 +55,7 @@ See [docs/spec/06-inspector.md](spec/06-inspector.md#style).
 
 ## Verification
 
-`pnpm test` runs 787 tests; `pnpm e2e` runs 58 in a real browser. Both gate CI, along with lint,
+`pnpm test` runs 817 tests; `pnpm e2e` runs 58 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
 computed from the stylesheets and axe runs over the designer in six states. See
 [accessibility.md](accessibility.md).

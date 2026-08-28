@@ -65,6 +65,7 @@ import { FormRenderer } from '@formsmith/renderer'
 | `language` | `string`                                  | no       | BCP 47 tag; defaults to the document            |
 | `evaluate` | `Evaluator`                               | no       | Sandbox for computed props                      |
 | `device`   | `Device`                                  | no       | Render `css` for one device, not by media query |
+| `context`  | `FormContext`                             | no       | What the host knows and does not submit         |
 
 ### The host owns the data
 
@@ -107,27 +108,109 @@ the [grammar for them](#keys) is still only planned, so that is reachable today 
 `FieldSchema.autoValidate` is the per-field hint that a field wants validating while it is typed into.
 The host decides whether to honour it, and `autoValidateKeys(root)` names the fields that asked.
 
-### There is nowhere to put ephemeral state
+### State that is not an answer
 
-**Status: undecided**, and it blocks more real forms than any other gap in this specification.
+**Status: built.** "Three addresses found." "Checking availability." "43 seconds until you can resend."
+"Uploading, 40%." None of that belongs in `data`, because `data` is what the host submits and nobody
+wants `__addressCandidates` in the payload. `renderWhen` could only read `data`, so there was nowhere for
+it to live.
 
-"Three addresses found." "Checking availability." "43 seconds until you can resend." "Uploading, 40%."
-None of that belongs in `data`, because `data` is what the host submits and nobody wants
-`__addressCandidates` in the payload. But `renderWhen` can only read `data`, so today there is nowhere
-for it to live at all.
+It turned out not to be one thing. Splitting it is the whole answer, and the line between the two halves
+is not where it first looks.
 
-Three ways out, none free:
+#### The line: a condition must be answerable in Node
 
-- **A second controlled pair**, `uiState` and `onUiStateChange`. Consistent with everything else here,
-  and it doubles the host's wiring for state the host does not care about.
-- **Let the renderer hold this, and only this.** Breaks "holds no state", and arguably in the right
-  place: whether a spinner is spinning is not the host's business.
-- **A reserved namespace inside `data` that the host strips.** Cheapest, and it leaks into the payload
-  the first time somebody forgets.
+`renderWhen` gates validation. A hidden field is not validated, on the server as well as in the browser,
+and that is deliberate: a required answer nobody can see must never block a submit. The consequence is
+that **anything a condition can read has to be reproducible on the server**, or the two disagree about
+what the form asked, silently, and in the permissive direction.
 
-The second is the likely answer. It needs writing down before the action vocabulary is settled, because
-half the effects an action would return have nowhere to write to until it exists. See
-[09-actions.md](09-actions.md#why-this-is-not-next).
+So the split is not "important" against "transient". It is: can a value be handed to Node?
+
+|                         | Context  | Presentation                 |
+| ----------------------- | -------- | ---------------------------- |
+| Owner                   | the host | the kit component            |
+| Type                    | JSON     | anything, including a `File` |
+| Exists server-side      | yes      | no                           |
+| A condition can read it | yes      | **never**                    |
+| In the payload          | no       | no                           |
+
+#### Context
+
+`FormContext` is `Record<string, JsonValue>`, supplied through `FormRenderer`'s `context` prop and
+`EvalOptions.context` in core. A condition reads it through a third operand kind:
+
+```ts
+{ kind: 'context', path: 'user.role' }
+```
+
+A dot path, because a host's context already is nested and making every host flatten `{ user: { role } }`
+into `{ 'user.role': … }` is work Formsmith would be creating rather than doing. Every step is an
+own-property read that must land on a plain object, so `constructor.prototype` reads as missing and a
+path cannot walk into a string's `length`. A key containing a dot is unreachable, which is a stated limit
+rather than an escape syntax, because an escape syntax is a parser and a parser is a thing with its own
+bugs sitting in the middle of a security boundary.
+
+Context and `data` are separate namespaces. Merging them would make which one a rule reads depend on what
+the host happened to call a key, and the form author who wrote the rule cannot see the host's names.
+
+That it is JSON is enforced by the type and nowhere else. A host in TypeScript cannot put a `Date` in it;
+a host in JavaScript can, and the failure is the quiet kind again, because a `Date` compares as itself in
+the browser and as a string once it has been through a request. `missingContext` reports absence, not
+shape. Checking every leaf on every boot is a defensible thing to add and is deliberately not there yet.
+
+The evaluator gets it too, as a third argument: `(expression, data, context)`. An evaluator written
+before context existed ignores it and keeps working.
+
+#### Presentation state stays in the component
+
+A spinner's boolean, an upload's percentage, a `File`, an `AbortController`. These live in the kit
+component's own React state, they always did, and the decision is that they stay there and no condition
+can read them. There is nothing to build, which is the point: the renderer keeps holding no state, and
+the value that could not survive a trip to Node is the value nothing authored depends on.
+
+A host that wants "three addresses found" to drive a visibility rule publishes it to `context`. That is
+one line in the host and it makes the rule work identically on the server. This is also what makes the
+action vocabulary tractable: an effect writes to context, which the host already owns.
+
+#### Why not a reserved namespace inside `data`
+
+The cheapest option was `__` keys the host strips before submitting. Rejected for three reasons, and the
+first alone is enough:
+
+- It leaks. The strip is one line in one place in the host, and over the life of an application somebody
+  will add a second submit path that does not have it. A design whose safety depends on nobody forgetting
+  is a design that fails.
+- It cannot hold a `File` or an `AbortController`, so it solves half the problem while looking like it
+  solved all of it.
+- Wrong cardinality. `data` is keyed by `dataKey` and repeats per row inside a `Repeater`, while
+  "checking availability" is usually about the form.
+
+#### The quiet failure, and where it is caught
+
+A document that reads `user.role` and a host that never supplies it: the path reads as missing, the
+condition is false, the component is hidden, and `validateForm` skips it. A required answer becomes
+advisory, on the server.
+
+Nothing at evaluation time can fix that. Core cannot tell an unwired host from a context that genuinely
+has no such key, and the form still has to render for the person filling it in either way. But wiring is
+a boot-time question, so it gets a boot-time answer:
+
+```ts
+const missing = missingContext(document.root, context)
+if (missing.length) throw new Error('context missing: ' + missing.join(', '))
+```
+
+`contextKeys(root)` names every path a document reads, across visibility rules, condition-bound
+properties, and the `when` guard on a validation rule. Expressions are not covered and cannot be: what a
+string of JavaScript reads is the evaluator's business, and core does not parse it. A path holding
+`false` or `0` is supplied, not missing, or a host would learn to ignore the report.
+
+#### Still open: a row's own scope
+
+Reading "this row's index" or "the row above" needs addressing that does not exist yet. That is
+`Repeater`'s scoping problem and it is deliberately not answered here. See
+[03-components.md](03-components.md#what-is-deliberately-absent).
 
 ### A type the kit does not have
 
