@@ -212,6 +212,7 @@ describe('documentation links', () => {
     'docs/accessibility.md',
     'docs/prior-art/README.md',
     'docs/ideas.md',
+    '.claude/skills/write-tests/SKILL.md',
   ]
 
   /*
