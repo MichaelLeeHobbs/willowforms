@@ -15,7 +15,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormDocument } from '@formsmith/core'
+import type { ComponentNode, FormContext, FormDocument } from '@formsmith/core'
 
 import { FormRenderer } from './index.js'
 import type { NodeRendererProps, RendererKit } from './index.js'
@@ -212,13 +212,16 @@ describe('the host context', () => {
     },
   })
 
-  const renderWith = (context?: Record<string, unknown>): void => {
+  // Typed as the prop is, with no cast. A helper that widens to `unknown` and
+  // forces it through would let a non-JSON value into a test for the rule that
+  // context must be JSON, and the test would still pass.
+  const renderWith = (context?: FormContext): void => {
     render(
       <FormRenderer
         document={documentOf([field('always'), gated('adminOnly')])}
         kit={kit}
         data={{}}
-        {...(context ? { context: context as never } : {})}
+        {...(context ? { context } : {})}
         onChange={() => undefined}
       />,
     )

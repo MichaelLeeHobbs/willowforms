@@ -154,6 +154,11 @@ bugs sitting in the middle of a security boundary.
 Context and `data` are separate namespaces. Merging them would make which one a rule reads depend on what
 the host happened to call a key, and the form author who wrote the rule cannot see the host's names.
 
+That it is JSON is enforced by the type and nowhere else. A host in TypeScript cannot put a `Date` in it;
+a host in JavaScript can, and the failure is the quiet kind again, because a `Date` compares as itself in
+the browser and as a string once it has been through a request. `missingContext` reports absence, not
+shape. Checking every leaf on every boot is a defensible thing to add and is deliberately not there yet.
+
 The evaluator gets it too, as a third argument: `(expression, data, context)`. An evaluator written
 before context existed ignores it and keeps working.
 
