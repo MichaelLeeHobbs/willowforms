@@ -77,7 +77,14 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
       <VisibilityRow
         key={node.key + ':renderWhen'}
         value={node.renderWhen}
-        dataKeys={dataKeys.filter((key) => key !== dataKeyOf(node))}
+        /*
+         * A component cannot test its own field, because hiding it on its own
+         * emptiness removes the control that would fill it. Only a component
+         * that has a field, though: `dataKeyOf` falls back to the node key, so
+         * filtering unconditionally hid a real field from a container that
+         * happened to share its name.
+         */
+        dataKeys={node.schema ? dataKeys.filter((key) => key !== dataKeyOf(node)) : dataKeys}
         onChange={(next) => api.setRenderWhen(node.key, next)}
       />
 

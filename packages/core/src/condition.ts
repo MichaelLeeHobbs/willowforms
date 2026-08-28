@@ -30,7 +30,13 @@ function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
 
   const keys = Object.keys(a)
   if (keys.length !== Object.keys(b).length) return false
-  return keys.every((key) => key in b && same(a[key], b[key]))
+  /*
+   * `Object.hasOwn`, not `in`: `in` counts inherited properties, so an object
+   * that merely inherits the key it is missing would compare equal to one that
+   * really holds it. The same own-property rule `valueOf` follows, and missed
+   * here when that one was written.
+   */
+  return keys.every((key) => Object.hasOwn(b, key) && same(a[key], b[key]))
 }
 
 /**

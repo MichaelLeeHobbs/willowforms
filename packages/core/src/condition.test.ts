@@ -232,3 +232,35 @@ describe('a field named after something on the prototype', () => {
     )
   })
 })
+
+describe('object equality is about own properties', () => {
+  it('does not count an inherited key as one the object holds', () => {
+    /*
+     * `key in b` counts the prototype chain, so an object that merely inherits
+     * the key it is missing compared equal to one that really holds it. Same
+     * own-property rule `valueOf` follows.
+     */
+    /*
+     * The own-key counts have to match, or the length check answers first and
+     * the comparison never reaches the line under test. The first version of
+     * this test gave `inherits` one own key against two, so it passed against
+     * the bug it was written for.
+     */
+    const inherits = Object.create({ a: 1 }) as Record<string, unknown>
+    inherits['b'] = 2
+    inherits['c'] = 3
+
+    expect(Object.keys(inherits)).toHaveLength(2)
+    expect('a' in inherits).toBe(true)
+    expect(Object.hasOwn(inherits, 'a')).toBe(false)
+
+    expect(check({ op: 'eq', left: lit({ a: 1, b: 2 }), right: lit(inherits as never) })).toBe(
+      false,
+    )
+  })
+
+  it('still compares two plain objects by their contents', () => {
+    expect(check({ op: 'eq', left: lit({ a: 1, b: 2 }), right: lit({ b: 2, a: 1 }) })).toBe(true)
+    expect(check({ op: 'eq', left: lit({ a: 1 }), right: lit({ a: 2 }) })).toBe(false)
+  })
+})

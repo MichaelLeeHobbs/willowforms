@@ -444,6 +444,34 @@ describe('the visibility row', () => {
     expect(harness.latest()?.renderWhen).toEqual({ kind: 'static', value: false })
   })
 
+  it('offers every field to a component that has none of its own', async () => {
+    /*
+     * `dataKeyOf` falls back to the node key, so filtering unconditionally hid
+     * a real field from a container that happened to share its name. Only a
+     * component that carries data has an own field to exclude.
+     */
+    // The sibling has to share the container's key, or the filter removes
+    // nothing and the test passes against the bug it was written for.
+    const container: ComponentNode = { key: 'country', type: 'Row', props: {}, children: [] }
+    const harness = setup(container, [
+      {
+        key: 'countryField',
+        dataKey: 'country',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [] },
+      },
+    ])
+    await harness.select()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
+      (o) => o.value,
+    )
+
+    expect(options).toContain('country')
+  })
+
   it('does not offer the component its own field', async () => {
     // Hiding a component when its own value is empty hides the only control
     // that could fill it.
