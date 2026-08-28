@@ -12,7 +12,7 @@
  */
 
 import { evaluateCondition } from './condition.js'
-import { isEmpty, jsonToString } from './json.js'
+import { isEmpty, jsonToString, valueOf } from './json.js'
 import { dataKeyOf, flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -151,7 +151,7 @@ export function validateField(
 ): string | undefined {
   if (!node.schema) return undefined
   for (const rule of node.schema.validations) {
-    const error = applyRule(rule, data[dataKeyOf(node)], data, evaluate)
+    const error = applyRule(rule, valueOf(data, dataKeyOf(node)), data, evaluate)
     if (error) return error
   }
   return undefined

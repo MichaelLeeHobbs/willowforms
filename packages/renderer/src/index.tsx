@@ -9,7 +9,7 @@
 
 import { createContext, useCallback, useContext, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { dataKeyOf, evaluateCondition, isVisible } from '@formsmith/core'
+import { dataKeyOf, evaluateCondition, isVisible, valueOf } from '@formsmith/core'
 import type {
   ComponentNode,
   Evaluator,
@@ -165,7 +165,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       nodeProps={nodeProps}
       // Value by data key, error by node key. Two components may share a data
       // key; they can still fail for different reasons.
-      value={data[dataKey]}
+      value={valueOf(data, dataKey)}
       error={errors[node.key]}
       onChange={handleChange}
     >

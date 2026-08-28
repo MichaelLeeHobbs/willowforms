@@ -199,7 +199,11 @@ A component that holds no form data says so instead of showing an empty rule lis
 
 **Status: planned.** Two things a kit cannot anticipate:
 
-- **`renderWhen`.** **Built.** A Show when row offering Always, a condition, or an expression. A
+- **`renderWhen`.** **Built.** A Show when row offering Always, Never, a condition, or an expression.
+  `renderWhen` is a `PropValue`, so a document can hold any of its kinds: a static falsy reads as
+  Never, and a static truthy or a translation key reads as Always, which is what `isVisible` does with
+  them. Reading anything truthy as a condition left the select saying so while rendering no editor,
+  which made a hand-edited document unfixable from the panel. A
   component cannot test its own field: hiding a component when its own value is empty hides the only
   control that could fill it. The field list comes from the document, so a condition cannot name a key
   that does not exist, and a hand-edited one that does is shown rather than silently reassigned.

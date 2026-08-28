@@ -14,7 +14,7 @@
  * stay the evaluator's job, as the escape hatch rather than the only door.
  */
 
-import { isEmpty } from './json.js'
+import { isEmpty, valueOf } from './json.js'
 import type { Condition, FormData, JsonValue, Operand } from './types.js'
 
 /** Deep equality over JSON, which is the only equality a document can express. */
@@ -46,8 +46,10 @@ function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
 function operand(value: Operand | undefined, data: FormData): JsonValue | undefined {
   if (!value || typeof value !== 'object') return undefined
   if (value.kind === 'literal') return value.value
-  if (value.kind === 'ref')
-    return typeof value.dataKey === 'string' ? data[value.dataKey] : undefined
+  if (value.kind === 'ref') {
+    if (typeof value.dataKey !== 'string') return undefined
+    return valueOf(data, value.dataKey)
+  }
   return undefined
 }
 

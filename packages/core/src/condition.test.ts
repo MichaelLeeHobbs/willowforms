@@ -211,3 +211,24 @@ describe('a document is data, so it can be malformed', () => {
     }
   })
 })
+
+describe('a field named after something on the prototype', () => {
+  /*
+   * `data['toString']` finds a function on Object.prototype. A plain lookup
+   * makes a field nobody answered read as present and truthy, and visibility
+   * and validation would then disagree with the form the user is looking at.
+   */
+  const proto = ['toString', 'constructor', 'valueOf', 'hasOwnProperty']
+
+  it.each(proto)('treats %s as missing when the data does not hold it', (key) => {
+    expect(check({ op: 'notEmpty', value: ref(key) }, {})).toBe(false)
+    expect(check({ op: 'empty', value: ref(key) }, {})).toBe(true)
+    expect(check({ op: 'truthy', value: ref(key) }, {})).toBe(false)
+  })
+
+  it('still reads one the data really does hold', () => {
+    expect(check({ op: 'eq', left: ref('toString'), right: lit('yes') }, { toString: 'yes' })).toBe(
+      true,
+    )
+  })
+})

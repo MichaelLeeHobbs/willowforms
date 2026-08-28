@@ -29,7 +29,7 @@ export type {
 } from './kit.js'
 export { groupKit, indexKit } from './kit.js'
 
-export { isEmpty, jsonToString, optionValue, safeHref } from './json.js'
+export { isEmpty, jsonToString, optionValue, safeHref, valueOf } from './json.js'
 
 export { evaluateCondition } from './condition.js'
 

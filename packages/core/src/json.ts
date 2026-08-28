@@ -8,7 +8,7 @@
  * empty, and the rules already know what to do with empty.
  */
 
-import type { JsonValue } from './types.js'
+import type { FormData, JsonValue } from './types.js'
 
 export function jsonToString(value: JsonValue | undefined): string {
   if (value === undefined || value === null) return ''
@@ -112,4 +112,17 @@ export function isEmpty(value: JsonValue | undefined): boolean {
   if (typeof value === 'string') return value.trim() === ''
   if (Array.isArray(value)) return value.length === 0
   return false
+}
+
+/**
+ * What a field holds, or nothing.
+ *
+ * An own-property read, because a plain lookup finds the prototype: a field
+ * whose data key is `toString` or `constructor` would come back holding a
+ * function, which is present and truthy and not an answer anyone gave. Shared,
+ * so validation, the renderer and conditions cannot disagree about whether a
+ * field is missing.
+ */
+export function valueOf(data: FormData, dataKey: string): JsonValue | undefined {
+  return Object.hasOwn(data, dataKey) ? data[dataKey] : undefined
 }

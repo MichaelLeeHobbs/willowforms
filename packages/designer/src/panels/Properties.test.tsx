@@ -415,6 +415,35 @@ describe('the visibility row', () => {
     expect(screen.getByText(/nothing to test against/)).toBeTruthy()
   })
 
+  it.each([
+    ['static true', { kind: 'static', value: true }, 'always'],
+    ['static false', { kind: 'static', value: false }, 'never'],
+    ['a translation key', { kind: 'i18n', key: 'x' }, 'always'],
+    ['an expression', { kind: 'computed', expression: 'a' }, 'computed'],
+  ])('reads %s out of a hand-edited document as %s', async (_label, renderWhen, expected) => {
+    /*
+     * `renderWhen` is a PropValue, so a document can hold any of its kinds.
+     * Reading anything truthy as "a condition" left the select saying so while
+     * rendering no editor, which made those documents unfixable from the panel.
+     * A static truthy and a translation key both behave as no condition, which
+     * is what isVisible does with them.
+     */
+    const harness = setup({ ...dataField(), renderWhen: renderWhen as PropValue }, [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+
+    expect(screen.getByLabelText('Show when')).toHaveProperty('value', expected)
+  })
+
+  it('sets a static false for Never, which is not the same as absent', async () => {
+    const harness = await withSibling()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'never')
+
+    expect(harness.latest()?.renderWhen).toEqual({ kind: 'static', value: false })
+  })
+
   it('does not offer the component its own field', async () => {
     // Hiding a component when its own value is empty hides the only control
     // that could fill it.

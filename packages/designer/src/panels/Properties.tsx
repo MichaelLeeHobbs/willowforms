@@ -252,7 +252,24 @@ function VisibilityRow({
   dataKeys: string[]
   onChange: (next: PropValue | undefined) => void
 }): ReactNode {
-  const mode = value?.kind === 'computed' ? 'computed' : value ? 'condition' : 'always'
+  /*
+   * `renderWhen` is a `PropValue`, so a hand-edited document can hold a static
+   * boolean or a translation key as well as the two this row authors. Reading
+   * anything truthy as "a condition" left the select saying so while rendering
+   * no editor, which made those documents unfixable from the panel.
+   *
+   * A static false is the one that means something on its own: never shown.
+   * `isVisible` treats a static truthy and a translation key alike as no
+   * condition expressed, so both read as Always, which is what they do.
+   */
+  const mode =
+    value?.kind === 'computed'
+      ? 'computed'
+      : value?.kind === 'condition'
+        ? 'condition'
+        : value?.kind === 'static' && !value.value
+          ? 'never'
+          : 'always'
 
   return (
     <div className={'fs-prop-row' + (value ? ' is-set is-binding' : '')}>
@@ -264,12 +281,14 @@ function VisibilityRow({
           value={mode}
           onChange={(e) => {
             if (e.target.value === 'always') return onChange(undefined)
+            if (e.target.value === 'never') return onChange({ kind: 'static', value: false })
             if (e.target.value === 'computed') return onChange({ kind: 'computed', expression: '' })
             const first = dataKeys[0]
             if (first) onChange({ kind: 'condition', condition: emptyCondition(first) })
           }}
         >
           <option value="always">Always</option>
+          <option value="never">Never</option>
           {/*
             Disabled when there is nothing to test. A condition naming no field
             evaluates to false, so choosing it would hide the component
