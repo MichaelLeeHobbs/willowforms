@@ -107,8 +107,10 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
 
   it('runs a custom rule when an evaluator is injected', () => {
     const evaluate = (expr: string): boolean => expr === 'true'
-    expect(applyRule({ key: 'custom', expression: 'true' }, 'x', NO_DATA, evaluate)).toBeUndefined()
-    expect(applyRule({ key: 'custom', expression: 'false' }, 'x', NO_DATA, evaluate)).toBe(
+    expect(
+      applyRule({ key: 'custom', expression: 'true' }, 'x', NO_DATA, { evaluate }),
+    ).toBeUndefined()
+    expect(applyRule({ key: 'custom', expression: 'false' }, 'x', NO_DATA, { evaluate })).toBe(
       DEFAULT_MESSAGES.custom,
     )
   })

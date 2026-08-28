@@ -166,8 +166,17 @@ type Condition =
   | { op: 'and' | 'or'; conditions: Condition[] }
   | { op: 'not'; condition: Condition }
 
-type Operand = { kind: 'literal'; value: JsonValue } | { kind: 'ref'; dataKey: string }
+type Operand =
+  | { kind: 'literal'; value: JsonValue }
+  | { kind: 'ref'; dataKey: string }
+  | { kind: 'context'; path: string }
 ```
+
+The three operand kinds differ by where the value comes from, and that is the only thing separating them.
+`literal` is in the document, `ref` reads an answer the host will submit, and `context` reads what the
+host knows and never submits. There is deliberately no fourth kind for a component's own passing state:
+a condition gates validation, so everything it reads has to be reproducible on a server.
+See [12-api.md](12-api.md#state-that-is-not-an-answer).
 
 Closed on purpose. The set of comparisons a form author actually writes is small and finite, so it can be
 enumerated, given a picker in the panel, and evaluated by core with no sandbox at all. Expressions are

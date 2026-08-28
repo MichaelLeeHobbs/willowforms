@@ -472,6 +472,61 @@ describe('the visibility row', () => {
     expect(options).toContain('country')
   })
 
+  it('tests against something the host knows instead of a field', async () => {
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    await harness.user.selectOptions(screen.getByLabelText('Subject source'), 'context')
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'context', path: '' } },
+    })
+
+    await harness.user.type(screen.getByLabelText('Subject'), 'user.role')
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'context', path: 'user.role' } },
+    })
+  })
+
+  it('does not carry a data key across into a context path', async () => {
+    /*
+     * A field named `email` becoming the context path `email` reads perfectly
+     * plausibly and tests something else entirely. Starting empty is visibly
+     * unfinished, which is the only honest state for a switch that cannot be
+     * translated.
+     */
+    const harness = await withSibling()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    await harness.user.selectOptions(screen.getByLabelText('Subject source'), 'context')
+
+    expect(screen.getByLabelText('Subject')).toHaveProperty('value', '')
+  })
+
+  it('shows a stored context operand as one, rather than as a blank value', async () => {
+    // The kind select falls back to its first option when handed something it
+    // does not recognise, so a document read wrongly here looks like a field
+    // test that quietly changed what it tests.
+    const harness = setup(
+      {
+        key: 'website',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [] },
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'context', path: 'user.role' } },
+        },
+      },
+      [{ key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } }],
+    )
+    await harness.select()
+
+    expect(screen.getByLabelText('Subject source')).toHaveProperty('value', 'context')
+    expect(screen.getByLabelText('Subject')).toHaveProperty('value', 'user.role')
+  })
+
   it('does not offer the component its own field', async () => {
     // Hiding a component when its own value is empty hides the only control
     // that could fill it.

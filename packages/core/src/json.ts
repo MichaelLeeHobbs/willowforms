@@ -126,3 +126,36 @@ export function isEmpty(value: JsonValue | undefined): boolean {
 export function valueOf(data: FormData, dataKey: string): JsonValue | undefined {
   return Object.hasOwn(data, dataKey) ? data[dataKey] : undefined
 }
+
+/**
+ * What a dot path holds in the host's context, or nothing.
+ *
+ * Nested, unlike {@link valueOf}, because a host's context already is: nobody
+ * has `{ 'user.role': 'admin' }` sitting around, they have `{ user: { role } }`,
+ * and making every host flatten it before handing it over is work Formsmith
+ * would be creating rather than doing.
+ *
+ * Every step is an own-property read, for the reason `valueOf` is one, and the
+ * consequence is stronger here: a path is authored in a picker and stored in a
+ * document, so `constructor.prototype` is a string somebody can type. Each step
+ * must also land on a plain object, so a path cannot walk into a string's
+ * `length` or an array's `map`.
+ *
+ * A key containing a dot is unreachable. That is a real limit and it is stated
+ * rather than worked around, because an escape syntax is a parser, and a parser
+ * is a thing with its own bugs sitting in the middle of a security boundary.
+ */
+export function readPath(source: JsonValue | undefined, path: string): JsonValue | undefined {
+  if (typeof path !== 'string' || path === '') return undefined
+
+  let current: JsonValue | undefined = source
+
+  for (const step of path.split('.')) {
+    if (step === '') return undefined
+    if (current === null || typeof current !== 'object' || Array.isArray(current)) return undefined
+    if (!Object.hasOwn(current, step)) return undefined
+    current = current[step]
+  }
+
+  return current
+}

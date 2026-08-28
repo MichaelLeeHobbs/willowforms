@@ -17,6 +17,7 @@ import { dataKeyOf, flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
   ComponentNode,
+  FormContext,
   FormData,
   FormErrors,
   JsonValue,
@@ -24,8 +25,28 @@ import type {
   ValidationRule,
 } from './types.js'
 
-/** Evaluates a JS expression against the current form data. Host-supplied. */
-export type Evaluator = (expression: string, data: FormData) => JsonValue
+/**
+ * Evaluates a JS expression against the current form data. Host-supplied.
+ *
+ * `context` is the third argument rather than merged into `data`, because the
+ * two have different owners and only one of them is submitted. An evaluator
+ * written before context existed ignores it and keeps working.
+ */
+export type Evaluator = (expression: string, data: FormData, context?: FormContext) => JsonValue
+
+/**
+ * Everything the rules need beyond the answers themselves.
+ *
+ * A bag rather than two more positional arguments, because both are optional
+ * and `validateForm(root, data, undefined, context)` is a call nobody should
+ * have to write. Both are declared `| undefined` on purpose:
+ * `exactOptionalPropertyTypes` is on, and a caller forwarding its own optional
+ * prop is the normal case, not a mistake.
+ */
+export interface EvalOptions {
+  evaluate?: Evaluator | undefined
+  context?: FormContext | undefined
+}
 
 export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
   required: 'This field is required.',
@@ -84,19 +105,21 @@ function asNumber(value: JsonValue | undefined): number {
 }
 
 /** Is a rule's `when` guard satisfied? Unguarded rules always apply. */
-function guardPasses(when: PropValue | undefined, data: FormData, evaluate?: Evaluator): boolean {
+function guardPasses(when: PropValue | undefined, data: FormData, options: EvalOptions): boolean {
   if (!when) return true
   switch (when.kind) {
     case 'static':
       return Boolean(when.value)
     case 'computed':
       // Without a sandbox we cannot know, so skip the rule rather than guess.
-      return evaluate ? Boolean(evaluate(when.expression, data)) : false
+      return options.evaluate
+        ? Boolean(options.evaluate(when.expression, data, options.context))
+        : false
     case 'i18n':
       return true
     // No sandbox needed, so a guarded rule works where an expression would not.
     case 'condition':
-      return evaluateCondition(when.condition, data)
+      return evaluateCondition(when.condition, data, options.context)
   }
 }
 
@@ -111,9 +134,9 @@ export function applyRule(
   rule: ValidationRule,
   value: JsonValue | undefined,
   data: FormData,
-  evaluate?: Evaluator,
+  options: EvalOptions = {},
 ): string | undefined {
-  if (!guardPasses(rule.when, data, evaluate)) return undefined
+  if (!guardPasses(rule.when, data, options)) return undefined
 
   const fail = (): string => rule.message ?? DEFAULT_MESSAGES[rule.key]
 
@@ -138,8 +161,8 @@ export function applyRule(
     case 'uuid':
       return UUID.test(asString(value)) ? undefined : fail()
     case 'custom':
-      if (!evaluate) return undefined
-      return evaluate(rule.expression, data) ? undefined : fail()
+      if (!options.evaluate) return undefined
+      return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
   }
 }
 
@@ -147,11 +170,11 @@ export function applyRule(
 export function validateField(
   node: ComponentNode,
   data: FormData,
-  evaluate?: Evaluator,
+  options: EvalOptions = {},
 ): string | undefined {
   if (!node.schema) return undefined
   for (const rule of node.schema.validations) {
-    const error = applyRule(rule, valueOf(data, dataKeyOf(node)), data, evaluate)
+    const error = applyRule(rule, valueOf(data, dataKeyOf(node)), data, options)
     if (error) return error
   }
   return undefined
@@ -169,14 +192,14 @@ export function validateField(
 export function validateForm(
   root: ComponentNode,
   data: FormData,
-  evaluate?: Evaluator,
+  options: EvalOptions = {},
 ): FormErrors {
   const errors: FormErrors = {}
 
   const visit = (node: ComponentNode): void => {
-    if (!isVisible(node, data, evaluate)) return
+    if (!isVisible(node, data, options)) return
 
-    const error = validateField(node, data, evaluate)
+    const error = validateField(node, data, options)
     if (error) errors[node.key] = error
 
     for (const child of node.children ?? []) visit(child)

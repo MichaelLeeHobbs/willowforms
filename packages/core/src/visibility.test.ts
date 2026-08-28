@@ -22,8 +22,12 @@ describe('isVisible', () => {
 
   it('uses the injected evaluator for a computed condition', () => {
     const evaluate: Evaluator = (expression) => expression === 'yes'
-    expect(isVisible(field('a', { kind: 'computed', expression: 'yes' }), {}, evaluate)).toBe(true)
-    expect(isVisible(field('a', { kind: 'computed', expression: 'no' }), {}, evaluate)).toBe(false)
+    expect(isVisible(field('a', { kind: 'computed', expression: 'yes' }), {}, { evaluate })).toBe(
+      true,
+    )
+    expect(isVisible(field('a', { kind: 'computed', expression: 'no' }), {}, { evaluate })).toBe(
+      false,
+    )
   })
 
   it('hides a computed condition when no evaluator is injected', () => {
@@ -83,8 +87,8 @@ describe('validateForm and visibility', () => {
     }
     const evaluate: Evaluator = (_expression, data) => data['other'] === 'yes'
 
-    expect(validateForm(conditional, {}, evaluate)['why']).toBeUndefined()
-    expect(validateForm(conditional, { other: 'yes' }, evaluate)['why']).toBe(
+    expect(validateForm(conditional, {}, { evaluate })['why']).toBeUndefined()
+    expect(validateForm(conditional, { other: 'yes' }, { evaluate })['why']).toBe(
       'This field is required.',
     )
   })
@@ -121,7 +125,7 @@ describe('a structured condition needs no sandbox', () => {
     }
     const when: Condition = { op: 'truthy', value: { kind: 'ref', dataKey: 'consent' } }
 
-    expect(isVisible(node(when), { consent: true }, explode)).toBe(true)
+    expect(isVisible(node(when), { consent: true }, { evaluate: explode })).toBe(true)
   })
 
   it('hides rather than throws on a condition the document got wrong', () => {

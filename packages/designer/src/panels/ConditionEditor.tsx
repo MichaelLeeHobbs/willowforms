@@ -70,6 +70,7 @@ function asList<T>(value: T[] | undefined): T[] {
 function asOperand(value: Operand | undefined): Operand {
   if (!value || typeof value !== 'object') return literal('')
   if (value.kind === 'ref') return typeof value.dataKey === 'string' ? value : literal('')
+  if (value.kind === 'context') return typeof value.path === 'string' ? value : literal('')
   if (value.kind === 'literal') return value
   return literal('')
 }
@@ -135,17 +136,24 @@ interface OperandFieldProps {
 }
 
 /**
- * One side of a comparison: a field, or a fixed value.
+ * One side of a comparison: a field, a fixed value, or something the host knows.
  *
  * The field list comes from the document rather than being typed, so a
  * condition cannot reference a key that does not exist. A hand-edited document
  * still can, and the select shows that key rather than silently selecting the
  * first one, because quietly changing which field a rule tests is worse than
  * showing something unfamiliar.
+ *
+ * Context is typed instead, and cannot be anything else: what the host supplies
+ * is not in the document, so there is no list to offer. That asymmetry is worth
+ * the friction it causes, because the alternative is a document that carries a
+ * schema for something it does not own. `missingContext` is where a wrong path
+ * gets caught, at the host's boot rather than in the panel.
  */
 function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFieldProps): ReactNode {
   const value = asOperand(raw)
   const isRef = value.kind === 'ref'
+  const isContext = value.kind === 'context'
   const known = isRef && dataKeys.includes(value.dataKey)
 
   return (
@@ -156,22 +164,17 @@ function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFiel
       <select
         id={id + '-kind'}
         value={value.kind}
-        onChange={(e) =>
-          onChange(
-            e.target.value === 'ref'
-              ? { kind: 'ref', dataKey: dataKeys[0] ?? '' }
-              : literal(isRef ? '' : value.value),
-          )
-        }
+        onChange={(e) => onChange(switchKind(value, e.target.value, dataKeys))}
       >
         <option value="ref">Field</option>
         <option value="literal">Value</option>
+        <option value="context">Context</option>
       </select>
 
       <label className="fs-visually-hidden" htmlFor={id}>
         {label}
       </label>
-      {isRef ? (
+      {isRef && (
         <select
           id={id}
           value={value.dataKey}
@@ -184,7 +187,17 @@ function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFiel
             </option>
           ))}
         </select>
-      ) : (
+      )}
+      {isContext && (
+        <input
+          id={id}
+          type="text"
+          placeholder="user.role"
+          value={value.path}
+          onChange={(e) => onChange({ kind: 'context', path: e.target.value })}
+        />
+      )}
+      {!isRef && !isContext && (
         <input
           id={id}
           type="text"
@@ -194,6 +207,20 @@ function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFiel
       )}
     </div>
   )
+}
+
+/**
+ * The same operand, as a different kind.
+ *
+ * Nothing is carried across, and that is the point. A data key, a dot path and
+ * a literal are three different things wearing the same box, and a field named
+ * `email` becoming the context path `email` is a rule that reads plausibly and
+ * tests something else entirely. Starting empty is visibly unfinished.
+ */
+function switchKind(current: Operand, kind: string, dataKeys: string[]): Operand {
+  if (kind === 'ref') return { kind: 'ref', dataKey: dataKeys[0] ?? '' }
+  if (kind === 'context') return { kind: 'context', path: '' }
+  return literal(current.kind === 'literal' ? current.value : '')
 }
 
 /**

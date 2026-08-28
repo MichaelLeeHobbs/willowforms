@@ -12,7 +12,9 @@ import type { ComponentType, ReactNode } from 'react'
 import { dataKeyOf, evaluateCondition, isVisible, styleSheetFor, valueOf } from '@formsmith/core'
 import type {
   ComponentNode,
+  EvalOptions,
   Evaluator,
+  FormContext,
   FormData,
   FormDocument,
   FormErrors,
@@ -72,7 +74,12 @@ interface RenderContext {
   data: FormData
   errors: FormErrors
   translations: Record<string, string>
-  evaluate: Evaluator | undefined
+  /*
+   * The evaluator and the host's context travel together, because every call
+   * that needs one needs the other: a computed binding is handed the context
+   * too, and a condition reads it without an evaluator at all.
+   */
+  options: EvalOptions
   onChange: (key: string, value: JsonValue) => void
 }
 
@@ -98,7 +105,7 @@ export function resolveProp(
   value: PropValue,
   translations: Record<string, string>,
   data: FormData,
-  evaluate?: Evaluator,
+  options: EvalOptions = {},
 ): JsonValue {
   switch (value.kind) {
     case 'static':
@@ -107,10 +114,10 @@ export function resolveProp(
       return translations[value.key] ?? value.key
     // Resolves to a boolean. Meant for renderWhen, and harmless anywhere else.
     case 'condition':
-      return evaluateCondition(value.condition, data)
+      return evaluateCondition(value.condition, data, options.context)
     case 'computed':
       // No sandbox means no evaluation. Render the field rather than crash the form.
-      return evaluate ? evaluate(value.expression, data) : null
+      return options.evaluate ? options.evaluate(value.expression, data, options.context) : null
   }
 }
 
@@ -118,11 +125,11 @@ function resolveProps(
   node: ComponentNode,
   translations: Record<string, string>,
   data: FormData,
-  evaluate?: Evaluator,
+  options: EvalOptions,
 ): Record<string, JsonValue> {
   const out: Record<string, JsonValue> = {}
   for (const [name, value] of Object.entries(node.props)) {
-    out[name] = resolveProp(value, translations, data, evaluate)
+    out[name] = resolveProp(value, translations, data, options)
   }
   return out
 }
@@ -141,11 +148,11 @@ function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
 
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
-  const { scope, kit, data, errors, translations, evaluate, onChange } = ctx
+  const { scope, kit, data, errors, translations, options, onChange } = ctx
 
   const props = useMemo(
-    () => resolveProps(node, translations, data, evaluate),
-    [node, translations, data, evaluate],
+    () => resolveProps(node, translations, data, options),
+    [node, translations, data, options],
   )
 
   // On the derived string, not on the node. Depending on the node re-creates
@@ -164,7 +171,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
 
   // Shared with validateForm, so a hidden field is never validated behind the
   // user's back.
-  if (!isVisible(node, data, evaluate)) return null
+  if (!isVisible(node, data, options)) return null
 
   const Component = kit.renderers[node.type] ?? kit.fallback ?? MissingType
 
@@ -204,6 +211,16 @@ export interface FormRendererProps {
    * device becomes its own query and the viewport decides.
    */
   device?: Device
+  /**
+   * What the host knows that the form did not ask: a role, a flag, a lookup's
+   * result. Conditions can read it and it is never submitted.
+   *
+   * A document that reads a path this does not hold hides the component that
+   * reads it, quietly, and on a server that also skips validating it. Call
+   * `missingContext(document.root, context)` once at startup rather than
+   * discovering that per submit.
+   */
+  context?: FormContext
   onChange: (key: string, value: JsonValue) => void
 }
 
@@ -215,6 +232,7 @@ export function FormRenderer({
   language,
   evaluate,
   device,
+  context,
   onChange,
 }: FormRendererProps): ReactNode {
   const translations = useMemo(
@@ -226,9 +244,11 @@ export function FormRenderer({
   // the client, which a counter or a random string would not be.
   const scope = useId()
 
+  const options = useMemo<EvalOptions>(() => ({ evaluate, context }), [evaluate, context])
+
   const ctx = useMemo<RenderContext>(
-    () => ({ scope, kit, data, errors, translations, evaluate, onChange }),
-    [scope, kit, data, errors, translations, evaluate, onChange],
+    () => ({ scope, kit, data, errors, translations, options, onChange }),
+    [scope, kit, data, errors, translations, options, onChange],
   )
 
   /*

@@ -198,5 +198,69 @@ describe('two forms on one page', () => {
     const sheet = container.querySelector('style')?.textContent ?? ''
     expect(sheet).toContain('][data-fs-key="root"]')
     expect(sheet).not.toContain('] [data-fs-key="root"]')
+
+describe('the host context', () => {
+  const gated = (key: string): ComponentNode => ({
+    ...field(key),
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'user.role' },
+        right: { kind: 'literal', value: 'admin' },
+      },
+    },
+  })
+
+  const renderWith = (context?: Record<string, unknown>): void => {
+    render(
+      <FormRenderer
+        document={documentOf([field('always'), gated('adminOnly')])}
+        kit={kit}
+        data={{}}
+        {...(context ? { context: context as never } : {})}
+        onChange={() => undefined}
+      />,
+    )
+  }
+
+  it('shows a component whose rule the context satisfies', () => {
+    renderWith({ user: { role: 'admin' } })
+    expect(screen.getByLabelText('adminOnly')).toBeTruthy()
+  })
+
+  it('hides it when the context says otherwise', () => {
+    renderWith({ user: { role: 'viewer' } })
+    expect(screen.queryByLabelText('adminOnly')).toBeNull()
+    expect(screen.getByLabelText('always')).toBeTruthy()
+  })
+
+  it('hides it when no context was supplied at all', () => {
+    // The wiring failure, seen from the renderer. Nothing here can tell it
+    // apart from a role that is genuinely not admin, which is what
+    // missingContext is for.
+    renderWith()
+    expect(screen.queryByLabelText('adminOnly')).toBeNull()
+  })
+
+  it('hands the context to a computed binding as well', () => {
+    const evaluate = vi.fn().mockReturnValue('from the host')
+    render(
+      <FormRenderer
+        document={documentOf([
+          {
+            ...field('a'),
+            props: { label: { kind: 'computed', expression: 'ctx.user.role' } },
+          },
+        ])}
+        kit={kit}
+        data={{}}
+        context={{ user: { role: 'admin' } }}
+        evaluate={evaluate}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(evaluate).toHaveBeenCalledWith('ctx.user.role', {}, { user: { role: 'admin' } })
   })
 })
