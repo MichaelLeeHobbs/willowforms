@@ -393,6 +393,41 @@ describe('submittedData', () => {
     expect(submittedData(withHeading, { married: true, note: 'stray' })['note']).toBeUndefined()
   })
 
+  it('carries a field called __proto__ as an answer, not as a prototype', () => {
+    /*
+     * `out[key] = value` on an object literal runs the `__proto__` setter
+     * rather than adding a property: the answer disappears from the payload and
+     * the payload's prototype becomes whatever it pointed at. Data keys come
+     * out of a document and the grammar for them is still only planned, so this
+     * is reachable now rather than in theory.
+     */
+    const odd: ComponentNode = {
+      key: 'odd',
+      type: 'Form',
+      children: [
+        {
+          key: 'protoField',
+          dataKey: '__proto__',
+          type: 'Field',
+          props: {},
+          schema: { type: 'string', validations: [] },
+        },
+      ],
+      props: {},
+    }
+
+    // The literal `{ __proto__: … }` sets the prototype rather than a key, so
+    // even building the input takes care. This is how ordinary a mistake it is.
+    const data = JSON.parse('{"__proto__": {"polluted": true}}') as FormData
+    expect(Object.hasOwn(data, '__proto__')).toBe(true)
+
+    const out = submittedData(odd, data)
+
+    expect(Object.hasOwn(out, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype)
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined()
+  })
+
   it('agrees with validateForm about what is on screen', () => {
     /*
      * The two must not disagree: a field validateForm checks and this drops

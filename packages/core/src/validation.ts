@@ -224,7 +224,21 @@ export function autoValidateKeys(root: ComponentNode): Set<string> {
  * use, so all three agree about what is on screen.
  */
 export function submittedData(root: ComponentNode, data: FormData, evaluate?: Evaluator): FormData {
-  const kept: FormData = {}
+  /*
+   * Built on a null prototype, then copied into a plain object.
+   *
+   * `kept[key] = value` for a key of `__proto__` does not add a property to an
+   * object literal, it runs the setter and changes the object's prototype: the
+   * answer vanishes from the payload and the payload acquires whatever it was
+   * pointed at. Data keys come out of a document and the grammar for them is
+   * still only planned, so this is reachable today.
+   *
+   * The spread at the end is what makes the result ordinary. Spreading copies
+   * properties rather than assigning them, so `__proto__` arrives as a plain
+   * key on a plain object, and a host does not receive something surprising
+   * back from a function it will hand straight to `JSON.stringify`.
+   */
+  const kept: FormData = Object.create(null) as FormData
 
   const visit = (node: ComponentNode): void => {
     if (!isVisible(node, data, evaluate)) return
@@ -237,5 +251,5 @@ export function submittedData(root: ComponentNode, data: FormData, evaluate?: Ev
   }
 
   visit(root)
-  return kept
+  return { ...kept }
 }

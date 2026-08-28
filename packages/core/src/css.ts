@@ -10,10 +10,27 @@
  * stylesheet is forbidden from reaching into a kit's components by a test that
  * parses it; a Style tab that let an author write `input { padding: 0 }` would
  * hand every author the ability to make that mistake one form at a time.
+ *
+ * Keys are escaped rather than refused, because unlike the declarations they
+ * are not something an author is writing here. Refusing one would break a
+ * document that already renders, over a character in a name.
  */
 
 import type { ComponentNode, Device } from './types.js'
 import { walk } from './tree.js'
+
+export interface StyleSheetOptions {
+  /** Emit only this device's rules, flat. For a canvas that simulates a width. */
+  device?: Device | undefined
+  /**
+   * Confine every rule to one rendered form.
+   *
+   * Keys are unique within a document, not within a page. Two forms rendered
+   * together share a `root` key and usually more, so the renderer passes a
+   * per-instance scope and puts the matching attribute on every node.
+   */
+  scope?: string | undefined
+}
 
 /**
  * Which widths each device means at runtime.
@@ -56,10 +73,41 @@ export function safeDeclarations(text: string | undefined): string | undefined {
   return FORBIDDEN.test(trimmed) ? undefined : trimmed
 }
 
-/** A CSS string selector for one node, with the key escaped for the attribute. */
-function selectorFor(key: string): string {
-  // The key is author-controlled, so it is quoted and its quotes are escaped.
-  return '[data-fs-key="' + key.replace(/["\\]/g, '\\$&') + '"]'
+/**
+ * A key, as a CSS string, safe to place inside a `<style>` element.
+ *
+ * Keys are validated as non-empty and nothing else, and a document is data, so
+ * a key holding `</style>` is a string somebody can type. Quoting the attribute
+ * selector stops that breaking the *selector*; it does nothing about breaking
+ * out of the style element itself, which is script injection rather than a
+ * broken rule. `<` is escaped for that reason rather than for CSS's.
+ *
+ * Six-digit hex escapes, because CSS stops consuming after the sixth digit and
+ * a shorter one needs a trailing space that the next character could swallow.
+ * Control characters go the same way: a raw newline ends a CSS string.
+ */
+function escapeKey(key: string): string {
+  return key.replace(
+    // The control range is the point, not an accident: a raw newline or a NUL
+    // inside a CSS string ends it, and a key can hold either.
+    // eslint-disable-next-line no-control-regex
+    /["\\<]|[\u0000-\u001f\u007f]/g,
+    (ch) => '\\' + (ch.codePointAt(0) ?? 0).toString(16).padStart(6, '0'),
+  )
+}
+
+/**
+ * A selector for one node, optionally confined to one rendered form.
+ *
+ * A key is unique inside a document and nowhere else. Two forms on one page
+ * both have a `root`, and usually an `email`, so with no scope the first form's
+ * stylesheet reaches into the second. The scope is a compound rather than a
+ * descendant selector so that it also matches the root node, which carries both
+ * attributes itself.
+ */
+function selectorFor(key: string, scope: string | undefined): string {
+  const within = scope === undefined ? '' : '[data-fs-scope="' + escapeKey(scope) + '"]'
+  return within + '[data-fs-key="' + escapeKey(key) + '"]'
 }
 
 /**
@@ -75,7 +123,8 @@ function selectorFor(key: string): string {
  * by sizing a frame, and a media query would answer about the browser window
  * instead. Without one, every device becomes its query.
  */
-export function styleSheetFor(root: ComponentNode, device?: Device): string {
+export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = {}): string {
+  const { device, scope } = options
   const base: string[] = []
   const queried: Partial<Record<Exclude<Device, 'any'>, string[]>> = {}
 
@@ -83,7 +132,7 @@ export function styleSheetFor(root: ComponentNode, device?: Device): string {
     const css = node.css
     if (!css) return
 
-    const selector = selectorFor(node.key)
+    const selector = selectorFor(node.key, scope)
     const always = safeDeclarations(css.any)
     if (always) base.push(selector + '{' + always + '}')
 
@@ -119,23 +168,66 @@ export function styleSheetFor(root: ComponentNode, device?: Device): string {
  * both have to read and write the same text. Storing them separately would be
  * two sources for one value and a merge nobody can specify.
  *
- * Deliberately small: split on `;`, then on the first `:`. It is not a CSS
- * parser and does not need to be, because `safeDeclarations` has already
- * refused anything that is not a flat list of declarations.
+ * Small, but not as small as `text.split(';')`, which was the first version and
+ * was wrong. A `;` is only a separator at the top level: inside quotes it is
+ * text, and inside parentheses it belongs to the function. `background:
+ * url(data:image/svg+xml;base64,…)` is the case that matters, because a data
+ * URI has a `;` in the middle of it and splitting there truncates the value.
+ *
+ * That is worse than a display bug. The Style tab's structured controls rewrite
+ * this text every time one of them is touched, so editing the padding would
+ * silently destroy a background nobody was editing, and the promise that a
+ * control only ever touches its own declaration would be false.
+ *
+ * A `:` inside a value is the same problem in miniature, which is why the split
+ * between name and value walks rather than calling `indexOf`.
  */
 export function parseDeclarations(text: string | undefined): [string, string][] {
   if (!text) return []
-  const out: [string, string][] = []
 
-  for (const part of text.split(';')) {
-    const at = part.indexOf(':')
-    if (at === -1) continue
-    const name = part.slice(0, at).trim().toLowerCase()
-    const value = part.slice(at + 1).trim()
-    if (name && value) out.push([name, value])
+  const out: [string, string][] = []
+  for (const part of splitTop(text, ';')) {
+    const [name, value] = splitTop(part, ':', 1)
+    const trimmed = name?.trim().toLowerCase()
+    if (trimmed && value?.trim()) out.push([trimmed, value.trim()])
+  }
+  return out
+}
+
+/**
+ * Split on a separator, ignoring any that is inside quotes or parentheses.
+ *
+ * `limit` caps the number of splits, not the number of pieces, so a value
+ * holding its own `:` survives: `background: url(a:b)` splits once and the rest
+ * stays in the value. Escapes are honoured inside strings, because `"\""` is a
+ * quote that does not close the string.
+ */
+function splitTop(text: string, separator: string, limit = Infinity): string[] {
+  const parts: string[] = []
+  let start = 0
+  let depth = 0
+  let quote: string | undefined
+  let splits = 0
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
+    if (quote !== undefined) {
+      if (ch === '\\') i += 1
+      else if (ch === quote) quote = undefined
+      continue
+    }
+    if (ch === '"' || ch === "'") quote = ch
+    else if (ch === '(') depth += 1
+    else if (ch === ')') depth = Math.max(0, depth - 1)
+    else if (ch === separator && depth === 0 && splits < limit) {
+      parts.push(text.slice(start, i))
+      start = i + 1
+      splits += 1
+    }
   }
 
-  return out
+  parts.push(text.slice(start))
+  return parts
 }
 
 /** Declarations back to text, one per line so the raw field stays readable. */

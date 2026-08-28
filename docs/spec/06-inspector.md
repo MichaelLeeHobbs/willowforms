@@ -163,7 +163,15 @@ argument about which escape is sufficient, and refused rather than cleaned, beca
 what an author typed is how a rule ends up meaning something nobody asked for. The panel says the text
 was refused; the renderer leaves it out.
 
-Keys are author-controlled too, so the selector quotes and escapes them.
+Keys are author-controlled too, and they are escaped rather than refused, because unlike the
+declarations they are not something an author is writing here and refusing one would break a document
+that already renders over a character in a name. `<` is escaped along with the quotes: a key holding
+`</style>` never has to be valid CSS to be a problem, since it closes the element the stylesheet sits in.
+
+Rules are confined to one rendered form as well as to one component. A key is unique inside a document
+and nowhere else, so two forms on a page both have a `root`, and without a scope the first one's styling
+reaches into the second. The renderer stamps a per-instance `data-fs-scope` on every node and compounds
+it into every selector.
 
 What an author can still do is style that one element, which is the blast radius they can reason about.
 

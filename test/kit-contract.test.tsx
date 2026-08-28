@@ -168,6 +168,36 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
       },
     )
 
+    it.each(kit.components.map((c) => [c.type, c] as const))(
+      '%s carries the scope of the form it was rendered in',
+      (type, def) => {
+        /*
+         * Separate from the nodeProps check above, because it fails separately:
+         * a kit that picks the attributes out by name instead of spreading gets
+         * `data-fs-key` right, passes that test, and silently drops this one.
+         * The cost is two forms on a page sharing each other's styling.
+         */
+        const node = instantiate(def, root ?? { key: 'r', type: 'r', props: {} })
+        node.key = 'target'
+
+        const { container: dom } = render(
+          <FormRenderer
+            document={documentOf(node)}
+            kit={renderers}
+            data={{}}
+            onChange={() => undefined}
+          />,
+        )
+
+        const scope = dom.querySelector('[data-fs-key="target"]')?.getAttribute('data-fs-scope')
+        expect(
+          scope,
+          `${type} does not put data-fs-scope in the DOM, so its per-component CSS is not ` +
+            'confined to one form. Spread all of nodeProps rather than picking attributes out.',
+        ).toBeTruthy()
+      },
+    )
+
     it('renders children inside every container', () => {
       const containers = kit.components.filter((c) => c.container)
       expect(containers.length).toBeGreaterThan(0)

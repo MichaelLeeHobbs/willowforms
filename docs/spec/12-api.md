@@ -99,6 +99,11 @@ to the value as it is held, because the host owns `data` and hiding is often tem
 closing must not destroy what someone typed. Visibility comes from the same `isVisible` the renderer and
 `validateForm` use, so all three agree about what is on screen.
 
+It builds its result on a null prototype and copies it into a plain object at the end. `out[key] = value`
+for a key of `__proto__` sets the prototype instead of adding a property, so the answer would vanish from
+the payload and the payload would inherit whatever it pointed at. Data keys come out of a document and
+the [grammar for them](#keys) is still only planned, so that is reachable today rather than in theory.
+
 `FieldSchema.autoValidate` is the per-field hint that a field wants validating while it is typed into.
 The host decides whether to honour it, and `autoValidateKeys(root)` names the fields that asked.
 

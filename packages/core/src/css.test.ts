@@ -88,7 +88,7 @@ describe('styleSheetFor', () => {
      * answer about the browser window and the frame would be ignored.
      */
     const css = { any: 'padding: 8px', mobile: 'padding: 4px', tablet: 'padding: 6px' }
-    const sheet = styleSheetFor(root([node('card', css)]), 'mobile')
+    const sheet = styleSheetFor(root([node('card', css)]), { device: 'mobile' })
 
     expect(sheet).not.toContain('@media')
     expect(sheet).toContain('padding: 4px')
@@ -99,7 +99,7 @@ describe('styleSheetFor', () => {
   it('emits only the base when the simulated device has no rules of its own', () => {
     const sheet = styleSheetFor(
       root([node('card', { any: 'padding: 8px', mobile: 'padding: 4px' })]),
-      'desktop',
+      { device: 'desktop' },
     )
     expect(sheet).toBe('[data-fs-key="card"]{padding: 8px}')
   })
@@ -113,7 +113,45 @@ describe('styleSheetFor', () => {
     // Keys are author-controlled, so one holding a quote must not end the
     // attribute selector and start a different one.
     const sheet = styleSheetFor(root([node('a"] , body [x="', { any: 'color: red' })]))
-    expect(sheet).toBe('[data-fs-key="a\\"] , body [x=\\""]{color: red}')
+    expect(sheet).toBe('[data-fs-key="a\\000022] , body [x=\\000022"]{color: red}')
+  })
+
+  it('escapes a key that would otherwise break out of the style element', () => {
+    /*
+     * Worse than a broken selector, and it survives every defence aimed at CSS,
+     * because it never has to be valid CSS. This text is placed inside a
+     * `<style>` element, and `</style>` closes one wherever it appears.
+     */
+    const sheet = styleSheetFor(
+      root([node('a</style><script>x()</script>', { any: 'color: red' })]),
+    )
+    expect(sheet).not.toContain('<')
+    expect(sheet).toContain('\\00003c')
+  })
+
+  it('escapes a newline in a key, which would end the string on its own', () => {
+    const sheet = styleSheetFor(root([node('a\n{}', { any: 'color: red' })]))
+    expect(sheet).not.toContain('\n')
+  })
+
+  it('confines every rule to one rendered form when given a scope', () => {
+    /*
+     * Keys are unique inside a document, not inside a page. Two forms rendered
+     * together both have a `root`, so an unscoped sheet from the first styles
+     * the second.
+     */
+    const sheet = styleSheetFor(
+      root([node('card', { any: 'color: red', mobile: 'color: blue' })]),
+      {
+        scope: ':r1:',
+      },
+    )
+
+    expect(sheet).toContain('[data-fs-scope=":r1:"][data-fs-key="card"]')
+    // The compound has to reach into the media query too, or the base layer is
+    // confined and the device override is not.
+    expect(sheet.match(/data-fs-scope/g)).toHaveLength(2)
+    expect(sheet).not.toContain('[data-fs-scope=":r1:"] [data-fs-key')
   })
 
   it('reaches components nested anywhere in the tree', () => {
@@ -158,6 +196,48 @@ describe('declarations round-trip, so two editors can share one string', () => {
     const text = 'grid-template-areas: "a b"; padding: 8px'
     const next = setDeclaration(text, 'padding', '16px')
     expect(readDeclaration(next, 'grid-template-areas')).toBe('"a b"')
+  })
+
+  it('keeps a semicolon that belongs to a value', () => {
+    /*
+     * A data URI has a `;` in the middle of it. Splitting on every `;` cut the
+     * value in half, and because a structured control rewrites the whole string
+     * when it is touched, adjusting the padding would have destroyed a
+     * background nobody was editing.
+     */
+    const text = 'background: url(data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=); padding: 8px'
+
+    expect(parseDeclarations(text)).toEqual([
+      ['background', 'url(data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=)'],
+      ['padding', '8px'],
+    ])
+
+    const next = setDeclaration(text, 'padding', '16px')
+    expect(readDeclaration(next, 'background')).toBe(
+      'url(data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=)',
+    )
+  })
+
+  it('keeps a semicolon and a colon inside a quoted value', () => {
+    const text = 'content: "a; b: c"; padding: 8px'
+    expect(parseDeclarations(text)).toEqual([
+      ['content', '"a; b: c"'],
+      ['padding', '8px'],
+    ])
+  })
+
+  it('keeps a colon that belongs to the value rather than the name', () => {
+    // Splitting on the first colon is right; splitting on every one is not.
+    expect(parseDeclarations('background: url(https://x/y.png)')).toEqual([
+      ['background', 'url(https://x/y.png)'],
+    ])
+  })
+
+  it('is not confused by an escaped quote inside a string', () => {
+    expect(parseDeclarations('content: "a\\"; b"; padding: 8px')).toEqual([
+      ['content', '"a\\"; b"'],
+      ['padding', '8px'],
+    ])
   })
 
   it('ignores a fragment that is not a declaration', () => {

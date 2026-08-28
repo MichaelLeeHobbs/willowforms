@@ -136,3 +136,67 @@ describe('data keys in the renderer', () => {
     expect(container.querySelector('[data-fs-key="email"]')).toBeNull()
   })
 })
+
+describe('two forms on one page', () => {
+  /*
+   * Keys identify a node inside its document and nowhere else, so two forms
+   * rendered together both have a `root` and, in practice, an `email`. Styling
+   * is selected by key, so an unscoped stylesheet from the first form reaches
+   * into the second and there is nothing in the document that says it should
+   * not.
+   */
+  const styled = (): FormDocument => {
+    const doc = documentOf([field('email')])
+    doc.root.children![0]!.css = { any: 'color: rgb(1, 2, 3)' }
+    return doc
+  }
+
+  it('gives each rendered form its own scope', () => {
+    const { container } = render(
+      <>
+        <FormRenderer document={styled()} kit={kit} data={{}} onChange={() => undefined} />
+        <FormRenderer document={styled()} kit={kit} data={{}} onChange={() => undefined} />
+      </>,
+    )
+
+    const scopes = [...container.querySelectorAll('[data-fs-key="email"]')].map((el) =>
+      el.getAttribute('data-fs-scope'),
+    )
+
+    expect(scopes).toHaveLength(2)
+    expect(scopes[0]).toBeTruthy()
+    expect(scopes[0]).not.toBe(scopes[1])
+  })
+
+  it('confines each stylesheet to the form that owns it', () => {
+    const { container } = render(
+      <>
+        <FormRenderer document={styled()} kit={kit} data={{}} onChange={() => undefined} />
+        <FormRenderer document={styled()} kit={kit} data={{}} onChange={() => undefined} />
+      </>,
+    )
+
+    const sheets = [...container.querySelectorAll('style')].map((el) => el.textContent ?? '')
+    expect(sheets).toHaveLength(2)
+
+    // Every rule names a scope, and the two sheets do not name the same one.
+    for (const sheet of sheets) expect(sheet).toContain('[data-fs-scope=')
+    expect(sheets[0]).not.toBe(sheets[1])
+  })
+
+  it('puts the scope on the root as well, which a descendant selector would miss', () => {
+    const doc = documentOf([field('email')])
+    doc.root.css = { any: 'color: rgb(4, 5, 6)' }
+
+    const { container } = render(
+      <FormRenderer document={doc} kit={kit} data={{}} onChange={() => undefined} />,
+    )
+
+    const scope = container.querySelector('[data-fs-key="root"]')?.getAttribute('data-fs-scope')
+    expect(scope).toBeTruthy()
+
+    const sheet = container.querySelector('style')?.textContent ?? ''
+    expect(sheet).toContain('][data-fs-key="root"]')
+    expect(sheet).not.toContain('] [data-fs-key="root"]')
+  })
+})
