@@ -26,7 +26,9 @@ export interface Designer {
    * Open a tab in either pane. The left pane holds Components, Tree and
    * Settings; the inspector holds Properties and Rules.
    */
-  openTab: (name: 'Components' | 'Tree' | 'Settings' | 'Properties' | 'Rules') => Promise<void>
+  openTab: (
+    name: 'Components' | 'Tree' | 'Settings' | 'Properties' | 'Style' | 'Rules',
+  ) => Promise<void>
   undo: () => Promise<void>
 }
 

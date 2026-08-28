@@ -55,15 +55,16 @@ filling in a form.
 import { FormRenderer } from '@formsmith/renderer'
 ```
 
-| Prop       | Type                                      | Required | Meaning                              |
-| ---------- | ----------------------------------------- | -------- | ------------------------------------ |
-| `document` | `FormDocument`                            | yes      | The form                             |
-| `kit`      | `RendererKit`                             | yes      | Renderers                            |
-| `data`     | `FormData`                                | yes      | Current values, flat, keyed by node  |
-| `onChange` | `(key: string, value: JsonValue) => void` | yes      | One field changed                    |
-| `errors`   | `FormErrors`                              | no       | Messages to display, keyed by node   |
-| `language` | `string`                                  | no       | BCP 47 tag; defaults to the document |
-| `evaluate` | `Evaluator`                               | no       | Sandbox for computed props           |
+| Prop       | Type                                      | Required | Meaning                                         |
+| ---------- | ----------------------------------------- | -------- | ----------------------------------------------- |
+| `document` | `FormDocument`                            | yes      | The form                                        |
+| `kit`      | `RendererKit`                             | yes      | Renderers                                       |
+| `data`     | `FormData`                                | yes      | Current values, flat, keyed by node             |
+| `onChange` | `(key: string, value: JsonValue) => void` | yes      | One field changed                               |
+| `errors`   | `FormErrors`                              | no       | Messages to display, keyed by node              |
+| `language` | `string`                                  | no       | BCP 47 tag; defaults to the document            |
+| `evaluate` | `Evaluator`                               | no       | Sandbox for computed props                      |
+| `device`   | `Device`                                  | no       | Render `css` for one device, not by media query |
 
 ### The host owns the data
 
@@ -86,6 +87,17 @@ const [errors, setErrors] = useState<FormErrors>({})
 Submitting is `setErrors(validateForm(doc.root, data))` and checking whether the result is empty. That is
 the same call a server makes on the same document, which is the whole reason validation lives in core.
 See [08-validation.md](08-validation.md#server-parity).
+
+### What a form actually submits
+
+**Status: built.** A value stays in `data` after the field that collected it is hidden. Tick "married",
+give a spouse's name, untick it: `validateForm` correctly stops checking that field, and the answer is
+still in the payload. The form submits an answer to a question it is no longer asking.
+
+`submittedData(root, data, evaluate?)` is the projection a host applies when it submits. It is not done
+to the value as it is held, because the host owns `data` and hiding is often temporary — an accordion
+closing must not destroy what someone typed. Visibility comes from the same `isVisible` the renderer and
+`validateForm` use, so all three agree about what is on screen.
 
 `FieldSchema.autoValidate` is the per-field hint that a field wants validating while it is typed into.
 The host decides whether to honour it, and `autoValidateKeys(root)` names the fields that asked.

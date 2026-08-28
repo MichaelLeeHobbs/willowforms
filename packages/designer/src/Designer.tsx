@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { languageTag } from '@formsmith/core'
-import type { FormDocument, IconName, Kit } from '@formsmith/core'
+import type { Device, FormDocument, IconName, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
 
 import { dragLabel, useDrag } from './drag.js'
@@ -126,6 +126,13 @@ export function Designer({
   const [theme, setTheme] = useState<Theme>('system')
 
   /*
+   * Which breakpoint the Style tab edits. It follows the viewport, because
+   * authoring a tablet rule with no way to see a tablet is writing blind, and
+   * it can also be `any`, which is the base layer and not a viewport at all.
+   */
+  const [styleDevice, setStyleDevice] = useState<Device>('any')
+
+  /*
    * Which panes are collapsed. A view preference like the two above, and per
    * pane rather than one shared flag: hiding the palette to see a wide form and
    * hiding the inspector to see the tree are different intentions.
@@ -161,7 +168,14 @@ export function Designer({
         api={api}
         onOpenJson={() => setJsonOpen(true)}
         viewport={viewport}
-        onViewport={setViewport}
+        onViewport={(next) => {
+          setViewport(next)
+          // The Style tab edits the breakpoint the canvas is showing, so
+          // choosing a device in the toolbar moves what a style rule applies
+          // to. Otherwise an author sizes the canvas to a phone and edits the
+          // desktop rule.
+          setStyleDevice(next)
+        }}
         theme={theme}
         onTheme={setTheme}
         language={activeLanguage}
@@ -212,7 +226,18 @@ export function Designer({
           aria-label="Component properties"
           hidden={collapsed.right}
         >
-          <Inspector api={api} kit={kit} />
+          <Inspector
+            api={api}
+            kit={kit}
+            device={styleDevice}
+            onDevice={(next) => {
+              // `any` is the base layer rather than a device, so choosing it
+              // leaves the canvas where it is; a device moves the canvas too,
+              // because a rule for a width you cannot see is written blind.
+              if (next !== 'any') setViewport(next)
+              setStyleDevice(next)
+            }}
+          />
         </aside>
 
         <PaneHandle

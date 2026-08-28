@@ -128,7 +128,7 @@ describe('inspector tabs', () => {
     const tabs = within(tablist).getAllByRole('tab')
     // Form settings moved to the left pane: it belongs to the document, not to
     // whatever is selected.
-    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Rules'])
+    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Style', 'Rules'])
 
     const selected = tabs.find((t) => t.getAttribute('aria-selected') === 'true')
     expect(selected?.textContent).toBe('Properties')
@@ -163,7 +163,7 @@ describe('inspector tabs', () => {
     setup()
     const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
     const tabs = within(tablist).getAllByRole('tab')
-    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1'])
+    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
   })
 
   it('moves between tabs with the arrow keys', async () => {
@@ -173,8 +173,11 @@ describe('inspector tabs', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Properties' }))
     await user.keyboard('{ArrowRight}')
+    expect(focused()).toBe('Style')
+    expect(screen.getByRole('tab', { name: 'Style' }).getAttribute('aria-selected')).toBe('true')
+
+    await user.keyboard('{ArrowRight}')
     expect(focused()).toBe('Rules')
-    expect(screen.getByRole('tab', { name: 'Rules' }).getAttribute('aria-selected')).toBe('true')
 
     // Wraps around rather than stopping at the end.
     await user.keyboard('{ArrowRight}')

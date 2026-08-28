@@ -109,13 +109,13 @@ test('the inspector tabs are reachable and navigable by keyboard', async ({ desi
   await designer.page.getByRole('tab', { name: 'Properties' }).focus()
 
   await designer.page.keyboard.press('ArrowRight')
-  await expect(designer.page.getByRole('tab', { name: 'Rules' })).toBeFocused()
-  await expect(designer.page.getByRole('tab', { name: 'Rules' })).toHaveAttribute(
+  await expect(designer.page.getByRole('tab', { name: 'Style' })).toBeFocused()
+  await expect(designer.page.getByRole('tab', { name: 'Style' })).toHaveAttribute(
     'aria-selected',
     'true',
   )
 
-  // Two tabs now: form settings moved to the left pane, so End lands on Rules.
+  // Three tabs: Properties, Style, Rules. End lands on the last.
   await designer.page.keyboard.press('End')
   await expect(designer.page.getByRole('tab', { name: 'Rules' })).toBeFocused()
 })

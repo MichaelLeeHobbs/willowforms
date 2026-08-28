@@ -111,3 +111,60 @@ export function styleSheetFor(root: ComponentNode, device?: Device): string {
 
   return [...base, ...media].join('')
 }
+
+/**
+ * The declarations in a block, in the order they were written.
+ *
+ * The Style tab offers structured controls and a raw field over one string, so
+ * both have to read and write the same text. Storing them separately would be
+ * two sources for one value and a merge nobody can specify.
+ *
+ * Deliberately small: split on `;`, then on the first `:`. It is not a CSS
+ * parser and does not need to be, because `safeDeclarations` has already
+ * refused anything that is not a flat list of declarations.
+ */
+export function parseDeclarations(text: string | undefined): [string, string][] {
+  if (!text) return []
+  const out: [string, string][] = []
+
+  for (const part of text.split(';')) {
+    const at = part.indexOf(':')
+    if (at === -1) continue
+    const name = part.slice(0, at).trim().toLowerCase()
+    const value = part.slice(at + 1).trim()
+    if (name && value) out.push([name, value])
+  }
+
+  return out
+}
+
+/** Declarations back to text, one per line so the raw field stays readable. */
+export function printDeclarations(declarations: [string, string][]): string {
+  return declarations.map(([name, value]) => name + ': ' + value).join(';\n')
+}
+
+/**
+ * The text with one property set, replaced, or removed.
+ *
+ * Order is preserved and unknown declarations are left alone, so a structured
+ * control never discards something it does not have a widget for. That is the
+ * property that lets the two editors share a string: the raw field can hold
+ * anything, and the controls only ever touch their own line.
+ */
+export function setDeclaration(
+  text: string | undefined,
+  name: string,
+  value: string | undefined,
+): string {
+  const wanted = name.trim().toLowerCase()
+  const declarations = parseDeclarations(text).filter(([key]) => key !== wanted)
+  const trimmed = value?.trim()
+  if (trimmed) declarations.push([wanted, trimmed])
+  return printDeclarations(declarations)
+}
+
+/** What a property is set to in this text, if anything. */
+export function readDeclaration(text: string | undefined, name: string): string {
+  const wanted = name.trim().toLowerCase()
+  return parseDeclarations(text).find(([key]) => key === wanted)?.[1] ?? ''
+}

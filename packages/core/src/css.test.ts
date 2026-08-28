@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { safeDeclarations, styleSheetFor } from './css.js'
+import {
+  parseDeclarations,
+  readDeclaration,
+  safeDeclarations,
+  setDeclaration,
+  styleSheetFor,
+} from './css.js'
 import type { ComponentNode } from './types.js'
 
 const node = (key: string, css: ComponentNode['css']): ComponentNode => ({
@@ -114,5 +120,53 @@ describe('styleSheetFor', () => {
     const inner = node('inner', { any: 'color: red' })
     const outer: ComponentNode = { key: 'outer', type: 'Box', props: {}, children: [inner] }
     expect(styleSheetFor(root([outer]))).toContain('[data-fs-key="inner"]')
+  })
+})
+
+describe('declarations round-trip, so two editors can share one string', () => {
+  it('reads a property back out', () => {
+    expect(readDeclaration('padding: 8px; color: red', 'padding')).toBe('8px')
+    expect(readDeclaration('padding: 8px', 'margin')).toBe('')
+    expect(readDeclaration(undefined, 'padding')).toBe('')
+  })
+
+  it('is case-insensitive about the property name', () => {
+    expect(readDeclaration('PADDING: 8px', 'padding')).toBe('8px')
+  })
+
+  it('sets a property that was not there', () => {
+    expect(setDeclaration('color: red', 'padding', '8px')).toBe('color: red;\npadding: 8px')
+  })
+
+  it('replaces one that was, without duplicating it', () => {
+    const next = setDeclaration('padding: 8px; color: red', 'padding', '16px')
+    expect(readDeclaration(next, 'padding')).toBe('16px')
+    expect(parseDeclarations(next).filter(([name]) => name === 'padding')).toHaveLength(1)
+  })
+
+  it('removes a property when the value is emptied', () => {
+    expect(setDeclaration('padding: 8px; color: red', 'padding', '')).toBe('color: red')
+    expect(setDeclaration('padding: 8px; color: red', 'padding', undefined)).toBe('color: red')
+  })
+
+  it('leaves declarations it has no control for alone', () => {
+    /*
+     * The property that lets a structured control and a raw field edit one
+     * string: a control only ever touches its own line, so anything typed by
+     * hand survives being near a widget.
+     */
+    const text = 'grid-template-areas: "a b"; padding: 8px'
+    const next = setDeclaration(text, 'padding', '16px')
+    expect(readDeclaration(next, 'grid-template-areas')).toBe('"a b"')
+  })
+
+  it('ignores a fragment that is not a declaration', () => {
+    expect(parseDeclarations('padding: 8px; nonsense; : 4px; color:')).toEqual([['padding', '8px']])
+  })
+
+  it('survives a round trip through the sheet builder', () => {
+    const text = setDeclaration(setDeclaration('', 'padding', '8px'), 'color', 'red')
+    expect(safeDeclarations(text)).toBe(text)
+    expect(styleSheetFor(root([node('card', { any: text })]))).toContain('padding: 8px')
   })
 })

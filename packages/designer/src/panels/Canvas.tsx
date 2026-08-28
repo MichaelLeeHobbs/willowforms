@@ -360,6 +360,7 @@ export function Canvas({
             errors={errors}
             onChange={onChange}
             {...(language ? { language } : {})}
+            {...(viewport ? { device: viewport } : {})}
           />
         </div>
 
