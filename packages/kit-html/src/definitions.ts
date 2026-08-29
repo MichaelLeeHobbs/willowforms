@@ -223,6 +223,23 @@ export const htmlKit: Kit = {
       events: [],
     },
     {
+      type: 'Repeater',
+      label: 'Repeater',
+      icon: 'repeat',
+      group: 'layout',
+      container: true,
+      /*
+       * The only data-bound container. Its value is the list of rows, and its
+       * children are the shape of one row, drawn once per row. That pairing is
+       * how core recognises it, so it never has to learn the type string.
+       */
+      dataBound: true,
+      dataType: 'array',
+      defaultProps: { gap: 16 },
+      props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      events: [],
+    },
+    {
       type: 'Box',
       label: 'Box',
       icon: 'box',

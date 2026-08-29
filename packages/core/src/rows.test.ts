@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { NO_ROWS, addressOf, decodeRow, encodeRow, pushRow, rowContext, rowsOf } from './rows.js'
+import {
+  NO_ROWS,
+  addressOf,
+  applyChange,
+  decodeAddress,
+  decodeRow,
+  encodeRow,
+  pushRow,
+  rowContext,
+  rowsOf,
+} from './rows.js'
 import { DEFAULT_MESSAGES, isRowScope, validateForm } from './validation.js'
 import { createDocument } from './factory.js'
 import { validateDocument } from './tree.js'
@@ -262,5 +272,59 @@ describe('the quiet failure, caught before anyone submits', () => {
       schema: { type: 'boolean', validations: [] },
     })
     expect(validateDocument(withRoot).map((e) => e.code)).toEqual([])
+  })
+})
+
+describe('writing an answer at an address', () => {
+  const data: FormData = {
+    email: 'a@b.co',
+    addresses: [{ line1: 'one' }, { line1: 'two', postcode: 'X' }],
+  }
+
+  it('is an ordinary write outside a repeater', () => {
+    // A host that never adds a repeater sees no difference at all.
+    expect(applyChange({ a: 1 }, 'a', 2)).toEqual({ a: 2 })
+    expect(applyChange({ a: 1 }, 'b', 2)).toEqual({ a: 1, b: 2 })
+  })
+
+  it('places an answer in the row it names', () => {
+    const next = applyChange(data, 'addresses[1].postcode', 'SW1A 1AA')
+    expect(next['addresses']).toEqual([{ line1: 'one' }, { line1: 'two', postcode: 'SW1A 1AA' }])
+  })
+
+  it('leaves the rows it did not touch identical, not merely equal', () => {
+    // Referential identity, so a kit comparing props by identity still skips
+    // them. Equality would be true of a full copy and prove nothing.
+    const next = applyChange(data, 'addresses[1].postcode', 'Y')
+    const before = data['addresses'] as { line1: string }[]
+    const after = next['addresses'] as { line1: string }[]
+    expect(after[0]).toBe(before[0])
+    expect(after[1]).not.toBe(before[1])
+    expect(next).not.toBe(data)
+  })
+
+  it('changes nothing when the address cannot be placed', () => {
+    /*
+     * A row that is not there, a list that is not a list, a name the key
+     * grammar refuses. Returning the input is what stops a hostile index
+     * minting a sparse array with ten thousand holes.
+     */
+    for (const address of [
+      'addresses[9].postcode',
+      'email[0].postcode',
+      'nothing[0].postcode',
+      'addresses[1].__proto__',
+      'addresses[1].bad-name',
+      'addresses[-1].postcode',
+    ]) {
+      expect(applyChange(data, address, 'x'), address).toBe(data)
+    }
+  })
+
+  it('reads an address back', () => {
+    expect(decodeAddress('postcode')).toEqual({ path: NO_ROWS, name: 'postcode' })
+    expect(decodeAddress('addresses[1].postcode')?.name).toBe('postcode')
+    expect(encodeRow(decodeAddress('addresses[1].postcode')?.path ?? NO_ROWS)).toBe('addresses[1]')
+    expect(decodeAddress('addresses[1]')).toBeUndefined()
   })
 })

@@ -262,3 +262,69 @@ function formScopedRefs(condition: Condition | undefined): string[] {
   visit(condition)
   return found
 }
+
+/** An address split into the rows it sits under and the name at the end. */
+export interface ParsedAddress {
+  path: RowPath
+  name: string
+}
+
+/**
+ * An address read back, or nothing if it is not one.
+ *
+ * `postcode` outside a repeater, `addresses[1].postcode` inside one. Total, and
+ * only used at the boundary — the host's writer and the JSON editor — never on
+ * the evaluation path.
+ */
+export function decodeAddress(address: string): ParsedAddress | undefined {
+  const at = address.lastIndexOf('.')
+  if (at === -1) return keyProblem(address) ? undefined : { path: NO_ROWS, name: address }
+
+  const name = address.slice(at + 1)
+  if (keyProblem(name)) return undefined
+
+  const path = decodeRow(address.slice(0, at))
+  return path ? { path, name } : undefined
+}
+
+/**
+ * One answer written at an address, immutably.
+ *
+ * The writer a host uses in `onChange`. For a document with no repeater an
+ * address is the data key, so this is `{ ...data, [key]: value }` and a host
+ * that never adds one sees no difference. It ships in core so that no host
+ * implements array descent, and so a `__proto__` step cannot be handled two
+ * different ways in two hosts.
+ *
+ * Structure-shared: rows the write did not touch keep referential identity, so
+ * a kit comparing props by identity still skips them. A write that cannot be
+ * placed returns the input unchanged rather than throwing or inventing a slot,
+ * which keeps a hostile index from minting a sparse array.
+ */
+export function applyChange(data: FormData, address: string, value: JsonValue): FormData {
+  const parsed = decodeAddress(address)
+  if (!parsed) return data
+  if (keyProblem(parsed.name)) return data
+
+  const place = (holder: FormData, depth: number): FormData | undefined => {
+    const frame = parsed.path[depth]
+    if (!frame) return { ...holder, [parsed.name]: value }
+
+    const list = holder[frame.key]
+    if (!Array.isArray(list)) return undefined
+
+    const row = list[frame.index]
+    if (row === undefined || row === null || typeof row !== 'object' || Array.isArray(row)) {
+      return undefined
+    }
+
+    const nextRow = place(row, depth + 1)
+    if (!nextRow) return undefined
+
+    const rows = [...list]
+    rows[frame.index] = nextRow
+    return { ...holder, [frame.key]: rows }
+  }
+
+  return place(data, 0) ?? data
+}

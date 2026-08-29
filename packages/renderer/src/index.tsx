@@ -9,10 +9,24 @@
 
 import { createContext, useCallback, useContext, useId, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { dataKeyOf, evaluateCondition, isVisible, styleSheetFor, valueOf } from '@formsmith/core'
+import {
+  NO_ROWS,
+  addressOf,
+  dataKeyOf,
+  encodeRow,
+  evaluateCondition,
+  isRowScope,
+  isVisible,
+  pushRow,
+  rowContext,
+  rowsOf,
+  styleSheetFor,
+  valueOf,
+} from '@formsmith/core'
 import type {
   ComponentNode,
   EvalOptions,
+  RowContext,
   Evaluator,
   FormContext,
   FormData,
@@ -62,6 +76,15 @@ export interface NodeAttributes {
    * rendered twice has the same problem.
    */
   'data-fs-scope': string
+  /**
+   * Which row of which repeater this element is in: `addresses[1]`.
+   *
+   * Absent outside a repeater, so every existing selector matches exactly what
+   * it matched before. Separate from `data-fs-key` on purpose, because the two
+   * are wanted in opposite directions: per-component CSS is authored once and
+   * has to reach every row, while a click has to land on one.
+   */
+  'data-fs-row'?: string
 }
 
 export type NodeRenderer = ComponentType<NodeRendererProps>
@@ -153,28 +176,50 @@ function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
+/**
+ * The row the nodes beneath it are being drawn in.
+ *
+ * A repeater provides one per row. Nothing else touches it, so a form with no
+ * repeater never leaves the default and behaves exactly as it did.
+ */
+const RowCtx = createContext<RowContext | undefined>(undefined)
+
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
   const { scope, revealHidden, kit, data, errors, translations, options, onChange } = ctx
+  const row = useContext(RowCtx)
+
+  // Everything a rule reads has to know which row it is in, or the renderer and
+  // validateForm disagree about what is on screen.
+  const scoped = useMemo<EvalOptions>(
+    () => ({ ...options, ...(row ? { row } : {}) }),
+    [options, row],
+  )
 
   /*
    * Shared with validateForm, so a hidden field is never validated behind the
    * user's back. Computed up here because the node's attributes depend on it.
    */
-  const visible = isVisible(node, data, options)
+  const visible = isVisible(node, data, scoped)
 
   const props = useMemo(
-    () => resolveProps(node, translations, data, options),
-    [node, translations, data, options],
+    () => resolveProps(node, translations, data, scoped),
+    [node, translations, data, scoped],
   )
 
   // On the derived string, not on the node. Depending on the node re-creates
   // this on any edit to it, which defeats memoisation in every kit component
   // that compares props by identity.
   const dataKey = dataKeyOf(node)
+  /*
+   * An address, not a bare key. Outside a repeater the two are the same string,
+   * so a host that never adds one sees no change; inside one it names the row,
+   * and `applyChange` in core is the writer that places it.
+   */
+  const address = useMemo(() => addressOf(row?.path ?? NO_ROWS, dataKey), [row, dataKey])
   const handleChange = useCallback(
-    (value: JsonValue) => onChange(dataKey, value),
-    [onChange, dataKey],
+    (value: JsonValue) => onChange(address, value),
+    [onChange, address],
   )
 
   const nodeProps = useMemo<NodeAttributes>(
@@ -182,16 +227,35 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       'data-fs-key': node.key,
       'data-fs-type': node.type,
       'data-fs-scope': scope,
+      ...(row ? { 'data-fs-row': encodeRow(row.path) } : {}),
       ...(visible ? {} : { 'data-fs-hidden': 'true' as const }),
     }),
-    [node.key, node.type, scope, visible],
+    [node.key, node.type, scope, visible, row],
   )
 
   if (!visible && !revealHidden) return null
 
   const Component = kit.renderers[node.type] ?? kit.fallback ?? MissingType
 
-  const children = node.children?.map((child) => <RenderNode key={child.key} node={child} />)
+  /*
+   * A repeater draws its children once per row, each under that row's scope.
+   * The rows come out of the data, so the count is never something a caller
+   * claims. Keyed by index, which remounts rows below a deletion — the cost of
+   * refusing to put a generated row id inside `data`, where it would be a
+   * non-answer in the payload.
+   */
+  const children = isRowScope(node)
+    ? rowsOf(valueOf(row?.values ?? data, dataKey)).map((value, index) => (
+        <RowCtx.Provider
+          key={index}
+          value={rowContext(pushRow(row?.path ?? NO_ROWS, { key: node.key, index }), value)}
+        >
+          {node.children?.map((child) => (
+            <RenderNode key={child.key} node={child} />
+          ))}
+        </RowCtx.Provider>
+      ))
+    : node.children?.map((child) => <RenderNode key={child.key} node={child} />)
 
   return (
     <Component
@@ -200,8 +264,8 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       nodeProps={nodeProps}
       // Value by data key, error by node key. Two components may share a data
       // key; they can still fail for different reasons.
-      value={valueOf(data, dataKey)}
-      error={errors[node.key]}
+      value={valueOf(row?.values ?? data, dataKey)}
+      error={errors[addressOf(row?.path ?? NO_ROWS, node.key)]}
       onChange={handleChange}
     >
       {children}

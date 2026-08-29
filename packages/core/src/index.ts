@@ -49,9 +49,12 @@ export { contextKeys, contextValues, missingContext } from './context.js'
 export { KEY_PATTERN, RESERVED_KEYS, keyProblem } from './keys.js'
 
 export type { RowContext, RowFrame, RowPath } from './rows.js'
+export type { ParsedAddress } from './rows.js'
 export {
   NO_ROWS,
   addressOf,
+  applyChange,
+  decodeAddress,
   decodeRow,
   encodeRow,
   innermost,

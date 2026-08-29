@@ -353,3 +353,94 @@ describe('revealing what a condition hides', () => {
     expect(screen.getByLabelText('buried')).toBeTruthy()
   })
 })
+
+describe('a repeater', () => {
+  const repeating = (): FormDocument =>
+    documentOf([
+      field('email'),
+      {
+        key: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [field('line1')],
+      },
+    ])
+
+  const twoRows = { email: 'a@b.co', addresses: [{ line1: 'one' }, { line1: 'two' }] }
+
+  it('draws its children once per row, with each row holding its own answer', () => {
+    render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+
+    const inputs = screen.getAllByLabelText('line1')
+    expect(inputs).toHaveLength(2)
+    expect(inputs[0]).toHaveProperty('value', 'one')
+    expect(inputs[1]).toHaveProperty('value', 'two')
+  })
+
+  it('draws nothing for a value that is not a list', () => {
+    // Rows come out of the data, and a document is data, so a repeater whose
+    // value is a string has no rows rather than throwing at the person filling
+    // in the form.
+    render(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={{ addresses: 'nonsense' }}
+        onChange={() => undefined}
+      />,
+    )
+    expect(screen.queryByLabelText('line1')).toBeNull()
+  })
+
+  it('marks which row an element is in', () => {
+    const { container } = render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+
+    const rows = [...container.querySelectorAll('[data-fs-key="line1"]')].map((el) =>
+      el.getAttribute('data-fs-row'),
+    )
+    expect(rows).toEqual(['addresses[0]', 'addresses[1]'])
+    // Absent outside a repeater, so every existing selector is unchanged.
+    expect(container.querySelector('[data-fs-key="email"]')?.hasAttribute('data-fs-row')).toBe(
+      false,
+    )
+  })
+
+  it('reports a change at an address naming the row', () => {
+    /*
+     * The one real migration. Outside a repeater the address is the data key,
+     * byte-identical, so nothing breaks until a repeater exists — and then a
+     * bare `{...d, [key]: v}` writes a literal 'addresses[1].line1' property,
+     * which is visible in the first submit rather than silent.
+     */
+    const onChange = vi.fn()
+    render(<FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={onChange} />)
+
+    fireEvent.change(screen.getAllByLabelText('line1')[1] as HTMLElement, {
+      target: { value: 'edited' },
+    })
+
+    expect(onChange).toHaveBeenCalledWith('addresses[1].line1', 'edited')
+  })
+
+  it('gives each row its own error', () => {
+    const { container } = render(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={twoRows}
+        errors={{ 'addresses[1].line1': 'Wrong.' }}
+        onChange={() => undefined}
+      />,
+    )
+
+    const messages = [...container.querySelectorAll('[data-testid="line1-error"]')].map(
+      (el) => el.textContent,
+    )
+    expect(messages).toEqual(['', 'Wrong.'])
+  })
+})
