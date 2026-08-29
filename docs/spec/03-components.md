@@ -310,6 +310,9 @@ get made here. See `docs/decisions.md`.
 ### Still to build
 
 A `Step` entry in the palette that is a container with its `renderWhen` pre-seeded, so an author does not
-write the condition by hand; a step switcher on the canvas so one step can be seen at a time; and the
-canvas supplying `context` at all, without which preview cannot show a step. No Next or Back buttons:
-advancing a step is navigation, and navigation belongs to the host's router.
+write the condition by hand. No Next or Back buttons: advancing a step is navigation, and navigation
+belongs to the host's router.
+
+The canvas half is built. It supplies `context.step` and offers a switcher naming the steps the document
+declares, so preview shows one step at a time while editing shows all of them.
+See [05-canvas.md](05-canvas.md#the-step-switcher).

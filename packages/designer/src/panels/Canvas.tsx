@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import type { Device, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
-import { autoValidateKeys, findParent, indexKit, validateForm } from '@formsmith/core'
+import type { Device, FormContext, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
+import {
+  autoValidateKeys,
+  contextValues,
+  findParent,
+  indexKit,
+  validateForm,
+} from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -86,6 +92,35 @@ export function Canvas({
   language,
 }: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
+
+  /*
+   * The steps this document declares, read out of it rather than configured.
+   *
+   * A step is a container shown when `context.step` equals its own name, so the
+   * names the document compares that path against are the flow. Empty for a
+   * form with no steps, which is why the switcher only appears when there is
+   * something to switch between.
+   */
+  const steps = useMemo(
+    () =>
+      contextValues(api.document.root, 'step').filter(
+        (name): name is string => typeof name === 'string',
+      ),
+    [api.document.root],
+  )
+  const [step, setStep] = useState<string | undefined>(undefined)
+
+  /*
+   * The canvas supplies the context, or a form whose visibility depends on the
+   * host renders as nothing in preview and the author cannot check their work.
+   * Only `step` for now: the rest of a host's context is not knowable here, and
+   * inventing values would be worse than showing none.
+   */
+  const current = step !== undefined && steps.includes(step) ? step : steps[0]
+  const context = useMemo<FormContext | undefined>(
+    () => (current === undefined ? undefined : { step: current }),
+    [current],
+  )
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
   /** Fields the user has changed. A field validates while typing only after it is touched. */
@@ -302,6 +337,19 @@ export function Canvas({
           {preview ? 'Back to editing' : 'Preview'}
         </button>
 
+        {steps.length > 1 && (
+          <label className="fs-canvas__step">
+            Step
+            <select value={current ?? ''} onChange={(e) => setStep(e.target.value)}>
+              {steps.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         {preview && (
           <>
             <button type="button" onClick={() => setValidated(true)}>
@@ -373,6 +421,7 @@ export function Canvas({
             data={data}
             errors={errors}
             revealHidden={editing}
+            {...(context ? { context } : {})}
             onChange={onChange}
             {...(language ? { language } : {})}
             {...(viewport ? { device: viewport } : {})}

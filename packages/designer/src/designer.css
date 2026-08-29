@@ -303,6 +303,19 @@
   border-block-end: 1px solid var(--fs-border);
 }
 
+/*
+ * The step switcher, shown only when the document declares more than one step.
+ * Scoped to the bar, which is designer chrome, so this never reaches a kit
+ * component on the canvas.
+ */
+.fs-canvas__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fs-text-muted);
+}
+
 .fs-canvas__surface {
   position: relative;
   flex: 1;

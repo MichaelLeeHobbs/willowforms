@@ -208,9 +208,17 @@ gives back something the designer took, never an appearance decision on the kit'
 revealed node is exactly that. An overlay in `SelectionLayer` is the shape that fits, since selection and
 hover frames already work that way.
 
-**Open: the canvas supplies no `context`.** A condition reading `{kind:'context'}` cannot be evaluated on
-the canvas in either mode, so preview cannot show a form whose visibility depends on the host. Less
-urgent now that editing draws the component regardless.
+### The step switcher
+
+**Status: built.** The canvas supplies `context.step`, and a bar control chooses which step it names. The
+steps come out of the document — `contextValues(root, 'step')` reads the names its conditions compare
+that path against — so a form with no steps gets no control and an ordinary form is unchanged.
+
+Without it, preview showed an empty form for any wizard and an author could not check their own work.
+
+Only `step`. The rest of a host's context is not knowable here, and inventing values would be worse than
+showing none, so a condition reading `user.role` on the canvas still reads as missing. Editing draws the
+component regardless, which is what keeps that from being a hole.
 
 ## Gaps
 

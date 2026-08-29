@@ -20,7 +20,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import type { FormDocument, Kit, PropValue } from '@formsmith/core'
+import type { ComponentNode, FormDocument, Kit, PropValue } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
@@ -440,5 +440,77 @@ describe('a component a condition hides', () => {
     expect(
       view.container.querySelector('[data-fs-key="first"]')?.hasAttribute('data-fs-hidden'),
     ).toBe(false)
+  })
+})
+
+describe('a document with steps', () => {
+  /*
+   * A step is a container shown when `context.step` equals its own name. The
+   * canvas has to supply that context or preview shows an empty form and the
+   * author cannot check their own wizard.
+   */
+  const stepped = (): FormDocument => {
+    const doc = makeDocument()
+    const step = (name: string, child: ComponentNode): ComponentNode => ({
+      key: 'step-' + name,
+      type: 'Screen',
+      props: {},
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: name },
+        },
+      },
+      children: [child],
+    })
+    doc.root.children = [
+      step('one', { key: 'first', type: 'Field', props: { label: staticProp('First') } }),
+      step('two', { key: 'second', type: 'Field', props: { label: staticProp('Second') } }),
+    ]
+    return doc
+  }
+
+  const open = (): ReturnType<typeof render> =>
+    render(<Designer initialDocument={stepped()} kit={kit} rendererKit={rendererKit} />)
+
+  it('offers a switcher naming the steps the document declares', () => {
+    open()
+    const select = screen.getByLabelText('Step')
+
+    expect([...select.querySelectorAll('option')].map((o) => o.value)).toEqual(['one', 'two'])
+  })
+
+  it('shows no switcher for a form that declares no steps', () => {
+    // It reads the flow out of the document, so an ordinary form gets nothing.
+    render(<Designer initialDocument={makeDocument()} kit={kit} rendererKit={rendererKit} />)
+
+    expect(screen.queryByLabelText('Step')).toBeNull()
+  })
+
+  it('previews the chosen step, which needs the canvas to supply the context', async () => {
+    const user = userEvent.setup()
+    const view = open()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(view.container.querySelector('[data-fs-key="step-one"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-fs-key="step-two"]')).toBeNull()
+
+    await user.selectOptions(screen.getByLabelText('Step'), 'two')
+
+    expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-fs-key="step-one"]')).toBeNull()
+  })
+
+  it('shows every step while editing, so all of them can be arranged', () => {
+    // Editing reveals what a condition hides, so a step the author is not
+    // previewing is still there to drop into.
+    const view = open()
+
+    expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
+    expect(
+      view.container.querySelector('[data-fs-key="step-two"]')?.getAttribute('data-fs-hidden'),
+    ).toBe('true')
   })
 })
