@@ -4,6 +4,23 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The key grammar is the JavaScript identifier subset
+
+- **Decided:** `^[A-Za-z_][A-Za-z0-9_]*$`, plus `__proto__`, `constructor` and `prototype` refused by
+  name. Enforced by `keyProblem`, called from both `validateDocument` and the panel's rename, so a paste
+  and a rename are judged the same way. Applies to `dataKey` too.
+- **Why:** A hyphen is the tempting addition — real forms are full of `first-name` — and it is exactly
+  the one that breaks. `computed` bindings are host-evaluated JavaScript, so `first-name` in an
+  expression is a subtraction, silently and with no error anywhere. A key namespace expressions can name
+  has to be an identifier namespace. `.`, `[` and `]` stay free because row addressing will need them.
+- **Rejected:** Allowing hyphens, which reads friendlier and hands every author a silent wrong answer the
+  first time they write an expression. Also rejected: reporting a bad key as a warning rather than an
+  error, which is how a document that cannot round-trip through JSON Schema ends up in a database.
+- **Reversal:** Loosening later is easy and tightening later is not, so this is deliberately the strict
+  end. It is a breaking change for a document holding a key outside the grammar, which is free while
+  nothing is published and would not be afterwards. That asymmetry is the argument for doing it now.
+- **When:** 2026-08-28, on `feat/steps`.
+
 ### `missingContext` is checked against the scopes, not the bare context
 
 - **Decided:** A host that evaluates under several environments runs the boot-time check against those

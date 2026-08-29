@@ -5,6 +5,7 @@
  * designer's undo stack holds references to prior states. Nothing here mutates.
  */
 
+import { keyProblem } from './keys.js'
 import type { ComponentNode, FormDocument } from './types.js'
 
 /** Depth-first walk, parents before children. */
@@ -258,6 +259,8 @@ export interface StructuralError {
     | 'unknown-action'
     | 'empty-key'
     | 'empty-data-key'
+    | 'invalid-key'
+    | 'invalid-data-key'
     | 'unknown-language'
     | 'malformed'
   message: string
@@ -324,6 +327,16 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       seen.add(key)
 
       /*
+       * The same rule a rename is judged by, so a pasted document cannot hold a
+       * key the panel would have refused. Reported after the emptiness check
+       * above, which says something more specific about the same failure.
+       */
+      const problem = keyProblem(key)
+      if (problem) {
+        errors.push({ code: 'invalid-key', message: 'Component ' + key + ': ' + problem, key })
+      }
+
+      /*
        * A present dataKey has to be usable as a name. It is not checked for
        * uniqueness: sharing one is legal, and it is what lets two guarded
        * fields write the same answer.
@@ -335,6 +348,20 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
           message: 'Component ' + key + ' has an empty data key.',
           key,
         })
+      } else if (dataKey !== undefined) {
+        /*
+         * Held to the same grammar, and it matters more here: a data key is a
+         * property name in the exported JSON Schema and a key in the submitted
+         * payload, so it leaves the document in a way a node key never does.
+         */
+        const problem = keyProblem(dataKey)
+        if (problem) {
+          errors.push({
+            code: 'invalid-data-key',
+            message: 'Component ' + key + ' has an invalid data key: ' + problem,
+            key,
+          })
+        }
       }
 
       visitEvents(value['events'], key, path)

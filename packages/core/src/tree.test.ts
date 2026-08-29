@@ -532,6 +532,38 @@ describe('validateDocument and data keys', () => {
   it('accepts an absent data key', () => {
     expect(validateDocument(withDataKey(undefined))).toEqual([])
   })
+
+  it('rejects a data key the grammar does not allow', () => {
+    /*
+     * It matters more here than for a node key: a data key is a property name
+     * in the exported JSON Schema and a key in the submitted payload, so it
+     * leaves the document in a way a node key never does.
+     */
+    expect(validateDocument(withDataKey('first-name')).map((e) => e.code)).toEqual([
+      'invalid-data-key',
+    ])
+    expect(validateDocument(withDataKey('__proto__')).map((e) => e.code)).toEqual([
+      'invalid-data-key',
+    ])
+  })
+
+  it('rejects a component key the grammar does not allow', () => {
+    // The same rule a rename is judged by, so a pasted document cannot hold a
+    // key the panel would have refused.
+    const document: FormDocument = {
+      ...createDocument('Keys', 'keys'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'first-name', type: 'TextField', props: {} }],
+      },
+    }
+
+    const errors = validateDocument(document)
+    expect(errors.map((e) => e.code)).toEqual(['invalid-key'])
+    expect(errors[0]?.key).toBe('first-name')
+  })
 })
 
 describe('a component that arrives with a visibility rule', () => {

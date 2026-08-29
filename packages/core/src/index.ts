@@ -46,6 +46,8 @@ export {
 
 export { contextKeys, contextValues, missingContext } from './context.js'
 
+export { KEY_PATTERN, RESERVED_KEYS, keyProblem } from './keys.js'
+
 export { isVisible } from './visibility.js'
 
 export { findLanguage, languageTag } from './language.js'

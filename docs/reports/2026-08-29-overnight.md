@@ -85,6 +85,13 @@ The boot-time `missingContext` check has to run against the contexts a host will
 base context. `step` is a path the server fills in per scope, so checked against the base context every
 wizard was refused for a path that was never missing.
 
+## Parked on an external gate
+
+- **#21** — awaiting Copilot re-review after two findings were fixed. Both were real: the canvas
+  validated without the context it renders with, reintroducing the renderer/validation disagreement
+  `isVisible` exists to prevent; and `contextValues` collected more than its comment claimed. Nothing
+  blocks continuing.
+
 ## Still running
 
 Nothing.

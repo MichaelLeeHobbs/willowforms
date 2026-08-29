@@ -226,19 +226,39 @@ node nobody can reach.
 
 ## Keys
 
-**Status: partial**, and the loosest contract here.
+**Status: built.** A node's `key` is its identity, and a `dataKey` is what the payload calls an answer.
+Between them they are the property name in exported JSON Schema, the key in `FormData` and `FormErrors`,
+the value of `data-fs-key`, part of a CSS selector, and a name an expression can mention. Uniqueness used
+to be the only rule enforced, so a key holding a space, a quote or a newline made a legal document and an
+awkward everything-else.
 
-A node's `key` is its identity. It is the property name in exported JSON Schema, the key in `FormData`
-and `FormErrors`, the value of `data-fs-key`, and part of a CSS selector the designer builds. Today
-`renameKey` accepts any non-empty string once trimmed, and uniqueness within the document is the only
-rule enforced.
+```
+KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
+RESERVED_KEYS = ['__proto__', 'constructor', 'prototype']
+```
 
-That is more permissive than what depends on it. A key holding a space or a quote makes a legal document
-today and an awkward JSON Schema property tomorrow. The selectors are already defended: `CSS.escape` is
-used everywhere a key becomes one, which is the only reason this has not broken yet.
+`keyProblem(key)` returns the reason or nothing, and both callers show it to someone: the Properties
+panel refuses a rename with it, and `validateDocument` reports `invalid-key` or `invalid-data-key`
+against a pasted document. One rule, so a rename and a paste are judged the same way — which is what the
+previous version of this section said was missing.
 
-**Planned:** a stated grammar, checked in `validateDocument` so a pasted document is judged by the same
-rule as a rename. Until then, treat anything outside `[A-Za-z_][A-Za-z0-9_]*` as working by accident.
+**The grammar is the JavaScript identifier subset, and the reason is the evaluator rather than
+tidiness.** A hyphen is the tempting addition, because real forms are full of `first-name`, and it is
+exactly the one that breaks: `computed` bindings are host-evaluated JavaScript, so `first-name` in an
+expression is a subtraction, silently, with no error anywhere. A key namespace expressions can name has
+to be an identifier namespace.
+
+**`.`, `[` and `]` are left free deliberately.** Row addressing needs them, and settling this before
+repeated scope is why the key grammar comes first: a path grammar layered on a key grammar that does not
+exist is how the libraries that had to break their addressing twice got there. See `docs/decisions.md`.
+
+`__proto__` passes the pattern and is refused by name. Assigning it does not add a property, it sets the
+prototype, so an answer under that key vanishes from the payload and the payload inherits whatever it
+pointed at. `submittedData` builds on a null prototype to survive that; refusing the name is the other
+half, and the cheaper one.
+
+This is a breaking change for a document holding a key outside the grammar, and it is deliberate while
+nothing is published.
 
 ## Undo
 
