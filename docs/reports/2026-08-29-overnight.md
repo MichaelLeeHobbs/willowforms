@@ -8,10 +8,12 @@ Written as the work happened. Horizon: 9am Eastern, Saturday 2026-08-29.
 
 - **#19 Style tab.** Per-component CSS, structured controls and a raw field over one string.
 
-### Open on a branch
+- **#20 host context** — merged as `313b108`. It merged mid-session while work continued on the branch,
+  so five later commits were stranded and have been moved onto `feat/steps` cut from the updated main.
 
-- **#20 `feat/context`** — host context conditions can read, plus everything below. Rebased onto main
-  after #19 landed. CI was green on every gate locally.
+### Open
+
+- **#21 `feat/steps`** — the canvas defect, the steps decision, `validateAcross`, the step switcher.
 
 ## The work
 
@@ -49,7 +51,7 @@ fails `format:check`.
 
 ## Verification
 
-825 unit tests, 62 e2e, lint / format / typecheck / build clean. The context feature was also exercised
+841 unit tests, 62 e2e, lint / format / typecheck / build clean. The context feature was also exercised
 end to end through the real demo server in Node: a guest's empty submit accepted, an admin's rejected, a
 document reading a path the server does not supply answered with a 500 naming that path, and a payload
 claiming `user.role: admin` ignored because the server reads its own context.
@@ -58,13 +60,34 @@ claiming `user.role: admin` ignored because the server reads its own context.
 
 See `docs/decisions.md`. Entries added since the handover:
 
-1. Edit mode draws what a condition hides; preview does not.
-2. The context an effect writes is the browser's, never the server's.
+1. Steps next, then the key grammar, then repeated scope — with the losing case's strongest surviving
+   point, which changes what repeated scope must include.
+2. `missingContext` is checked against the scopes, not the bare context.
+3. Edit mode draws what a condition hides; preview does not.
+4. The context an effect writes is the browser's, never the server's.
+
+### Steps: decided, then built
+
+The steelman settled it. Four of six form libraries needed a breaking change to their row addressing
+after shipping; none ever needed one to add pages. Steps add no addressing here, so nothing is waiting on
+them. Order is steps, then the key grammar, then repeated scope.
+
+There is no Step type in core: a step is a container with a condition. Per-step validation was already
+free. What was broken is the submit, which from the last step validated only the last step and accepted
+an answer skipped earlier. `validateAcross` merges a run per step and `contextValues` reads the flow out
+of the document, so the server never takes the step list from the request.
+
+The canvas now supplies `context.step` with a switcher, so a wizard can actually be previewed.
+
+### A finding that only came from running it
+
+The boot-time `missingContext` check has to run against the contexts a host will evaluate in, not its
+base context. `step` is a path the server fills in per scope, so checked against the base context every
+wizard was refused for a path that was never missing.
 
 ## Still running
 
-- Steelman on **steps vs repeated scope**. Both briefs are in; the ground-truth agent is still working.
-  Decision and reversal cost will be logged in `docs/decisions.md` and noted here.
+Nothing.
 
 ## Hit the stop-list
 
