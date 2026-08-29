@@ -133,8 +133,14 @@ which is the host's and never submitted. That is the same split `FormData` and `
 extended by the one [12-api.md](12-api.md#state-that-is-not-an-answer) settled, and an imperative
 `set(key, value)` could not show any of it.
 
-`setContext` is what makes "three addresses found" authorable: the effect writes it, a condition reads
-it, and the same rule evaluates on the server, where the context is whatever the request supplied.
+`setContext` is what makes "three addresses found" authorable: the effect writes it, and a condition reads
+it.
+
+It writes to the browser's copy, and only that. The server builds its own context from its own session
+and never reads one out of the request body, so an effect cannot reach across and tell the server what to
+believe. A rule guarding something that matters must therefore read a path the server can derive for
+itself. That is a real limit on `setContext` and it is the right one: an effect is authored in a document,
+and a document must not be able to grant itself privilege on the server.
 
 An unknown effect kind rejects the whole list rather than applying part of it. A document authored in a
 newer designer must fail visibly in an older host, not half-apply.
