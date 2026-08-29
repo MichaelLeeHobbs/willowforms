@@ -116,6 +116,29 @@ forced MUI's `Grid` to change, which is correct because its renderer converts.
 
 The demo server also ran a validation scope per non-string step value, now filtered.
 
+### minLength on a list always failed
+
+`jsonToString` returns `''` for anything that is not a string, number or boolean, and the length rules
+went through it. A multi-select with two options chosen measured zero, so `minLength: 2` failed every time
+and `maxLength` passed every time — silently, with the chosen options on screen and a message saying the
+answer was too short.
+
+### Row addressing, designed four ways
+
+Not built. Four designs in parallel under different constraints, then judged. The decision and both
+corrections are in `docs/decisions.md`; the two worth your attention:
+
+**All four independently found that rows never enter the tree**, which corrects the steelman entry saying
+repeated scope is "a node-identity change in `tree.ts` first". The measurement behind that was real, but
+every failure in it needs one key at three places in the tree, and it never is. `tree.ts` needs no
+changes. The real bug that measurement surfaced — two lookups disagreeing — was live with unique keys too
+and is fixed.
+
+**The data shape is forced, not chosen.** `toJsonSchema` projects for a validator that never runs this
+code, and JSON Schema expresses `array/items/object` natively while it cannot express an unbounded family
+of `addresses[0].street` keys. Nested also keeps `onChange` unchanged, because adding a row is one write
+to one top-level key.
+
 ## Parked on an external gate
 
 - **#21** — awaiting Copilot re-review after two findings were fixed. Both were real: the canvas

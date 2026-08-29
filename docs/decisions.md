@@ -4,6 +4,60 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### Row addressing: rows are a projection, not nodes
+
+Designed four ways in parallel under different constraints — minimal interface, maximal flexibility,
+common-case-trivial, ports-and-adapters — then judged. Not yet built; this is the shape the build follows.
+
+- **Decided, and unanimous across all four designs:** **rows never mint keys.** The authored subtree
+  exists once in the document; rows exist in the DOM, in `FormData` and in `FormErrors`, and never in the
+  tree. A `Repeater` is a node whose `schema.type` is `array` and which has children.
+- **Decided: the data is nested**, and this was _forced_ rather than chosen. `toJsonSchema` projects for a
+  validator that never runs this code, and JSON Schema expresses `{type:'array', items:{type:'object'}}`
+  natively while it cannot express an unbounded family of `addresses[0].street` keys without
+  `patternProperties`. The same choice keeps `onChange(key, value)` unchanged, because adding a row is one
+  write to one top-level key. Flat encoding would have forced a new port on every host.
+- **Decided: no path string ever appears in a document.** Addresses are formed at the boundary and
+  consumed at the boundary — the DOM, error keys, and the host's writer. An author never types an index.
+- **Decided: `Operand.ref` gains an explicit scope discriminant** rather than a path grammar. Absent means
+  the form, which is what every existing `ref` already means, so no document migrates.
+- **Decided: `data-fs-row` is a separate attribute from `data-fs-key`.** They are wanted in opposite
+  directions and one attribute cannot do both: per-component CSS is authored once and must reach every
+  row, while a click must land on exactly one. That also leaves `css.ts` and every kit untouched.
+
+**This corrects an entry above.** The steelman recorded, from a measurement, that repeated scope "is a
+node-identity change in `tree.ts` first" — `findNode` returning row 3 while `pathTo` returned row 1,
+`updateNode` editing every row. That measurement was real but the conclusion does not follow: every one
+of those failures needs the same key at three places in the tree, and it never is one. `tree.ts` needs no
+changes at all. The finding it did produce was genuine and is fixed separately — the two lookups
+disagreeing was a live bug with unique keys too.
+
+A second correction: I repeated JSONForms' maintainer's point that pointer-style addressing cannot
+express row-relative and root references at once, and applied it to `Operand`. `Operand` is not
+pointer-style. It is a tagged union whose tag _is_ the namespace, and `types.ts` says so. The enhancement
+JSONForms had to bolt on is, here, one optional field on one member.
+
+- **Rejected: leading-dot anchoring** in `ref.dataKey` (`.country` for this row). It is the smallest
+  possible grammar and it makes the most common authoring mistake silent — writing `country` inside a row
+  and getting the root field. That ambiguity is what left Form.io with eight path flavours.
+- **Rejected: refusing root access from inside a row entirely.** Safe, and it loses a case every real
+  forms product has: "show the VAT field on each line only for a business order". The refusal is cheaper
+  than the ambiguity, but an explicit discriminant is cheaper than both.
+- **Rejected: a stable row id.** It puts a non-answer inside `data`, which
+  [12-api.md](spec/12-api.md#state-that-is-not-an-answer) already refused by name. Rows are addressed by
+  index; a reorder rewrites held error keys explicitly at the moment it happens.
+- **The risk this carries, and it must be built with the mitigation, not after it:** a condition authored
+  inside a row and left at the default scope reads a key that only exists in the row, resolves to
+  `undefined`, hides the field, and `validateForm` skips it. That is exactly the quiet failure
+  `missingContext` exists to catch — a required answer silently becoming advisory on the server — so it
+  takes the same boot-time answer. `validateDocument` must report a form-scoped `ref` naming a data key
+  that exists only inside a repeater, and the picker must write the row scope when authoring inside one.
+- **Reversal:** the frame-list shape supports nested repeaters and can be narrowed to a single integer if
+  nesting is refused, which is a narrowing rather than a rewrite. Everything cut for a first version —
+  outward anchors, row offsets, row facts beyond the index — is an additive union member that the
+  compiler will point at.
+- **When:** 2026-08-29, designed on `feat/steps`, not yet built.
+
 ### The key grammar is the JavaScript identifier subset
 
 - **Decided:** `^[A-Za-z_][A-Za-z0-9_]*$`, plus `__proto__`, `constructor` and `prototype` refused by
