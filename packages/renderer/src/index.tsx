@@ -47,6 +47,12 @@ export interface NodeAttributes {
   'data-fs-key': string
   'data-fs-type': string
   /**
+   * Set when this node's `renderWhen` says hide it but the host asked to see it
+   * anyway. Absent otherwise, so `[data-fs-hidden]` selects exactly the nodes a
+   * person filling in the form would not be shown.
+   */
+  'data-fs-hidden'?: 'true'
+  /**
    * Which rendered form this element belongs to.
    *
    * A key identifies a node inside its document and nowhere else, so two forms
@@ -70,6 +76,7 @@ export interface RendererKit {
 
 interface RenderContext {
   scope: string
+  revealHidden: boolean
   kit: RendererKit
   data: FormData
   errors: FormErrors
@@ -148,7 +155,13 @@ function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
 
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
-  const { scope, kit, data, errors, translations, options, onChange } = ctx
+  const { scope, revealHidden, kit, data, errors, translations, options, onChange } = ctx
+
+  /*
+   * Shared with validateForm, so a hidden field is never validated behind the
+   * user's back. Computed up here because the node's attributes depend on it.
+   */
+  const visible = isVisible(node, data, options)
 
   const props = useMemo(
     () => resolveProps(node, translations, data, options),
@@ -165,13 +178,16 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   )
 
   const nodeProps = useMemo<NodeAttributes>(
-    () => ({ 'data-fs-key': node.key, 'data-fs-type': node.type, 'data-fs-scope': scope }),
-    [node.key, node.type, scope],
+    () => ({
+      'data-fs-key': node.key,
+      'data-fs-type': node.type,
+      'data-fs-scope': scope,
+      ...(visible ? {} : { 'data-fs-hidden': 'true' as const }),
+    }),
+    [node.key, node.type, scope, visible],
   )
 
-  // Shared with validateForm, so a hidden field is never validated behind the
-  // user's back.
-  if (!isVisible(node, data, options)) return null
+  if (!visible && !revealHidden) return null
 
   const Component = kit.renderers[node.type] ?? kit.fallback ?? MissingType
 
@@ -200,6 +216,21 @@ export interface FormRendererProps {
   errors?: FormErrors
   /** Language tag to draw translations from. Defaults to the document default. */
   language?: string
+  /**
+   * Draw components their `renderWhen` would hide, marked with `data-fs-hidden`.
+   *
+   * For an authoring surface, and wrong anywhere a person is filling in a form.
+   * The designer's canvas renders with empty data and swallows pointer events so
+   * a click can select rather than type, so a conditional component was absent
+   * from the DOM: it could not be seen, positioned, or dropped into, and the
+   * only way to reach it was the tree. Arranging a form means arranging every
+   * component in it, including the ones a given user will not see. Showing what
+   * a user sees is what Preview is for.
+   *
+   * Validation is untouched. `validateForm` calls the same `isVisible`, so this
+   * changes what is drawn and never what is checked.
+   */
+  revealHidden?: boolean
   /** Sandbox for computed bindings. Omit to render computed props as null. */
   evaluate?: Evaluator
   /**
@@ -230,6 +261,7 @@ export function FormRenderer({
   data,
   errors = NO_ERRORS,
   language,
+  revealHidden = false,
   evaluate,
   device,
   context,
@@ -247,8 +279,8 @@ export function FormRenderer({
   const options = useMemo<EvalOptions>(() => ({ evaluate, context }), [evaluate, context])
 
   const ctx = useMemo<RenderContext>(
-    () => ({ scope, kit, data, errors, translations, options, onChange }),
-    [scope, kit, data, errors, translations, options, onChange],
+    () => ({ scope, revealHidden, kit, data, errors, translations, options, onChange }),
+    [scope, revealHidden, kit, data, errors, translations, options, onChange],
   )
 
   /*

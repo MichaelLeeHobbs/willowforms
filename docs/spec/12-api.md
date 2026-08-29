@@ -55,17 +55,18 @@ filling in a form.
 import { FormRenderer } from '@formsmith/renderer'
 ```
 
-| Prop       | Type                                      | Required | Meaning                                         |
-| ---------- | ----------------------------------------- | -------- | ----------------------------------------------- |
-| `document` | `FormDocument`                            | yes      | The form                                        |
-| `kit`      | `RendererKit`                             | yes      | Renderers                                       |
-| `data`     | `FormData`                                | yes      | Current values, flat, keyed by node             |
-| `onChange` | `(key: string, value: JsonValue) => void` | yes      | One field changed                               |
-| `errors`   | `FormErrors`                              | no       | Messages to display, keyed by node              |
-| `language` | `string`                                  | no       | BCP 47 tag; defaults to the document            |
-| `evaluate` | `Evaluator`                               | no       | Sandbox for computed props                      |
-| `device`   | `Device`                                  | no       | Render `css` for one device, not by media query |
-| `context`  | `FormContext`                             | no       | What the host knows and does not submit         |
+| Prop           | Type                                      | Required | Meaning                                               |
+| -------------- | ----------------------------------------- | -------- | ----------------------------------------------------- |
+| `document`     | `FormDocument`                            | yes      | The form                                              |
+| `kit`          | `RendererKit`                             | yes      | Renderers                                             |
+| `data`         | `FormData`                                | yes      | Current values, flat, keyed by node                   |
+| `onChange`     | `(key: string, value: JsonValue) => void` | yes      | One field changed                                     |
+| `errors`       | `FormErrors`                              | no       | Messages to display, keyed by node                    |
+| `language`     | `string`                                  | no       | BCP 47 tag; defaults to the document                  |
+| `evaluate`     | `Evaluator`                               | no       | Sandbox for computed props                            |
+| `device`       | `Device`                                  | no       | Render `css` for one device, not by media query       |
+| `context`      | `FormContext`                             | no       | What the host knows and does not submit               |
+| `revealHidden` | `boolean`                                 | no       | Draw what `renderWhen` hides. Authoring surfaces only |
 
 ### The host owns the data
 

@@ -269,3 +269,87 @@ describe('the host context', () => {
     expect(evaluate).toHaveBeenCalledWith('ctx.user.role', {}, { user: { role: 'admin' } })
   })
 })
+
+describe('revealing what a condition hides', () => {
+  /*
+   * An authoring surface has to show a component a user would not see, or it
+   * cannot be arranged. The runtime must not, which is why this is a prop and
+   * not a default.
+   */
+  const conditional = (): FormDocument =>
+    documentOf([
+      field('always'),
+      {
+        ...field('sometimes'),
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'consent' } },
+        },
+      },
+    ])
+
+  it('leaves it out by default, which is what a person filling in the form gets', () => {
+    render(<FormRenderer document={conditional()} kit={kit} data={{}} onChange={() => undefined} />)
+
+    expect(screen.getByLabelText('always')).toBeTruthy()
+    expect(screen.queryByLabelText('sometimes')).toBeNull()
+  })
+
+  it('draws it when asked, marked so the surface can tell it apart', () => {
+    const { container } = render(
+      <FormRenderer
+        document={conditional()}
+        kit={kit}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(screen.getByLabelText('sometimes')).toBeTruthy()
+    expect(
+      container.querySelector('[data-fs-key="sometimes"]')?.getAttribute('data-fs-hidden'),
+    ).toBe('true')
+  })
+
+  it('does not mark a component the condition actually shows', () => {
+    // Without this the attribute would say "hidden" for everything and the
+    // surface could not tell the two apart, which is the whole point of it.
+    const { container } = render(
+      <FormRenderer
+        document={conditional()}
+        kit={kit}
+        data={{ consent: true }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(
+      container.querySelector('[data-fs-key="sometimes"]')?.hasAttribute('data-fs-hidden'),
+    ).toBe(false)
+    expect(container.querySelector('[data-fs-key="always"]')?.hasAttribute('data-fs-hidden')).toBe(
+      false,
+    )
+  })
+
+  it('reveals a hidden container and everything under it', () => {
+    // Hiding a container hides its subtree, so revealing one has to reveal the
+    // subtree too or a conditional Stack is still an unreachable hole.
+    const doc = documentOf([
+      {
+        key: 'box',
+        type: 'Screen',
+        props: {},
+        renderWhen: { kind: 'static', value: false },
+        children: [field('buried')],
+      },
+    ])
+
+    render(
+      <FormRenderer document={doc} kit={kit} data={{}} revealHidden onChange={() => undefined} />,
+    )
+
+    expect(screen.getByLabelText('buried')).toBeTruthy()
+  })
+})

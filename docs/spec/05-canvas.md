@@ -172,6 +172,46 @@ both the data and the errors.
 
 The same `validateForm` that a server would call. See [08-validation.md](08-validation.md#server-parity).
 
+## A conditional component on the canvas
+
+**Status: built**, after shipping broken. Conditions were the last phase's flagship: a closed vocabulary,
+evaluated in core, with a picker in the panel. An author could express one, and then could not see the
+component they expressed it on.
+
+The mechanism was three shipped decisions meeting, each defensible alone:
+
+1. The canvas renders through the same `FormRenderer` in edit mode as in preview, with the same `data`,
+   which starts empty and stays empty.
+2. While editing, a click is a selection gesture, so pointer events are swallowed in the capture phase
+   before the kit's components see them. The author cannot type into a field to satisfy a condition.
+3. `isVisible` returned false, so the node was absent from the DOM. `measureTree` skips what did not
+   render, so nothing could be dropped into it either.
+
+Set `renderWhen` on a field and it left the canvas. It was still a row in the tree, so it could be
+selected and its properties edited, but it could not be seen, positioned, or dropped into. The repository
+already knew half of this: the canvas tests read the tree rather than the canvas precisely because "a
+node hidden by `renderWhen` is a row here and no element there", written as a testing caution without
+anyone noticing it described an authoring hole.
+
+**Editing and preview now disagree about this, as they already disagree about events.** `FormRenderer`
+takes `revealHidden`; the canvas passes it while editing and never in preview. A revealed node carries
+`data-fs-hidden="true"`, and its children come with it, or a conditional container would still be a hole.
+Arranging a form means arranging every component in it, including the ones a given user will not see;
+showing what a user sees is what Preview is for.
+
+Validation is untouched. `validateForm` calls the same `isVisible`, so this changed what is drawn and
+never what is checked.
+
+**Open: what the marker should look like.** The attribute is in the DOM; nothing draws with it yet.
+Invariant 3's test forbids the obvious answer — its bar is that a sanctioned reach into a kit component
+gives back something the designer took, never an appearance decision on the kit's behalf, and dimming a
+revealed node is exactly that. An overlay in `SelectionLayer` is the shape that fits, since selection and
+hover frames already work that way.
+
+**Open: the canvas supplies no `context`.** A condition reading `{kind:'context'}` cannot be evaluated on
+the canvas in either mode, so preview cannot show a form whose visibility depends on the host. Less
+urgent now that editing draws the component regardless.
+
 ## Gaps
 
 **Empty state.** A document whose root has no children renders an empty canvas with no explanation. It

@@ -353,11 +353,26 @@ export function Canvas({
           data-fs-viewport={viewport}
           style={frameWidth === undefined ? undefined : { width: frameWidth }}
         >
+          {/*
+           * `revealHidden` while editing, never in preview.
+           *
+           * The canvas renders with empty data and swallows pointer events so a
+           * click selects rather than types, so nothing here can ever satisfy a
+           * condition. A component with `renderWhen` set was therefore absent
+           * from the DOM: invisible, unselectable on the canvas, and skipped by
+           * `measureTree`, so nothing could be dropped into it either. The tree
+           * was the only way to reach it.
+           *
+           * Arranging a form means arranging every component in it, including
+           * the ones a given user will not see. Showing what a user sees is
+           * what Preview is for, and Preview still hides them.
+           */}
           <FormRenderer
             document={api.document}
             kit={rendererKit}
             data={data}
             errors={errors}
+            revealHidden={editing}
             onChange={onChange}
             {...(language ? { language } : {})}
             {...(viewport ? { device: viewport } : {})}

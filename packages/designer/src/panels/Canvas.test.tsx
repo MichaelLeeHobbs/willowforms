@@ -379,3 +379,66 @@ describe('release handling', () => {
     }
   })
 })
+
+describe('a component a condition hides', () => {
+  /*
+   * Shipped broken. The canvas renders through the same FormRenderer as
+   * preview, with `data` that starts empty, and edit mode swallows pointer
+   * events so a click selects rather than types. Nothing on the canvas can ever
+   * satisfy a condition, so a component with `renderWhen` set was absent from
+   * the DOM entirely: not visible, not selectable there, and skipped by
+   * `measureTree` so nothing could be dropped into it.
+   *
+   * The tests already knew half of this — `keys()` above reads the tree rather
+   * than the canvas because "a node hidden by renderWhen is a row here and no
+   * element there" — written as a caution about testing, without anyone noticing
+   * it described an authoring hole.
+   */
+  const conditional = (): FormDocument => {
+    const doc = makeDocument()
+    doc.root.children![1]!.renderWhen = {
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'consent' } },
+    }
+    return doc
+  }
+
+  const open = (): ReturnType<typeof render> =>
+    render(<Designer initialDocument={conditional()} kit={kit} rendererKit={rendererKit} />)
+
+  it('is on the canvas while editing, so it can be seen and arranged', () => {
+    const view = open()
+    const element = view.container.querySelector('[data-fs-key="second"]')
+
+    expect(element).not.toBeNull()
+    expect(element?.getAttribute('data-fs-hidden')).toBe('true')
+  })
+
+  it('is selectable on the canvas, not only through the tree', async () => {
+    const user = userEvent.setup()
+    const view = open()
+    const element = view.container.querySelector<HTMLElement>('[data-fs-key="second"]')
+
+    await user.click(element!)
+
+    expect(view.container.querySelector('.fs-selection--active')).not.toBeNull()
+    // The properties panel is the observable proof that the store selection moved.
+    expect(screen.getByDisplayValue('Second')).toBeTruthy()
+  })
+
+  it('leaves the canvas in preview, which is what a user would see', () => {
+    const view = open()
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+    expect(view.container.querySelector('[data-fs-key="second"]')).toBeNull()
+    expect(view.container.querySelector('[data-fs-key="first"]')).not.toBeNull()
+  })
+
+  it('marks only the component the condition hides', () => {
+    const view = open()
+
+    expect(
+      view.container.querySelector('[data-fs-key="first"]')?.hasAttribute('data-fs-hidden'),
+    ).toBe(false)
+  })
+})
