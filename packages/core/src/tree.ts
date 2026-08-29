@@ -6,6 +6,7 @@
  */
 
 import { keyProblem } from './keys.js'
+import { rowScopeProblems } from './rows.js'
 import type { ComponentNode, FormDocument } from './types.js'
 
 /** Depth-first walk, parents before children. */
@@ -276,6 +277,7 @@ export interface StructuralError {
     | 'empty-data-key'
     | 'invalid-key'
     | 'invalid-data-key'
+    | 'row-scope'
     | 'unknown-language'
     | 'malformed'
   message: string
@@ -422,6 +424,18 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
   }
 
   visit(candidate['root'], 'root')
+
+  /*
+   * A condition inside a repeater that reads a row's field at form scope reads
+   * nothing, hides its component, and takes it out of validation. Decidable
+   * from the tree, so it is reported here rather than discovered per submit.
+   */
+  const rootNode = candidate['root']
+  if (isRecord(rootNode)) {
+    for (const found of rowScopeProblems(rootNode as unknown as ComponentNode)) {
+      errors.push({ code: 'row-scope', message: found.problem, key: found.key })
+    }
+  }
 
   const languages = candidate['languages']
   if (!Array.isArray(languages)) {

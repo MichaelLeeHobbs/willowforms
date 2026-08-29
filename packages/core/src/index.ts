@@ -48,6 +48,18 @@ export { contextKeys, contextValues, missingContext } from './context.js'
 
 export { KEY_PATTERN, RESERVED_KEYS, keyProblem } from './keys.js'
 
+export type { RowContext, RowFrame, RowPath } from './rows.js'
+export {
+  NO_ROWS,
+  addressOf,
+  decodeRow,
+  encodeRow,
+  innermost,
+  pushRow,
+  rowContext,
+  rowsOf,
+} from './rows.js'
+
 export { isVisible } from './visibility.js'
 
 export { findLanguage, languageTag } from './language.js'
@@ -80,6 +92,7 @@ export {
   submittedData,
   DEFAULT_MESSAGES,
   validateField,
+  isRowScope,
   validateAcross,
   validateForm,
 } from './validation.js'

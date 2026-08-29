@@ -13,6 +13,8 @@
 
 import { evaluateCondition } from './condition.js'
 import { isEmpty, jsonToString, valueOf } from './json.js'
+import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
+import type { RowContext } from './rows.js'
 import { dataKeyOf, flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -46,6 +48,13 @@ export type Evaluator = (expression: string, data: FormData, context?: FormConte
 export interface EvalOptions {
   evaluate?: Evaluator | undefined
   context?: FormContext | undefined
+  /**
+   * Which repeater row this evaluation is inside. Absent at the top level.
+   *
+   * Set by the walk that enters a row, never by a caller: a host passing one
+   * would be claiming a position in data it does not control.
+   */
+  row?: RowContext | undefined
 }
 
 export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
@@ -137,7 +146,7 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       return true
     // No sandbox needed, so a guarded rule works where an expression would not.
     case 'condition':
-      return evaluateCondition(when.condition, data, options.context)
+      return evaluateCondition(when.condition, data, options.context, options.row)
   }
 }
 
@@ -191,8 +200,10 @@ export function validateField(
   options: EvalOptions = {},
 ): string | undefined {
   if (!node.schema) return undefined
+  // A field inside a row holds its answer in that row, not at the top level.
+  const held = valueOf(options.row?.values ?? data, dataKeyOf(node))
   for (const rule of node.schema.validations) {
-    const error = applyRule(rule, valueOf(data, dataKeyOf(node)), data, options)
+    const error = applyRule(rule, held, data, options)
     if (error) return error
   }
   return undefined
@@ -214,17 +225,56 @@ export function validateForm(
 ): FormErrors {
   const errors: FormErrors = {}
 
-  const visit = (node: ComponentNode): void => {
-    if (!isVisible(node, data, options)) return
+  const visit = (node: ComponentNode, scope: EvalOptions): void => {
+    if (!isVisible(node, data, scope)) return
 
-    const error = validateField(node, data, options)
-    if (error) errors[node.key] = error
+    const path = scope.row?.path ?? NO_ROWS
+    const error = validateField(node, data, scope)
+    if (error) errors[addressOf(path, node.key)] = error
 
-    for (const child of node.children ?? []) visit(child)
+    /*
+     * A repeater validates its children once per row, each under that row's
+     * own scope, so a required answer missing from row two is reported against
+     * row two rather than against the one authored node they share.
+     *
+     * The rows come out of the data. Nothing asks the browser how many there
+     * are, which is the same discipline `validateAcross` follows for steps: a
+     * count from the request would let a client submit one row and have the
+     * rest go unchecked.
+     */
+    if (isRowScope(node)) {
+      const rows = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+      rows.forEach((row, index) => {
+        const inner: EvalOptions = {
+          ...scope,
+          row: rowContext(pushRow(path, { key: node.key, index }), row),
+        }
+        for (const child of node.children ?? []) visit(child, inner)
+      })
+      return
+    }
+
+    for (const child of node.children ?? []) visit(child, scope)
   }
 
-  visit(root)
+  visit(root, options)
   return errors
+}
+
+/**
+ * A node whose children are drawn once per row.
+ *
+ * Recognised from the node rather than from a type string, because component
+ * types are kit-scoped and core must not learn the word `Repeater`. A
+ * data-bound container holding a list is the only thing that shape can mean.
+ */
+export function isRowScope(node: ComponentNode): boolean {
+  return node.schema?.type === 'array' && node.children !== undefined
+}
+
+/** The record a node's own value is read from: a row's object, or the form's data. */
+function rowData(data: FormData, scope: EvalOptions): FormData {
+  return scope.row?.values ?? data
 }
 
 /**
@@ -289,19 +339,44 @@ export function submittedData(
    * key on a plain object, and a host does not receive something surprising
    * back from a function it will hand straight to `JSON.stringify`.
    */
-  const kept: FormData = Object.create(null) as FormData
+  const collect = (node: ComponentNode, scope: EvalOptions, into: FormData): void => {
+    if (!isVisible(node, data, scope)) return
 
-  const visit = (node: ComponentNode): void => {
-    if (!isVisible(node, data, options)) return
+    const held = scope.row?.values ?? data
+
+    /*
+     * A repeater keeps its rows, and each row keeps only the answers that row
+     * still asks for. Row order is preserved and no row is dropped: a row the
+     * user filled in is not a question the form stopped asking, it is one of
+     * several answers to the same one.
+     */
+    if (isRowScope(node)) {
+      const key = dataKeyOf(node)
+      const rows = rowsOf(valueOf(held, key))
+      const path = scope.row?.path ?? NO_ROWS
+
+      into[key] = rows.map((row, index) => {
+        const inner: EvalOptions = {
+          ...scope,
+          row: rowContext(pushRow(path, { key: node.key, index }), row),
+        }
+        const kept: FormData = Object.create(null) as FormData
+        for (const child of node.children ?? []) collect(child, inner, kept)
+        return { ...kept }
+      })
+      return
+    }
+
     if (node.schema) {
       const key = dataKeyOf(node)
-      const value = valueOf(data, key)
-      if (value !== undefined) kept[key] = value
+      const value = valueOf(held, key)
+      if (value !== undefined) into[key] = value
     }
-    for (const child of node.children ?? []) visit(child)
+    for (const child of node.children ?? []) collect(child, scope, into)
   }
 
-  visit(root)
+  const kept: FormData = Object.create(null) as FormData
+  collect(root, options, kept)
   return { ...kept }
 }
 

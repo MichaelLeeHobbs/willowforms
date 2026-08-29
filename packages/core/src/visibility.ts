@@ -49,6 +49,6 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
      * nothing at all.
      */
     case 'condition':
-      return evaluateCondition(when.condition, data, options.context)
+      return evaluateCondition(when.condition, data, options.context, options.row)
   }
 }
