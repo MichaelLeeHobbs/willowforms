@@ -20,20 +20,35 @@ export function walk(
   visit(node)
 }
 
+/*
+ * First match, in document order.
+ *
+ * Keys are unique — `validateDocument` reports a duplicate and the panel refuses
+ * a rename that would make one — but reporting is not preventing, and a host can
+ * render a document it never validated. These used to assign on every match with
+ * no early exit, so they returned the *last* one while `pathTo` below returned
+ * the first. Two functions in this file disagreeing about which node a key means
+ * is a bug with no defensible reading, whichever answer is right.
+ *
+ * First, because that is what `pathTo` already does and what `querySelector`
+ * does in `geometry.ts`, so all three now agree.
+ */
 export function findNode(root: ComponentNode, key: string): ComponentNode | undefined {
-  let found: ComponentNode | undefined
-  walk(root, (n) => {
-    if (n.key === key) found = n
-  })
-  return found
+  if (root.key === key) return root
+  for (const child of root.children ?? []) {
+    const hit = findNode(child, key)
+    if (hit) return hit
+  }
+  return undefined
 }
 
 export function findParent(root: ComponentNode, key: string): ComponentNode | undefined {
-  let found: ComponentNode | undefined
-  walk(root, (n, parent) => {
-    if (n.key === key) found = parent
-  })
-  return found
+  for (const child of root.children ?? []) {
+    if (child.key === key) return root
+    const hit = findParent(child, key)
+    if (hit) return hit
+  }
+  return undefined
 }
 
 /** Keys from the root down to the target, inclusive. Empty if not found. */

@@ -626,3 +626,39 @@ describe('a component that arrives with a visibility rule', () => {
     expect(instantiate(plain, root).renderWhen).toBeUndefined()
   })
 })
+
+describe('two lookups for one key', () => {
+  /*
+   * Keys are unique: validateDocument reports a duplicate and the panel refuses
+   * a rename that would make one. But reporting is not preventing, and a host
+   * can render a document it never validated — so what these do when a document
+   * is wrong is worth pinning, because they used to do different things.
+   *
+   * findNode and findParent assigned on every match with no early exit, so they
+   * answered with the last match while pathTo answered with the first. Two
+   * functions in one file disagreeing about which node a key means is a bug
+   * whichever answer is correct.
+   */
+  const twins: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      { key: 'group', type: 'Stack', props: {}, children: [{ key: 'twin', type: 'A', props: {} }] },
+      { key: 'other', type: 'Stack', props: {}, children: [{ key: 'twin', type: 'B', props: {} }] },
+    ],
+  }
+
+  it('agrees with pathTo about which node a repeated key means', () => {
+    expect(findNode(twins, 'twin')?.type).toBe('A')
+    expect(pathTo(twins, 'twin')).toEqual(['root', 'group', 'twin'])
+    expect(findParent(twins, 'twin')?.key).toBe('group')
+  })
+
+  it('still finds the root and a unique node', () => {
+    expect(findNode(twins, 'root')?.key).toBe('root')
+    expect(findNode(twins, 'other')?.type).toBe('Stack')
+    expect(findNode(twins, 'nobody')).toBeUndefined()
+    expect(findParent(twins, 'root')).toBeUndefined()
+  })
+})
