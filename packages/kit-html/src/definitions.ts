@@ -198,6 +198,31 @@ export const htmlKit: Kit = {
       events: [],
     },
     {
+      type: 'Step',
+      label: 'Step',
+      icon: 'box',
+      group: 'layout',
+      container: true,
+      /*
+       * A step is a container shown when `context.step` equals its own key.
+       * That condition is the whole difference between a step and a box, so it
+       * is stated here rather than left for every author to write by hand and
+       * get the path right. It is a starting value: the Rules tab edits it
+       * afterwards like any other visibility rule.
+       */
+      defaultRenderWhen: (key) => ({
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: key },
+        },
+      }),
+      defaultProps: { gap: 16 },
+      props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      events: [],
+    },
+    {
       type: 'Box',
       label: 'Box',
       icon: 'box',

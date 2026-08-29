@@ -68,14 +68,15 @@ Twenty-six components. **Built** means both kits implement it and the contract t
 
 ### Layout
 
-| Component  | Status  | Container | Properties                                        |
-| ---------- | ------- | --------- | ------------------------------------------------- |
-| `Screen`   | Built   | yes       | `maxWidth`, `gap`                                 |
-| `Stack`    | Built   | yes       | `direction`, `gap`                                |
-| `Grid`     | Built   | yes       | `columns`, `gap`, `minColumnWidth`                |
-| `Box`      | Built   | yes       | `padding`, `background`, `radius`                 |
-| `Card`     | Built   | yes       | `title`, `subtitle`, `variant`                    |
-| `Repeater` | Planned | yes       | `minItems`, `maxItems`, `addLabel`, `removeLabel` |
+| Component  | Status  | Container | Properties                                         |
+| ---------- | ------- | --------- | -------------------------------------------------- |
+| `Screen`   | Built   | yes       | `maxWidth`, `gap`                                  |
+| `Step`     | Built   | yes       | `gap`; ships with a `renderWhen` on `context.step` |
+| `Stack`    | Built   | yes       | `direction`, `gap`                                 |
+| `Grid`     | Built   | yes       | `columns`, `gap`, `minColumnWidth`                 |
+| `Box`      | Built   | yes       | `padding`, `background`, `radius`                  |
+| `Card`     | Built   | yes       | `title`, `subtitle`, `variant`                     |
+| `Repeater` | Planned | yes       | `minItems`, `maxItems`, `addLabel`, `removeLabel`  |
 
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
 twelve-column system: a form author thinks "two side by side", not "six of twelve".
@@ -309,9 +310,12 @@ get made here. See `docs/decisions.md`.
 
 ### Still to build
 
-A `Step` entry in the palette that is a container with its `renderWhen` pre-seeded, so an author does not
-write the condition by hand. No Next or Back buttons: advancing a step is navigation, and navigation
-belongs to the host's router.
+No Next or Back buttons: advancing a step is navigation, and navigation belongs to the host's router.
+
+The `Step` palette entry is built. Both kits ship one, and it is the first use of `defaultRenderWhen` on
+`ComponentDef` — a visibility rule a freshly dropped instance starts with, generated from the node's own
+key, so two steps cannot silently share a condition and show at once. A starting value rather than a
+constraint: the Rules tab edits it afterwards like any other `renderWhen`, deletion included.
 
 The canvas half is built. It supplies `context.step` and offers a switcher naming the steps the document
 declares, so preview shows one step at a time while editing shows all of them.

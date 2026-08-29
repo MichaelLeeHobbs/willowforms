@@ -31,7 +31,7 @@ function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
   return <div {...nodeProps}>{children}</div>
 }
 
-function Field({ nodeProps, props, value, onChange }: NodeRendererProps): ReactNode {
+function Field({ nodeProps, props, value, error, onChange }: NodeRendererProps): ReactNode {
   const label = typeof props['label'] === 'string' ? props['label'] : ''
   // A wrapper with the input nested inside it, so a click lands on a descendant
   // of the element carrying data-fs-key rather than on the element itself.
@@ -44,6 +44,12 @@ function Field({ nodeProps, props, value, onChange }: NodeRendererProps): ReactN
           onChange={(e) => onChange(e.target.value)}
         />
       </label>
+      {/*
+       * Displaying the error is a kit obligation, so the fixture has to do it
+       * too. It did not, which is why nothing here noticed the canvas computing
+       * errors without the context it hands the renderer.
+       */}
+      <span data-testid={nodeProps['data-fs-key'] + '-error'}>{error ?? ''}</span>
     </div>
   )
 }
@@ -466,7 +472,12 @@ describe('a document with steps', () => {
       children: [child],
     })
     doc.root.children = [
-      step('one', { key: 'first', type: 'Field', props: { label: staticProp('First') } }),
+      step('one', {
+        key: 'first',
+        type: 'Field',
+        props: { label: staticProp('First') },
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      }),
       step('two', { key: 'second', type: 'Field', props: { label: staticProp('Second') } }),
     ]
     return doc
@@ -501,6 +512,27 @@ describe('a document with steps', () => {
 
     expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
     expect(view.container.querySelector('[data-fs-key="step-one"]')).toBeNull()
+  })
+
+  it('validates the step preview is showing, rather than treating it as hidden', async () => {
+    /*
+     * The canvas gives the renderer a context and has to give validateForm the
+     * same one. Without it the renderer draws step one while validateForm calls
+     * it hidden and reports nothing, so Validate on an empty required field
+     * comes back clean. That is the disagreement isVisible exists to prevent,
+     * arriving through an argument list rather than a second code path.
+     */
+    const user = userEvent.setup()
+    const view = open()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(view.container.querySelector('[data-fs-key="first"]')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Validate' }))
+
+    expect(view.container.querySelector('[data-testid="first-error"]')?.textContent).toBe(
+      'This field is required.',
+    )
   })
 
   it('shows every step while editing, so all of them can be arranged', () => {

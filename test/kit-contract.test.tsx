@@ -149,11 +149,20 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         const node = instantiate(def, root ?? { key: 'r', type: 'r', props: {} })
         node.key = 'target'
 
+        /*
+         * `revealHidden`, because this asks whether the renderer spreads
+         * nodeProps, which has nothing to do with whether a condition shows the
+         * node. A kit may ship a component that is conditional the moment it is
+         * dropped — `Step` is one, hidden until `context.step` names it — and
+         * without this the contract would be unsatisfiable for that whole class
+         * of component rather than merely unmet.
+         */
         const { container: dom } = render(
           <FormRenderer
             document={documentOf(node)}
             kit={renderers}
             data={{}}
+            revealHidden
             onChange={() => undefined}
           />,
         )
@@ -185,6 +194,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
             document={documentOf(node)}
             kit={renderers}
             data={{}}
+            revealHidden
             onChange={() => undefined}
           />,
         )

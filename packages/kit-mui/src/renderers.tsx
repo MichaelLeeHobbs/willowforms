@@ -76,6 +76,19 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
   )
 }
 
+/*
+ * A step draws as a plain column. Everything that makes it a step is the
+ * condition on it, which core evaluates, so there is nothing here for a kit to
+ * decide beyond how a group of fields stacks up.
+ */
+function StepNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  return (
+    <Stack {...nodeProps} direction="column" gap={num(props['gap'], 2)}>
+      {children}
+    </Stack>
+  )
+}
+
 function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
   const level = str(props['level'], 'h5') as Variant
   return (
@@ -605,6 +618,7 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack: StackNode,
+  Step: StepNode,
   Heading,
   TextField: TextFieldNode,
   NumberField: NumberFieldNode,

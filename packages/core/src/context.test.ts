@@ -228,3 +228,23 @@ describe('contextValues, which is how a document declares its flow', () => {
     expect(contextValues(wizard([guarded]), 'step')).toEqual(['buried'])
   })
 })
+
+describe('contextValues collects broadly on purpose', () => {
+  it('takes a literal from a comparison nobody would write against a step', () => {
+    /*
+     * `gt` on a step name is meaningless, and it is still collected. Too many
+     * names costs `validateAcross` a pass over a tree where nothing matches;
+     * one missed is a step whose required fields are never checked.
+     */
+    const odd: Condition = {
+      op: 'gt',
+      left: { kind: 'context', path: 'step' },
+      right: { kind: 'literal', value: 'two' },
+    }
+    const root = tree([
+      { key: 'a', type: 'Box', props: {}, renderWhen: { kind: 'condition', condition: odd } },
+    ])
+
+    expect(contextValues(root, 'step')).toEqual(['two'])
+  })
+})

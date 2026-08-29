@@ -179,7 +179,14 @@ export function Canvas({
    * meant doing that on every keystroke in preview.
    */
   const errors = useMemo(() => {
-    const all = validateForm(api.document.root, data)
+    /*
+     * The same context the renderer was given, or the two disagree about what
+     * is on screen — which is the bug `isVisible` exists to prevent, arriving
+     * through an argument list. Preview draws the current step, so validating
+     * without the context would treat that step as hidden and report nothing:
+     * Validate on an empty required field would come back clean.
+     */
+    const all = validateForm(api.document.root, data, context ? { context } : {})
     if (validated) return all
 
     /*
@@ -196,7 +203,7 @@ export function Canvas({
       shown[key] = all[key] as string
     }
     return shown ?? NO_ERRORS
-  }, [validated, api.document.root, data, touched])
+  }, [validated, api.document.root, data, touched, context])
 
   const onChange = useCallback((key: string, value: JsonValue) => {
     setData((d) => ({ ...d, [key]: value }))

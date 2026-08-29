@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { createDocument, emptyRoot, prop } from './factory.js'
+import { createDocument, emptyRoot, instantiate, prop } from './factory.js'
+import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument } from './types.js'
 import {
   collectKeys,
@@ -530,5 +531,66 @@ describe('validateDocument and data keys', () => {
 
   it('accepts an absent data key', () => {
     expect(validateDocument(withDataKey(undefined))).toEqual([])
+  })
+})
+
+describe('a component that arrives with a visibility rule', () => {
+  /*
+   * A Step is a container shown when `context.step` equals its own key. That
+   * condition is the whole difference between a step and a box, so a kit states
+   * it rather than asking every author to write it by hand and get the path
+   * right. It has to be applied after the key is generated, because the rule
+   * names the node.
+   */
+  const stepDef: ComponentDef = {
+    type: 'Step',
+    label: 'Step',
+    icon: 'box',
+    group: 'layout',
+    container: true,
+    defaultRenderWhen: (key) => ({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: key },
+      },
+    }),
+    defaultProps: {},
+    props: [],
+    events: [],
+  }
+
+  const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [] }
+
+  it('names the node the rule is on, not the type', () => {
+    const node = instantiate(stepDef, root)
+
+    expect(node.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: node.key },
+      },
+    })
+  })
+
+  it('gives two steps different rules, so they are different steps', () => {
+    // Generated from the key, so a second one cannot silently share the first's
+    // condition and show at the same time.
+    const first = instantiate(stepDef, root)
+    const withFirst: ComponentNode = { ...root, children: [first] }
+    const second = instantiate(stepDef, withFirst)
+
+    expect(second.key).not.toBe(first.key)
+    expect(second.renderWhen).not.toEqual(first.renderWhen)
+  })
+
+  it('leaves a component that declares none without one', () => {
+    const plain: ComponentDef = { ...stepDef, type: 'Box' }
+    delete (plain as { defaultRenderWhen?: unknown }).defaultRenderWhen
+
+    expect(instantiate(plain, root).renderWhen).toBeUndefined()
   })
 })

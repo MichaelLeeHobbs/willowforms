@@ -113,9 +113,20 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * unchecked. The document is the thing both sides already agree on.
  *
  * Structural, like `contextKeys`, and for the same reason: a document is data.
- * `eq` and `ne` contribute the literal on the other side; `in` and `notIn`
- * contribute their options. An operator that compares a context path to a field
- * contributes nothing, because there is no name to collect.
+ * Any comparison contributes the literal on its other side, and `in`/`notIn`
+ * contribute their options. That deliberately includes operators nobody would
+ * write against a step name — `gt` on one is meaningless, and it is still
+ * collected.
+ *
+ * Collecting too much is the safe direction and collecting too little is not.
+ * The caller is `validateAcross`, so a name that turns out not to be a step
+ * costs one extra pass over a tree in which nothing matches it, while a name
+ * this missed is a step whose required fields never get checked. The same
+ * reasoning as reading structurally rather than by `op`: a new operator must
+ * not fall silently out of a check that exists to catch omissions.
+ *
+ * An operator comparing a context path to a field contributes nothing, because
+ * there is no name there to collect.
  */
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
   const seen: JsonValue[] = []
