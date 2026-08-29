@@ -60,7 +60,21 @@ describe('the key grammar', () => {
     }
   })
 
-  it('judges the trimmed key, matching what a rename stores', () => {
-    expect(keyProblem('  email  ')).toBeUndefined()
+  it('refuses a key still wearing whitespace, because that is what got stored', () => {
+    /*
+     * Trimming is an input convenience in the panel, which stores what it
+     * trimmed. A key reaching a document with spaces was never typed through
+     * the panel, and it is not the same string as its trimmed twin anywhere it
+     * is used: `data-fs-key=" email "` keeps the spaces while a rename of the
+     * same field would not. Two components could then hold what everything
+     * downstream treats as one name, and the duplicate check would not see it.
+     */
+    expect(keyProblem('  email  ')).toBeDefined()
+    expect(keyProblem('email ')).toBeDefined()
+    expect(keyProblem('email')).toBeUndefined()
+  })
+
+  it('still says "empty" for whitespace alone, which is the more useful message', () => {
+    expect(keyProblem('   ')).toContain('empty')
   })
 })

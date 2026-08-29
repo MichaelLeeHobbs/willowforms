@@ -237,6 +237,12 @@ KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 RESERVED_KEYS = ['__proto__', 'constructor', 'prototype']
 ```
 
+It judges the key **as stored**, not a trimmed reading of it. Trimming is an input convenience in the
+panel, which stores what it trimmed, so a key that reaches a document still wearing spaces was never
+typed through the panel — and it is not the same string as its trimmed twin anywhere it is used, while a
+rename of the same field would produce the trimmed one. Two components could otherwise hold what
+everything downstream treats as one name, with the duplicate check unable to see it.
+
 `keyProblem(key)` returns the reason or nothing, and both callers show it to someone: the Properties
 panel refuses a rename with it, and `validateDocument` reports `invalid-key` or `invalid-data-key`
 against a pasted document. One rule, so a rename and a paste are judged the same way — which is what the

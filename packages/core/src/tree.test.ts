@@ -662,3 +662,28 @@ describe('two lookups for one key', () => {
     expect(findParent(twins, 'root')).toBeUndefined()
   })
 })
+
+describe('a key that only looks unique', () => {
+  it('refuses a pasted key wearing whitespace, which its twin would not have', () => {
+    /*
+     * `email` and ` email ` are two components as far as the duplicate check is
+     * concerned, and one name everywhere downstream: the panel would store the
+     * trimmed form for either, so a rename of one silently becomes the other.
+     * The stored key is judged as stored.
+     */
+    const document: FormDocument = {
+      ...createDocument('Keys', 'keys'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          { key: 'email', type: 'TextField', props: {} },
+          { key: ' email ', type: 'TextField', props: {} },
+        ],
+      },
+    }
+
+    expect(validateDocument(document).map((e) => e.code)).toContain('invalid-key')
+  })
+})

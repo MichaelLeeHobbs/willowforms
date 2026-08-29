@@ -56,7 +56,18 @@ export function keyProblem(key: unknown): string | undefined {
     )
   }
 
-  if (!KEY_PATTERN.test(trimmed)) {
+  /*
+   * The stored key, not a trimmed reading of it.
+   *
+   * Trimming is an input convenience in the panel, which stores what it
+   * trimmed. A key that reaches a document still wearing spaces was never typed
+   * through the panel, and it is not the same string as its trimmed twin
+   * anywhere it is used: `data-fs-key=" email "` and `FormData[' email ']` keep
+   * the spaces, while a rename of the same field would not. Two components can
+   * then hold what everything downstream treats as one name, and the duplicate
+   * check would not see it.
+   */
+  if (!KEY_PATTERN.test(key)) {
     return (
       'A key must start with a letter or underscore and hold only letters, numbers and underscores. ' +
       'Expressions are JavaScript, so a hyphen in a key reads as a subtraction.'
