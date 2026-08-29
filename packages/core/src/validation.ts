@@ -96,6 +96,24 @@ function isMissing(value: JsonValue | undefined): boolean {
   return value === false || isEmpty(value)
 }
 
+/**
+ * How long an answer is, for the two rules that ask.
+ *
+ * An array counts its items. Without this it went through `jsonToString`, which
+ * returns `''` for anything that is not a string, number or boolean — so a
+ * multi-select with two options chosen measured zero, `minLength: 2` failed
+ * every time and `maxLength` passed every time. Silently: the value was there
+ * on screen and the message said it was too short.
+ *
+ * Counting items is what an author writing "at least two" on a multi-select
+ * means. A repeater may still want `minItems` and `maxItems` of its own, which
+ * map onto the JSON Schema keywords of those names; this is not that, it is the
+ * existing rule no longer being wrong about a value it already receives.
+ */
+function lengthOf(value: JsonValue | undefined): number {
+  return Array.isArray(value) ? value.length : asString(value).length
+}
+
 function asString(value: JsonValue | undefined): string {
   return jsonToString(value)
 }
@@ -145,9 +163,9 @@ export function applyRule(
 
   switch (rule.key) {
     case 'minLength':
-      return asString(value).length < rule.value ? fail() : undefined
+      return lengthOf(value) < rule.value ? fail() : undefined
     case 'maxLength':
-      return asString(value).length > rule.value ? fail() : undefined
+      return lengthOf(value) > rule.value ? fail() : undefined
     case 'min':
       return asNumber(value) < rule.value ? fail() : undefined
     case 'max':

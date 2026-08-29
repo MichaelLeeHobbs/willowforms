@@ -52,16 +52,16 @@ type ValidationRule =
   | { key: 'custom'; expression: string; message?: string; when?: PropValue }
 ```
 
-| Rule                      | Parameter          | Applies to | Fails when                      |
-| ------------------------- | ------------------ | ---------- | ------------------------------- |
-| `required`                | —                  | anything   | the value is empty              |
-| `minLength` / `maxLength` | `number`           | text       | the string is shorter or longer |
-| `min` / `max`             | `number`           | numbers    | the number is outside the range |
-| `pattern`                 | regular expression | text       | the expression does not match   |
-| `email`                   | —                  | text       | it is not an email address      |
-| `url`                     | —                  | text       | `URL.canParse` rejects it       |
-| `uuid`                    | —                  | text       | it is not a UUID                |
-| `custom`                  | expression         | anything   | the expression returns falsy    |
+| Rule                      | Parameter          | Applies to | Fails when                                  |
+| ------------------------- | ------------------ | ---------- | ------------------------------------------- |
+| `required`                | —                  | anything   | the value is empty                          |
+| `minLength` / `maxLength` | `number`           | text, list | the string or the list is shorter or longer |
+| `min` / `max`             | `number`           | numbers    | the number is outside the range             |
+| `pattern`                 | regular expression | text       | the expression does not match               |
+| `email`                   | —                  | text       | it is not an email address                  |
+| `url`                     | —                  | text       | `URL.canParse` rejects it                   |
+| `uuid`                    | —                  | text       | it is not a UUID                            |
+| `custom`                  | expression         | anything   | the expression returns falsy                |
 
 **Empty** means `undefined`, `null`, a string that is blank once trimmed, or an empty array. A `0` is a
 value, not an absence.

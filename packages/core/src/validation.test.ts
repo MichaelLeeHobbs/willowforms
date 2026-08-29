@@ -595,3 +595,32 @@ describe('validateAcross, and the submit it exists to stop', () => {
     expect(validateAcross(wizard, {}, [])).toEqual({})
   })
 })
+
+describe('length rules on a value that is not text', () => {
+  /*
+   * `jsonToString` returns '' for anything that is not a string, number or
+   * boolean, so an array measured zero: `minLength: 2` failed for every
+   * multi-select no matter how many options were chosen, and `maxLength` passed
+   * for all of them. Silently, with the chosen options on screen and a message
+   * saying the answer was too short.
+   */
+  it('counts the items in an array', () => {
+    expect(check({ key: 'minLength', value: 2 }, ['a', 'b'])).toBeUndefined()
+    expect(check({ key: 'minLength', value: 3 }, ['a', 'b'])).toBe(DEFAULT_MESSAGES.minLength)
+    expect(check({ key: 'maxLength', value: 1 }, ['a', 'b'])).toBe(DEFAULT_MESSAGES.maxLength)
+    expect(check({ key: 'maxLength', value: 2 }, ['a', 'b'])).toBeUndefined()
+  })
+
+  it('still measures text by its characters', () => {
+    expect(check({ key: 'minLength', value: 3 }, 'ab')).toBe(DEFAULT_MESSAGES.minLength)
+    expect(check({ key: 'minLength', value: 2 }, 'ab')).toBeUndefined()
+  })
+
+  it('leaves an empty array to required, like every other empty value', () => {
+    // `isEmpty` counts an empty array as empty, and only `required` fails on
+    // an empty value. A `minLength` on an unanswered multi-select must not
+    // report before the user has touched it.
+    expect(check({ key: 'minLength', value: 1 }, [])).toBeUndefined()
+    expect(check({ key: 'required' }, [])).toBe(DEFAULT_MESSAGES.required)
+  })
+})
