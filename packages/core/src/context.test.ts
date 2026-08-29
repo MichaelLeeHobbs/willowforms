@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { contextKeys, missingContext } from './context.js'
+import { contextKeys, contextValues, missingContext } from './context.js'
 import { validateForm } from './validation.js'
 import type { ComponentNode, Condition, Operand } from './types.js'
 
@@ -156,5 +156,75 @@ describe('the failure missingContext exists to catch', () => {
   it('silently skips it when the context is not, which is why the check is at boot', () => {
     expect(validateForm(root, {})).toEqual({})
     expect(missingContext(root, {})).toEqual(['user.role'])
+  })
+})
+
+describe('contextValues, which is how a document declares its flow', () => {
+  const step = (name: string): Condition => ({
+    op: 'eq',
+    left: { kind: 'context', path: 'step' },
+    right: { kind: 'literal', value: name },
+  })
+
+  const wizard = (conditions: Condition[]): ComponentNode =>
+    tree(
+      conditions.map((condition, index) => ({
+        key: 's' + String(index),
+        type: 'Box',
+        props: {},
+        renderWhen: { kind: 'condition', condition },
+        children: [],
+      })),
+    )
+
+  it('reads the steps out of the document, in document order', () => {
+    expect(contextValues(wizard([step('one'), step('two'), step('three')]), 'step')).toEqual([
+      'one',
+      'two',
+      'three',
+    ])
+  })
+
+  it('reads a path on either side of the comparison', () => {
+    // An author can write the literal first, and the condition means the same.
+    const flipped: Condition = {
+      op: 'eq',
+      left: { kind: 'literal', value: 'backwards' },
+      right: { kind: 'context', path: 'step' },
+    }
+    expect(contextValues(wizard([flipped]), 'step')).toEqual(['backwards'])
+  })
+
+  it('collects the options of a membership test', () => {
+    // A step shown for more than one value of the path is still those steps.
+    const shared: Condition = {
+      op: 'in',
+      value: { kind: 'context', path: 'step' },
+      options: ['a', 'b'],
+    }
+    expect(contextValues(wizard([shared]), 'step')).toEqual(['a', 'b'])
+  })
+
+  it('does not repeat a value two steps share', () => {
+    expect(contextValues(wizard([step('one'), step('one')]), 'step')).toEqual(['one'])
+  })
+
+  it('ignores a different path, and a comparison with no name to collect', () => {
+    const other = step('one')
+    const againstAField: Condition = {
+      op: 'eq',
+      left: { kind: 'context', path: 'step' },
+      right: { kind: 'ref', dataKey: 'whatever' },
+    }
+    expect(contextValues(wizard([other, againstAField]), 'phase')).toEqual([])
+    expect(contextValues(wizard([againstAField]), 'step')).toEqual([])
+  })
+
+  it('finds a step nested inside a group', () => {
+    const guarded: Condition = {
+      op: 'and',
+      conditions: [step('buried'), { op: 'truthy', value: { kind: 'ref', dataKey: 'ok' } }],
+    }
+    expect(contextValues(wizard([guarded]), 'step')).toEqual(['buried'])
   })
 })

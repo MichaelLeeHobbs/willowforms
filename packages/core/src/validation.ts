@@ -286,3 +286,45 @@ export function submittedData(
   visit(root)
   return { ...kept }
 }
+
+/**
+ * Validate one document under several evaluation environments, merged.
+ *
+ * A multi-step form needs two different answers from the same rules. While the
+ * user is on step two, only step two should be checked, and that is
+ * `validateForm(stepNode, data)` — it already takes any node as its root. At
+ * submit, every step has to be checked, and `validateForm(root, data)` will not
+ * do it: the other steps are hidden, hidden means not validated, and the form is
+ * accepted with required answers missing from steps nobody is looking at.
+ *
+ * That is `isVisible` behaving exactly as specified, and wrong here, because an
+ * earlier step is not *unwanted*, it is *already done*. `renderWhen` false means
+ * the author excluded this; a step the user is not on means not yet. The two
+ * need different treatment and this is where they get it.
+ *
+ * No new concept: run the existing walk once per environment and merge. Steps
+ * partition the tree, so a key appears under at most one of them and the merge
+ * has nothing to resolve. Where scopes do overlap the first answer wins, which
+ * matches the first-failing-rule order everywhere else.
+ *
+ * **The server enumerates the environments from the document, never from the
+ * request.** A `validateForm` that took a step would let a client name step one
+ * and have the rest go unchecked, and unlike a blocked submit that failure is
+ * invisible. `contextValues(root, 'step')` reads the flow out of the document,
+ * which is the thing both sides already agree on.
+ */
+export function validateAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormErrors {
+  const merged: FormErrors = {}
+
+  for (const scope of scopes) {
+    for (const [key, message] of Object.entries(validateForm(root, data, scope))) {
+      merged[key] ??= message
+    }
+  }
+
+  return merged
+}

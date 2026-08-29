@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ComponentNode, Condition, FormData, ValidationRule } from './types.js'
+import { contextValues } from './context.js'
+import type { EvalOptions } from './validation.js'
 import {
   DEFAULT_MESSAGES,
   applyRule,
   autoValidateKeys,
   submittedData,
+  validateAcross,
   validateField,
   validateForm,
 } from './validation.js'
@@ -496,5 +499,99 @@ describe('submittedData', () => {
 
     expect(validateForm(required, data)).toEqual({})
     expect(submittedData(required, data)['spouseName']).toBeUndefined()
+  })
+})
+
+describe('validateAcross, and the submit it exists to stop', () => {
+  /*
+   * A three-step form, each step a container shown when `context.step` matches.
+   * The trap is measured rather than described: submitting from the last step
+   * validates only the last step, so an answer skipped on step two is accepted.
+   */
+  const field = (key: string): ComponentNode => ({
+    key,
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'required' }] },
+  })
+
+  const step = (name: string, children: ComponentNode[]): ComponentNode => ({
+    key: 'step-' + name,
+    type: 'Box',
+    props: {},
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: name },
+      },
+    },
+    children,
+  })
+
+  const wizard: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      step('who', [field('name')]),
+      step('where', [field('street'), field('city')]),
+      step('pay', [field('card')]),
+    ],
+  }
+
+  const onStep = (name: string): EvalOptions => ({ context: { step: name } })
+
+  /*
+   * The steps as a server would take them: out of the document, never out of
+   * the request. A value that is not a string is not a step name, so it is not
+   * quietly stringified into one.
+   */
+  const stepScopes = (root: ComponentNode): EvalOptions[] =>
+    contextValues(root, 'step')
+      .filter((name): name is string => typeof name === 'string')
+      .map(onStep)
+  const answered = { name: 'Ada', street: 'Long Lane', card: '4242' }
+
+  it('validates only the step the user is on', () => {
+    expect(validateForm(wizard, {}, onStep('where'))).toEqual({
+      street: DEFAULT_MESSAGES.required,
+      city: DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('accepts a submit missing an earlier step, which is the bug', () => {
+    // Not a wish: this is what validateForm does, correctly, and why the merge
+    // below has to exist. `city` was required and never answered.
+    expect(validateForm(wizard, answered, onStep('pay'))).toEqual({})
+  })
+
+  it('catches it when every step is checked', () => {
+    const scopes = ['who', 'where', 'pay'].map(onStep)
+    expect(validateAcross(wizard, answered, scopes)).toEqual({ city: DEFAULT_MESSAGES.required })
+  })
+
+  it('takes the steps from the document, so a client cannot name only its own', () => {
+    /*
+     * The server never asks the browser which steps exist. A client that named
+     * only `pay` would have the rest go unchecked, and unlike a blocked submit
+     * that failure is invisible.
+     */
+    const scopes = stepScopes(wizard)
+    expect(scopes).toHaveLength(3)
+    expect(validateAcross(wizard, answered, scopes)).toEqual({ city: DEFAULT_MESSAGES.required })
+  })
+
+  it('is empty when every step is satisfied', () => {
+    const scopes = stepScopes(wizard)
+    expect(validateAcross(wizard, { ...answered, city: 'Ely' }, scopes)).toEqual({})
+  })
+
+  it('merges nothing into an empty scope list, rather than validating everything', () => {
+    // A document that declares no steps yields no scopes, and the honest answer
+    // to "validate across nothing" is nothing. A host that means the whole form
+    // calls validateForm.
+    expect(validateAcross(wizard, {}, [])).toEqual({})
   })
 })

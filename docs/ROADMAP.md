@@ -37,7 +37,7 @@ See [docs/spec/12-api.md](spec/12-api.md#state-that-is-not-an-answer).
 
 **Then the two gaps that block real forms**, neither of which is an action:
 
-- **Steps.** No Step component, so no per-step validation, no branching, no progress. That is onboarding
+- **Steps.** _Decided, and the core is built._ No Step component, so no per-step validation, no branching, no progress. That is onboarding
   and surveys. See [docs/spec/03-components.md](spec/03-components.md#what-is-deliberately-absent).
 - **Repeated scope.** Already known, still blocking `Repeater` and every "add another" button.
 
@@ -55,7 +55,7 @@ See [docs/spec/06-inspector.md](spec/06-inspector.md#style).
 
 ## Verification
 
-`pnpm test` runs 825 tests; `pnpm e2e` runs 62 in a real browser. Both gate CI, along with lint,
+`pnpm test` runs 837 tests; `pnpm e2e` runs 62 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
 computed from the stylesheets and axe runs over the designer in six states. See
 [accessibility.md](accessibility.md).

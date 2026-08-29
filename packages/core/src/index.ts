@@ -44,7 +44,7 @@ export {
   styleSheetFor,
 } from './css.js'
 
-export { contextKeys, missingContext } from './context.js'
+export { contextKeys, contextValues, missingContext } from './context.js'
 
 export { isVisible } from './visibility.js'
 
@@ -78,6 +78,7 @@ export {
   submittedData,
   DEFAULT_MESSAGES,
   validateField,
+  validateAcross,
   validateForm,
 } from './validation.js'
 

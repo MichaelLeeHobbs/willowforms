@@ -4,6 +4,59 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### `missingContext` is checked against the scopes, not the bare context
+
+- **Decided:** A host that evaluates under several environments runs the boot-time check against those
+  environments, not against its base context. `apps/demo-server` unions `missingContext` over its scopes.
+- **Why:** Found by running it. `step` is a path the server fills in itself, once per scope, so against
+  the base session context it reads as missing and every multi-step form is refused for a path that was
+  never missing. The question the check is actually asking is whether every path a document reads can be
+  read in the environments it will be evaluated in.
+- **Rejected:** Teaching `missingContext` about steps, which would put a feature core deliberately does
+  not know about into the function that checks wiring. Also rejected: dropping the check for documents
+  that read `step`, which trades a false alarm for a silent hole.
+- **Reversal:** Trivial, and confined to the host. Core is unchanged.
+- **When:** 2026-08-28, on `feat/context`.
+
+### Steps next, then the key grammar, then repeated scope
+
+- **Decided:** Keep the approved order. Build steps, then the key grammar `12-api.md` already calls
+  planned, then repeated scope. Settled by a steelman: two briefs arguing opposite sides at full
+  strength, tested against an agent with no stake that surveyed six libraries and ran the naive Repeater
+  against this core.
+- **Why:** The evidence points away from the reversal's central claim. Across react-hook-form, Formik,
+  JSON Schema, JSONForms, SurveyJS and Form.io, **four of six needed a breaking change to their row
+  addressing after shipping and none ever needed one to add pages.** The mechanism is why: paging
+  partitions a form along an axis the data model does not have, so it is a view transform, while
+  repetition adds a coordinate to every path beneath it and the setter, getter, validator, error
+  reporter, condition evaluator and reconciliation key must all learn it at once. Steps here add
+  `validateAcross(root, data, EvalOptions[])`, a container definition and a canvas prop — none of which
+  names, addresses or stores a value — so there is no addressing vocabulary for rows to inherit. Five of
+  the six libraries also implemented steps exactly as this repo already does, a display flag over an
+  existing container, so the shape is convergent rather than naive.
+- **Rejected:** Repeated scope first. Its strongest claim, that whoever is second inherits the other's
+  idea of scope, is untestable for this repo, and the ground-truth agent warned explicitly against
+  reading the library corpus as evidence about ordering: those projects never chose, they all ended up
+  with both. What the corpus constrains is risk _within_ the addressing layer, which is orthogonal to
+  which feature ships first.
+- **The losing case's strongest surviving point**, which changes what repeated scope must include:
+  repetition breaks this codebase **silently**, and not only in the DOM. Measured against core with one
+  row subtree present three times — `findNode` returns row 3 while `pathTo` returns row 1, `updateNode`
+  edits every row, `removeNode` deletes every row, `moveNode` collapses three into one. So repeated
+  scope is not "add a component"; it is a node-identity change in `tree.ts` first. Form.io ended with
+  eight path flavours because they kept finding they had the wrong one, and JSONForms' maintainer states
+  that pointer-style addressing cannot express row-relative and root references at once without a
+  special enhancement — and Formsmith's `Operand` is exactly pointer-style. The key grammar goes between
+  the two features for that reason: a path grammar on top of a key grammar that does not exist is how
+  that mistake gets made here.
+- **Reversal:** Cheap, and asymmetric on purpose. Steps add no type, no addressing and no public-API
+  change, so if this order is wrong the work is not thrown away — it is a container definition and one
+  validation helper that repeated scope neither uses nor contradicts.
+- **What would change my mind:** if the goal shifts to publishing the document format and freezing it
+  soon, breaking `FormData` and `onChange` before first publish dominates and repeated scope goes first.
+  Or a real user needing "add another" before a wizard.
+- **When:** 2026-08-28, on `feat/context`.
+
 ### Edit mode draws what a condition hides; preview does not
 
 - **Decided:** `FormRenderer` takes `revealHidden`, and the designer passes it while editing and never
