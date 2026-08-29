@@ -123,9 +123,9 @@ went through it. A multi-select with two options chosen measured zero, so `minLe
 and `maxLength` passed every time — silently, with the chosen options on screen and a message saying the
 answer was too short.
 
-### Row addressing, designed four ways
+### Repeated scope: designed four ways, then built
 
-Not built. Four designs in parallel under different constraints, then judged. The decision and both
+Built, not just designed. Four designs in parallel under different constraints, then judged. The decision and both
 corrections are in `docs/decisions.md`; the two worth your attention:
 
 **All four independently found that rows never enter the tree**, which corrects the steelman entry saying
@@ -136,8 +136,21 @@ and is fixed.
 
 **The data shape is forced, not chosen.** `toJsonSchema` projects for a validator that never runs this
 code, and JSON Schema expresses `array/items/object` natively while it cannot express an unbounded family
-of `addresses[0].street` keys. Nested also keeps `onChange` unchanged, because adding a row is one write
-to one top-level key.
+of `addresses[0].street` keys.
+
+**What shipped:** the row coordinate; `validateForm` walking a repeater once per row; `Operand.ref`'s
+scope discriminant with the boot-time check for its one dangerous default; `submittedData` pruning within
+rows; the renderer drawing rows and carrying `data-fs-row`; `applyChange` as the host's writer; a
+`Repeater` in both kits; an authoring row so an empty repeater is still reachable on the canvas; and the
+nested schema export, which was silently wrong before — a server validating a real payload against the
+flat projection would have rejected every submission.
+
+**Proven against the running server, not asserted.** A two-row order with a missing `sku` in row 1
+returns 422 naming `lines[1].sku`; both rows complete returns 200.
+
+**The kit contract earned its keep again.** It caught that a `Repeater` is data-bound and therefore owes
+an error message. That is not a formality: its value is the list, so "add at least one address" is its
+own error and has nowhere else to appear.
 
 ## Parked on an external gate
 
