@@ -422,3 +422,24 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     expect(indexKit(kit).size).toBe(kit.components.length)
   })
 })
+
+describe('a default copied between kits', () => {
+  /*
+   * There is no general rule here to check: MUI's `gap` is a spacing-scale
+   * multiplier and the HTML kit's is pixels, so 16 is right in one and 128
+   * pixels in the other, and MUI's `Grid` legitimately uses pixels because its
+   * renderer converts them.
+   *
+   * What is checkable is narrower and is the mistake that actually happened.
+   * `Step` renders as a `Stack` in both kits — same element, same pass-through
+   * of `gap` — so the two must agree within a kit. `Step` arrived carrying the
+   * HTML kit's 16 into MUI, where it is 128 pixels.
+   */
+  it.each(KITS)('$name gives Step the same gap as the Stack it renders as', ({ kit }) => {
+    const gapOf = (type: string): unknown =>
+      kit.components.find((def) => def.type === type)?.defaultProps['gap']
+
+    expect(gapOf('Step'), 'Step has no gap default').toBeTypeOf('number')
+    expect(gapOf('Step')).toBe(gapOf('Stack'))
+  })
+})

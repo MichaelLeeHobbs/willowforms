@@ -212,7 +212,8 @@ export const muiKit: Kit = {
           right: { kind: 'literal', value: key },
         },
       }),
-      defaultProps: { gap: 16 },
+      // MUI's spacing scale, like Screen and Stack. 16 here would be 128px.
+      defaultProps: { gap: 2 },
       props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
       events: [],
     },

@@ -94,6 +94,7 @@ obligation missed.
 | Every `select` editor supplies options                           | An empty picker is a dead end                                                |
 | Every renderer puts `data-fs-key` in the DOM                     | The designer cannot select it otherwise                                      |
 | Every renderer puts `data-fs-scope` in the DOM                   | Two forms on one page otherwise share a key namespace, and each other's CSS  |
+| A Step's gap default matches the Stack it renders as             | A spacing-scale value and a pixel value look alike; 16 is 128px in MUI       |
 | Containers render children inside themselves                     | Rendering them outside breaks drop targeting                                 |
 | Data-bound components survive an absent value                    | A freshly dropped field has no data yet                                      |
 | Every data-bound component displays its error                    | A failed submit that says nothing is the worst outcome                       |

@@ -100,7 +100,15 @@ app.post('/api/forms/:id/submit', async (c) => {
    * answers missing. A form with no steps yields no scopes, so it validates
    * once, which is the ordinary case.
    */
-  const steps = contextValues(doc.root, 'step')
+  /*
+   * Strings only. A step is a name, and a document comparing the path against a
+   * number or an object is not naming one — running a scope per value would be
+   * work with nothing to find, and a hand-edited document could ask for a lot
+   * of it.
+   */
+  const steps = contextValues(doc.root, 'step').filter(
+    (step): step is string => typeof step === 'string',
+  )
   const scopes = steps.length
     ? steps.map((step) => ({ context: { ...context, step } }))
     : [{ context }]
