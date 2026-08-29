@@ -12,6 +12,7 @@
  */
 
 import { dataKeyOf, walk } from './tree.js'
+import { isRowScope } from './validation.js'
 import type { ComponentNode, FieldSchema, FormDocument, ValidationRule } from './types.js'
 
 export interface JsonSchemaProperty {
@@ -24,6 +25,15 @@ export interface JsonSchemaProperty {
   maximum?: number
   pattern?: string
   items?: JsonSchemaProperty
+  /**
+   * A repeater's rows are objects, so `items` carries their shape.
+   *
+   * Repetition is the one structural thing JSON Schema expresses natively, and
+   * a row's `required` belongs here rather than on the document: those fields
+   * are required *of each row*, not of the payload.
+   */
+  properties?: Record<string, JsonSchemaProperty>
+  required?: string[]
   /** Draft 2020-12 keyword, used for file fields. */
   contentEncoding?: string
 }
@@ -119,14 +129,42 @@ function titleOf(node: ComponentNode): string | undefined {
 }
 
 export function toJsonSchema(document: FormDocument): JsonSchema {
+  const shape = objectFor(document.root)
+
+  const schema: JsonSchema = { $schema: DRAFT, type: 'object', properties: shape.properties }
+  if (document.name) schema.title = document.name
+  if (shape.required.length > 0) schema.required = shape.required
+  return schema
+}
+
+/**
+ * One object's worth of the projection: a form, or one row of a repeater.
+ *
+ * Nesting is layout and does not reach the payload, so a `Stack` contributes
+ * its children flat. Repetition is cardinality, which is the one structural
+ * thing JSON Schema does express, so a repeater contributes an `array` whose
+ * `items` is the object its own children describe — and its rows' `required`
+ * lands inside `items`, never on the document.
+ *
+ * Getting this wrong is silent. The flat projection named a repeater's fields
+ * at the top level, so a server validating a real payload against the exported
+ * schema would reject every submission or accept anything.
+ */
+function objectFor(root: ComponentNode): {
+  properties: Record<string, JsonSchemaProperty>
+  required: string[]
+} {
   const properties: Record<string, JsonSchemaProperty> = {}
   const required: string[] = []
 
-  walk(document.root, (node) => {
+  const visit = (node: ComponentNode): void => {
     // Only data-bound components carry a schema, and only they appear in the
     // submitted data. Layout and display components are not in the projection.
     const field = node.schema
-    if (!field) return
+    if (!field) {
+      for (const child of node.children ?? []) visit(child)
+      return
+    }
 
     let property = baseType(field.type)
     const title = titleOf(node)
@@ -147,11 +185,19 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
       }
     }
 
-    properties[name] = property
-  })
+    if (isRowScope(node)) {
+      const row = objectFor(node)
+      const items: JsonSchemaProperty = { type: 'object', properties: row.properties }
+      if (row.required.length > 0) items.required = row.required
+      properties[name] = { ...property, items }
+      return
+    }
 
-  const schema: JsonSchema = { $schema: DRAFT, type: 'object', properties }
-  if (document.name) schema.title = document.name
-  if (required.length > 0) schema.required = required
-  return schema
+    properties[name] = property
+    for (const child of node.children ?? []) visit(child)
+  }
+
+  for (const child of root.children ?? []) visit(child)
+  if (root.schema && !isRowScope(root)) visit(root)
+  return { properties, required }
 }

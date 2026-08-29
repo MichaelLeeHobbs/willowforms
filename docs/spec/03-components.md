@@ -68,25 +68,28 @@ Twenty-six components. **Built** means both kits implement it and the contract t
 
 ### Layout
 
-| Component  | Status  | Container | Properties                                         |
-| ---------- | ------- | --------- | -------------------------------------------------- |
-| `Screen`   | Built   | yes       | `maxWidth`, `gap`                                  |
-| `Step`     | Built   | yes       | `gap`; ships with a `renderWhen` on `context.step` |
-| `Stack`    | Built   | yes       | `direction`, `gap`                                 |
-| `Grid`     | Built   | yes       | `columns`, `gap`, `minColumnWidth`                 |
-| `Box`      | Built   | yes       | `padding`, `background`, `radius`                  |
-| `Card`     | Built   | yes       | `title`, `subtitle`, `variant`                     |
-| `Repeater` | Planned | yes       | `minItems`, `maxItems`, `addLabel`, `removeLabel`  |
+| Component  | Status | Container | Properties                                         |
+| ---------- | ------ | --------- | -------------------------------------------------- |
+| `Screen`   | Built  | yes       | `maxWidth`, `gap`                                  |
+| `Step`     | Built  | yes       | `gap`; ships with a `renderWhen` on `context.step` |
+| `Stack`    | Built  | yes       | `direction`, `gap`                                 |
+| `Grid`     | Built  | yes       | `columns`, `gap`, `minColumnWidth`                 |
+| `Box`      | Built  | yes       | `padding`, `background`, `radius`                  |
+| `Card`     | Built  | yes       | `title`, `subtitle`, `variant`                     |
+| `Repeater` | Built  | yes       | `gap`; its value is the list of rows               |
 
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
 twelve-column system: a form author thinks "two side by side", not "six of twelve".
 
-`Repeater` is the one structurally interesting component here. It renders its children once per item in
-an array value, which makes it the only data-bound container, and it is how a form expresses "add another
-address". It needs the document model to express a repeated scope: a data key that means "index 2 of this
-array" rather than a name at the top level. `dataKey` does not do that and was never going to, so
-`Repeater` is still blocked, on a design that has not been written. See
-[01-document-model.md](01-document-model.md#datakey) for what data keys do cover.
+`Repeater` is the one structurally interesting component here, and it is built. It renders its children
+once per item in an array value, which makes it the only data-bound container, and it is how a form
+expresses "add another address".
+
+**Rows never mint keys.** The authored subtree exists once in the document; a row exists in the DOM, in
+`FormData` and in `FormErrors`, and never in the tree. That prohibition is what left every tree operation
+untouched: each way duplicate keys break them needs the same key at three places in the tree, and it
+never is. `dataKey` was never going to express "index 2 of this array", and it does not have to, because
+no index is ever authored. See [Repeated scope](#repeated-scope).
 
 ### Display
 
@@ -204,6 +207,61 @@ lifecycle events are declared only by `Screen`. Settle them when something reads
 3. Run `test/kit-contract.test.tsx`. It checks sixteen obligations against every kit. Most hold for the
    kit as a whole; the `nodeProps` rule runs once per component.
 4. Add a row above and mark it Built.
+
+## Repeated scope
+
+**Status: built.** A `Repeater` draws its children once per row of an array value. The design was settled
+four ways in parallel and judged before a line was written; the decision and its two corrections are in
+`docs/decisions.md`.
+
+### Rows never mint keys
+
+The authored subtree exists once in the document. A row exists in the DOM, in `FormData` and in
+`FormErrors`, and never in the tree. Everything else follows from that prohibition, including the reason
+no tree operation changed: each way duplicate keys break `findNode`, `updateNode`, `removeNode` and
+`moveNode` needs the same key at three places in the tree, and it never is.
+
+Core recognises a repeater from its shape — a data-bound container holding a list — rather than from a
+type string, because component types are kit-scoped and core must not learn the word.
+
+### No address is ever authored
+
+An address is formed at the boundary and consumed at the boundary: an error key, a `data-fs-row`
+attribute, a read into data. `addresses[1].postcode` is a runtime coordinate, not something in a
+document, so there is no path grammar for a later feature to overload. It parses unambiguously only
+because the key grammar excludes `.`, `[` and `]`, which is the return on holding them back.
+
+`data-fs-row` is a separate attribute from `data-fs-key` because the two are wanted in opposite
+directions: per-component CSS is authored once and has to reach every row, while a click has to land on
+exactly one.
+
+### A condition says which scope it means
+
+`Operand.ref` carries `scope`. Absent means the form, which is what every `ref` written before repeaters
+meant, so no document migrates. `row` reads the enclosing row — and reads _only_ it. There is
+deliberately no fallback to the form when the row has no such field: once a name can mean either, no
+caller can tell which one it got, and the fix is always another flavour of path.
+
+That default carries the one real risk, so its mitigation shipped with it. A condition authored inside a
+row and left at form scope reads nothing, hides its component, and takes it out of validation — the quiet
+failure this project is organised against. `validateDocument` reports it, because unlike a missing
+context it is decidable from the tree alone.
+
+### What a host writes
+
+`onChange` reports an address. Outside a repeater it is the data key, byte for byte, so a host that never
+adds one sees no change. `applyChange` is the writer, and it ships in core so no host implements array
+descent and `__proto__` is not handled two different ways in two places.
+
+Rows are keyed by index, which remounts the rows below a deletion. That is the price of refusing a
+generated row id, which would put a non-answer inside `data` — the thing
+[12-api.md](12-api.md#state-that-is-not-an-answer) already refused by name.
+
+### Still to build
+
+Add and remove buttons, which is an action rather than a component; nested repeaters, which the coordinate
+already supports and nothing yet exercises; and `minItems`/`maxItems` as rules of their own, though
+`minLength` on the list now counts its rows correctly.
 
 ## Steps
 
