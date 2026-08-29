@@ -244,8 +244,20 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
    * refusing to put a generated row id inside `data`, where it would be a
    * non-answer in the payload.
    */
+  /*
+   * An authoring surface draws one row for an empty repeater.
+   *
+   * The canvas renders with empty data, so a repeater has no rows there and its
+   * children never render: the authored subtree would be invisible and nothing
+   * could be dropped into it. That is the same hole `revealHidden` was added to
+   * close for a conditional component, so it is the same flag. A person filling
+   * in the form still sees no rows until there are some.
+   */
+  const rows = rowsOf(valueOf(row?.values ?? data, dataKey))
+  const drawn = revealHidden && rows.length === 0 ? [{}] : rows
+
   const children = isRowScope(node)
-    ? rowsOf(valueOf(row?.values ?? data, dataKey)).map((value, index) => (
+    ? drawn.map((value, index) => (
         <RowCtx.Provider
           key={index}
           value={rowContext(pushRow(row?.path ?? NO_ROWS, { key: node.key, index }), value)}

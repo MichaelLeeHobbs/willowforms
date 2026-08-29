@@ -444,3 +444,53 @@ describe('a repeater', () => {
     expect(messages).toEqual(['', 'Wrong.'])
   })
 })
+
+describe('a repeater on an authoring surface', () => {
+  const empty = (): FormDocument =>
+    documentOf([
+      {
+        key: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [field('line1')],
+      },
+    ])
+
+  it('draws nothing for a person filling in the form', () => {
+    render(<FormRenderer document={empty()} kit={kit} data={{}} onChange={() => undefined} />)
+    expect(screen.queryByLabelText('line1')).toBeNull()
+  })
+
+  it('draws one row while editing, so the subtree can be reached', () => {
+    /*
+     * The canvas renders with empty data, so without this a repeater's children
+     * never render: the authored subtree would be invisible and nothing could
+     * be dropped into it. Exactly the hole `revealHidden` closed for a
+     * conditional component, so it is the same flag.
+     */
+    render(
+      <FormRenderer
+        document={empty()}
+        kit={kit}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    expect(screen.getAllByLabelText('line1')).toHaveLength(1)
+  })
+
+  it('does not invent a row when there is real data to draw', () => {
+    render(
+      <FormRenderer
+        document={empty()}
+        kit={kit}
+        data={{ addresses: [{ line1: 'a' }, { line1: 'b' }] }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    expect(screen.getAllByLabelText('line1')).toHaveLength(2)
+  })
+})

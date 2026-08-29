@@ -163,7 +163,7 @@ partial edit and an undo all survive.
 
 - [ ] **Break the fix and watch the right test fail.** Not the suite — the specific test that
       names the behaviour. This is the only step that distinguishes a test from a comment.
-- [ ] **Run `pnpm e2e` too.** 62 of these checks are the only ones that see layout, real event
+- [ ] **Run `pnpm e2e` too.** 65 of these checks are the only ones that see layout, real event
       capture, and focus. jsdom will not tell you.
 - [ ] **Check the counts.** `pnpm test` and `pnpm e2e` totals appear in `README.md`,
       `CLAUDE.md` and `docs/ROADMAP.md`, and `test/docs.test.ts` compares them.
