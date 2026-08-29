@@ -85,6 +85,37 @@ The boot-time `missingContext` check has to run against the contexts a host will
 base context. `step` is a path the server fills in per scope, so checked against the base context every
 wizard was refused for a path that was never missing.
 
+### The key grammar
+
+`12-api.md` called this the loosest contract in the project: uniqueness was the only rule enforced, so a
+key holding a space, a quote or a newline made a legal document. It is also the decided prerequisite for
+repeated scope.
+
+Now the JavaScript identifier subset, and the reason is the evaluator rather than tidiness. A hyphen is
+the tempting addition, because real forms are full of `first-name`, and it is exactly the one that
+breaks: `computed` bindings are host-evaluated JavaScript, so `first-name` in an expression is a
+subtraction, silently. `.`, `[` and `]` stay free because row addressing needs them. `__proto__` passes
+the pattern and is refused by name.
+
+`keyProblem` is called from both `validateDocument` and the panel's rename, so a paste and a rename are
+judged the same way — which is what that section said was missing.
+
+### Two lookups for one key gave two different answers
+
+`findNode` and `findParent` answered with the _last_ node carrying a key while `pathTo` answered with the
+first. Found while measuring what repetition breaks. First match now, matching `pathTo` and
+`querySelector`. Deliberately did not touch `updateNode`, which edits every match: what that should do is
+the repeated-scope design's question.
+
+### Two more review findings
+
+A `Step` in the MUI kit was 128 pixels tall between fields — MUI's `gap` is a spacing-scale multiplier
+and the HTML kit's is pixels, and the unit did not travel with the definition when I copied it. The
+contract suite now checks the narrow true version of this; a first attempt at a general rule would have
+forced MUI's `Grid` to change, which is correct because its renderer converts.
+
+The demo server also ran a validation scope per non-string step value, now filtered.
+
 ## Parked on an external gate
 
 - **#21** — awaiting Copilot re-review after two findings were fixed. Both were real: the canvas
