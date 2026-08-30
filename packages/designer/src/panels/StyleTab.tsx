@@ -115,20 +115,14 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
       </div>
 
       {CONTROLS.map((control) => (
-        <div className="fs-prop-row" key={control.name}>
-          <label htmlFor={'fs-style-' + control.name}>{control.label}</label>
-          <div className="fs-prop-row__control">
-            <input
-              id={'fs-style-' + control.name}
-              type="text"
-              placeholder={control.placeholder}
-              value={readDeclaration(text, control.name)}
-              onChange={(e) =>
-                api.setNodeCss(node.key, device, setDeclaration(text, control.name, e.target.value))
-              }
-            />
-          </div>
-        </div>
+        <DeclarationField
+          key={node.key + ':' + device + ':' + control.name}
+          control={control}
+          value={readDeclaration(text, control.name)}
+          onCommit={(next) =>
+            api.setNodeCss(node.key, device, setDeclaration(text, control.name, next))
+          }
+        />
       ))}
 
       <RawCss
@@ -137,6 +131,72 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
         onCommit={(next) => api.setNodeCss(node.key, device, next)}
       />
     </section>
+  )
+}
+
+/**
+ * One declaration, committed on blur rather than on every keystroke.
+ *
+ * The control used to be `value={readDeclaration(...)}` with an `onChange` that
+ * wrote straight through, which reads as the obvious controlled input and is
+ * the third instance of Trap 10 in this repository. `setDeclaration` parses and
+ * normalises, and the parse trims — so the space in `8px auto` was removed as
+ * it was typed, the next character landed against `8px`, and the field stored
+ * `8pxauto`. Its own placeholder could not be entered into it.
+ *
+ * The same draft-and-resync shape as `RawCss` below, the JSON editor and the
+ * key field. Committing on blur *and* on Enter, because a single-line field is
+ * a place people press Enter.
+ */
+function DeclarationField({
+  control,
+  value,
+  onCommit,
+}: {
+  control: { name: string; label: string; placeholder: string }
+  value: string
+  onCommit: (next: string) => void
+}): ReactNode {
+  const [draft, setDraft] = useState(value)
+  const [committed, setCommitted] = useState(value)
+
+  /*
+   * Re-sync when the document changes underneath, without losing an edit in
+   * progress: only the version this control last saw is replaced. Undo, redo,
+   * and the raw field rewriting this same declaration all reach here.
+   */
+  if (value !== committed) {
+    setCommitted(value)
+    setDraft(value)
+  }
+
+  const commit = (): void => {
+    if (draft === committed) return
+    setCommitted(draft)
+    onCommit(draft)
+  }
+
+  return (
+    <div className="fs-prop-row">
+      <label htmlFor={'fs-style-' + control.name}>{control.label}</label>
+      <div className="fs-prop-row__control">
+        <input
+          id={'fs-style-' + control.name}
+          type="text"
+          placeholder={control.placeholder}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commit()
+            }
+            if (e.key === 'Escape') setDraft(value)
+          }}
+        />
+      </div>
+    </div>
   )
 }
 

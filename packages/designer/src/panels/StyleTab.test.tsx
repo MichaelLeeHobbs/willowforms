@@ -118,6 +118,9 @@ describe('the Style tab', () => {
     await harness.openStyle()
 
     await harness.user.type(screen.getByLabelText('Padding'), '8px')
+    // Committed on blur, not on every keystroke: the control holds a draft so a
+    // value with a space in it can be typed at all.
+    await harness.user.tab()
 
     expect(harness.latest()?.css?.any).toContain('padding: 8px')
   })
@@ -136,6 +139,7 @@ describe('the Style tab', () => {
     await harness.openStyle()
 
     await harness.user.type(screen.getByLabelText('Radius'), '4px')
+    await harness.user.tab()
 
     expect(harness.latest()?.css?.any).toContain('grid-template-areas')
     expect(harness.latest()?.css?.any).toContain('border-radius: 4px')
@@ -147,6 +151,7 @@ describe('the Style tab', () => {
     await harness.openStyle()
 
     await harness.user.clear(screen.getByLabelText('Padding'))
+    await harness.user.tab()
 
     expect(harness.latest()?.css).toBeUndefined()
   })
@@ -157,6 +162,7 @@ describe('the Style tab', () => {
 
     await harness.user.selectOptions(screen.getByLabelText('Applies to'), 'mobile')
     await harness.user.type(screen.getByLabelText('Padding'), '4px')
+    await harness.user.tab()
 
     expect(harness.latest()?.css?.any).toContain('8px')
     expect(harness.latest()?.css?.mobile).toContain('4px')
@@ -201,5 +207,69 @@ describe('property sections', () => {
     expect(disclosure).toBeTruthy()
     expect(disclosure?.open).toBe(false)
     expect(screen.getByLabelText('Label')).toBeTruthy()
+  })
+})
+
+/**
+ * A structured control holds a draft, like every other editor here that parses.
+ *
+ * Trap 10 in this repository's own skill, and the third instance of it. The
+ * controls read `readDeclaration` on every render and wrote `setDeclaration` on
+ * every keystroke, so the value being typed was parsed, normalised and handed
+ * back before it was finished. `setDeclaration` trims, so the space in
+ * `8px auto` was removed the moment it was typed and the next character landed
+ * against `8px` — the field's own placeholder could not be entered into it.
+ */
+describe('a value being typed into a structured control', () => {
+  it.each([
+    ['Margin', '0, or 8px auto', '8px auto', 'margin'],
+    ['Border', '1px solid #ccc', '1px solid #ccc', 'border'],
+    ['Padding', '8px, or 8px 16px', '8px 16px', 'padding'],
+  ])('survives being typed into %s', async (label, placeholder, typed, property) => {
+    const harness = setup(field())
+    await harness.openStyle()
+
+    const input = screen.getByLabelText(label)
+    // The string the control itself offers as an example. If the field cannot
+    // accept its own placeholder, the control does not work.
+    expect(input.getAttribute('placeholder')).toBe(placeholder)
+
+    await harness.user.type(input, typed)
+    await harness.user.tab()
+
+    expect(harness.latest()?.css?.any).toContain(property + ': ' + typed)
+  })
+
+  it('shows what was typed while it is being typed', async () => {
+    // Not only the stored value: the box itself went blank-ish as the parse
+    // rewrote it, which is what made this look like a broken keyboard.
+    const harness = setup(field())
+    await harness.openStyle()
+
+    const input = screen.getByLabelText('Margin')
+    await harness.user.type(input, '8px auto')
+
+    expect(input).toHaveProperty('value', '8px auto')
+  })
+
+  it('still reads a value back out of the document', async () => {
+    // The control. A draft that never re-syncs would pass every test above and
+    // show the previous component's styling.
+    const harness = setup({ ...field(), css: { any: 'margin: 4px 8px' } })
+    await harness.openStyle()
+
+    expect(screen.getByLabelText('Margin')).toHaveProperty('value', '4px 8px')
+  })
+
+  it('re-syncs when the raw field rewrites the same declaration', async () => {
+    const harness = setup({ ...field(), css: { any: 'margin: 4px' } })
+    await harness.openStyle()
+
+    const raw = screen.getByLabelText('CSS')
+    await harness.user.clear(raw)
+    await harness.user.type(raw, 'margin: 99px')
+    await harness.user.tab()
+
+    expect(screen.getByLabelText('Margin')).toHaveProperty('value', '99px')
   })
 })

@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 8 — the gate reads the whole document, and a throwing node no longer takes the page
+- **Last completed:** item 9 — the structured Style controls and the options box hold a draft
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -105,7 +105,7 @@ Root causes. Each collapses several individual findings, so these come before th
       _Check:_ a test per unchecked branch; a component test proving a document that passes the gate cannot
       take the root down. Standing gate.
 
-- [ ] **9. A control must not re-derive its text from its own parsed value.** Theme 5, and Trap 10 in the
+- [x] **9. A control must not re-derive its text from its own parsed value.** Theme 5, and Trap 10 in the
       repository own skill. `8px auto` stores as `8pxauto`; `1px solid #ccc` stores as `1pxsolid#ccc`; the
       condition editor options box commits on every blur, so tabbing through rewrites it.
       _Check:_ both literal placeholder strings survive a round trip through the Style tab; tabbing through a

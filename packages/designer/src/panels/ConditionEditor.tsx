@@ -371,6 +371,19 @@ function OptionsField({
 
   const commit = (): void => {
     /*
+     * Nothing happens unless the text actually changed. Committing on every
+     * blur meant tabbing *past* this control counted as editing it: the parse
+     * below is lossy on purpose, so a stored `"007"` came back as the number
+     * `7` and a stored `" x "` came back as `"x"`, with nobody typing anything
+     * and an undo entry left behind for the edit that was never made.
+     *
+     * Compared against the text this box was last given rather than against the
+     * parsed list, because that is the comparison the draft is already keeping
+     * and it needs no equality over JSON.
+     */
+    if (draft === committed) return
+
+    /*
      * Trimmed per line, and blank lines dropped. A line of spaces kept as an
      * option is a value no form data can ever equal.
      */

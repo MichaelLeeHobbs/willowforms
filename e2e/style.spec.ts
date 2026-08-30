@@ -24,8 +24,15 @@ test('a structured control styles the component on the canvas', async ({ designe
   await designer.select('website')
   await designer.openTab('Style')
 
+  /*
+   * Enter commits, and so does moving focus away. The control holds a draft
+   * rather than writing through on every keystroke, because parsing what is
+   * half-typed removed the space from `8px auto` as it was being typed.
+   */
   await designer.page.getByLabel('Padding').fill('24px')
+  await designer.page.getByLabel('Padding').press('Enter')
   await designer.page.getByLabel('Radius').fill('9px')
+  await designer.page.getByLabel('Radius').press('Enter')
 
   expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
   expect(await styleOf(designer, 'website', 'border-top-left-radius')).toBe('9px')
@@ -36,9 +43,11 @@ test('a device rule overrides the base layer when that device is shown', async (
   await designer.openTab('Style')
 
   await designer.page.getByLabel('Padding').fill('24px')
+  await designer.page.getByLabel('Padding').press('Enter')
 
   await designer.page.getByLabel('Applies to').selectOption('mobile')
   await designer.page.getByLabel('Padding').fill('4px')
+  await designer.page.getByLabel('Padding').press('Enter')
 
   // Choosing a device in the Style tab moves the canvas to it, so what is on
   // screen is the rule being edited.

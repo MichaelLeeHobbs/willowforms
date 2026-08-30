@@ -990,3 +990,82 @@ describe('a condition authored inside a row', () => {
     })
   })
 })
+
+/**
+ * Tabbing past a control is not editing it.
+ *
+ * The options box commits on blur, and it committed unconditionally — so simply
+ * moving focus through the panel parsed the stored list and wrote the parse
+ * back. Parsing is lossy on purpose: it trims, drops blanks, and reads text that
+ * looks numeric as a number. So a stored `"007"` became the number `7` and a
+ * stored `" x "` became `"x"`, without anybody typing anything, and each pass
+ * left an undo entry for an edit that was never made.
+ */
+describe('moving focus through a membership condition', () => {
+  const stored = (options: unknown[]): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'in',
+        value: { kind: 'ref', dataKey: 'website' },
+        options: options as never,
+      },
+    },
+  })
+
+  it('leaves the stored options byte-identical', async () => {
+    /*
+     * Both of these survive a render and are changed by a parse, which is what
+     * makes them the fixture: `007` is text a postcode or an account number
+     * would hold, and the spaces are somebody's deliberate padding.
+     */
+    const harness = setup(stored(['007', ' x ']))
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    box.focus()
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['007', ' x '] },
+    })
+  })
+
+  it('records no edit at all', async () => {
+    // Undo is the visible half. Every tab-through used to push a version, so
+    // undo walked back through edits nobody made before reaching a real one.
+    const harness = setup(stored([18, 21]))
+    await harness.select()
+
+    const before = harness.latest()
+
+    const box = screen.getByLabelText('Options, one per line')
+    box.focus()
+    await harness.user.tab()
+
+    // Same object, not merely an equal one: tree operations are immutable, so a
+    // commit that changed nothing would still hand back a new document.
+    expect(harness.latest()).toBe(before)
+  })
+
+  it('still commits an edit that was actually made', async () => {
+    // The control. Never committing would pass both tests above.
+    const harness = setup(stored(['007']))
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'GB')
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['GB'] },
+    })
+  })
+})
