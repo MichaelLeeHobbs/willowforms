@@ -8,7 +8,7 @@
  * drop actually happens rather than asserted in a unit test.
  */
 
-import { expect, test } from './harness.js'
+import { expect, stableBox, test } from './harness.js'
 
 test('a repeater is authorable even though it has no rows', async ({ designer }) => {
   await designer.openTab('Components')
@@ -24,10 +24,9 @@ test('a field dropped into a repeater lands in the authored row, once', async ({
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
-  const target = await designer.node('repeater').boundingBox()
   const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
-  const start = await palette.boundingBox()
-  if (!target || !start) throw new Error('nothing to measure')
+  const target = await stableBox(designer.node('repeater'))
+  const start = await stableBox(palette)
 
   await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
   await designer.page.mouse.down()
@@ -55,10 +54,9 @@ test('preview draws a row per answer and keeps them apart', async ({ designer })
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
-  const target = await designer.node('repeater').boundingBox()
   const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
-  const start = await palette.boundingBox()
-  if (!target || !start) throw new Error('nothing to measure')
+  const target = await stableBox(designer.node('repeater'))
+  const start = await stableBox(palette)
 
   await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
   await designer.page.mouse.down()

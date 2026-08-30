@@ -107,6 +107,58 @@ export const test = base.extend<{ designer: Designer }>({
 })
 
 /**
+ * Measure an element only once it has stopped moving.
+ *
+ * `boundingBox()` waits for the element to be attached and visible, but not for
+ * it to be still — that check is part of Playwright's actionability, and a bare
+ * measurement does not get it. So a box read while the left pane is still
+ * settling after a tab change describes where the element *was*, and the
+ * `mouse.down()` that follows lands wherever that coordinate now points, which
+ * is usually nothing at all.
+ *
+ * That is not hypothetical. The palette drag failed nine CI runs out of ten
+ * while passing locally every time, and the failure snapshot showed the whole
+ * gesture completing with Undo still disabled: no mutation, so the press never
+ * reached the button. A developer machine settles before the next statement
+ * runs; a loaded runner does not.
+ *
+ * Two consecutive equal readings, which is the same definition of stable that
+ * Playwright's own actionability uses.
+ *
+ * This deliberately does not scroll anything into view. Scrolling to reach the
+ * target moves the source that was already measured, which broke two passing
+ * drags the first time this was written.
+ */
+export async function stableBox(
+  target: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  let previous = await target.boundingBox()
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await target
+      .page()
+      .evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+    const current = await target.boundingBox()
+    if (
+      previous &&
+      current &&
+      previous.x === current.x &&
+      previous.y === current.y &&
+      previous.width === current.width &&
+      previous.height === current.height
+    ) {
+      return current
+    }
+    previous = current
+  }
+
+  throw new Error(
+    previous
+      ? 'An element never stopped moving, so it cannot be dragged reliably.'
+      : 'Cannot drag something that is not on screen.',
+  )
+}
+
+/**
  * Drag one element onto another with real mouse events.
  *
  * Steps through intermediate positions rather than jumping: the drag controller
@@ -119,9 +171,8 @@ export async function dragOnto(
   to: Locator,
   where: 'top' | 'middle' | 'bottom' = 'middle',
 ): Promise<void> {
-  const start = await from.boundingBox()
-  const end = await to.boundingBox()
-  if (!start || !end) throw new Error('Cannot drag something that is not on screen.')
+  const start = await stableBox(from)
+  const end = await stableBox(to)
 
   const targetY =
     where === 'top'
