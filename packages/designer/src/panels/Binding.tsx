@@ -13,6 +13,7 @@
  * user-facing copy, so a colour or a gap never offers a translation key.
  */
 
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { languageTag } from '@formsmith/core'
 import type { Language, PropSchema, PropValue } from '@formsmith/core'
@@ -122,16 +123,25 @@ export function BindingMode({
 
 export interface ComputedEditorProps {
   id: string
+  /** What this expression is for, so the box can name itself. */
+  label?: string
   value: Extract<PropValue, { kind: 'computed' }>
   onChange: (value: PropValue) => void
 }
 
-export function ComputedEditor({ id, value, onChange }: ComputedEditorProps): ReactNode {
+export function ComputedEditor({ id, value, label, onChange }: ComputedEditorProps): ReactNode {
   return (
     <>
       <textarea
         id={id}
         className="fs-binding__expression"
+        /*
+         * Named. The only label on this row points at the mode select, so this
+         * box announced itself as nothing — and the accessibility suite audits a
+         * selected component at rest, which is a state in which this box is not
+         * on screen, so axe never saw it.
+         */
+        aria-label={(label ? label + ' ' : '') + 'expression'}
         rows={2}
         spellCheck={false}
         placeholder="data.firstName + ' ' + data.lastName"
@@ -156,6 +166,98 @@ export interface TranslationEditorProps {
   onTranslate: (language: string, key: string, text: string) => void
 }
 
+/**
+ * One language's bundle, whatever the document holds in its place.
+ *
+ * `translations[tag]?.[key]` guards the bundle and not the record, so a
+ * document missing `translations` altogether crashed this panel — and the panel
+ * is where somebody goes to repair such a document. `validateDocument` refuses
+ * it now; nothing on the path from a host's storage to here runs that.
+ */
+function bundleFor(
+  translations: Record<string, Record<string, string>>,
+  tag: string,
+): Record<string, string> {
+  if (!translations || typeof translations !== 'object') return {}
+  const bundle = translations[tag]
+  return bundle && typeof bundle === 'object' ? bundle : {}
+}
+
+/**
+ * The translation key, committed on blur, carrying its text with it.
+ *
+ * It was a controlled input writing a new binding on every keystroke, so typing
+ * a new name walked through every prefix of it. None of those prefixes has a
+ * bundle entry, so both language boxes blanked as you typed — and the text
+ * already written stayed under the old key, orphaned, with no way back to it
+ * from the panel.
+ *
+ * The same draft-and-commit shape as every other editor here that parses or
+ * renames. What is different is that the commit has to move the translations
+ * too: a key is the name of something, and renaming it without the thing it
+ * names is what made this destructive rather than merely awkward.
+ */
+function TranslationKeyField({
+  id,
+  value,
+  languages,
+  translations,
+  onRename,
+}: {
+  id: string
+  value: string
+  languages: Language[]
+  translations: Record<string, Record<string, string>>
+  onRename: (next: string, carried: [string, string][]) => void
+}): ReactNode {
+  const [draft, setDraft] = useState(value)
+  const [committed, setCommitted] = useState(value)
+
+  if (value !== committed) {
+    setCommitted(value)
+    setDraft(value)
+  }
+
+  const commit = (): void => {
+    const trimmed = draft.trim()
+    if (!trimmed || trimmed === value) {
+      setDraft(value)
+      return
+    }
+
+    const carried = languages
+      .map((language): [string, string] => {
+        const tag = languageTag(language)
+        return [tag, bundleFor(translations, tag)[value] ?? '']
+      })
+      .filter(([, text]) => text !== '')
+
+    setCommitted(trimmed)
+    setDraft(trimmed)
+    onRename(trimmed, carried)
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      className="fs-binding__key"
+      // Named, because the only label on this row points at the mode select.
+      aria-label="Translation key"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commit()
+        }
+        if (e.key === 'Escape') setDraft(value)
+      }}
+    />
+  )
+}
+
 export function TranslationEditor({
   id,
   value,
@@ -167,12 +269,25 @@ export function TranslationEditor({
 }: TranslationEditorProps): ReactNode {
   return (
     <>
-      <input
+      {/*
+       * A draft, committed on blur, and the rename carries the translations
+       * with it.
+       *
+       * It wrote a new binding on every keystroke, so typing a new name walked
+       * through every prefix of it — and none of those prefixes had a bundle
+       * entry, so both language boxes blanked as you typed and the text already
+       * written was orphaned under the old key, permanently. There is no way
+       * back to it from the panel.
+       */}
+      <TranslationKeyField
         id={id}
-        type="text"
-        className="fs-binding__key"
         value={value.key}
-        onChange={(e) => onChange({ kind: 'i18n', key: e.target.value })}
+        languages={languages}
+        translations={translations}
+        onRename={(next, carried) => {
+          onChange({ kind: 'i18n', key: next })
+          for (const [language, text] of carried) onTranslate(language, next, text)
+        }}
       />
 
       <ul className="fs-binding__languages">
@@ -183,7 +298,7 @@ export function TranslationEditor({
            * bundle nothing read, so the canvas kept showing the raw key.
            */
           const tag = languageTag(language)
-          const text = translations[tag]?.[value.key] ?? ''
+          const text = bundleFor(translations, tag)[value.key] ?? ''
           const fieldId = id + '-' + tag
           return (
             <li key={tag}>

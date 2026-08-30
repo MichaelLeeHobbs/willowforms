@@ -21,6 +21,18 @@ export interface MoveTarget {
   index: number
 }
 
+/**
+ * Where this key is in the flattened tree — the first place, if it is in two.
+ *
+ * `validateDocument` reports a duplicate key and the panel refuses a rename
+ * that would make one, but reporting is not preventing and a host can render a
+ * document it never validated. So this answers the first, which is what
+ * `findNode`, `findParent` and `pathTo` in core all deliberately answer and
+ * what the three tree mutators were changed to answer. Focus, the move and the
+ * announcement then agree with each other and with the rest of the project,
+ * which is the property that matters — whichever of the two the user meant, all
+ * four say the same thing about it.
+ */
 const at = (rows: FlatNode[], key: string): number => rows.findIndex((r) => r.node.key === key)
 
 /**

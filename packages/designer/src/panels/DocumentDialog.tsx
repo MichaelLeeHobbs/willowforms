@@ -203,7 +203,17 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
                   type="file"
                   accept="application/json,.json"
                   className="fs-visually-hidden"
-                  onChange={(e) => onFile(e.target.files?.[0])}
+                  onChange={(e) => {
+                    onFile(e.target.files?.[0])
+                    /*
+                     * Cleared, so importing the same file twice does something
+                     * the second time. A file input fires nothing when the
+                     * chosen file has not changed, so re-importing after
+                     * editing it on disk silently did nothing at all — no note,
+                     * no error, just a button that had stopped working.
+                     */
+                    e.target.value = ''
+                  }}
                 />
               </label>
               <button type="button" onClick={() => setDraft(documentJson)}>

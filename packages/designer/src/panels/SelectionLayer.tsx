@@ -9,7 +9,7 @@
  * disturb the kit's layout.
  */
 
-import { useCallback, useLayoutEffect, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { FormDocument } from '@formsmith/core'
 
@@ -74,15 +74,38 @@ export function SelectionLayer({
   const [selected, setSelected] = useState<Rect | undefined>(undefined)
   const [hover, setHover] = useState<Rect | undefined>(undefined)
 
+  /*
+   * What to measure, held in a ref so the observer does not care that it
+   * changed.
+   *
+   * `remeasure` used to close over the selection and the hover, so it was a new
+   * function every time either moved — and the effect below lists it, so the
+   * `ResizeObserver` and both listeners were torn down and rebuilt on every
+   * hover move. `observe()` delivers an immediate callback, so a sweep across
+   * thirty components cost thirty observer cycles and thirty extra renders on
+   * top of the thirty it was actually asked for.
+   */
+  const what = useRef({ selectedKey, selectedRow, hoverKey })
+
   const remeasure = useCallback(() => {
     const surface = surfaceRef.current
     if (!surface) return
-    setSelected(measure(surface, selectedKey, selectedRow))
+    const { selectedKey: key, selectedRow: row, hoverKey: hovered } = what.current
+    setSelected(measure(surface, key, row))
     // One frame is enough when the pointer is over the selection already.
-    setHover(measure(surface, hoverKey === selectedKey ? undefined : hoverKey))
-  }, [surfaceRef, selectedKey, hoverKey])
+    setHover(measure(surface, hovered === key ? undefined : hovered))
+  }, [surfaceRef])
 
-  useLayoutEffect(remeasure, [remeasure, document])
+  /*
+   * On every change to what is selected or hovered, as well as to the document.
+   * The ref is written here rather than in its own effect, because a layout
+   * effect runs before an ordinary one — so the first measure after a selection
+   * would have read the previous one and drawn no frame at all.
+   */
+  useLayoutEffect(() => {
+    what.current = { selectedKey, selectedRow, hoverKey }
+    remeasure()
+  }, [remeasure, document, selectedKey, selectedRow, hoverKey])
 
   useLayoutEffect(() => {
     const surface = surfaceRef.current
@@ -112,7 +135,7 @@ export function SelectionLayer({
       block: 'nearest',
       inline: 'nearest',
     })
-  }, [surfaceRef, selectedKey])
+  }, [surfaceRef, selectedKey, selectedRow])
 
   return (
     <>

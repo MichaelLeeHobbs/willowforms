@@ -10,7 +10,7 @@ import type {
   PropSchema,
   PropValue,
 } from '@formsmith/core'
-import { dataKeyOf, indexKit, jsonToString, keyScopesFor } from '@formsmith/core'
+import { dataKeyOf, indexKit, jsonToString, keyScopesFor, optionValue } from '@formsmith/core'
 
 import { Icon, ICON_NAMES } from '../Icon.js'
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
@@ -219,8 +219,17 @@ function KeyField({
   const [error, setError] = useState('')
 
   const commit = (): void => {
-    if (draft === value) return
-    const result = onRename(draft)
+    /*
+     * Normalised first, then compared — the same order `DataKeyField` uses.
+     * Comparing the untrimmed draft and leaving the trimming to the store meant
+     * that typing " email " over `email` was a rename to the same key: the store
+     * did nothing, and the panel went on showing a key the document does not
+     * have.
+     */
+    const trimmed = draft.trim()
+    if (trimmed !== draft) setDraft(trimmed)
+    if (trimmed === value) return
+    const result = onRename(trimmed)
     if (result.ok) {
       setError('')
       return
@@ -352,7 +361,12 @@ function VisibilityRow({
         )}
 
         {value?.kind === 'computed' && (
-          <ComputedEditor id="fs-prop-renderwhen" value={value} onChange={onChange} />
+          <ComputedEditor
+            id="fs-prop-renderwhen"
+            label="Show when"
+            value={value}
+            onChange={onChange}
+          />
         )}
       </div>
 
@@ -495,7 +509,7 @@ function PropRow({
         <label htmlFor={id}>{schema.label}</label>
         <div className="fs-prop-row__control">
           {mode}
-          <ComputedEditor id={id} value={value} onChange={onChange} />
+          <ComputedEditor id={id} label={schema.label} value={value} onChange={onChange} />
         </div>
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
       </div>
@@ -605,8 +619,21 @@ function PropRow({
         ) : schema.editor === 'select' ? (
           <select
             id={id}
-            value={typeof raw === 'string' ? raw : ''}
-            onChange={(e) => set(e.target.value)}
+            /*
+             * Read and written through `jsonToString` and `optionValue`, which
+             * are inverses. `PropOption.value` is a `JsonValue`, and this
+             * treated it as a string in both directions — so a kit declaring
+             * `{ label: 'Two', value: 2 }` showed nothing selected and stored
+             * `"2"`. Neither shipped kit does that today, which is the only
+             * reason it was invisible: the panel is the part a third kit meets
+             * first.
+             */
+            value={jsonToString(raw)}
+            onChange={(e) =>
+              e.target.value === ''
+                ? onChange(undefined)
+                : set(optionValue(schema.options?.map((o) => o.value) ?? [], e.target.value))
+            }
           >
             <option value="">(default)</option>
             {schema.options?.map((o) => (

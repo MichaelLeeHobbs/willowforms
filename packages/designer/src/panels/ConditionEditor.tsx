@@ -75,14 +75,36 @@ function asOperand(value: Operand | undefined): Operand {
   return literal('')
 }
 
-/** A condition of the requested shape, keeping whatever the old one can spare. */
+/**
+ * A condition of the requested shape, keeping whatever the old one can spare.
+ *
+ * Changing a group — `and`, `or`, `not` — to a scalar operator has nothing to
+ * carry: a list of conditions is not an operand. It used to discard the group
+ * outright, and because the store coalesces by label, one undo went back to
+ * before the whole condition was authored rather than restoring the group. The
+ * first condition inside is carried instead, which is the nearest thing to what
+ * the author was looking at, and leaves the rest recoverable in one step.
+ */
 function morph(current: Condition, op: Condition['op']): Condition {
+  const carried =
+    'conditions' in current
+      ? asList(current.conditions)[0]
+      : 'condition' in current
+        ? current.condition
+        : undefined
+
+  const inner = carried ? asCondition(carried) : undefined
+
   const firstOperand: Operand =
     'left' in current
       ? asOperand(current.left)
       : 'value' in current
         ? asOperand(current.value)
-        : literal('')
+        : inner && 'left' in inner
+          ? asOperand(inner.left)
+          : inner && 'value' in inner
+            ? asOperand(inner.value)
+            : literal('')
 
   if ((COMPARISONS as readonly string[]).includes(op)) {
     const right: Operand = 'right' in current ? asOperand(current.right) : literal('')

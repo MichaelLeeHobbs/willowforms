@@ -7,8 +7,8 @@
  * component library in play is whichever kit renders the canvas.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { languageTag } from '@formsmith/core'
 import type { Device, FormDocument, IconName, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
@@ -63,11 +63,28 @@ export function Designer({
 }: DesignerProps): ReactNode {
   const api = useDesigner(initialDocument)
 
+  /*
+   * The host is told when the *document* changes, and only then.
+   *
+   * `onChange` was in the dependency list, so a host passing an inline arrow —
+   * which is what a host writes — re-emitted on every one of its own renders.
+   * If the host then stores what it is given, that is a render loop, and if it
+   * bails on identical values it is merely wasted work it cannot see.
+   *
+   * Held in a ref for the same reason `drag.ts` holds its own callback, with
+   * the same note there about writing it in an effect rather than during
+   * render.
+   */
+  const emit = useRef(onChange)
   useEffect(() => {
-    onChange?.(api.document)
-  }, [api.document, onChange])
+    emit.current = onChange
+  }, [onChange])
 
-  useKeyboardShortcuts(api)
+  useEffect(() => {
+    emit.current?.(api.document)
+  }, [api.document])
+
+  const shellRef = useRef<HTMLDivElement>(null)
 
   const [jsonOpen, setJsonOpen] = useState(false)
 
@@ -85,6 +102,8 @@ export function Designer({
     // so moving a component twice is announced twice.
     setAnnouncement((previous) => (previous === message ? message + '​' : message))
   }, [])
+
+  useKeyboardShortcuts(api, shellRef, announce)
 
   const commitDrop = useCallback(
     (source: DragSource, target: DropCommit) => {
@@ -160,6 +179,26 @@ export function Designer({
 
   return (
     <div
+      ref={shellRef}
+      /*
+       * Focusable, so the shortcuts below can be bound here rather than to the
+       * whole page. Not in the tab order — this is a container, not a control.
+       */
+      tabIndex={-1}
+      onPointerDown={(event) => {
+        const target = event.target
+        // Anything that takes focus itself keeps it: a click in a text field
+        // must not be stolen by the container it happens to be inside.
+        if (
+          target instanceof Element &&
+          target.closest(
+            'input, textarea, select, button, a[href], [tabindex]:not([tabindex="-1"])',
+          )
+        ) {
+          return
+        }
+        shellRef.current?.focus({ preventScroll: true })
+      }}
       className="fs-shell"
       data-testid="formsmith-designer"
       {...(theme === 'system' ? {} : { 'data-fs-theme': theme })}
@@ -453,7 +492,11 @@ function Toolbar({
  * Global shortcuts. Ignored while focus is in a text field, so typing "z" in a
  * label does not undo the document.
  */
-function useKeyboardShortcuts(api: DesignerApi): void {
+function useKeyboardShortcuts(
+  api: DesignerApi,
+  shell: RefObject<HTMLDivElement | null>,
+  announce: (message: string) => void,
+): void {
   const { undo, redo, removeComponent, select, selectedKey } = api
 
   const onKeyDown = useCallback(
@@ -495,18 +538,37 @@ function useKeyboardShortcuts(api: DesignerApi): void {
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedKey) {
         event.preventDefault()
         removeComponent(selectedKey)
+        // Announced, like every other addition and removal. These two were the
+        // only shell mutations that said nothing, against the shell spec.
+        announce(selectedKey + ' removed.')
         return
       }
       if (event.key === 'Escape' && selectedKey) {
         event.preventDefault()
         select(undefined)
+        announce('Selection cleared.')
       }
     },
-    [undo, redo, removeComponent, select, selectedKey],
+    [undo, redo, removeComponent, select, selectedKey, announce],
   )
 
+  /*
+   * Bound to the shell, not to `window`.
+   *
+   * On `window` the designer claimed Ctrl+Z, Delete, Backspace and Escape for
+   * the entire host page — a form builder embedded in an admin panel took that
+   * page's undo away from it, and gave it back nothing.
+   *
+   * The shell carries `tabIndex={-1}` and takes focus when a click lands on
+   * something that will not take it itself, so a keystroke after selecting a
+   * component on the canvas still arrives. That is also what makes the
+   * behaviour honest: the shortcuts belong to the designer when the designer
+   * has focus, which is what a person would guess.
+   */
   useEffect(() => {
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onKeyDown])
+    const element = shell.current
+    if (!element) return
+    element.addEventListener('keydown', onKeyDown)
+    return () => element.removeEventListener('keydown', onKeyDown)
+  }, [onKeyDown, shell])
 }

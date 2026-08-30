@@ -36,16 +36,36 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
      * and the tag the renderer looks translations up by was never the one the
      * panel had written.
      */
-    const [primary = '', region] = raw.split('-')
+    /*
+     * Checked against a grammar, not merely split.
+     *
+     * `raw.split('-')` took the first two subtags and dropped the rest, so
+     * `zh-Hans-CN` was stored as `zh-HANS`: every translation authored for it
+     * went into a bundle the renderer will never look up, because the tag it
+     * looks up is the one this panel wrote. And nothing checked the shape at
+     * all, so `en US` became a bundle key nothing can ever resolve.
+     *
+     * The subset this library supports, stated: a primary subtag and an
+     * optional region, which is what `Language` has fields for. A tag with a
+     * script subtag is refused with a reason rather than silently truncated —
+     * saying "not yet" is a smaller failure than storing text nobody will find.
+     */
+    const parsed = /^([A-Za-z]{2,3})(?:-([A-Za-z]{2}|\d{3}))?$/.exec(raw)
+    if (!parsed) {
+      setError(
+        raw.split('-').length > 2
+          ? 'A script subtag such as zh-Hans-CN is not supported yet. Use zh or zh-CN.'
+          : 'Enter a language code, such as fr or pt-BR.',
+      )
+      return
+    }
+
+    const [, primary = '', region] = parsed
     const language: Language = {
       code: primary.toLowerCase(),
       ...(region ? { dialect: region.toUpperCase() } : {}),
       name: name.trim() || raw,
       bidi: 'ltr',
-    }
-    if (!language.code) {
-      setError('Enter a language code, such as fr or pt-BR.')
-      return
     }
     const tag = languageTag(language)
     if (doc.languages.some((l) => languageTag(l).toLowerCase() === tag.toLowerCase())) {

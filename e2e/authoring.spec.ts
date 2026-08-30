@@ -129,8 +129,15 @@ test('adding a language leaves the document valid', async ({ designer }) => {
 test('a computed property renders nothing rather than throwing', async ({ designer }) => {
   await designer.select('email')
   await designer.page.getByLabel('Helper text binding').selectOption('computed')
-  // Exact: the binding picker's label also starts with "Helper text".
-  await designer.page.getByLabel('Helper text', { exact: true }).fill("'hi ' + data.firstName")
+  /*
+   * "Helper text expression". The box had no accessible name of its own — the
+   * only label on the row points at the mode select — so it announced itself as
+   * nothing, and the accessibility suite audits a component at rest, which is a
+   * state this box is not in.
+   */
+  await designer.page
+    .getByLabel('Helper text expression', { exact: true })
+    .fill("'hi ' + data.firstName")
 
   // The playground injects no evaluator, so this resolves to nothing and the
   // field keeps rendering.

@@ -384,3 +384,50 @@ describe('form settings', () => {
     expect(latest().languages).toHaveLength(1)
   })
 })
+
+/**
+ * Renaming a translation key, and opening a document that has no bundles.
+ */
+describe('the translation key field', () => {
+  it('carries the text with the key', async () => {
+    /*
+     * It wrote a new binding on every keystroke, so typing a new name walked
+     * through every prefix of it — and no prefix has a bundle entry, so both
+     * language boxes blanked as they were typed while the text already written
+     * stayed under the old key. Orphaned, with no way back to it from the panel.
+     */
+    const { user, select, latest } = setup([
+      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'fr', name: 'French', bidi: 'ltr' },
+    ])
+    await select()
+
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+    await user.type(screen.getByLabelText('English'), 'Email')
+    await user.type(screen.getByLabelText('French'), 'Courriel')
+
+    const key = latest().root.children?.[0]?.props['label']
+    const before = key?.kind === 'i18n' ? key.key : ''
+    expect(latest().translations['en']?.[before]).toBe('Email')
+
+    const box = screen.getByRole('textbox', { name: 'Translation key' })
+    await user.clear(box)
+    await user.type(box, 'emailLabel')
+    await user.tab()
+
+    expect(latest().translations['en']?.['emailLabel']).toBe('Email')
+    expect(latest().translations['fr']?.['emailLabel']).toBe('Courriel')
+  })
+
+  it('shows what is being typed rather than re-deriving it', async () => {
+    const { user, select } = setup()
+    await select()
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+
+    const box = screen.getByRole('textbox', { name: 'Translation key' })
+    await user.clear(box)
+    await user.type(box, 'gree')
+
+    expect(box).toHaveProperty('value', 'gree')
+  })
+})

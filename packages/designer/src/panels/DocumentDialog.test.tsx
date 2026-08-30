@@ -363,7 +363,14 @@ describe('shell shortcuts while the dialog is open', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
     await harness.user.click(treeRow('email'))
 
-    fireEvent.keyDown(globalThis.document.body, { key: 'Delete' })
+    /*
+     * Dispatched on the shell, because that is where the shortcuts live now.
+     * They used to be on `window`, which meant the designer claimed Delete,
+     * Backspace, Escape and Ctrl+Z for the whole host page.
+     */
+    const shell = globalThis.document.querySelector('.fs-shell')
+    if (!shell) throw new Error('no shell')
+    fireEvent.keyDown(shell, { key: 'Delete' })
 
     expect(harness.latest().root.children?.map((c) => c.key)).not.toContain('email')
   })

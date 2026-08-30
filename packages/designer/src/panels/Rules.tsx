@@ -103,9 +103,27 @@ export function Rules({ api }: RulesProps): ReactNode {
     )
   }
 
-  const rules = schema.validations
+  /*
+   * Guarded, because a document is data. `validateDocument` refuses a schema
+   * with non-array validations now, and nothing on the path from a paste to
+   * this panel runs it — a pasted `"schema": {"type":"string"}` rendered fine
+   * on the canvas and took the whole designer down the moment this tab opened.
+   * The panel is where somebody goes to repair such a document.
+   */
+  const rules = Array.isArray(schema.validations) ? schema.validations : []
   const write = (next: Partial<FieldSchema>): void =>
     api.setFieldSchema(node.key, { ...schema, ...next })
+
+  /*
+   * Whether changing the data type would stop this component repeating.
+   *
+   * Core recognises a repeater from the node — `schema.type === 'array'` plus
+   * children — so this select quietly decides whether a container draws its
+   * subtree once or once per row. Changing it away from `array` stops the rows
+   * being drawn and makes every row-scoped condition inside read nothing, and
+   * the control gives no sign that it does anything but name a type.
+   */
+  const repeats = schema.type === 'array' && Array.isArray(node.children)
 
   const used = new Set(rules.map((r) => r.key))
   // Every rule but `custom` is idempotent, so offering a second one is noise.
@@ -119,6 +137,7 @@ export function Rules({ api }: RulesProps): ReactNode {
           id="fs-field-type"
           value={schema.type}
           onChange={(e) => write({ type: e.target.value as FieldSchema['type'] })}
+          aria-describedby={repeats ? 'fs-field-type-note' : undefined}
         >
           {FIELD_TYPES.map((type) => (
             <option key={type} value={type}>
@@ -126,6 +145,13 @@ export function Rules({ api }: RulesProps): ReactNode {
             </option>
           ))}
         </select>
+        {repeats && (
+          <p id="fs-field-type-note" className="fs-prop-row__hint">
+            This component repeats its contents once per row because it holds a list. Changing the
+            type away from <code>array</code> stops that, and any condition inside that reads
+            &ldquo;this row&rdquo; will read nothing.
+          </p>
+        )}
       </div>
 
       <div className="fs-prop-row">

@@ -214,8 +214,22 @@ export function Tree({
         // keypress removed the component twice, pushing two undo entries and
         // needing two undos to get it back.
         event.stopPropagation()
+        /*
+         * Where focus goes, which nothing decided. The move and duplicate paths
+         * both restore it and this one did not, so deleting from the keyboard
+         * dropped focus onto `document.body` — every subsequent arrow key went
+         * nowhere and the tree had to be tabbed back into.
+         *
+         * The next row, or the previous one when the deleted row was last. The
+         * row is measured before the removal, because afterwards it is gone.
+         */
+        const rows = flatten(root)
+        const position = rows.findIndex((r) => r.node.key === node.key)
+        const after = rows[position + 1] ?? rows[position - 1]
+
         onRemove(node.key)
         announce(node.key + ' removed.')
+        if (after) requestAnimationFrame(() => focusRow(after.node.key))
       }
     },
     [announce, focusRow, kit, onDuplicate, onMove, onRemove, onSelect, root],
@@ -362,6 +376,17 @@ function TreeItem({
           <button
             type="button"
             className="fs-tree__remove"
+            /*
+             * Out of the tab order, like the row it sits in. The tree is one tab
+             * stop with arrow keys inside it, which is what the roving tabindex
+             * on the rows is for — and every row's Remove button was a stop of
+             * its own, so a forty-component form added thirty-nine of them.
+             * Exactly the problem the roving tabindex was added to solve.
+             *
+             * Reachable without it: Delete on a focused row removes the
+             * component, which is the keyboard route the tree already has.
+             */
+            tabIndex={-1}
             aria-label={'Remove ' + node.key}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
