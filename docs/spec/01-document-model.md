@@ -1,13 +1,15 @@
 # Document model
 
 **Status: partial.** The tree, property values, and validation rules are built and tested. The format has
-no version migration path, and four fields the types declare have nothing reading them:
-`ComponentNode.events` (see [09-actions.md](09-actions.md)), `FormDocument.version`, and both members of
+no version migration path, and three fields the types declare are checked by `validateDocument` and then
+acted on by nothing: `ComponentNode.events` (see [09-actions.md](09-actions.md)) and both members of
 `FormSettings`.
 
 That list was six. `FieldSchema.autoValidate` came off it when the canvas preview began reading it,
-`ComponentDef.icon` when the palette began drawing it, and `ComponentNode.css` when the Style tab began
-writing it and `styleSheetFor` began reading it.
+`ComponentDef.icon` when the palette began drawing it, `ComponentNode.css` when the Style tab began
+writing it and `styleSheetFor` began reading it, and `FormDocument.version` when the gate began refusing
+a document that does not say `'1'` — which is not a migration, but it is a reader, and a document with
+the wrong version no longer loads at all.
 
 A form is a recursive tree of `ComponentNode`. The tree is the source of truth. Everything else —
 JSON Schema, submitted data, the palette, the properties panel — is derived from it or projected out

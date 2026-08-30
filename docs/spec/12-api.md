@@ -1,7 +1,11 @@
 # Public API
 
 **Status: partial.** The three entry points below are built and stable in practice. Nothing yet states a
-compatibility promise, and the key grammar is looser than anything downstream of it wants.
+compatibility promise.
+
+The key grammar used to be named here as an outstanding weakness. It is not: `keyProblem` enforces the
+JavaScript identifier subset, called from both `validateDocument` and the panel's rename, so a paste and
+a rename are judged the same way. See the section below, which is Built.
 
 This is what a consumer imports. Everything else in this specification describes behaviour behind these
 three surfaces, and none of the other twelve files said what they were, which left the most-used contract

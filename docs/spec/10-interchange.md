@@ -75,15 +75,19 @@ whose entire job is to judge untrusted documents was the one that could be crash
 **Status: built.** A one-way projection. JSON Schema is an export format, never storage: it cannot
 express layout or nesting, and layout is half of what a visual builder produces.
 
-`toJsonSchema(document)` walks the tree, keeps every component carrying a `schema`, and produces a
-**flat** object. That is the predicate, and it is not quite the same as `ComponentDef.dataBound`: a
-hand-edited document can carry a schema on a component the kit does not consider data-bound, and the
-export takes it at its word.
-Form data is flat, keyed by component key however deeply the components nest, so a nested schema would
-misrepresent the payload.
+`toJsonSchema(document)` walks the tree and keeps every component carrying a `schema`. That is the
+predicate, and it is not quite the same as `ComponentDef.dataBound`: a hand-edited document can carry a
+schema on a component the kit does not consider data-bound, and the export takes it at its word.
 
-`FieldSchema['type']` also permits `array` and `object`. Both are accepted and exported as the matching
-type, and neither has a component that produces one yet.
+**Flat except for repetition.** Layout does not reach the payload, so a `Stack` contributes its children
+at the same level a bare field would. Repetition does: a repeater is the one structural thing JSON Schema
+expresses natively, so it exports as an `array` whose `items` describes the object its own children make,
+and its rows' `required` lands inside `items` rather than on the document. Projecting a repeater's fields
+flat would name answers the payload does not hold, and a server validating a real submission against the
+export would then reject every one of them. [ARCHITECTURE.md](../ARCHITECTURE.md) states the same rule.
+
+`FieldSchema['type']` also permits `array` and `object`. `Repeater` produces an `array` in both kits;
+nothing produces an `object` yet.
 
 | Model                           | Schema                                  |
 | ------------------------------- | --------------------------------------- |
