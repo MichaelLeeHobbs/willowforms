@@ -1,7 +1,11 @@
 # Component catalogue
 
-**Status: partial.** Eight of the twenty-six below are built, in both kits. Two of the six palette groups
-have no components at all.
+**Status: built.** 27 of the 27 below are built, in both kits, and every palette group this catalogue
+uses has components in it.
+
+The two numbers are digits rather than words on purpose: `test/docs.test.ts` reads them and compares
+them against the table below and against both kits' `definitions.ts`, so a component added to a kit and
+not to this page fails the build.
 
 This is the list Formsmith commits to. A kit is free to offer more or fewer — nothing in the contract
 requires this catalogue — but the two kits in this repository implement it, which is what lets a document
@@ -58,13 +62,13 @@ components, which is the reason to move them rather than a reason not to.
 
 ## Palette groups
 
-`PaletteGroup` is `inputs | selection | layout | display | feedback | navigation | custom`. Every group
-below is used, which closes two that are currently empty. `custom` is reserved for host-defined
-components and this catalogue never uses it.
+`PaletteGroup` is `inputs | selection | layout | display | feedback | navigation | custom`. All six
+groups below hold components. `custom` is reserved for host-defined components and this catalogue never
+uses it.
 
 ## The catalogue
 
-Twenty-six components. **Built** means both kits implement it and the contract test passes.
+27 components. **Built** means both kits implement it and the contract test passes.
 
 ### Layout
 

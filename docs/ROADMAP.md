@@ -37,7 +37,7 @@ See [docs/spec/12-api.md](spec/12-api.md#state-that-is-not-an-answer).
 
 **Then the two gaps that block real forms**, neither of which is an action:
 
-- **Steps.** _Decided, and the core is built._ No Step component, so no per-step validation, no branching, no progress. That is onboarding
+- **Steps.** _Built._ A `Step` component in both kits, shown when `context.step` names it, with `validateAcross` checking every step's fields rather than only the one on screen. No branching and no progress indicator yet. That is onboarding
   and surveys. See [docs/spec/03-components.md](spec/03-components.md#what-is-deliberately-absent).
 - ~~**Repeated scope.**~~ **Built.** Rows are a projection of the authored subtree, never nodes in the
   tree, so no tree operation changed. See [docs/spec/03-components.md](spec/03-components.md#repeated-scope).
@@ -56,7 +56,7 @@ See [docs/spec/06-inspector.md](spec/06-inspector.md#style).
 
 ## Verification
 
-`pnpm test` runs 1046 tests; `pnpm e2e` runs 66 in a real browser. Both gate CI, along with lint,
+`pnpm test` runs 1061 tests; `pnpm e2e` runs 66 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
 computed from the stylesheets and axe runs over the designer in six states. See
 [accessibility.md](accessibility.md).

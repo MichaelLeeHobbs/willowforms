@@ -246,3 +246,236 @@ describe('documentation links', () => {
     expect(broken).toEqual([])
   })
 })
+
+/*
+ * Everything below is one kind of drift: the specification saying a thing does
+ * not exist while the repository holds it. That is the direction that matters.
+ * A document overstating what is built is caught by anybody who tries the
+ * feature; a document understating it is read as a to-do list, and the work
+ * gets scheduled twice.
+ *
+ * Every one of these guards was written against a drift that was live in this
+ * repository on 2026-08-30, and each was watched failing before the prose was
+ * corrected.
+ */
+
+/** The source a claim about "nothing does this" is checked against. */
+function sourceFiles(): { path: string; text: string }[] {
+  const found: { path: string; text: string }[] = []
+
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(fileURLToPath(new URL(dir, root)), { withFileTypes: true })) {
+      const path = dir + entry.name
+      if (entry.isDirectory()) {
+        walk(path + '/')
+        continue
+      }
+      // Tests are not the product. A fixture may mention a field the product
+      // never touches, which is exactly what a "nothing reads it" claim means.
+      if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue
+      found.push({ path, text: read(path) })
+    }
+  }
+
+  for (const pkg of ['core', 'renderer', 'designer', 'kit-mui', 'kit-html']) {
+    walk('packages/' + pkg + '/src/')
+  }
+  return found
+}
+
+/** Where a string appears in the product, if anywhere. */
+function mentions(needle: string): string[] {
+  return sourceFiles()
+    .filter((file) => file.text.includes(needle))
+    .map((file) => file.path)
+}
+
+describe('the component catalogue and the kits agree', () => {
+  /*
+   * The catalogue's preamble carried "Eight of the twenty-six below are built"
+   * long after all twenty-seven were, because the number is prose and the table
+   * beneath it is where the work actually lands. Both are now read from the
+   * kits, which are the thing the sentence is about.
+   */
+  const catalogue = read('docs/spec/03-components.md')
+
+  /** Component types a kit declares, read out of its definitions. */
+  const typesIn = (kit: string): string[] =>
+    [...read('packages/' + kit + '/src/definitions.ts').matchAll(/^ {6}type: '(\w+)',$/gm)]
+      .map((match) => match[1] ?? '')
+      .sort()
+
+  /** Every row of the catalogue tables, as name and status. */
+  const rows = [...catalogue.matchAll(/^\| `(\w+)`\s*\| (Built|Planned)\s*\|/gm)].map((match) => ({
+    name: match[1] ?? '',
+    status: match[2] ?? '',
+  }))
+
+  it('lists exactly the components both kits implement', () => {
+    const built = rows
+      .filter((row) => row.status === 'Built')
+      .map((row) => row.name)
+      .sort()
+
+    /*
+     * Both sides come out of a regex over a file this test does not control the
+     * formatting of. A regex that stopped matching would leave both lists empty
+     * and the comparison would pass, having read nothing.
+     */
+    expect(built.length, 'no Built rows were parsed out of the catalogue').toBeGreaterThan(0)
+    expect(typesIn('kit-mui').length, 'no types were parsed out of kit-mui').toBeGreaterThan(0)
+
+    // "Built means both kits implement it and the contract test passes", which
+    // makes this the same sentence, executed.
+    expect(built).toEqual(typesIn('kit-mui'))
+    expect(built).toEqual(typesIn('kit-html'))
+  })
+
+  it('states a built count that matches the table', () => {
+    /*
+     * Digits, not words. The count is a guarded number like the test totals
+     * above, and "twenty-six" is a number no regex should have to read.
+     */
+    const claim = /(\d+) of the (\d+) below are built/.exec(catalogue)
+    expect(claim, 'the preamble no longer states a built count in digits').toBeTruthy()
+
+    expect(Number(claim?.[1])).toBe(rows.filter((row) => row.status === 'Built').length)
+    expect(Number(claim?.[2])).toBe(rows.length)
+  })
+
+  it('states a total that matches the table', () => {
+    const total = /(\d+) components\. \*\*Built\*\* means/.exec(catalogue)
+    expect(total, 'the catalogue no longer states its size in digits').toBeTruthy()
+    expect(Number(total?.[1])).toBe(rows.length)
+  })
+})
+
+describe('the roadmap does not deny a component that exists', () => {
+  /*
+   * "**Steps.** _Decided, and the core is built._ No Step component" sat in the
+   * roadmap after `Step` shipped in both kits. The roadmap is the first thing
+   * anybody reads to decide what to work on, so a stale absence there is a
+   * feature built twice.
+   */
+  it.each(['kit-mui', 'kit-html'])('%s implements nothing the roadmap calls missing', (kit) => {
+    const declared = new Set(
+      [...read('packages/' + kit + '/src/definitions.ts').matchAll(/^ {6}type: '(\w+)',$/gm)].map(
+        (match) => match[1],
+      ),
+    )
+
+    const denied = [...read('docs/ROADMAP.md').matchAll(/No `?([A-Z]\w+)`? component/g)].map(
+      (match) => match[1] ?? '',
+    )
+
+    expect(denied.filter((type) => declared.has(type))).toEqual([])
+  })
+})
+
+describe('a section that calls itself planned is still planned', () => {
+  /*
+   * The general shape of the two drifts above. A `Status: planned` heading, or
+   * a `**Planned:**` paragraph, is a claim that something is absent — and
+   * nothing re-reads it once the thing arrives. `ComponentNode.css` was called
+   * planned with "nothing writes it and nothing reads it" while the Style tab
+   * wrote it and `styleSheetFor` read it; a language selector was called
+   * planned while the toolbar drew one.
+   *
+   * So each claim names a string whose presence in the product disproves it.
+   * The table is keyed by the claim, and a claim with no entry fails, which is
+   * what stops the table going stale as sections are added.
+   *
+   * `null` means there is nothing to look for yet, and it has to say why. That
+   * is an honest answer for a feature with no named surface — it is not an
+   * excuse, because the next guard rejects a `null` with no reason.
+   */
+  const DISPROOF: Record<string, { needle: string | null; because: string }> = {
+    '01-document-model.md: Versioning and migration': {
+      needle: null,
+      because: 'a migration has no name yet; there is no function it would have to be called',
+    },
+    '01-document-model.md: events': {
+      needle: 'setEvents',
+      because: 'authoring an event means a store action that writes ComponentNode.events',
+    },
+    '06-inspector.md: Actions': {
+      needle: 'setEvents',
+      because: 'the Actions tab is the surface for that same store action',
+    },
+    '06-inspector.md: Additional properties': {
+      needle: null,
+      because: 'an author-defined property has no store action and no element id yet',
+    },
+    '07-bindings.md: try an expression': {
+      needle: null,
+      because: 'a scratch evaluation surface has no element id yet',
+    },
+    '08-validation.md: message as a PropValue': {
+      needle: 'message?: PropValue',
+      because: 'the type is where this lands, and it still reads message?: string',
+    },
+    '08-validation.md: Cross-field rules': {
+      needle: null,
+      because: 'no rule key is reserved for it, so there is no string to find',
+    },
+    '09-actions.md: the whole file': {
+      needle: 'setEvents',
+      because: 'nothing authors an action until the store can write one',
+    },
+    '09-actions.md: Authoring': {
+      needle: 'setEvents',
+      because: 'the same store action, named from the other document',
+    },
+  }
+
+  /** Every planned claim in the specification, named the way the table names it. */
+  function claims(): string[] {
+    const found: string[] = []
+    for (const file of readdirSync(fileURLToPath(new URL('docs/spec/', root)))) {
+      if (!file.endsWith('.md')) continue
+      const text = read('docs/spec/' + file)
+
+      /*
+       * A `Status: planned` marker belongs to the heading above it; a
+       * `**Planned:**` paragraph is named by its own first few words. Both are
+       * claims of absence and both are checked.
+       */
+      for (const match of text.matchAll(/\*\*Status: planned\.?\*\*|\*\*Planned:\*\*([^\n]*)/g)) {
+        const before = text.slice(0, match.index ?? 0)
+        const heading = [...before.matchAll(/^#{2,3} +(.+?)\s*$/gm)].at(-1)?.[1]
+        found.push(
+          match[0].startsWith('**Planned:**')
+            ? file + ': ' + summarise(match[1] ?? '')
+            : file + ': ' + (heading ?? 'the whole file'),
+        )
+      }
+    }
+    return found
+  }
+
+  /** A `**Planned:**` paragraph, shortened to the phrase the table keys on. */
+  function summarise(rest: string): string {
+    const words = rest.trim().replace(/[`*]/g, '').split(/\s+/)
+    if (words.join(' ').startsWith('a language selector')) return 'a language selector'
+    if (words.join(' ').startsWith('a way to try an expression')) return 'try an expression'
+    if (words.join(' ').startsWith('they should be')) return 'message as a PropValue'
+    return words.slice(0, 4).join(' ')
+  }
+
+  it('has an entry for every planned claim, and no entry without one', () => {
+    // Both directions. An unlisted claim goes unchecked; a listed one that no
+    // longer exists is a guard nobody is maintaining.
+    expect([...claims()].sort()).toEqual(Object.keys(DISPROOF).sort())
+  })
+
+  it.each(Object.entries(DISPROOF))('%s is not disproved by the source', (name, entry) => {
+    /*
+     * `null` means there is nothing to look for, which is a decision and not a
+     * shrug — so the reason is checked for every entry, not only those ones.
+     */
+    expect(entry.because.length, name + ' gives no reason').toBeGreaterThan(20)
+
+    const found = entry.needle === null ? [] : mentions(entry.needle)
+    expect(found, name + ' says planned, but ' + entry.because).toEqual([])
+  })
+})

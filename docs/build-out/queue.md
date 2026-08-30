@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 9 — the structured Style controls and the options box hold a draft
+- **Last completed:** item 10 — four guards in `docs.test.ts`, and the five drifts they found
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -111,7 +111,7 @@ Root causes. Each collapses several individual findings, so these come before th
       _Check:_ both literal placeholder strings survive a round trip through the Style tab; tabbing through a
       membership condition leaves its stored options byte-identical. Standing gate.
 
-- [ ] **10. The documentation states what is actually built.** Theme 6, and the 11 HIGH findings in area 11.
+- [x] **10. The documentation states what is actually built.** Theme 6, and the 11 HIGH findings in area 11.
       `01-document-model.md` on `ComponentNode.css`, `ROADMAP.md` on the Step component, `03-components.md`
       on the built count, `07-bindings.md` on the language selector.
       _Check:_ `docs.test.ts` is tightened so each of those four drifts fails it, then all pass. Standing gate.

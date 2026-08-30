@@ -106,12 +106,13 @@ They should be `PropValue`. See [08-validation.md](08-validation.md#messages).
 
 ## The active language
 
-**Status: partial.** `FormRenderer` takes a `language` prop and falls back to `document.defaultLanguage`.
-The designer never passes it, so the canvas always shows the default and there is no way to see the form
-in another language while building it.
+**Status: built.** `FormRenderer` takes a `language` prop and falls back to
+`document.defaultLanguage`. The toolbar draws a selector whenever the document has more than one
+language, and the designer passes the choice to the canvas, so a form can be seen in any of its
+languages while it is being built. See [04-shell.md](04-shell.md).
 
-**Planned:** a language selector in the toolbar that sets the canvas language. See
-[04-shell.md](04-shell.md).
+Removing the language the canvas is showing drops the selection back to the document's default rather
+than leaving the canvas pointed at a language that is gone.
 
 ## Why a tagged union
 

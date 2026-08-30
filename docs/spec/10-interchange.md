@@ -18,10 +18,9 @@ people embedding it.
 `onChange` fires on every change, including every coalesced keystroke run. It is the only output the
 designer has today.
 
-**Planned:** a host that wants a Save button rather than continuous saving passes `onSave`, and the
-toolbar shows one; without it there is no button, because a Save the designer cannot honour is worse than
-none. `DesignerProps` has no `onSave` yet. See [04-shell.md](04-shell.md#toolbar) and
-[12-api.md](12-api.md).
+A host that wants a Save button rather than continuous saving passes `onSave`, and the toolbar shows
+one; without it there is no button, because a Save the designer cannot honour is worse than none. See
+[04-shell.md](04-shell.md#toolbar) and [12-api.md](12-api.md).
 
 `apps/demo-server` exists to demonstrate the other half — that `validateForm` is the same function on a
 server — and not to suggest Formsmith needs a backend.
