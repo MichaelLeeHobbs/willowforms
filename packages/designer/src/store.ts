@@ -28,7 +28,9 @@ import {
   languageTag,
   moveNode,
   removeNode,
+  repointBinding,
   updateNode,
+  validateDocument,
 } from '@formsmith/core'
 
 export const MAX_HISTORY = 100
@@ -202,11 +204,70 @@ function containerFor(root: ComponentNode, key: string | undefined): string {
   return node.key
 }
 
+/**
+ * The document with one node rewritten, or the document itself when the rewrite
+ * changed nothing.
+ *
+ * `updateNode` compares by identity and every writer's updater returns a fresh
+ * object — `{ ...node, props }` — so the root was always new and `commit`'s own
+ * identity check never fired. Setting a property to what it already was
+ * therefore took a slot in a capped undo stack, which means a real edit fell
+ * off the far end of it.
+ *
+ * Compared as JSON, on one node. A `ComponentNode` is JSON by construction —
+ * that is what makes a document storable — and a node is small, so this costs a
+ * few microseconds on the edit path and nothing anywhere else. Comparing whole
+ * documents would have been simpler and would have put the same cost on every
+ * keystroke.
+ */
+function writeNode(
+  doc: FormDocument,
+  key: string,
+  update: (node: ComponentNode) => ComponentNode,
+): FormDocument {
+  return withRoot(
+    doc,
+    updateNode(doc.root, key, (node) => {
+      const next = update(node)
+      return JSON.stringify(next) === JSON.stringify(node) ? node : next
+    }),
+  )
+}
+
+/**
+ * The document with a new root, or the document itself when nothing moved.
+ *
+ * `commit` already refuses to record a document it has seen — by identity — and
+ * every writer defeated that by building a fresh one around a root `updateNode`
+ * had handed back unchanged. So setting a property to what it already was took
+ * a slot in a capped stack, which means a real edit fell off the end of it.
+ */
+function withRoot(doc: FormDocument, root: ComponentNode): FormDocument {
+  return root === doc.root ? doc : { ...doc, root }
+}
+
 export function useDesigner(initial: FormDocument): DesignerApi {
   const [history, setHistory] = useState<History>({ past: [], present: initial, future: [] })
-  const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
+  const [chosenKey, setSelectedKey] = useState<string | undefined>(undefined)
 
   const document = history.present
+
+  /*
+   * The selection always names a node that is in the document, or nothing.
+   *
+   * Every path that removes a node used to clear the selection itself, and each
+   * got it slightly wrong: `removeComponent` compared the removed key against
+   * the selection, so removing a *container* left the selection on a
+   * descendant; undo and redo restored the document and never touched the
+   * selection at all. That state — a selection naming a node that is not there
+   * — is the precondition for every other bug in this file.
+   *
+   * Derived rather than reconciled. An effect would leave a render in which the
+   * two disagree, and would be a `setState` in an effect besides; this cannot
+   * disagree at all, because there is nothing to keep in step.
+   */
+  const selectedKey =
+    chosenKey !== undefined && findNode(document.root, chosenKey) ? chosenKey : undefined
 
   /*
    * The current document, readable from a handler without putting it in a
@@ -221,6 +282,28 @@ export function useDesigner(initial: FormDocument): DesignerApi {
    * reads and is a render behind whenever two edits land in one tick. Written in
    * an effect rather than during render, for the reason `drag.ts` gives.
    */
+  /*
+   * A host's own document, checked once and said out loud.
+   *
+   * The only in-repo write path is gated by `validateDocument` — the JSON
+   * dialog refuses anything that would crash the renderer — and a document
+   * restored from a host's storage goes through no gate at all. Duplicate keys
+   * then make every tree operation edit the first match, silently.
+   *
+   * A warning rather than a refusal: a library that will not open a host's own
+   * saved document is worse than one that opens it and says what is wrong, and
+   * the designer is where somebody goes to repair it.
+   */
+  useEffect(() => {
+    const problems = validateDocument(initial)
+    if (problems.length === 0) return
+    console.warn(
+      'Formsmith: this document does not validate. ' +
+        problems.map((problem) => problem.message).join(' '),
+    )
+    // Once, for the document this hook was mounted with.
+  }, [initial])
+
   const latest = useRef(history.present)
   useEffect(() => {
     latest.current = history.present
@@ -257,16 +340,14 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   const setProp = useCallback(
     (key: string, name: string, value: PropValue | undefined) => {
       apply(
-        (doc) => ({
-          ...doc,
-          root: updateNode(doc.root, key, (node) => {
+        (doc) =>
+          writeNode(doc, key, (node) => {
             const props = { ...node.props }
             // Clearing a property removes it so the component default applies again.
             if (value === undefined) delete props[name]
             else props[name] = value
             return { ...node, props }
           }),
-        }),
         // Typing into one property is one undo step, not one per character.
         'prop:' + key + ':' + name,
       )
@@ -277,9 +358,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   const setFieldSchema = useCallback(
     (key: string, schema: FieldSchema | undefined) => {
       apply(
-        (doc) => ({
-          ...doc,
-          root: updateNode(doc.root, key, (node) => {
+        (doc) =>
+          writeNode(doc, key, (node) => {
             if (!schema) {
               // exactOptionalPropertyTypes: an absent schema is an absent key,
               // not a key holding undefined.
@@ -288,7 +368,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             }
             return { ...node, schema }
           }),
-        }),
         'schema:' + key,
       )
     },
@@ -378,10 +457,35 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         return { ok: false, reason: trimmed + ' is already used by another component.' }
       }
 
-      apply((doc) => ({
-        ...doc,
-        root: updateNode(doc.root, key, (node) => ({ ...node, key: trimmed })),
-      }))
+      /*
+       * And the component being renamed has to exist. It answered `{ok: true}`,
+       * moved the selection onto the new name, and committed an entry for an
+       * edit that did not happen — reachable whenever the selection names a node
+       * an undo has removed, which is an ordinary state rather than a rare one.
+       */
+      if (!findNode(history.present.root, key)) {
+        return { ok: false, reason: 'There is no component keyed ' + key + ' any more.' }
+      }
+
+      /*
+       * The key and anything that names it. A `Step` ships with a condition
+       * comparing `context.step` against its own key, so renaming one rewrote
+       * `node.key` and left the condition naming the old one — the step became
+       * unsatisfiable, permanently, with nothing reporting why. `duplicateNode`
+       * in core had the same hole from the other side and is fixed the same way.
+       */
+      apply((doc) =>
+        withRoot(
+          doc,
+          updateNode(doc.root, key, (node) => ({
+            ...node,
+            key: trimmed,
+            ...(node.renderWhen
+              ? { renderWhen: repointBinding(node.renderWhen, key, trimmed) }
+              : {}),
+          })),
+        ),
+      )
       setSelectedKey((current) => (current === key ? trimmed : current))
       return { ok: true }
     },
@@ -439,9 +543,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   const setRenderWhen = useCallback(
     (key: string, value: PropValue | undefined) => {
       apply(
-        (doc) => ({
-          ...doc,
-          root: updateNode(doc.root, key, (node) => {
+        (doc) =>
+          writeNode(doc, key, (node) => {
             if (!value) {
               // exactOptionalPropertyTypes: absent is an absent key, not a key
               // holding undefined.
@@ -450,7 +553,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             }
             return { ...node, renderWhen: value }
           }),
-        }),
         'renderWhen:' + key,
       )
     },
@@ -460,9 +562,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   const setNodeCss = useCallback(
     (key: string, device: Device, text: string) => {
       apply(
-        (doc) => ({
-          ...doc,
-          root: updateNode(doc.root, key, (node) => {
+        (doc) =>
+          writeNode(doc, key, (node) => {
             const next = { ...(node.css ?? {}) }
             if (text.trim()) next[device] = text
             else delete next[device]
@@ -474,7 +575,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             }
             return { ...node, css: next }
           }),
-        }),
         // Coalesced per device, so typing a padding value is one undo entry.
         'css:' + key + ':' + device,
       )
@@ -486,9 +586,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     (key: string, dataKey: string) => {
       const trimmed = dataKey.trim()
       apply(
-        (doc) => ({
-          ...doc,
-          root: updateNode(doc.root, key, (node) => {
+        (doc) =>
+          writeNode(doc, key, (node) => {
             if (!trimmed || trimmed === key) {
               // exactOptionalPropertyTypes: no override is an absent key, not a
               // key holding undefined.
@@ -497,7 +596,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             }
             return { ...node, dataKey: trimmed }
           }),
-        }),
         'dataKey:' + key,
       )
     },
@@ -514,30 +612,66 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [document, selectedKey],
   )
 
-  return {
-    document,
-    selectedKey,
-    selectedNode,
-    canUndo: history.past.length > 0,
-    canRedo: history.future.length > 0,
-    select: setSelectedKey,
-    addComponent,
-    setProp,
-    setFieldSchema,
-    renameDocument,
-    setTranslation,
-    setLanguages,
-    renameKey,
-    setDataKey,
-    setRenderWhen,
-    setNodeCss,
-    moveComponent,
-    duplicateComponent,
-    removeComponent,
-    replaceDocument,
-    undo: () => setHistory(undo),
-    redo: () => setHistory(redo),
-  }
+  /*
+   * One object, held across renders.
+   *
+   * This returned a fresh object with fresh closures every time, so nothing
+   * downstream could memoise anything: every keystroke re-rendered the canvas
+   * and the tree in full and re-attached the shell's window keydown listener.
+   * Every member below is already stable — `useCallback` with empty or narrow
+   * dependencies — so the only thing that was changing was the wrapper.
+   */
+  const undoNow = useCallback(() => setHistory(undo), [])
+  const redoNow = useCallback(() => setHistory(redo), [])
+
+  return useMemo(
+    () => ({
+      document,
+      selectedKey,
+      selectedNode,
+      canUndo: history.past.length > 0,
+      canRedo: history.future.length > 0,
+      select: setSelectedKey,
+      addComponent,
+      setProp,
+      setFieldSchema,
+      renameDocument,
+      setTranslation,
+      setLanguages,
+      renameKey,
+      setDataKey,
+      setRenderWhen,
+      setNodeCss,
+      moveComponent,
+      duplicateComponent,
+      removeComponent,
+      replaceDocument,
+      undo: undoNow,
+      redo: redoNow,
+    }),
+    [
+      document,
+      selectedKey,
+      selectedNode,
+      history,
+      addComponent,
+      setProp,
+      setFieldSchema,
+      renameDocument,
+      setTranslation,
+      setLanguages,
+      renameKey,
+      setDataKey,
+      setRenderWhen,
+      setNodeCss,
+      moveComponent,
+      duplicateComponent,
+      removeComponent,
+      replaceDocument,
+      undoNow,
+      redoNow,
+    ],
+  )
 }
 
 /** Exported for tests; the hook wraps these. */

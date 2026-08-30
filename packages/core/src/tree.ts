@@ -167,12 +167,18 @@ function baseOf(key: string): string {
 /**
  * A binding with every literal naming `from` changed to name `to`.
  *
+ * Exported because two callers need the same rule: `duplicateNode` below, which
+ * re-points a copy's own condition at its new key, and the designer's rename,
+ * which has the same problem arriving from the other direction. A `Step` ships
+ * with a condition comparing `context.step` against its own key, so either
+ * operation leaves it naming a component that is not there.
+ *
  * Structural and total, because a document is data: anything unreadable is
  * returned as it stands rather than throwing. Only literals are touched, and
  * only ones equal to the old key — a `ref` names a data key, which the copy
  * shares deliberately.
  */
-function repoint(value: PropValue, from: string, to: string): PropValue {
+export function repointBinding(value: PropValue, from: string, to: string): PropValue {
   if (value.kind !== 'condition') return value
 
   const inCondition = (condition: Condition): Condition => {
@@ -231,7 +237,7 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
      * every literal that happens to match would corrupt a condition testing an
      * unrelated field whose value is the copied key.
      */
-    if (node.renderWhen) next.renderWhen = repoint(node.renderWhen, node.key, nextKey)
+    if (node.renderWhen) next.renderWhen = repointBinding(node.renderWhen, node.key, nextKey)
     if (node.schema) next.schema = { ...node.schema, validations: [...node.schema.validations] }
     if (node.children) next.children = node.children.map(copy)
     return next

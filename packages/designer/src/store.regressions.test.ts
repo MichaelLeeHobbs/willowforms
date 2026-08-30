@@ -10,7 +10,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ComponentDef, FormDocument, Language } from '@formsmith/core'
 import { validateDocument } from '@formsmith/core'
 
@@ -412,5 +412,205 @@ describe('writing a translation', () => {
       existing: 'Salut',
       greeting: 'Bonjour',
     })
+  })
+})
+
+/**
+ * Eight ways the store recorded, or failed to record, something that did not
+ * happen.
+ */
+describe('the store and edits that changed nothing', () => {
+  it('takes no undo slot for a property set to what it already was', () => {
+    /*
+     * Every property writer rebuilt the document even when `updateNode`
+     * returned the root unchanged, so a no-op consumed a slot in a capped
+     * stack — which means a real edit fell off the end of it.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.setProp('email', 'label', { kind: 'static', value: 'Email' })
+    })
+    const after = result.current.document
+
+    act(() => {
+      result.current.setProp('email', 'label', { kind: 'static', value: 'Email' })
+    })
+
+    expect(result.current.document).toBe(after)
+  })
+
+  it('still records an edit that changes something', () => {
+    // The control. Recording nothing would pass the test above and lose every
+    // edit anybody made.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.setProp('email', 'label', { kind: 'static', value: 'Email' })
+    })
+    const after = result.current.document
+
+    act(() => {
+      result.current.setProp('email', 'label', { kind: 'static', value: 'Address' })
+    })
+
+    expect(result.current.document).not.toBe(after)
+  })
+
+  it('does not leave the selection on a node an undo removed', () => {
+    /*
+     * Undo restored the document and never the selection, so `selectedKey`
+     * routinely named a node that is not in the tree — which is the state every
+     * other bug in this file needs in order to happen.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.addComponent(field, 'root')
+    })
+    const added = result.current.selectedKey
+
+    act(() => {
+      result.current.undo()
+    })
+
+    expect(added).toBeDefined()
+    expect(result.current.selectedKey).not.toBe(added)
+    expect(result.current.selectedNode).toBeUndefined()
+  })
+
+  it('clears the selection when a container holding it is removed', () => {
+    // It compared the removed key against the selection, so removing a
+    // container left the selection on a descendant that no longer exists.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.select('inner')
+    })
+    act(() => {
+      result.current.removeComponent('group')
+    })
+
+    expect(result.current.selectedKey).toBeUndefined()
+  })
+
+  it('refuses to rename a key that is not in the document', () => {
+    // It answered `{ok: true}`, moved the selection onto the new name, and
+    // committed an entry for an edit that did not happen.
+    const { result } = renderHook(() => useDesigner(doc()))
+    const before = result.current.document
+
+    let outcome: { ok: boolean } | undefined
+    act(() => {
+      outcome = result.current.renameKey('nowhere', 'somewhere')
+    })
+
+    expect(outcome?.ok).toBe(false)
+    expect(result.current.document).toBe(before)
+    expect(result.current.selectedKey).not.toBe('somewhere')
+  })
+
+  it('re-points a condition that named the key being renamed', () => {
+    /*
+     * A `Step` ships with a condition comparing `context.step` against its own
+     * key. Renaming the step rewrote `node.key` and left the condition naming
+     * the old one, so the step became unsatisfiable — permanently, with nothing
+     * reporting why. `duplicateNode` had the same hole from the other side.
+     */
+    const stepped: FormDocument = {
+      ...doc(),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'step1',
+            type: 'Stack',
+            props: {},
+            children: [],
+            renderWhen: {
+              kind: 'condition',
+              condition: {
+                op: 'eq',
+                left: { kind: 'context', path: 'step' },
+                right: { kind: 'literal', value: 'step1' },
+              },
+            },
+          },
+        ],
+      },
+    }
+
+    const { result } = renderHook(() => useDesigner(stepped))
+    act(() => {
+      result.current.renameKey('step1', 'details')
+    })
+
+    const when = result.current.document.root.children?.[0]?.renderWhen
+    const right =
+      when?.kind === 'condition' && 'right' in when.condition ? when.condition.right : undefined
+    expect(right).toEqual({ kind: 'literal', value: 'details' })
+  })
+
+  it('hands back the same api object when nothing has changed', () => {
+    /*
+     * `useDesigner` returned a fresh object with fresh closures on every render,
+     * so nothing downstream could memoise: every keystroke re-rendered the
+     * canvas and the tree in full and re-attached the window keydown listener.
+     */
+    const { result, rerender } = renderHook(() => useDesigner(doc()))
+    const first = result.current
+
+    rerender()
+
+    expect(result.current).toBe(first)
+  })
+
+  it('hands back a different one when the document changes', () => {
+    // The control: a frozen api would never see an edit.
+    const { result } = renderHook(() => useDesigner(doc()))
+    const first = result.current
+
+    act(() => {
+      result.current.setProp('email', 'label', { kind: 'static', value: 'Changed' })
+    })
+
+    expect(result.current).not.toBe(first)
+  })
+
+  it('says so when a host hands it a document that does not validate', () => {
+    /*
+     * The only in-repo write path is gated by `validateDocument`; a document
+     * restored from a host's own storage is not. Duplicate keys then make every
+     * tree operation edit the first match, silently.
+     */
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const duplicated: FormDocument = {
+      ...doc(),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          { key: 'same', type: 'Field', props: {} },
+          { key: 'same', type: 'Field', props: {} },
+        ],
+      },
+    }
+
+    renderHook(() => useDesigner(duplicated))
+
+    expect(warn).toHaveBeenCalled()
+    expect(String(warn.mock.calls[0])).toContain('same')
+    warn.mockRestore()
+  })
+
+  it('says nothing about a document that is fine', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    renderHook(() => useDesigner(doc()))
+
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

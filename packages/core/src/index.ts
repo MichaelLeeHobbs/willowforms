@@ -95,6 +95,7 @@ export {
   moveNode,
   pathTo,
   removeNode,
+  repointBinding,
   updateNode,
   validateDocument,
   walk,
