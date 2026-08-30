@@ -4,6 +4,123 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### A document's CSS values are refused in core, not made safe by the rendering shape
+
+Settled by a steelman: two briefs at full strength against a neutral agent that ran the real
+React 19 + MUI + emotion + stylis pipeline, real headless Chromium with request interception, and a
+17-payload bypass battery.
+
+- **Decided:** add a value-level refusal to core — a sibling of `safeDeclarations` — and call it from
+  both kits at the one sink each has. Refuse `{ } < @ ; !`, `/*`, control characters, and
+  `url(` / `image-set(` / `element(` / `cross-fade(`. Keep `sx`.
+- **Why the rendering shape is not enough:** a React `style` object is safe only on the client. React's
+  server renderer does not validate CSS at all — `renderToStaticMarkup` emits the string verbatim, and
+  Chromium renders `red;position:fixed;inset:0;z-index:99999` as a full-viewport overlay that then
+  vanishes on hydration. Nothing here server-renders today, but MUI's dominant deployment is Next.js.
+  And a `style` object accepts `url(https://…)`, `image-set(…)` and `var(--x, url(…))`: measured with
+  request interception, the outbound fetch fires identically from an inline attribute and from an emotion
+  class. So the shape closes the injection and leaves the exfiltration untouched, in **both** kits.
+- **The refusal set is checked, not assumed:** CSS-escaped braces, backslash escapes, fullwidth `｝`,
+  braces inside quoted strings and inside `url()`, unbalanced parens, NUL, tab, CRLF, form feed — none
+  escaped the class block, and all ten legitimate colour values passed. `CSS.supports` was rejected as
+  the validator: it is browser-only, and core must run in Node.
+- **A correction to my own reasoning.** I argued a denylist was impossible because banning `;` would break
+  `url(data:image/svg+xml;base64,…)`, which `css.ts` was rewritten to protect. That holds for
+  `safeDeclarations`, which validates a declaration _list_. It does not hold for a single **value** on a
+  prop whose declared editor is `color` — `url()` is not a colour, so refusing it matches the prop's own
+  declared domain. Two sinks, two grammars; I applied one proof to both.
+- **The losing case's surviving point, and it should still be done:** `sx` buys almost nothing here.
+  Across all five `sx` blocks there are zero theme tokens, zero pseudo-selectors and zero breakpoints —
+  only the spacing scale, `shape.borderRadius`, and stylis autoprefixing. The `/8` conversions exist
+  purely to undo a theme transform the kit does not want, and one of them undoes the wrong one (see
+  below). Moving `Box` to `style` is the right refactor on its own merits; it is just not the security
+  fix.
+- **Exposure is one prop, not a class.** `background` on `Box` is the only string-typed style value in
+  either kit — the same single line in both. Everything else is already `num()` or an enum.
+- **A sanitiser must sit at the sink or at resolve time**, not at document load: `resolveProp` evaluates
+  a `computed` binding through the host's evaluator at render time.
+- **Reversal:** one function in core and one call site per kit.
+- **What would change my mind:** a legitimate authored value that needs `url()` on a prop declared as a
+  colour. The Style tab remains the channel for real CSS.
+- **When:** 2026-08-30.
+
+### The MUI kit halves every corner radius
+
+- **Decided:** `borderRadius` in `kit-mui`'s `Box` must not be divided by 8.
+- **Why:** MUI multiplies `borderRadius` by `theme.shape.borderRadius`, which defaults to **4**, while the
+  kit divides by 8. Measured: `radius: 8` renders 4px and `radius: 24` renders 12px, against 8px and 24px
+  in `kit-html`. `padding: n/8` is separately fragile — it round-trips only under the default
+  `spacing: 8` and silently rescales under any host theme.
+- **Why it matters beyond the arithmetic:** this is the cross-kit divergence the `Grid` comment two
+  functions above it was written to prevent, sitting undetected below it. Nothing catches it because no
+  test renders the same document through both kits and compares computed style.
+- **Reversal:** trivial. Found by the Q1 ground-truth agent while measuring something else.
+- **When:** 2026-08-30.
+
+### A row frame carries the repeater's data key, not its node key
+
+Settled by a steelman: two briefs arguing opposite sides at full strength, against a neutral agent that
+built a patched copy of core and ran both designs.
+
+- **Decided:** `RowFrame.key` holds `dataKeyOf(node)`. Three one-token edits — `validation.ts:250`,
+  `validation.ts:361`, `renderer/index.tsx:263` — after which `applyChange` is correct as written and
+  `rowValue` can be deleted. The **leaf** of an error key stays `node.key`, unchanged.
+- **Why:** the coordinate is dereferenced in exactly one place, `applyChange`, and it is dereferenced as
+  data. Everywhere else it is a label. `validateForm`, `submittedData` and the renderer all already
+  descend with `dataKeyOf(node)`, so the address was the odd one out, not the data path. Under the node
+  key, a repeater whose `key` differs from its `dataKey` silently discards every row edit — and worse,
+  can write an answer into an _unrelated_ list that happens to share the name, which is the opposite of
+  what the "a write that cannot be placed returns the input unchanged" comment promises.
+- **The strongest argument against, and why it fell:** data keys may repeat, so an error coordinate built
+  from them looked ambiguous. Run against a document with two repeaters legally sharing `dataKey`, both
+  visible: four error keys, four distinct, no collision. It is impossible rather than merely unobserved —
+  node keys are globally unique, `validateDocument` enforces that with one `seen` set over the tree, so a
+  node's chain of enclosing repeaters is fixed and only the indices vary. The prefix disambiguates rows;
+  the leaf carries identity. The objection conflated the two.
+- **The losing case's surviving point:** `dataKeyOf` is total from identity to name and has no inverse,
+  so a data-keyed frame cannot recover which repeater it came from. That is real. It costs
+  `data-fs-row` uniqueness when two visible repeaters share a data key — measured as near-worthless: no
+  kit reads the attribute, `css.ts` scopes by `data-fs-key` rather than by it, and the one e2e assertion
+  passes either way. Note the stated justification for `data-fs-row` in this file was that per-component
+  CSS must reach every row; `css.ts` shows `data-fs-key` already does that, so the attribute is close to
+  write-only.
+- **Rejected:** giving `applyChange` the tree, or a `dataKeyOfRepeater` mapper. `rowValue` already has
+  that signature and has been dead since it landed — it has no caller because the caller that needs it
+  structurally cannot accept it. `applyChange(data, address, value)` is the signature promised to hosts
+  precisely so that no host implements array descent.
+- **Prior art:** five of five libraries surveyed name a row coordinate by the storage name, never by a
+  component id. The two that maintain parallel identity and data systems (JSONForms, SurveyJS) keep
+  identity out of the path and pay a translation cost anyway; SurveyJS, whose `name`/`valueName` split is
+  nearly identical to this one, resolved value-addressing toward the data name.
+- **Reversal:** three tokens, and nothing persisted changes — no address string appears in a document.
+- **What would change my mind:** a consumer that must recover _which repeater_ a coordinate came from
+  using only the string. None exists today; `FormErrors` keys have exactly two readers in the repo.
+- **When:** 2026-08-30.
+
+### The demo store stays in the repo; the ignore line has to land on main
+
+- **Decided:** keep `apps/demo-server/forms.json` where it is and commit the `.gitignore` hunk from
+  `c559676` to `main`. Do not relocate the store.
+- **Why:** the repo already ignores eight runtime-generated in-tree paths, and all three commented
+  `.gitignore` blocks are "a tool wrote here" — there is no precedent for relocating one. Prior art
+  agrees: Strapi's `.tmp/data.db`, Prisma's `dev.db`, json-server's `db.json` are all in-tree and
+  ignored, and no widely-used example server moves its store to a temp directory. Two facts retire the
+  strongest framing against: `forms.json` has never been committed on any ref, and the submit route never
+  persists, so the worst content is a form definition the developer wrote themselves.
+- **The losing case's surviving point, and it sets the real task:** a `.gitignore` line is branch-local
+  state, and this one is stranded. `git log --all -S` finds it in exactly one commit, on
+  `origin/docs/steps-decision` — the only one of twenty-one branches with no PR. `main` does not have it.
+  And the accident it prevents already happened here: `.vscode/terminals.json.9516.tmp` was swept in by a
+  `git add -A` and pushed to the public remote, with the `.vscode/` ignore line landing only afterwards.
+  So the durability objection is answered by _where the line lives_, not by where the store lives.
+- **Rejected:** `os.tmpdir()`. The Windows-cleanup counter-argument turned out to be unsupported —
+  `%TEMP%` on this machine still holds files from 2018 — but relocation buys nothing the precedent does
+  not already cover, and costs the demo the legibility that is most of its job.
+- **Reversal:** one line either way.
+- **What would change my mind:** the submit route persisting answers. Then the file holds someone else's
+  data rather than the developer's own, and it leaves the repository the same day.
+- **When:** 2026-08-30.
+
 ### Row addressing: rows are a projection, not nodes
 
 Designed four ways in parallel under different constraints — minimal interface, maximal flexibility,
