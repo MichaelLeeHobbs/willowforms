@@ -5,6 +5,7 @@ import { contextValues } from './context.js'
 import type { EvalOptions } from './validation.js'
 import {
   DEFAULT_MESSAGES,
+  UNREADABLE_RULE,
   applyRule,
   autoValidateKeys,
   submittedData,
@@ -622,5 +623,63 @@ describe('length rules on a value that is not text', () => {
     // report before the user has touched it.
     expect(check({ key: 'minLength', value: 1 }, [])).toBeUndefined()
     expect(check({ key: 'required' }, [])).toBe(DEFAULT_MESSAGES.required)
+  })
+})
+
+/**
+ * A rule tag this code does not recognise.
+ *
+ * The same shape as the `renderWhen` typo, one function over. Both switches are
+ * exhaustive over a closed union and neither had a tail, so an unrecognised tag
+ * returned `undefined` — read as *guard not satisfied* in one and as *the value
+ * passed* in the other. Either way the rule silently stopped applying, which on
+ * the server is a required answer becoming optional with nothing logged.
+ */
+describe('a validation tag this code cannot read', () => {
+  it('applies a rule whose guard is unreadable, rather than skipping it', () => {
+    const rule = {
+      key: 'required',
+      when: { kind: 'conditon', condition: { op: 'truthy', value: { kind: 'literal', value: 1 } } },
+    }
+
+    // A guard that cannot be read has not said no. Skipping the rule is the
+    // permissive answer, and permissive is the direction that fails silently.
+    expect(check(rule as unknown as ValidationRule, '')).toBe(DEFAULT_MESSAGES.required)
+  })
+
+  it('still honours a guard it can read', () => {
+    // The control. If an unreadable guard passing were achieved by ignoring
+    // guards altogether, this would fail.
+    const rule: ValidationRule = { key: 'required', when: { kind: 'static', value: false } }
+    expect(check(rule, '')).toBeUndefined()
+  })
+
+  it('fails a rule whose key is unreadable, rather than passing the value', () => {
+    // `{ key: 'requird' }` used to fall off the second switch and read as "the
+    // value is fine", so a mistyped rule was a rule that never ran.
+    expect(check({ key: 'requird', value: 3 } as unknown as ValidationRule, '')).toBe(
+      UNREADABLE_RULE,
+    )
+  })
+
+  it('says which rule it could not read is not the point; blocking the submit is', () => {
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'a',
+          type: 'Field',
+          props: {},
+          schema: {
+            type: 'string',
+            validations: [{ key: 'requird' } as unknown as ValidationRule],
+          },
+        },
+      ],
+    }
+
+    expect(validateForm(root, { a: 'anything' })).toEqual({ a: UNREADABLE_RULE })
   })
 })

@@ -21,6 +21,7 @@ import {
   rowContext,
   rowsOf,
   styleSheetFor,
+  unreadableTag,
   valueOf,
 } from '@formsmith/core'
 import type {
@@ -148,6 +149,19 @@ export function resolveProp(
     case 'computed':
       // No sandbox means no evaluation. Render the field rather than crash the form.
       return options.evaluate ? options.evaluate(value.expression, data, options.context) : null
+
+    /*
+     * A kind this code does not have. `null` rather than falling off the end
+     * returning `undefined`, so a kit reading this prop gets a JSON value like
+     * every other branch does — and, more to the point, so the compiler keeps
+     * checking this switch. Without the `default` the closed union is what made
+     * the missing tail legal, and a document is not a value the compiler made.
+     *
+     * `validateDocument` refuses such a document up front. This is what happens
+     * to the one that never went through it.
+     */
+    default:
+      return unreadableTag(value, null)
   }
 }
 

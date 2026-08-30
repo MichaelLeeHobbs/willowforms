@@ -13,6 +13,7 @@
  */
 
 import { evaluateCondition } from './condition.js'
+import { unreadableTag } from './exhaustive.js'
 import type { ComponentNode, FormData } from './types.js'
 import type { EvalOptions } from './validation.js'
 
@@ -50,5 +51,19 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
      */
     case 'condition':
       return evaluateCondition(when.condition, data, options.context, options.row)
+
+    /*
+     * A kind this code does not have. Shown, which is the same answer `i18n`
+     * gets one case up and for the same reason: a tag that is not a condition
+     * expresses no condition, and the absence of a rule means shown.
+     *
+     * Not the answer `evaluateCondition` gives, and the two questions are
+     * different. That one is asked whether a condition *holds*, and an
+     * unreadable one does not hold. This one is asked whether a rule was
+     * expressed at all, and answering "hidden" to that takes the node and its
+     * whole subtree out of validation over a typo.
+     */
+    default:
+      return unreadableTag(when, true)
   }
 }

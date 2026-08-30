@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 6 — the MUI kit stops rescaling authored lengths. Item 5 landed on main as PR #23.
+- **Last completed:** item 7 — an unreadable union tag reads as "no rule", and the gate refuses it
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -93,7 +93,7 @@ These have a decided design in `docs/decisions.md`. Implement what is written th
 
 Root causes. Each collapses several individual findings, so these come before the per-area sweeps.
 
-- [ ] **7. An unknown union tag must never read as "skip it".** Theme 1. `isVisible` and `guardPasses`
+- [x] **7. An unknown union tag must never read as "skip it".** Theme 1. `isVisible` and `guardPasses`
       both fall off an exhaustive switch and return `undefined`, which is read as _hidden_ and as _guard not
       satisfied_. A one-character typo in a document reaches this.
       _Check:_ a test per switch feeding an unrecognised tag, asserting the safe reading rather than silent

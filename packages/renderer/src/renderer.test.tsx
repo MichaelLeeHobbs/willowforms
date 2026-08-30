@@ -15,10 +15,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormContext, FormData, FormDocument } from '@formsmith/core'
+import type { ComponentNode, FormContext, FormData, FormDocument, PropValue } from '@formsmith/core'
 import { applyChange } from '@formsmith/core'
 
-import { FormRenderer } from './index.js'
+import { FormRenderer, resolveProp } from './index.js'
 import type { NodeRendererProps, RendererKit } from './index.js'
 
 function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
@@ -660,5 +660,37 @@ describe('a repeater whose two names differ', () => {
       (el) => el.textContent,
     )
     expect(messages).toEqual(['', 'Wrong.'])
+  })
+})
+
+/**
+ * A property binding whose kind this code cannot read.
+ *
+ * The fourth switch of the same theme. `resolveProp` was exhaustive over
+ * `PropValue` with no tail, so a mistyped kind fell off it and the kit was
+ * handed `undefined` for a prop that every other branch resolves to a JSON
+ * value. `validateDocument` refuses such a document now; this is the render
+ * that never went through it.
+ */
+describe('a property binding this code cannot read', () => {
+  it('resolves to null rather than to nothing at all', () => {
+    const typo = { kind: 'statc', value: 'hello' } as unknown as PropValue
+
+    expect(resolveProp(typo, {}, {})).toBeNull()
+  })
+
+  it('still renders the component the prop is on', () => {
+    const node: ComponentNode = {
+      key: 'greeting',
+      type: 'Field',
+      props: { label: { kind: 'statc', value: 'hello' } as unknown as PropValue },
+      schema: { type: 'string', validations: [] },
+    }
+
+    render(
+      <FormRenderer document={documentOf([node])} kit={kit} data={{}} onChange={() => undefined} />,
+    )
+
+    expect(screen.getByLabelText('greeting')).toBeTruthy()
   })
 })

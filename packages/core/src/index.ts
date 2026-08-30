@@ -34,6 +34,8 @@ export { isEmpty, jsonToString, optionValue, readPath, safeHref, valueOf } from 
 
 export { evaluateCondition } from './condition.js'
 
+export { unreadableTag } from './exhaustive.js'
+
 export {
   DEVICE_QUERY,
   parseDeclarations,
@@ -96,6 +98,7 @@ export {
   autoValidateKeys,
   submittedData,
   DEFAULT_MESSAGES,
+  UNREADABLE_RULE,
   validateField,
   isRowScope,
   validateAcross,

@@ -136,3 +136,53 @@ describe('a structured condition needs no sandbox', () => {
     expect(isVisible(node(broken), {})).toBe(false)
   })
 })
+
+/**
+ * A `renderWhen` whose kind this code does not recognise.
+ *
+ * TypeScript permits the missing tail return because `PropValue` is a closed
+ * union — and a document is data, so a one-character typo reaches it. `kind:
+ * 'conditon'` fell off the switch and returned `undefined`, which every caller
+ * reads as *hidden*: the node and its whole subtree left the DOM and left
+ * `validateForm`, so a required answer quietly became advisory on the server.
+ *
+ * Shown is the safe reading, and it is the reading this function already gives
+ * a kind that is not a condition: `i18n` returns true with the comment that a
+ * translation key expresses no condition. An unrecognised kind expresses none
+ * either. Being shown when you should not be is a question the user can see;
+ * being unvalidated is not.
+ *
+ * This does not contradict `evaluateCondition`, which is false for an
+ * unreadable condition. That one is asked whether a condition *holds*, and an
+ * unreadable one does not hold. This one is asked whether a rule was expressed.
+ */
+describe('a renderWhen this code cannot read', () => {
+  const typo = {
+    kind: 'conditon',
+    condition: { op: 'truthy', value: { kind: 'literal', value: 1 } },
+  }
+
+  it('shows the component rather than dropping it silently', () => {
+    expect(isVisible(field('a', typo as unknown as ComponentNode['renderWhen']), {})).toBe(true)
+  })
+
+  it('never answers undefined, which is what made this invisible', () => {
+    // The failure was not "the wrong boolean", it was "not a boolean at all".
+    expect(typeof isVisible(field('a', typo as unknown as ComponentNode['renderWhen']), {})).toBe(
+      'boolean',
+    )
+  })
+
+  it('keeps the field in validation, which is the point', () => {
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [field('a', typo as unknown as ComponentNode['renderWhen'])],
+    }
+
+    // Hidden meant unvalidated. A required answer must not stop being required
+    // because somebody mistyped a tag.
+    expect(Object.keys(validateForm(root, {}))).toEqual(['a'])
+  })
+})

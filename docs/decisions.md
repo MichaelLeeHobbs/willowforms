@@ -4,6 +4,36 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### An unreadable tag reads as "no rule", not as "skip it"
+
+- **Decided:** every `switch` over a closed union in the evaluation path gets a `default` that routes
+  through `unreadableTag(value, fallback)`. `isVisible` answers **shown**, `guardPasses` answers **the
+  rule applies**, `applyRule` answers **a failure**, `resolveProp` answers **null**. `validateDocument`
+  refuses the tag up front, so none of those readings should ever be reached.
+- **Why shown rather than hidden**, which is the reading this codebase gives elsewhere: `isVisible`
+  already answers `true` for `i18n`, on the ground that a translation key expresses no condition. An
+  unrecognised kind expresses none either. Hidden means unvalidated, and a required answer that stops
+  being required on the server is invisible; a field shown when it should not be is a question the
+  person filling in the form can see.
+- **This does not reverse `evaluateCondition`,** which is false for a condition it cannot read. That
+  function is asked whether a condition _holds_; an unreadable one does not hold. `isVisible` is asked
+  whether a rule was expressed at all.
+- **`applyRule` checks the key before the empty short-circuit,** and the order is the decision. "Every
+  rule but `required` passes on an empty value" is a statement about rules, and an unreadable tag is not
+  one — the case that matters is a mistyped `required`, which arrives with an empty value and would have
+  gone straight through a check placed after it.
+- **Rejected: a bare `default`.** It buys the runtime answer and throws away the compile-time
+  exhaustiveness the missing tail return was providing. The `never` parameter keeps both: adding a union
+  member without a case stops compiling. Verified by adding one and watching four call sites fail.
+- **Rejected: throwing.** A malformed document is the gate's problem to refuse and the panel's to
+  report. Taking the form down in front of the person filling it in is not an improvement on either.
+- **The gate's two vocabularies are written out, and checked both ways by the compiler.** They have to
+  be literal strings, because the question is what an _untrusted_ document holds and a type cannot ask
+  that. `satisfies` refuses a string outside the union and a `Covers` conditional type refuses a union
+  member outside the list.
+- **Reversal:** one helper, four `default` cases, one check in the gate.
+- **When:** 2026-08-30.
+
 ### A length in the MUI kit is a CSS string, not a theme multiple
 
 A widening of the entry below, which decided only that `borderRadius` must stop being divided by 8.

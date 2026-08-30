@@ -747,3 +747,75 @@ describe('validateDocument and translations', () => {
     expect(codes({ fr: { greeting: 'Bonjour' } })).toEqual([])
   })
 })
+
+/**
+ * The gate rejects a tag nothing can read.
+ *
+ * The runtime readings are the second answer, not the first. A document holding
+ * `kind: 'conditon'` is malformed, and the point of a boot-time check is that
+ * nobody has to reason about what a malformed document does at render time.
+ */
+describe('validateDocument and unrecognised tags', () => {
+  const documentWith = (node: Partial<ComponentNode>): FormDocument => ({
+    ...createDocument('Contact', 'doc'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'field', type: 'TextField', props: {}, ...node }],
+    },
+  })
+
+  const codes = (node: Partial<ComponentNode>): string[] =>
+    validateDocument(documentWith(node)).map((e) => e.code)
+
+  it('accepts every kind the union actually has', () => {
+    expect(codes({ renderWhen: { kind: 'static', value: true } })).toEqual([])
+    expect(codes({ renderWhen: { kind: 'computed', expression: 'x' } })).toEqual([])
+    expect(codes({ renderWhen: { kind: 'i18n', key: 'x' } })).toEqual([])
+    expect(
+      codes({
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'literal', value: 1 } },
+        },
+      }),
+    ).toEqual([])
+  })
+
+  it('rejects a renderWhen whose kind is not one of them', () => {
+    expect(
+      codes({ renderWhen: { kind: 'conditon' } } as unknown as Partial<ComponentNode>),
+    ).toContain('malformed')
+  })
+
+  it('rejects a rule guard whose kind is not one of them', () => {
+    expect(
+      codes({
+        schema: {
+          type: 'string',
+          validations: [{ key: 'required', when: { kind: 'conditon' } }],
+        },
+      } as unknown as Partial<ComponentNode>),
+    ).toContain('malformed')
+  })
+
+  it('rejects a validation whose key is not a rule', () => {
+    expect(
+      codes({
+        schema: { type: 'string', validations: [{ key: 'requird' }] },
+      } as unknown as Partial<ComponentNode>),
+    ).toContain('malformed')
+  })
+
+  it('accepts the rules that do exist', () => {
+    expect(
+      codes({
+        schema: {
+          type: 'string',
+          validations: [{ key: 'required' }, { key: 'minLength', value: 2 }, { key: 'email' }],
+        },
+      } as unknown as Partial<ComponentNode>),
+    ).toEqual([])
+  })
+})

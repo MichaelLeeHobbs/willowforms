@@ -7,7 +7,7 @@
 
 import { keyProblem } from './keys.js'
 import { rowScopeProblems } from './rows.js'
-import type { ComponentNode, FormDocument } from './types.js'
+import type { ComponentNode, FormDocument, PropValue, ValidationRule } from './types.js'
 
 /** Depth-first walk, parents before children. */
 export function walk(
@@ -296,6 +296,62 @@ export interface StructuralError {
  * The type says `FormDocument` because that is what callers should have. The
  * checks assume nothing.
  */
+/**
+ * Every tag the two closed unions in a document actually have.
+ *
+ * Written out rather than derived, because these are the strings a *document*
+ * may hold and the whole job is comparing an untrusted one against them. A type
+ * cannot do that: by the time a value is typed as `PropValue`, the question has
+ * been assumed away.
+ *
+ * Written out is how a guard goes stale, so both directions are checked by the
+ * compiler below. `satisfies` refuses a string that is not in the union, and
+ * `Covers` refuses a union member that is not in the list — so adding a kind or
+ * a rule without adding it here stops the build rather than silently widening
+ * what this gate accepts.
+ *
+ * The rule keys are not taken from `DEFAULT_MESSAGES`, which is the same list
+ * and is already total over the union: `validation.ts` imports this file, so
+ * reading it back would be a cycle.
+ */
+const BINDING_KIND_LIST = [
+  'static',
+  'computed',
+  'i18n',
+  'condition',
+] as const satisfies readonly PropValue['kind'][]
+
+const RULE_KEY_LIST = [
+  'required',
+  'minLength',
+  'maxLength',
+  'min',
+  'max',
+  'pattern',
+  'email',
+  'url',
+  'uuid',
+  'custom',
+] as const satisfies readonly ValidationRule['key'][]
+
+/** `true` only when the list names every member of the union. */
+type Covers<Union extends string, Listed extends string> = [Exclude<Union, Listed>] extends [never]
+  ? true
+  : ['missing from the list:', Exclude<Union, Listed>]
+
+const BINDING_KINDS_COVER_THE_UNION: Covers<PropValue['kind'], (typeof BINDING_KIND_LIST)[number]> =
+  true
+
+const RULE_KEYS_COVER_THE_UNION: Covers<ValidationRule['key'], (typeof RULE_KEY_LIST)[number]> =
+  true
+
+// Read once each, so the assertions above are not dead code to the linter.
+void BINDING_KINDS_COVER_THE_UNION
+void RULE_KEYS_COVER_THE_UNION
+
+const BINDING_KINDS: ReadonlySet<string> = new Set(BINDING_KIND_LIST)
+const RULE_KEYS: ReadonlySet<string> = new Set(RULE_KEY_LIST)
+
 export function validateDocument(doc: FormDocument): StructuralError[] {
   const errors: StructuralError[] = []
   const seen = new Set<string>()
@@ -418,6 +474,7 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       }
 
       visitEvents(value['events'], key, path)
+      visitTags(value, key, path)
     }
 
     const children = value['children']
@@ -427,6 +484,75 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       return
     }
     children.forEach((child, index) => visit(child, path + '.children[' + String(index) + ']'))
+  }
+
+  /**
+   * Tags nothing can read, refused before anything has to guess.
+   *
+   * `PropValue` and `ValidationRule` are closed unions, so every `switch` over
+   * one is exhaustive and TypeScript allows it to have no tail. That proof holds
+   * for a value the compiler made. A document is data, so `kind: 'conditon'` is
+   * one keystroke away, and it used to fall off two of those switches and come
+   * back `undefined` — read as *hidden* and as *the guard did not pass*. Both
+   * take the field out of validation, which on the server is a required answer
+   * quietly becoming optional.
+   *
+   * The runtime readings are fixed too, in `visibility.ts` and `validation.ts`.
+   * This is the answer that means nobody has to rely on them.
+   */
+  const visitTags = (node: Record<string, unknown>, key: string, path: string): void => {
+    const binding = (value: unknown, what: string): void => {
+      if (value === undefined) return
+      if (!isRecord(value)) {
+        malformed(what + ' on ' + key + ' must be an object.')
+        return
+      }
+      if (!BINDING_KINDS.has(value['kind'] as string)) {
+        malformed(
+          what +
+            ' on ' +
+            key +
+            ' has kind ' +
+            JSON.stringify(value['kind']) +
+            ', which is not one of ' +
+            [...BINDING_KINDS].join(', ') +
+            '.',
+        )
+      }
+    }
+
+    binding(node['renderWhen'], 'renderWhen')
+
+    const schema = node['schema']
+    if (schema === undefined) return
+    if (!isRecord(schema)) {
+      malformed(path + '.schema must be an object.')
+      return
+    }
+
+    const validations = schema['validations']
+    if (validations === undefined) return
+    if (!Array.isArray(validations)) {
+      malformed(path + '.schema.validations must be an array.')
+      return
+    }
+
+    for (const rule of validations) {
+      if (!isRecord(rule)) {
+        malformed(path + '.schema.validations holds an entry that is not a rule.')
+        continue
+      }
+      if (!RULE_KEYS.has(rule['key'] as string)) {
+        malformed(
+          'Component ' +
+            key +
+            ' has a rule keyed ' +
+            JSON.stringify(rule['key']) +
+            ', which is not a rule this library has.',
+        )
+      }
+      binding(rule['when'], 'a rule guard')
+    }
   }
 
   const visitEvents = (events: unknown, key: string, path: string): void => {

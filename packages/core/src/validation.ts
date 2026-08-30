@@ -16,6 +16,7 @@ import { isEmpty, jsonToString, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
 import { dataKeyOf, flatten } from './tree.js'
+import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
   ComponentNode,
@@ -69,6 +70,29 @@ export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
   uuid: 'Enter a valid UUID.',
   custom: 'Invalid value.',
 }
+
+/**
+ * What a rule this code cannot read reports.
+ *
+ * Not in `DEFAULT_MESSAGES`, because it is not a rule's message — it is the
+ * absence of one. A document holding `{ key: 'requird' }` is malformed and
+ * `validateDocument` says so; this is what happens to the document that never
+ * went through the gate.
+ *
+ * It reports rather than passing, and that direction is the whole point. A rule
+ * the code cannot apply has not been satisfied, and a submit that goes through
+ * because a tag was mistyped is the silent permissive failure this project is
+ * organised against. Wrong and loud beats wrong and quiet.
+ */
+export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
+
+/*
+ * The rule keys that exist, taken from the message table rather than written
+ * out again. `DEFAULT_MESSAGES` is typed as a total record over the union, so
+ * adding a rule without a message does not compile and this set cannot drift
+ * behind it.
+ */
+const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
 
 /**
  * A pattern rule, compiled defensively.
@@ -147,6 +171,14 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
     // No sandbox needed, so a guarded rule works where an expression would not.
     case 'condition':
       return evaluateCondition(when.condition, data, options.context, options.row)
+
+    /*
+     * A guard this code cannot read has not said no, so the rule applies. The
+     * other direction skips the rule, which is a required answer quietly
+     * becoming optional — on the server, over a mistyped tag.
+     */
+    default:
+      return unreadableTag(when, true)
   }
 }
 
@@ -164,6 +196,15 @@ export function applyRule(
   options: EvalOptions = {},
 ): string | undefined {
   if (!guardPasses(rule.when, data, options)) return undefined
+
+  /*
+   * Before the empty short-circuit below, and that order is the point. "Every
+   * rule but `required` passes on an empty value" is a statement about rules,
+   * and a tag this code cannot read is not one. The case that matters is a
+   * mistyped `required`, and it arrives with an empty value, so checking after
+   * the short-circuit would let exactly that one through.
+   */
+  if (!KNOWN_RULES.has(rule.key)) return UNREADABLE_RULE
 
   const fail = (): string => rule.message ?? DEFAULT_MESSAGES[rule.key]
 
@@ -190,6 +231,16 @@ export function applyRule(
     case 'custom':
       if (!options.evaluate) return undefined
       return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
+
+    /*
+     * Unreachable: the `KNOWN_RULES` check above has already answered for a key
+     * that is not in the union. It stays because it is what keeps the compiler
+     * checking this switch for exhaustiveness — adding a rule key without a
+     * case here stops compiling, which the missing tail return used to do and
+     * a bare `default` would throw away.
+     */
+    default:
+      return unreadableTag(rule, UNREADABLE_RULE)
   }
 }
 
