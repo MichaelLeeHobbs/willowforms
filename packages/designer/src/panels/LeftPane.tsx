@@ -50,7 +50,14 @@ export function LeftPane({
 
   return (
     <Tabs label="Left pane" tabs={TABS} active={active} onSelect={setActive}>
-      {active === 'components' && <Palette kit={kit} onAdd={onAdd} onDragStart={onDragStart} />}
+      {active === 'components' && (
+        <Palette
+          kit={kit}
+          onAdd={onAdd}
+          onDragStart={onDragStart}
+          consumeClick={drag.consumeClick}
+        />
+      )}
       {active === 'tree' && (
         <Tree
           root={api.document.root}

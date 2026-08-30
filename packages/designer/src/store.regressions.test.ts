@@ -286,16 +286,131 @@ describe('language identity', () => {
   })
 })
 
-describe('adding a component', () => {
-  it('selects the component it added', async () => {
+/**
+ * Adding a component to something that cannot hold one.
+ *
+ * `insertNode` gives `children` to any node it is pointed at, so nesting a
+ * component inside a leaf produces a subtree no renderer draws — while
+ * `validateForm` and `toJsonSchema` still walk it, so it contributes a required
+ * field nobody can fill in. Every other insertion path checks: `dnd.ts` refuses
+ * a non-container drop target and `keyboard.ts` refuses to move right into one.
+ * The palette's own click did not.
+ *
+ * Whether a node can hold children is asked of the node, not of a kit. A
+ * container is instantiated with `children: []` and a leaf is not, which is the
+ * same "recognise it from the node" rule `isRowScope` follows — and it means the
+ * store needs no kit to answer.
+ */
+describe('where an added component lands', () => {
+  it('goes into the selected container', () => {
     const { result } = renderHook(() => useDesigner(doc()))
 
-    await act(async () => {
-      result.current.addComponent(field, 'root')
-      await Promise.resolve()
+    act(() => {
+      result.current.addComponent(field, 'group')
     })
 
-    expect(result.current.selectedKey).toBeDefined()
-    expect(result.current.selectedNode?.type).toBe('Field')
+    const group = result.current.document.root.children?.[2]
+    expect(group?.children?.map((c) => c.key)).toEqual(['inner', 'field'])
+  })
+
+  it('goes beside a leaf rather than inside it', () => {
+    /*
+     * Not refused, which would be a dead control — clicking a palette entry and
+     * having nothing happen is the failure this project treats as worst. The
+     * nearest ancestor that can hold children is what the author meant.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.addComponent(field, 'inner')
+    })
+
+    const group = result.current.document.root.children?.[2]
+    expect(group?.children?.map((c) => c.key)).toEqual(['inner', 'field'])
+    // And not inside the leaf, which is the shape that renders as nothing.
+    expect(group?.children?.[0]?.children).toBeUndefined()
+  })
+
+  it('falls back to the root when the selection is not in the document', () => {
+    // Undo restores the document and not the selection, so `selectedKey` naming
+    // a node that no longer exists is an ordinary state rather than a rare one.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.addComponent(field, 'gone')
+    })
+
+    expect(rootKeys(result.current.document)).toEqual(['email', 'phone', 'group', 'field'])
+  })
+
+  it('selects what it added, and only after it is in the document', () => {
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.addComponent(field, 'group')
+    })
+
+    expect(result.current.selectedKey).toBe('field')
+    expect(result.current.selectedNode?.key).toBe('field')
+  })
+})
+
+/**
+ * A translation written into a document that has no bundles.
+ *
+ * `doc.translations[language]` was read before the `?? {}` that was supposed to
+ * defend it, so a pasted document missing the key threw — inside a React state
+ * updater, which takes the designer and its whole undo history down with it.
+ * `validateDocument` refuses such a document now; the panel is still where
+ * somebody goes to repair one, so it is the last place that can afford to fall
+ * over on it.
+ */
+describe('writing a translation', () => {
+  const withoutBundles = (): FormDocument => {
+    const base = doc()
+    return { ...base, translations: undefined as unknown as FormDocument['translations'] }
+  }
+
+  it('survives a document with no translations at all', () => {
+    const { result } = renderHook(() => useDesigner(withoutBundles()))
+
+    act(() => {
+      result.current.setTranslation('fr', 'greeting', 'Bonjour')
+    })
+
+    expect(result.current.document.translations).toEqual({ fr: { greeting: 'Bonjour' } })
+  })
+
+  it('survives a language whose bundle is not an object', () => {
+    const base = doc()
+    const broken = {
+      ...base,
+      translations: { fr: 'nope' } as unknown as FormDocument['translations'],
+    }
+    const { result } = renderHook(() => useDesigner(broken))
+
+    act(() => {
+      result.current.setTranslation('fr', 'greeting', 'Bonjour')
+    })
+
+    expect(result.current.document.translations['fr']).toEqual({ greeting: 'Bonjour' })
+  })
+
+  it('still writes into the bundle that is there', () => {
+    // The control. Replacing the bundle unconditionally would pass both tests
+    // above and quietly discard every translation already written.
+    const base = doc()
+    const { result } = renderHook(() =>
+      useDesigner({ ...base, translations: { fr: { existing: 'Salut' } } }),
+    )
+
+    act(() => {
+      result.current.setTranslation('fr', 'greeting', 'Bonjour')
+    })
+
+    expect(result.current.document.translations['fr']).toEqual({
+      existing: 'Salut',
+      greeting: 'Bonjour',
+    })
   })
 })

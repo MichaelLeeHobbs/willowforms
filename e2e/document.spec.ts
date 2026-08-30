@@ -98,7 +98,14 @@ test('the schema view describes the data, not the layout', async ({ designer }) 
   await designer.page.getByRole('button', { name: 'JSON' }).click()
   await designer.page.getByRole('tab', { name: 'JSON Schema' }).click()
 
-  const schema = JSON.parse(await designer.page.getByLabel('JSON Schema').inputValue()) as {
+  /*
+   * The textarea, not the tabpanel. The dialog's views are real tabs now, and a
+   * tabpanel is labelled by its own tab — so "JSON Schema" names two elements
+   * and the looser locator resolved to the wrong one.
+   */
+  const schema = JSON.parse(
+    await designer.page.getByRole('textbox', { name: 'JSON Schema' }).inputValue(),
+  ) as {
     type: string
     properties: Record<string, unknown>
     required?: string[]
@@ -116,7 +123,10 @@ test('the schema view cannot be edited', async ({ designer }) => {
   await designer.page.getByRole('button', { name: 'JSON' }).click()
   await designer.page.getByRole('tab', { name: 'JSON Schema' }).click()
 
-  await expect(designer.page.getByLabel('JSON Schema')).toHaveAttribute('readonly', '')
+  await expect(designer.page.getByRole('textbox', { name: 'JSON Schema' })).toHaveAttribute(
+    'readonly',
+    '',
+  )
 })
 
 test('the same document renders through either kit', async ({ designer }) => {

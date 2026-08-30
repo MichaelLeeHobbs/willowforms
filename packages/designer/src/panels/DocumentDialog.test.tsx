@@ -11,7 +11,7 @@
  * is a real guard rather than a formality.
  */
 
-import { render, screen, within } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -246,7 +246,10 @@ describe('the JSON dialog', () => {
     await user.click(screen.getByRole('tab', { name: 'JSON Schema' }))
 
     const schema = JSON.parse(
-      screen.getByLabelText<HTMLTextAreaElement>('JSON Schema').value,
+      // The textarea, not the tabpanel: the panel is labelled by its own tab, so
+      // "JSON Schema" now names two elements. Trap 4, arriving the moment the
+      // dialog gained the tabpanel it was missing.
+      screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'JSON Schema' }).value,
     ) as JsonSchema
     expect(schema.type).toBe('object')
     expect(schema.properties['email']).toMatchObject({ type: 'string', title: 'Email' })
@@ -259,7 +262,9 @@ describe('the JSON dialog', () => {
     await open()
     await user.click(screen.getByRole('tab', { name: 'JSON Schema' }))
 
-    expect(screen.getByLabelText<HTMLTextAreaElement>('JSON Schema').readOnly).toBe(true)
+    expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'JSON Schema' }).readOnly).toBe(
+      true,
+    )
   })
 
   it('says so when the clipboard is refused instead of appearing to work', async () => {
@@ -278,5 +283,160 @@ describe('the JSON dialog', () => {
       'textContent',
       expect.stringContaining('refused clipboard access'),
     )
+  })
+})
+
+/**
+ * The shell's shortcuts, while the dialog is open.
+ *
+ * `showModal()` makes the background inert to *pointers*. It does nothing about
+ * keys, and the shell binds Delete, Backspace, Escape and Ctrl+Z to `window`
+ * with a guard that excludes only text fields. So Backspace on the dialog's own
+ * Apply button deleted the component selected behind it, while the textarea in
+ * front of you still showed the JSON from before the deletion.
+ *
+ * The guard is containment: an event from inside an open dialog is that
+ * dialog's. It is also what lets Escape reach the native close watcher, which
+ * the shell was cancelling with an unconditional `preventDefault` whenever
+ * anything was selected — so the dialog took two presses to close.
+ */
+describe('shell shortcuts while the dialog is open', () => {
+  /** The tree row for a node, which is what selects it. */
+  function treeRow(key: string): HTMLElement {
+    const row = globalThis.document.querySelector<HTMLElement>('[data-fs-tree-row="' + key + '"]')
+    if (!row) throw new Error('no tree row for ' + key)
+    return row
+  }
+
+  /** Select a component, then open the dialog over it. */
+  async function selectedThenOpen(harness: Harness): Promise<void> {
+    fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
+    await harness.user.click(treeRow('email'))
+    await harness.open()
+  }
+
+  it('does not delete the component behind it on Backspace', async () => {
+    const harness = setup()
+    await selectedThenOpen(harness)
+
+    const apply = screen.getByRole('button', { name: 'Apply' })
+    apply.focus()
+    fireEvent.keyDown(apply, { key: 'Backspace' })
+
+    expect(harness.latest().root.children?.map((c) => c.key)).toContain('email')
+  })
+
+  it('does not delete it on Delete either', async () => {
+    const harness = setup()
+    await selectedThenOpen(harness)
+
+    const apply = screen.getByRole('button', { name: 'Apply' })
+    apply.focus()
+    fireEvent.keyDown(apply, { key: 'Delete' })
+
+    expect(harness.latest().root.children?.map((c) => c.key)).toContain('email')
+  })
+
+  it('leaves Escape to the dialog rather than cancelling it', async () => {
+    /*
+     * The shell called `preventDefault()` on Escape whenever anything was
+     * selected, which cancels the native `<dialog>` close request — so the first
+     * press did nothing visible and the second closed it. jsdom has no close
+     * watcher, so what is checked here is the half that is checkable: the shell
+     * does not claim the event.
+     */
+    const harness = setup()
+    await selectedThenOpen(harness)
+
+    const apply = screen.getByRole('button', { name: 'Apply' })
+    apply.focus()
+    const event = createEvent.keyDown(apply, { key: 'Escape' })
+    fireEvent(apply, event)
+
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('still claims the shortcut when the dialog is closed', async () => {
+    // The control. Ignoring these keys everywhere would pass all three tests
+    // above and silently remove the shell's own shortcuts.
+    const harness = setup()
+    fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
+    await harness.user.click(treeRow('email'))
+
+    fireEvent.keyDown(globalThis.document.body, { key: 'Delete' })
+
+    expect(harness.latest().root.children?.map((c) => c.key)).not.toContain('email')
+  })
+})
+
+/**
+ * The dialog's two views are tabs, and tabs have a keyboard.
+ *
+ * This dialog hand-rolled its own tablist: a roving `tabIndex` with no arrow
+ * handler, no `aria-controls`, and no `tabpanel` anywhere. A roving tabindex
+ * means exactly one tab is in the tab order, so with no arrow keys the JSON
+ * Schema view could not be reached from the keyboard at all.
+ *
+ * `Tabs.tsx` already implements this, and its own comment says two copies was
+ * the mistake it was avoiding. Axe passes either way — no rule requires arrow
+ * keys — which is why a passing accessibility suite said nothing about it.
+ */
+describe('the dialog view tabs', () => {
+  async function openTabs(): Promise<Harness> {
+    const harness = setup()
+    await harness.open()
+    return harness
+  }
+
+  it('moves between views with the arrow keys', async () => {
+    const harness = await openTabs()
+
+    const document_ = screen.getByRole('tab', { name: 'Document' })
+    document_.focus()
+    fireEvent.keyDown(document_, { key: 'ArrowRight' })
+
+    expect(screen.getByRole('tab', { name: 'JSON Schema' })).toHaveProperty('ariaSelected', 'true')
+    expect(harness.latest().name).toBe('Contact request')
+  })
+
+  it('wraps around, and Home and End reach the ends', async () => {
+    await openTabs()
+
+    const document_ = screen.getByRole('tab', { name: 'Document' })
+    document_.focus()
+    fireEvent.keyDown(document_, { key: 'End' })
+    expect(screen.getByRole('tab', { name: 'JSON Schema' })).toHaveProperty('ariaSelected', 'true')
+
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'JSON Schema' }), { key: 'Home' })
+    expect(screen.getByRole('tab', { name: 'Document' })).toHaveProperty('ariaSelected', 'true')
+  })
+
+  it('gives the selected tab a panel that exists', async () => {
+    await openTabs()
+
+    /*
+     * Scoped to the dialog. The left pane has tabs of its own, so an unscoped
+     * `getByRole('tab')` matches both and the query that was meant to check one
+     * thing silently measures another — Trap 4, and the reason the same query
+     * became ambiguous the moment the left pane grew tabs.
+     */
+    const dialog = within(screen.getByRole('dialog'))
+    const selected = dialog.getByRole('tab', { selected: true })
+    const panelId = selected.getAttribute('aria-controls')
+
+    expect(panelId, 'the selected tab controls nothing').toBeTruthy()
+    // An unresolved IDREF is not an axe violation, which is how the inspector
+    // shipped two of them for months.
+    expect(globalThis.document.getElementById(panelId ?? '')).toBeTruthy()
+    expect(dialog.getByRole('tabpanel')).toBeTruthy()
+  })
+
+  it('still closes', async () => {
+    // The control: the close button lives beside the strip and has to survive
+    // the strip being replaced.
+    const harness = await openTabs()
+    await harness.user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(screen.queryByLabelText('Form document JSON')).toBeNull()
   })
 })

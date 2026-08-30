@@ -19,6 +19,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { ComponentNode, FormDocument, Kit, PropValue } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
@@ -27,11 +28,26 @@ import { Designer } from '../Designer.js'
 
 const staticProp = (value: string): PropValue => ({ kind: 'static', value })
 
+/*
+ * How many times the kit has been asked to draw a component.
+ *
+ * The only way to see a render that produces identical output. A drag moves the
+ * pointer, not the document, so every one of these during a drag is work whose
+ * result cannot have changed.
+ */
+let fieldRenders = 0
+
 function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
   return <div {...nodeProps}>{children}</div>
 }
 
 function Field({ nodeProps, props, value, error, onChange }: NodeRendererProps): ReactNode {
+  // Counted on commit rather than during render, which is where a component is
+  // allowed to have an effect. It measures the same thing: a subtree React
+  // skips is one this function was never called for, so it never commits.
+  useEffect(() => {
+    fieldRenders += 1
+  })
   const label = typeof props['label'] === 'string' ? props['label'] : ''
   // A wrapper with the input nested inside it, so a click lands on a descendant
   // of the element carrying data-fs-key rather than on the element itself.
@@ -112,10 +128,13 @@ interface Harness {
   hoverFrame: () => HTMLElement | null
   /** Keys of the root's children, in document order. */
   keys: () => string[]
+  /** How many times the kit has drawn a field since this harness was made. */
+  renders: () => number
 }
 
 function setup(): Harness {
   const user = userEvent.setup()
+  fieldRenders = 0
   const view = render(
     <Designer initialDocument={makeDocument()} kit={kit} rendererKit={rendererKit} />,
   )
@@ -141,7 +160,7 @@ function setup(): Harness {
       .map((el) => (el as HTMLElement).dataset['fsTreeRow'])
       .filter((key): key is string => Boolean(key) && key !== 'root')
   }
-  return { user, view, node, frame, hoverFrame, keys }
+  return { user, view, node, frame, hoverFrame, keys, renders: () => fieldRenders }
 }
 
 describe('canvas selection', () => {
@@ -544,5 +563,68 @@ describe('a document with steps', () => {
     expect(
       view.container.querySelector('[data-fs-key="step-two"]')?.getAttribute('data-fs-hidden'),
     ).toBe('true')
+  })
+})
+
+/**
+ * Dragging does not re-render the form under the pointer.
+ *
+ * The drag controller puts the pointer position in React state, and it has to:
+ * the drop indicator follows the pointer, and both the canvas and the tree draw
+ * one. So the canvas re-renders on every `pointermove`, at pointer-event
+ * frequency, which is fine.
+ *
+ * What is not fine is what used to happen below it. Nothing stood between the
+ * canvas and the form, so every one of those renders walked the whole document
+ * — `isVisible` and `resolveProps` for every node, then every kit component —
+ * to produce output that cannot have changed, because a pointer position is not
+ * an input to any of it.
+ *
+ * The boundary is element identity: the canvas hands React the same
+ * `<FormRenderer>` element it handed it last time, and React skips the subtree.
+ */
+describe('a drag over the canvas', () => {
+  it('does not re-render the components under it', async () => {
+    const { user, view, renders } = setup()
+
+    const target = view.container.querySelector<HTMLElement>('[data-fs-key="first"]')
+    if (!target) throw new Error('no component on the canvas')
+
+    await user.pointer({ target, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } })
+    const before = renders()
+
+    // Past the threshold, then a few moves, which is the shortest real drag.
+    fireEvent.pointerMove(window, { clientX: 40, clientY: 40 })
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 60 })
+    fireEvent.pointerMove(window, { clientX: 80, clientY: 80 })
+
+    expect(renders()).toBe(before)
+
+    fireEvent.pointerUp(window, { clientX: 80, clientY: 80 })
+  })
+
+  it('still re-renders them when the document changes', async () => {
+    /*
+     * The control. A boundary that never lets anything through would pass the
+     * test above and freeze the canvas, which is the whole product.
+     */
+    const { user, renders } = setup()
+    const before = renders()
+
+    await user.click(screen.getByRole('button', { name: 'Remove quiet' }))
+
+    expect(renders()).toBeGreaterThan(before)
+  })
+
+  it('still re-renders them when a canvas prop changes', async () => {
+    // The second control, on the other input. Preview flips `revealHidden`,
+    // which the renderer reads, so a memo that ignored it would draw the wrong
+    // thing rather than merely draw it late.
+    const { user, renders } = setup()
+    const before = renders()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    expect(renders()).toBeGreaterThan(before)
   })
 })

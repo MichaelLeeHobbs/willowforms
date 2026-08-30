@@ -8,7 +8,7 @@
  * memory leak that only shows up in long authoring sessions.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ComponentDef,
   ComponentNode,
@@ -169,11 +169,62 @@ export interface DesignerApi {
   redo: () => void
 }
 
+/**
+ * Where a component dropped "onto" this key actually goes.
+ *
+ * `insertNode` gives `children` to whatever it is pointed at, so nesting a
+ * component inside a leaf produces a subtree no renderer draws — while
+ * `validateForm` and `toJsonSchema` still walk it, so it adds a required field
+ * nobody can fill in. Every other insertion path already refused that:
+ * `dnd.ts` skips a non-container drop target and `keyboard.ts` refuses to move
+ * right into one. The palette's click did not.
+ *
+ * Refusing is the wrong answer here, though. Clicking a palette entry and
+ * having nothing happen is the dead control this project treats as the worst
+ * failure, so this walks out to the nearest ancestor that can hold children —
+ * which is what an author selecting a field and adding a component means.
+ *
+ * Whether a node can hold children is asked of the node. A container is
+ * instantiated with `children: []` and a leaf is not, so no kit is needed:
+ * the same "recognise it from the node" rule `isRowScope` follows.
+ */
+function containerFor(root: ComponentNode, key: string | undefined): string {
+  if (key === undefined) return root.key
+
+  let node = findNode(root, key)
+  if (!node) return root.key
+
+  while (!Array.isArray(node.children)) {
+    const parent = findParent(root, node.key)
+    if (!parent) return root.key
+    node = parent
+  }
+  return node.key
+}
+
 export function useDesigner(initial: FormDocument): DesignerApi {
   const [history, setHistory] = useState<History>({ past: [], present: initial, future: [] })
   const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
 
   const document = history.present
+
+  /*
+   * The current document, readable from a handler without putting it in a
+   * dependency array.
+   *
+   * A state updater has to be pure — React is free to call it twice — so a
+   * handler that must *decide* something before it writes cannot decide it in
+   * there. `addComponent` is the case: where a component lands depends on the
+   * tree, and so does whether anything landed at all.
+   *
+   * A ref rather than the render closure, which is what `duplicateComponent`
+   * reads and is a render behind whenever two edits land in one tick. Written in
+   * an effect rather than during render, for the reason `drag.ts` gives.
+   */
+  const latest = useRef(history.present)
+  useEffect(() => {
+    latest.current = history.present
+  }, [history.present])
 
   const apply = useCallback((mutate: (doc: FormDocument) => FormDocument, label?: string) => {
     setHistory((h) => commit(h, mutate(h.present), label))
@@ -181,17 +232,26 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const addComponent = useCallback((def: ComponentDef, parentKey?: string, index?: number) => {
     /*
-     * The new key is computed here rather than inside the updater. A state
-     * updater must be pure: React is free to call it twice, and this one used to
-     * call setSelectedKey from inside it, which is a state update during another
-     * component's render.
+     * Everything is decided here and the updater only writes. It used to do both
+     * in the updater and schedule the selection out of it with `queueMicrotask`,
+     * which is a side effect inside a function three lines of its own comment
+     * said had to be pure.
      */
-    setHistory((h) => {
-      const node = instantiate(def, h.present.root)
-      const parent = parentKey ?? h.present.root.key
-      queueMicrotask(() => setSelectedKey(node.key))
-      return commit(h, { ...h.present, root: insertNode(h.present.root, parent, node, index) })
-    })
+    const doc = latest.current
+    const node = instantiate(def, doc.root)
+    const root = insertNode(doc.root, containerFor(doc.root, parentKey), node, index)
+
+    /*
+     * Nothing landed, so nothing is committed and the selection does not move.
+     * It used to wrap the result unconditionally, so an insert that matched no
+     * parent still took an undo slot — and still selected a key that is not in
+     * the document, which is the precondition for the next mistake.
+     * `moveComponent` and `removeComponent` have always guarded this.
+     */
+    if (root === doc.root) return
+
+    setHistory((h) => commit(h, { ...doc, root }))
+    setSelectedKey(node.key)
   }, [])
 
   const setProp = useCallback(
@@ -246,10 +306,22 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     (language: string, key: string, text: string) => {
       apply(
         (doc) => {
-          const bundle = { ...(doc.translations[language] ?? {}) }
+          /*
+           * Both levels guarded. The index happened *before* the `?? {}` that
+           * was meant to defend it, so a pasted document with no `translations`
+           * threw — inside a state updater, which takes the designer and its
+           * whole undo history with it. A bundle that is not an object is the
+           * same shape one level down: spreading a string yields a record of
+           * its characters.
+           */
+          const bundles =
+            doc.translations && typeof doc.translations === 'object' ? doc.translations : {}
+          const held = bundles[language]
+          const bundle = { ...(held && typeof held === 'object' ? held : {}) }
+
           if (text) bundle[key] = text
           else delete bundle[key]
-          return { ...doc, translations: { ...doc.translations, [language]: bundle } }
+          return { ...doc, translations: { ...bundles, [language]: bundle } }
         },
         'translation:' + language + ':' + key,
       )

@@ -11,7 +11,7 @@
  * phone, so the test that matters most here is that the document does not move.
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -282,5 +282,52 @@ describe('collapsing a pane', () => {
     await user.click(handle('left'))
     const controls = handle('left').getAttribute('aria-controls')
     expect(shell.querySelector('[id="' + controls + '"]')).not.toBeNull()
+  })
+})
+
+/**
+ * A palette entry is a button and a drag handle, and the two have to be told
+ * apart.
+ *
+ * It arms a drag on `pointerdown` and adds on `click`. The drag controller
+ * already decides which of the two happened and raises a flag saying "that
+ * release was a drag, not a click" — and the palette never asked. So a drag
+ * begun on a button and abandoned back over it added a component anyway, which
+ * is what dragging out and changing your mind looks like.
+ *
+ * The canvas and the tree both ask. The palette could not: `PaletteProps` had
+ * no way to reach the controller, so the gap was structural rather than an
+ * oversight in a handler.
+ */
+describe('a palette entry pressed and dragged', () => {
+  /** Press, move past the threshold, release — all over the same button. */
+  function dragAndReturn(button: HTMLElement): void {
+    fireEvent.pointerDown(button, { clientX: 10, clientY: 10, bubbles: true })
+    fireEvent.pointerMove(window, { clientX: 12, clientY: 12 })
+    fireEvent.pointerMove(window, { clientX: 90, clientY: 90 })
+    fireEvent.pointerUp(window, { clientX: 10, clientY: 10 })
+    fireEvent.click(button, { bubbles: true })
+  }
+
+  it('does not add a component when the drag is abandoned over it', async () => {
+    const harness = setup()
+    await harness.user.click(screen.getByRole('tab', { name: 'Components' }))
+
+    const before = harness.latest().root.children?.length ?? 0
+    dragAndReturn(screen.getByRole('button', { name: 'Field' }))
+
+    expect(harness.latest().root.children?.length ?? 0).toBe(before)
+  })
+
+  it('still adds one on a plain click', async () => {
+    // The control, and the one that matters most: this is the no-aim path the
+    // palette exists for, and swallowing every click would remove it.
+    const harness = setup()
+    await harness.user.click(screen.getByRole('tab', { name: 'Components' }))
+
+    const before = harness.latest().root.children?.length ?? 0
+    await harness.user.click(screen.getByRole('button', { name: 'Field' }))
+
+    expect(harness.latest().root.children?.length ?? 0).toBe(before + 1)
   })
 })

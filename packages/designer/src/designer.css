@@ -347,6 +347,27 @@
   border-block-end: 1px solid var(--fs-border);
 }
 
+/*
+ * A strip with something beside it, on the same row.
+ *
+ * Only the JSON dialog uses it, for its close button. The button cannot go
+ * inside the strip — that is the `tablist` and may hold nothing but tabs — and
+ * wanting it on that row is what led the dialog to grow a second, keyboardless
+ * tab implementation of its own.
+ *
+ * The strip grows so its underline still runs the full width, which is what it
+ * did when it was the only thing on the row.
+ */
+.fs-tabs__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fs-tabs__row > .fs-tabs {
+  flex: 1;
+}
+
 .fs-tabs__tab {
   font: inherit;
   color: var(--fs-text-muted);

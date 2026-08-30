@@ -464,6 +464,21 @@ function useKeyboardShortcuts(api: DesignerApi): void {
         tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable
       if (typing) return
 
+      /*
+       * An event from inside an open dialog belongs to that dialog.
+       *
+       * `showModal()` makes the background inert to *pointers* and says nothing
+       * about keys, so these shortcuts stayed armed over a modal: Backspace on
+       * the JSON dialog's Apply button deleted the component selected behind it
+       * while the textarea in front of you still showed the JSON from before.
+       * The `typing` guard above does not help — a button is not a text field.
+       *
+       * It is also what lets Escape close the dialog. This handler called
+       * `preventDefault()` on Escape whenever anything was selected, which
+       * cancels the native close request, so the dialog took two presses.
+       */
+      if (target?.closest('dialog[open]')) return
+
       const mod = event.ctrlKey || event.metaKey
 
       if (mod && event.key.toLowerCase() === 'z') {

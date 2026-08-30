@@ -189,15 +189,42 @@ export function useDrag(
       cancel()
     }
 
+    /*
+     * The flag lowers itself once the click it was raised for has been and gone.
+     *
+     * It used to be lowered only by a `consumeClick()` caller, and there are
+     * exactly two of those — the canvas and the tree. A palette drag starts on a
+     * button in the left pane and ends on the canvas, so the `click` the browser
+     * dispatches goes to their nearest common ancestor, above both readers.
+     * Nobody lowered it, it stayed up, and it ate the next unrelated click:
+     * after every drop from the palette, the first click on a component
+     * silently failed to select it.
+     *
+     * On `window` and in the bubble phase, so it runs after every element
+     * handler that might want to read it — lowering it in the capture phase
+     * would take the flag away before the canvas got to ask.
+     *
+     * `pointerdown` as well, for the click whose propagation something stopped
+     * and which therefore never reached the window. A new press is a new
+     * interaction whatever happened to the last one.
+     */
+    const lowerSwallow = (): void => {
+      swallowClick.current = false
+    }
+
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', cancel)
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('click', lowerSwallow)
+    window.addEventListener('pointerdown', lowerSwallow)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', cancel)
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('click', lowerSwallow)
+      window.removeEventListener('pointerdown', lowerSwallow)
     }
   }, [])
 

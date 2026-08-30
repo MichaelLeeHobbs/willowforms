@@ -329,6 +329,41 @@ export function Canvas({
 
   const editing = !preview
 
+  /*
+   * The form, as an element that only changes when its inputs do.
+   *
+   * The drag controller keeps the pointer position in React state, and it has
+   * to: the drop indicator follows the pointer. So this component re-renders on
+   * every `pointermove`, at pointer-event frequency, which is fine on its own.
+   *
+   * What was not fine is that nothing stood between here and the form. Every
+   * one of those renders walked the whole document — `isVisible` and
+   * `resolveProps` for every node, then every kit component — to produce output
+   * that cannot have changed, because a pointer position is not an input to any
+   * of it. On a large form that is the whole tree, per pointer event.
+   *
+   * Holding the element itself is the boundary: React compares children by
+   * identity and skips a subtree whose element it has already seen. It is also
+   * the honest list of what the form depends on, which a reader can check
+   * against the props below.
+   */
+  const form = useMemo(
+    () => (
+      <FormRenderer
+        document={api.document}
+        kit={rendererKit}
+        data={data}
+        errors={errors}
+        revealHidden={editing}
+        {...(context ? { context } : {})}
+        onChange={onChange}
+        {...(language ? { language } : {})}
+        {...(viewport ? { device: viewport } : {})}
+      />
+    ),
+    [api.document, rendererKit, data, errors, editing, context, onChange, language, viewport],
+  )
+
   return (
     <div className="fs-canvas__inner">
       <div className="fs-canvas__bar">
@@ -422,17 +457,7 @@ export function Canvas({
            * the ones a given user will not see. Showing what a user sees is
            * what Preview is for, and Preview still hides them.
            */}
-          <FormRenderer
-            document={api.document}
-            kit={rendererKit}
-            data={data}
-            errors={errors}
-            revealHidden={editing}
-            {...(context ? { context } : {})}
-            onChange={onChange}
-            {...(language ? { language } : {})}
-            {...(viewport ? { device: viewport } : {})}
-          />
+          {form}
         </div>
 
         {editing && (

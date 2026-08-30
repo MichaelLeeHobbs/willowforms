@@ -137,6 +137,25 @@ function DataKeyField({
   onCommit: (next: string) => void
 }): ReactNode {
   const [draft, setDraft] = useState(value)
+  const [committed, setCommitted] = useState(value)
+
+  /*
+   * Re-sync when the document changes underneath, without losing an edit in
+   * progress: only the version this field last saw is replaced.
+   *
+   * It had none, and its React key is the node's key, which does not change
+   * when only the data key does — so an undo restored the document while this
+   * box went on showing the text from before it, and the next blur wrote that
+   * text back. The undo silently reversed itself, and the submitted payload's
+   * key with it.
+   *
+   * The same shape as the raw CSS field, the JSON editor and the options box.
+   * This was the last editor here without it.
+   */
+  if (value !== committed) {
+    setCommitted(value)
+    setDraft(value)
+  }
 
   const commit = (): void => {
     /*
@@ -148,6 +167,7 @@ function DataKeyField({
     const trimmed = draft.trim()
     if (trimmed !== draft) setDraft(trimmed)
     if (trimmed === value) return
+    setCommitted(trimmed)
     onCommit(trimmed)
   }
 

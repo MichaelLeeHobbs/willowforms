@@ -21,9 +21,18 @@ export interface PaletteProps {
   onAdd: (def: ComponentDef) => void
   /** Press and move. The drag controller decides which of the two happened. */
   onDragStart: (def: ComponentDef, event: ReactPointerEvent) => void
+  /**
+   * Whether the click now arriving is really the tail of a drag.
+   *
+   * The controller decides which of the two a release was and raises a flag;
+   * the canvas and the tree both ask. This did not, so a drag begun on a
+   * palette entry and abandoned back over it added a component anyway — which
+   * is exactly what dragging out and changing your mind looks like.
+   */
+  consumeClick: () => boolean
 }
 
-export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
+export function Palette({ kit, onAdd, onDragStart, consumeClick }: PaletteProps): ReactNode {
   const [query, setQuery] = useState('')
   const groups = useMemo(() => groupKit(kit), [kit])
 
@@ -69,7 +78,10 @@ export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
                   key={def.type}
                   type="button"
                   className="fs-palette__item"
-                  onClick={() => onAdd(def)}
+                  onClick={() => {
+                    if (consumeClick()) return
+                    onAdd(def)
+                  }}
                   onPointerDown={(event) => onDragStart(def, event)}
                   title={'Add ' + def.label + ', or drag it onto the canvas'}
                 >

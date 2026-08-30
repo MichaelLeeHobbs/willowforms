@@ -193,3 +193,78 @@ describe('a commit handler replaced between renders', () => {
     expect(first).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * The click a drag leaves behind.
+ *
+ * A release that moved must not also read as a click on whatever is under the
+ * pointer, so the controller raises a flag and the canvas and the tree lower it
+ * in their own click handlers. That works for a drag that starts and ends
+ * inside one of those two.
+ *
+ * It is not most drags. A palette drag starts on a button in the left pane, and
+ * the `click` the browser then dispatches goes to the nearest common ancestor —
+ * above both readers. Nobody lowered the flag, so it stayed up and ate the next
+ * unrelated click: after every drop from the palette, the first click on a
+ * component silently failed to select it.
+ *
+ * So the controller lowers it itself, once the click it was raised for has been
+ * and gone. On `window` and in the bubble phase, which is after every element
+ * handler that might want to read it.
+ */
+describe('the click that follows a drag', () => {
+  const source: DragSource = { kind: 'move', key: 'heading', label: 'heading' }
+
+  it('is swallowed', async () => {
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    expect(result.current.consumeClick()).toBe(true)
+  })
+
+  it('stops being swallowed once it has happened, even if nobody read the flag', async () => {
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    // The click lands somewhere neither the canvas nor the tree is listening —
+    // which is where a palette drag's click lands, every time.
+    act(() => {
+      window.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+
+  it('starts fresh when a new gesture begins', async () => {
+    // A belt for the click whose propagation something stopped, so it never
+    // reached the window at all. A new press is a new interaction either way.
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    act(() => {
+      window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+
+  it('is not swallowed when the pointer never moved', async () => {
+    // The control. A press that did not become a drag is a click, and
+    // swallowing it would make the palette and the tree unclickable.
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 10, clientY: 10 }))
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+})

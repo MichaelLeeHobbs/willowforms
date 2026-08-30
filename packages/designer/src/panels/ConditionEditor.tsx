@@ -271,12 +271,7 @@ function OperandField({
         />
       )}
       {!isRef && !isContext && (
-        <input
-          id={id}
-          type="text"
-          value={jsonToString(value.value)}
-          onChange={(e) => onChange(literal(coerce(e.target.value)))}
-        />
+        <LiteralField id={id} value={value.value} onCommit={(next) => onChange(literal(next))} />
       )}
     </div>
   )
@@ -312,6 +307,65 @@ function switchKind(
 }
 
 /**
+ * A fixed value, committed on blur rather than parsed on every keystroke.
+ *
+ * The fourth instance of Trap 10 in this repository. The input was controlled
+ * from `jsonToString(coerce(text))`, so what was being typed was parsed and
+ * handed back before it was finished: typing `1.5` gave `1`, then `1.` parsed
+ * back to `1`, and the `5` landed against it as `15`. A decimal could not be
+ * entered at all.
+ *
+ * Same shape as the options box below and the raw CSS field on the Style tab.
+ */
+function LiteralField({
+  id,
+  value,
+  onCommit,
+}: {
+  id: string
+  value: JsonValue
+  onCommit: (next: JsonValue) => void
+}): ReactNode {
+  const text = jsonToString(value)
+  const [draft, setDraft] = useState(text)
+  const [committed, setCommitted] = useState(text)
+
+  // Re-sync when the document changes underneath, without losing an edit in
+  // progress. Undo, redo and a document swapped in from the JSON dialog.
+  if (text !== committed) {
+    setCommitted(text)
+    setDraft(text)
+  }
+
+  const commit = (): void => {
+    if (draft === committed) return
+    const parsed = coerce(draft)
+    // Show what was stored, so the box stops disagreeing with the document.
+    const stored = jsonToString(parsed)
+    setCommitted(stored)
+    setDraft(stored)
+    onCommit(parsed)
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commit()
+        }
+        if (e.key === 'Escape') setDraft(text)
+      }}
+    />
+  )
+}
+
+/**
  * What the author typed, as the value they almost certainly meant.
  *
  * A form's data is JSON, so `18` typed against a number field has to become the
@@ -324,8 +378,24 @@ function coerce(text: string): JsonValue {
   if (text === '') return ''
   if (text === 'true') return true
   if (text === 'false') return false
+
+  /*
+   * A number only when the number is spelled the way JavaScript spells it.
+   *
+   * `Number()` accepts far more than that, so `01234` became `1234` and could
+   * never match the string a postcode field holds; `+441234567890` became a
+   * number; `1.50` became `1.5`. The comment below already named postcodes and
+   * phone numbers as the cost, which was the moment to notice that "looks
+   * numeric" is not the test — "would be written this way if it were a number"
+   * is.
+   *
+   * The round trip is that test, and it is exact: `18` prints back as `18` and
+   * is a number; `01234` prints back as `1234`, which is not what was typed, so
+   * it stays text.
+   */
   const asNumber = Number(text)
-  return text.trim() !== '' && !Number.isNaN(asNumber) ? asNumber : text
+  if (!Number.isNaN(asNumber) && String(asNumber) === text) return asNumber
+  return text
 }
 
 /**

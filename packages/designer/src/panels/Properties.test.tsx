@@ -1069,3 +1069,162 @@ describe('moving focus through a membership condition', () => {
     })
   })
 })
+
+/**
+ * The data key field, after an undo.
+ *
+ * It holds a draft and commits on blur, which is right — but it never re-synced,
+ * and its React key is the node's key, which does not change when only the data
+ * key changes. So an undo restored the document while the box went on showing
+ * the text from before it, and the next blur wrote that text back: the undo
+ * silently reversed, and the payload's key with it.
+ *
+ * The same shape as the raw CSS field, the JSON editor and the options box.
+ * This one was the last editor here without it.
+ */
+describe('the data key field and undo', () => {
+  const named = (): ComponentNode => ({
+    key: 'emailField',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  it('shows the key the document holds after an undo', async () => {
+    const harness = setup(named())
+    await harness.select()
+
+    const input = screen.getByLabelText('Data key')
+    await harness.user.clear(input)
+    await harness.user.type(input, 'primaryEmail')
+    await harness.user.tab()
+    expect(harness.node('emailField')?.dataKey).toBe('primaryEmail')
+
+    await harness.user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(screen.getByLabelText('Data key')).toHaveProperty('value', 'emailField')
+  })
+
+  it('does not write the stale text back on the next blur', async () => {
+    // The failure that made this worth fixing. The box kept the old text, and
+    // blurring it committed that text — so the undo undid itself.
+    const harness = setup(named())
+    await harness.select()
+
+    const input = screen.getByLabelText('Data key')
+    await harness.user.clear(input)
+    await harness.user.type(input, 'primaryEmail')
+    await harness.user.tab()
+
+    await harness.user.click(screen.getByRole('button', { name: 'Undo' }))
+    await harness.user.click(screen.getByLabelText('Data key'))
+    await harness.user.tab()
+
+    expect(harness.node('emailField')?.dataKey).toBeUndefined()
+  })
+
+  it('keeps an edit in progress when the document changes elsewhere', async () => {
+    /*
+     * The control, and the reason a draft exists at all. Re-syncing on every
+     * render would throw away what is being typed; only the version this field
+     * last saw is replaced.
+     */
+    const harness = setup(named())
+    await harness.select()
+
+    const input = screen.getByLabelText('Data key')
+    await harness.user.clear(input)
+    await harness.user.type(input, 'halfTyped')
+
+    expect(input).toHaveProperty('value', 'halfTyped')
+    expect(harness.node('emailField')?.dataKey).toBeUndefined()
+  })
+})
+
+/**
+ * A literal that looks numeric and is not.
+ *
+ * `coerce` turned anything `Number()` accepts into a number, so `is 01234`
+ * stored `1234` and could never match the string a postcode field holds. The
+ * doc comment beside it named postcodes and phone numbers as the cost and said
+ * comparison operators "are the only place this matters" — the code applied it
+ * to every literal in every operator.
+ *
+ * The rule now is that a number has to be spelled the way JavaScript spells it.
+ * `18` round-trips to `18` and becomes a number; `01234` round-trips to `1234`,
+ * which is not what was typed, so it stays text.
+ */
+describe('typing a literal into a condition', () => {
+  const listy = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'ref', dataKey: 'website' },
+        right: { kind: 'literal', value: '' },
+      },
+    },
+  })
+
+  const stored = (harness: Harness): unknown => {
+    const when = harness.node('website')?.renderWhen
+    return when?.kind === 'condition' && 'right' in when.condition
+      ? when.condition.right
+      : undefined
+  }
+
+  it.each([
+    ['a postcode with a leading zero', '01234', '01234'],
+    ['a phone number', '+441234567890', '+441234567890'],
+    ['a version', '1.50', '1.50'],
+    ['something in exponent form', '1e3', '1e3'],
+  ])('keeps %s as text', async (_what, typed, expected) => {
+    const harness = setup(listy())
+    await harness.select()
+
+    const right = screen.getByLabelText('Right')
+    await harness.user.clear(right)
+    await harness.user.type(right, typed)
+    await harness.user.tab()
+
+    expect(stored(harness)).toEqual({ kind: 'literal', value: expected })
+  })
+
+  it.each([
+    ['a whole number', '18', 18],
+    ['a negative', '-4', -4],
+    ['a decimal', '1.5', 1.5],
+    ['zero', '0', 0],
+  ])('still reads %s as a number', async (_what, typed, expected) => {
+    /*
+     * The control, and the reason coercion exists: ordering refuses to compare
+     * a string to a number rather than guessing, so `is at least 18` against a
+     * number field can never be true if the literal is text.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const right = screen.getByLabelText('Right')
+    await harness.user.clear(right)
+    await harness.user.type(right, typed)
+    await harness.user.tab()
+
+    expect(stored(harness)).toEqual({ kind: 'literal', value: expected })
+  })
+
+  it('still reads true and false as booleans', async () => {
+    const harness = setup(listy())
+    await harness.select()
+
+    const right = screen.getByLabelText('Right')
+    await harness.user.clear(right)
+    await harness.user.type(right, 'true')
+    await harness.user.tab()
+
+    expect(stored(harness)).toEqual({ kind: 'literal', value: true })
+  })
+})

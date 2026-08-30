@@ -29,6 +29,17 @@ export interface TabsProps<Id extends string> {
   onSelect: (id: Id) => void
   /** The active panel's contents. Only the active panel is rendered. */
   children: ReactNode
+  /**
+   * Something to sit beside the strip, on the same row.
+   *
+   * The JSON dialog puts its close button there. It cannot go *inside* the
+   * strip, which is the `tablist` and may hold nothing but tabs, and the dialog
+   * having its own tab implementation to get that layout is what left its
+   * second view unreachable from the keyboard.
+   *
+   * Absent for every other caller, and then the markup is exactly what it was.
+   */
+  aside?: ReactNode
 }
 
 export function Tabs<Id extends string>({
@@ -37,6 +48,7 @@ export function Tabs<Id extends string>({
   active,
   onSelect,
   children,
+  aside,
 }: TabsProps<Id>): ReactNode {
   const base = useId()
   const strip = useRef<HTMLDivElement>(null)
@@ -77,31 +89,42 @@ export function Tabs<Id extends string>({
     [base, tabs, onSelect],
   )
 
+  const tablist = (
+    <div className="fs-tabs" role="tablist" aria-label={label} ref={strip}>
+      {tabs.map((tab, index) => (
+        <button
+          key={tab.id}
+          id={tabId(tab.id)}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.id}
+          /*
+           * Only the selected tab's panel is in the DOM, so only the selected
+           * tab can name one. An unresolved IDREF is not an axe violation,
+           * which is how the inspector shipped two of them for months.
+           */
+          {...(active === tab.id ? { 'aria-controls': panelId(tab.id) } : {})}
+          tabIndex={active === tab.id ? 0 : -1}
+          className={'fs-tabs__tab' + (active === tab.id ? ' is-active' : '')}
+          onClick={() => onSelect(tab.id)}
+          onKeyDown={(event) => onKeyDown(event, index)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <>
-      <div className="fs-tabs" role="tablist" aria-label={label} ref={strip}>
-        {tabs.map((tab, index) => (
-          <button
-            key={tab.id}
-            id={tabId(tab.id)}
-            type="button"
-            role="tab"
-            aria-selected={active === tab.id}
-            /*
-             * Only the selected tab's panel is in the DOM, so only the selected
-             * tab can name one. An unresolved IDREF is not an axe violation,
-             * which is how the inspector shipped two of them for months.
-             */
-            {...(active === tab.id ? { 'aria-controls': panelId(tab.id) } : {})}
-            tabIndex={active === tab.id ? 0 : -1}
-            className={'fs-tabs__tab' + (active === tab.id ? ' is-active' : '')}
-            onClick={() => onSelect(tab.id)}
-            onKeyDown={(event) => onKeyDown(event, index)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {aside === undefined ? (
+        tablist
+      ) : (
+        <div className="fs-tabs__row">
+          {tablist}
+          {aside}
+        </div>
+      )}
 
       <div
         id={panelId(active)}
