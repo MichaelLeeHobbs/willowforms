@@ -819,3 +819,273 @@ describe('validateDocument and unrecognised tags', () => {
     ).toEqual([])
   })
 })
+
+/**
+ * The gate looks at the whole document, not at the parts that were easy.
+ *
+ * `validateDocument` checked keys, actions and languages, and said nothing about
+ * `props`, `renderWhen`'s payload, `schema.validations`' payloads, `version`,
+ * `settings` or `css`. Every one of those is read at render time without a
+ * guard in front of it, and a document is data: it is authored by one person,
+ * stored by another, and hand-editable in between.
+ *
+ * The rule these tests hold the gate to is narrow and worth stating. It refuses
+ * what is **malformed**, meaning a shape no version of this library ever wrote.
+ * It does not refuse what is merely unusual, because a gate that rejects a
+ * document somebody is holding is worse than the render it was protecting.
+ */
+describe('validateDocument over the whole document', () => {
+  const docWith = (patch: Record<string, unknown>): FormDocument => ({
+    ...createDocument('Contact', 'doc'),
+    ...patch,
+  })
+
+  const nodeWith = (patch: Record<string, unknown>): FormDocument =>
+    docWith({
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'field', type: 'TextField', props: {}, ...patch }],
+      },
+    })
+
+  const codes = (doc: FormDocument): string[] => validateDocument(doc).map((e) => e.code)
+
+  it('accepts what the factory builds, which is the floor for all of this', () => {
+    expect(validateDocument(createDocument('Contact', 'doc'))).toEqual([])
+  })
+
+  describe('the document envelope', () => {
+    it('rejects a version this library did not write', () => {
+      expect(codes(docWith({ version: '2' }))).toContain('malformed')
+      expect(codes(docWith({ version: undefined }))).toContain('malformed')
+    })
+
+    it('rejects an id or a name that is not text', () => {
+      expect(codes(docWith({ id: 7 }))).toContain('malformed')
+      expect(codes(docWith({ name: null }))).toContain('malformed')
+    })
+
+    it('accepts an empty name, which is a form nobody has titled yet', () => {
+      expect(codes(docWith({ name: '' }))).toEqual([])
+    })
+
+    it('rejects settings that are not an object, or hold a type that is not a name', () => {
+      expect(codes(docWith({ settings: 'nope' }))).toContain('malformed')
+      expect(codes(docWith({ settings: { errorType: 7 } }))).toContain('malformed')
+    })
+
+    it('accepts settings it has no opinion about', () => {
+      expect(codes(docWith({ settings: {} }))).toEqual([])
+      expect(codes(docWith({ settings: { errorType: 'Alert' } }))).toEqual([])
+    })
+
+    it('rejects a language entry missing the parts the renderer reads', () => {
+      const languages = [{ code: 'en', name: 'English', bidi: 'sideways' }]
+      expect(codes(docWith({ languages, defaultLanguage: 'en' }))).toContain('malformed')
+      expect(
+        codes(docWith({ languages: [{ code: 'en', bidi: 'ltr' }], defaultLanguage: 'en' })),
+      ).toContain('malformed')
+    })
+
+    it('rejects an action that is not one', () => {
+      expect(codes(docWith({ actions: { go: 'nope' } }))).toContain('malformed')
+      expect(codes(docWith({ actions: { go: { name: 'go' } } }))).toContain('malformed')
+    })
+
+    it('accepts a well-formed action', () => {
+      expect(
+        codes(docWith({ actions: { go: { name: 'go', body: 'return 1', params: {} } } })),
+      ).toEqual([])
+    })
+  })
+
+  describe('a component property', () => {
+    it('rejects props that are not an object', () => {
+      expect(codes(nodeWith({ props: 'nope' }))).toContain('malformed')
+      expect(codes(nodeWith({ props: [] }))).toContain('malformed')
+    })
+
+    it('rejects a binding whose payload does not match its kind', () => {
+      // Each kind promises exactly one field. `resolveProp` reads it without
+      // asking, so `{ kind: 'i18n' }` with no key returns undefined as a label.
+      expect(codes(nodeWith({ props: { label: { kind: 'i18n' } } }))).toContain('malformed')
+      expect(codes(nodeWith({ props: { label: { kind: 'computed' } } }))).toContain('malformed')
+      expect(codes(nodeWith({ props: { label: { kind: 'computed', expression: 7 } } }))).toContain(
+        'malformed',
+      )
+      expect(codes(nodeWith({ props: { label: { kind: 'condition' } } }))).toContain('malformed')
+    })
+
+    it('accepts a static binding holding any JSON at all', () => {
+      // `static` is the one kind whose payload is unconstrained, deliberately: a
+      // prop can be a list of options or a nested object, and the kit decides.
+      for (const value of ['x', 7, true, null, [1, 2], { a: { b: 'c' } }]) {
+        expect(codes(nodeWith({ props: { label: { kind: 'static', value } } }))).toEqual([])
+      }
+    })
+
+    it('rejects a static binding with no value field at all', () => {
+      // Distinct from `value: undefined`, which JSON cannot express anyway.
+      expect(codes(nodeWith({ props: { label: { kind: 'static' } } }))).toContain('malformed')
+    })
+  })
+
+  describe('a condition', () => {
+    const renderWhen = (condition: unknown): FormDocument =>
+      nodeWith({ renderWhen: { kind: 'condition', condition } })
+
+    it('accepts the operators it has', () => {
+      expect(codes(renderWhen({ op: 'truthy', value: { kind: 'literal', value: 1 } }))).toEqual([])
+      expect(
+        codes(
+          renderWhen({
+            op: 'eq',
+            left: { kind: 'ref', dataKey: 'a' },
+            right: { kind: 'context', path: 'user.role' },
+          }),
+        ),
+      ).toEqual([])
+      expect(codes(renderWhen({ op: 'and', conditions: [] }))).toEqual([])
+    })
+
+    it('rejects an operator it does not have', () => {
+      expect(codes(renderWhen({ op: 'equals', left: {}, right: {} }))).toContain('malformed')
+    })
+
+    it('rejects an operand that is not one', () => {
+      expect(codes(renderWhen({ op: 'truthy', value: { kind: 'field', dataKey: 'a' } }))).toContain(
+        'malformed',
+      )
+      expect(codes(renderWhen({ op: 'truthy', value: { kind: 'ref' } }))).toContain('malformed')
+      expect(codes(renderWhen({ op: 'truthy', value: 'a' }))).toContain('malformed')
+    })
+
+    it('rejects a scope that is not a scope', () => {
+      expect(
+        codes(
+          renderWhen({ op: 'truthy', value: { kind: 'ref', dataKey: 'a', scope: 'sideways' } }),
+        ),
+      ).toContain('malformed')
+    })
+
+    it('rejects a membership test whose options are not a list', () => {
+      expect(
+        codes(renderWhen({ op: 'in', value: { kind: 'ref', dataKey: 'a' }, options: 'ab' })),
+      ).toContain('malformed')
+    })
+
+    it('reaches a condition nested inside a group', () => {
+      // The recursion is the point. A malformed condition three levels down is
+      // exactly as reachable at render time as one at the top.
+      expect(
+        codes(
+          renderWhen({
+            op: 'and',
+            conditions: [{ op: 'not', condition: { op: 'equals', left: {}, right: {} } }],
+          }),
+        ),
+      ).toContain('malformed')
+    })
+  })
+
+  describe('a field schema', () => {
+    it('rejects a data type this library does not have', () => {
+      expect(codes(nodeWith({ schema: { type: 'integer', validations: [] } }))).toContain(
+        'malformed',
+      )
+    })
+
+    it('accepts every data type it does have', () => {
+      for (const type of ['string', 'number', 'boolean', 'date', 'array', 'object', 'file']) {
+        expect(codes(nodeWith({ schema: { type, validations: [] } })), type).toEqual([])
+      }
+    })
+
+    it('rejects a rule whose parameter is the wrong kind of thing', () => {
+      // `minLength` compares with `<`, so a string bound silently compares
+      // lexicographically; `pattern` is handed to RegExp.
+      const rule = (r: unknown): FormDocument =>
+        nodeWith({ schema: { type: 'string', validations: [r] } })
+
+      expect(codes(rule({ key: 'minLength' }))).toContain('malformed')
+      expect(codes(rule({ key: 'minLength', value: '3' }))).toContain('malformed')
+      expect(codes(rule({ key: 'pattern', value: 3 }))).toContain('malformed')
+      expect(codes(rule({ key: 'custom' }))).toContain('malformed')
+      expect(codes(rule({ key: 'required', message: 7 }))).toContain('malformed')
+    })
+
+    it('accepts the rules as they are actually written', () => {
+      expect(
+        codes(
+          nodeWith({
+            schema: {
+              type: 'string',
+              autoValidate: true,
+              validations: [
+                { key: 'required', message: 'Needed.' },
+                { key: 'minLength', value: 3 },
+                { key: 'pattern', value: '^a' },
+                { key: 'custom', expression: 'value.length > 0' },
+              ],
+            },
+          }),
+        ),
+      ).toEqual([])
+    })
+
+    it('rejects an autoValidate that is not a yes or a no', () => {
+      expect(
+        codes(nodeWith({ schema: { type: 'string', validations: [], autoValidate: 'yes' } })),
+      ).toContain('malformed')
+    })
+  })
+
+  describe('per-component CSS', () => {
+    it('rejects css that is not an object of text', () => {
+      expect(codes(nodeWith({ css: 'color: red' }))).toContain('malformed')
+      expect(codes(nodeWith({ css: { any: 7 } }))).toContain('malformed')
+    })
+
+    it('rejects a breakpoint this library does not have', () => {
+      expect(codes(nodeWith({ css: { widescreen: 'color: red' } }))).toContain('malformed')
+    })
+
+    it('accepts the breakpoints it does have', () => {
+      expect(
+        codes(nodeWith({ css: { any: 'color: red', mobile: '', tablet: 'x', desktop: 'y' } })),
+      ).toEqual([])
+    })
+
+    it('does not refuse CSS that `safeDeclarations` will drop', () => {
+      /*
+       * A separate judgement on purpose. Text holding a brace is refused at
+       * render time and reported in the Style tab, and a document carrying it
+       * still opens and can be fixed. Refusing it here would make the panel that
+       * exists to repair such a document the one place you cannot load it.
+       */
+      expect(codes(nodeWith({ css: { any: 'color: red}html{display:none}' } }))).toEqual([])
+    })
+  })
+
+  describe('events', () => {
+    it('rejects an action reference whose type is neither kind', () => {
+      expect(codes(nodeWith({ events: { onChange: [{ name: 'go', type: 'magic' }] } }))).toContain(
+        'malformed',
+      )
+    })
+
+    it('rejects an event this library does not raise', () => {
+      expect(
+        codes(nodeWith({ events: { onTelepathy: [{ name: 'go', type: 'builtin' }] } })),
+      ).toContain('malformed')
+    })
+
+    it('accepts a builtin reference, which names no action on the document', () => {
+      expect(
+        codes(nodeWith({ events: { onChange: [{ name: 'submit', type: 'builtin' }] } })),
+      ).toEqual([])
+    })
+  })
+})

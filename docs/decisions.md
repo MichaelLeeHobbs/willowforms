@@ -4,6 +4,40 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The gate refuses what is malformed, not what is unusual; and the boundary is per node
+
+Two decisions from item 8, which are the same decision seen from both ends: what a document has to be
+before it renders, and what happens when one that is fine renders anyway and throws.
+
+- **Decided: `validateDocument` now reads the whole document** — `version`, `id`, `name`, `settings`,
+  `actions`, every `props` binding and its payload, `renderWhen`, conditions and their operands all the
+  way down, `schema.type`, each rule's parameter, `css`, event names and action-reference types.
+- **The line it draws:** refuse a shape **no version of this library ever wrote**. Do not refuse a shape
+  that is merely unusual. A gate that rejects a document somebody is holding is worse than the render it
+  was protecting, and the panel is where a broken document goes to be repaired.
+- **Three places that line bites, written down because they look like omissions:**
+  `static` bindings hold any JSON at all and only their _presence_ is checked, since a prop can be a
+  list of options or a nested object and the kit decides. An empty `name` is accepted, because a form
+  nobody has titled yet is a real state. And CSS that `safeDeclarations` will drop is accepted, because
+  refusing it here would make the Style tab the one place that document cannot be opened.
+- **The vocabularies are literal strings, checked both ways by the compiler.** They have to be literal:
+  the question is what an _untrusted_ document holds, and by the time a value is typed as `PropValue`
+  the question has been assumed away. `satisfies` refuses a string outside the union and a `Covers`
+  conditional type refuses a union member outside the list, so neither can drift.
+- **Decided: the error boundary is per node, not per form.** A form-level boundary saves the host's page
+  and still throws away every answer already typed into the fields that were fine. On the canvas it is
+  worse: the component that broke becomes unselectable, and selecting it is exactly what an author needs
+  in order to delete it.
+- **The fallback carries `data-fs-key` and `data-fs-type` itself.** The canvas hit-tests with
+  `closest('[data-fs-key]')` and nothing else in the DOM identifies a node, so without them a broken
+  component is unreachable from the canvas and from the tree at once.
+- **Rejected: logging the error.** React has already written its own copy to the console. It goes to an
+  `onError` prop instead, so a host that is watching gets it in its own telemetry and nobody gets it
+  twice.
+- **Reversal:** the boundary is one class and one wrapper. The gate is additive — it reports more, and
+  nothing reads its output as a whitelist — so relaxing any single check is deleting the check.
+- **When:** 2026-08-30.
+
 ### An unreadable tag reads as "no rule", not as "skip it"
 
 - **Decided:** every `switch` over a closed union in the evaluation path gets a `default` that routes

@@ -694,3 +694,135 @@ describe('a property binding this code cannot read', () => {
     expect(screen.getByLabelText('greeting')).toBeTruthy()
   })
 })
+
+/**
+ * A component that throws does not take the page with it.
+ *
+ * The gate is the first answer and it cannot be the only one. A kit is
+ * third-party code, a host's evaluator is arbitrary JavaScript, and a throw
+ * during render in React 19 unmounts the whole tree rather than the one node —
+ * so a single bad component blanks whatever page the form was embedded in.
+ * There was no error boundary anywhere in the repository.
+ *
+ * The boundary is per node rather than around the form. A form-level one keeps
+ * the host's page and still loses every answer already typed, and on the canvas
+ * it would make the broken component unselectable — which is the one thing an
+ * author needs in order to delete it.
+ */
+describe('a component that throws while rendering', () => {
+  function Boom(): ReactNode {
+    throw new Error('kit exploded')
+  }
+
+  const boomKit: RendererKit = { id: 'boom', renderers: { Screen: Screen_, Field, Boom } }
+
+  const documentWithBoom = (): FormDocument =>
+    documentOf([
+      { key: 'before', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+      { key: 'boom', type: 'Boom', props: {} },
+      { key: 'after', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+
+  /** React logs a caught error itself; the test is not interested in the noise. */
+  function quietly<T>(fn: () => T): T {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      return fn()
+    } finally {
+      spy.mockRestore()
+    }
+  }
+
+  it('keeps the rest of the form on the page', () => {
+    quietly(() =>
+      render(
+        <FormRenderer
+          document={documentWithBoom()}
+          kit={boomKit}
+          data={{ before: 'kept', after: 'also kept' }}
+          onChange={() => undefined}
+        />,
+      ),
+    )
+
+    // Both siblings render, and the answers already in them are still there.
+    expect(screen.getByLabelText('before')).toHaveProperty('value', 'kept')
+    expect(screen.getByLabelText('after')).toHaveProperty('value', 'also kept')
+  })
+
+  it('says so where the component would have been', () => {
+    const { container } = quietly(() =>
+      render(
+        <FormRenderer
+          document={documentWithBoom()}
+          kit={boomKit}
+          data={{}}
+          onChange={() => undefined}
+        />,
+      ),
+    )
+
+    const fallback = container.querySelector('[data-fs-key="boom"]')
+    expect(fallback).toBeTruthy()
+    // Announced, because a component vanishing silently is how a form asks a
+    // question nobody can answer.
+    expect(fallback?.getAttribute('role')).toBe('alert')
+  })
+
+  it('keeps the node selectable, which is how an author removes it', () => {
+    const { container } = quietly(() =>
+      render(
+        <FormRenderer
+          document={documentWithBoom()}
+          kit={boomKit}
+          data={{}}
+          revealHidden
+          onChange={() => undefined}
+        />,
+      ),
+    )
+
+    // The canvas hit-tests with `closest('[data-fs-key]')` and there is nothing
+    // else in the DOM that identifies a node, so the fallback has to carry it.
+    const fallback = container.querySelector('[data-fs-key="boom"]')
+    expect(fallback?.getAttribute('data-fs-type')).toBe('Boom')
+  })
+
+  it('hands the error to the host rather than swallowing it', () => {
+    const onError = vi.fn()
+    quietly(() =>
+      render(
+        <FormRenderer
+          document={documentWithBoom()}
+          kit={boomKit}
+          data={{}}
+          onError={onError}
+          onChange={() => undefined}
+        />,
+      ),
+    )
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    const [error, key] = onError.mock.calls[0] as [Error, string]
+    expect(error.message).toBe('kit exploded')
+    expect(key).toBe('boom')
+  })
+
+  it('does nothing at all when nothing throws', () => {
+    // The control. A boundary that renders its fallback unconditionally would
+    // pass every test above.
+    const onError = vi.fn()
+    render(
+      <FormRenderer
+        document={documentOf([field('email')])}
+        kit={kit}
+        data={{ email: 'a@b.co' }}
+        onError={onError}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(screen.getByLabelText('email')).toHaveProperty('value', 'a@b.co')
+    expect(onError).not.toHaveBeenCalled()
+  })
+})

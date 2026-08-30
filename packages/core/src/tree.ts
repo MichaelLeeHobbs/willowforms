@@ -7,7 +7,19 @@
 
 import { keyProblem } from './keys.js'
 import { rowScopeProblems } from './rows.js'
-import type { ComponentNode, FormDocument, PropValue, ValidationRule } from './types.js'
+import type {
+  ActionRef,
+  ComponentNode,
+  Condition,
+  Device,
+  EventName,
+  FieldSchema,
+  FormDocument,
+  Language,
+  Operand,
+  PropValue,
+  ValidationRule,
+} from './types.js'
 
 /** Depth-first walk, parents before children. */
 export function walk(
@@ -352,6 +364,91 @@ void RULE_KEYS_COVER_THE_UNION
 const BINDING_KINDS: ReadonlySet<string> = new Set(BINDING_KIND_LIST)
 const RULE_KEYS: ReadonlySet<string> = new Set(RULE_KEY_LIST)
 
+const FIELD_TYPE_LIST = [
+  'string',
+  'number',
+  'boolean',
+  'date',
+  'array',
+  'object',
+  'file',
+] as const satisfies readonly FieldSchema['type'][]
+
+const DEVICE_LIST = ['any', 'desktop', 'tablet', 'mobile'] as const satisfies readonly Device[]
+
+const EVENT_NAME_LIST = [
+  'onChange',
+  'onClick',
+  'onBlur',
+  'onFocus',
+  'onMount',
+  'onUnmount',
+] as const satisfies readonly EventName[]
+
+const CONDITION_OP_LIST = [
+  'eq',
+  'ne',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'empty',
+  'notEmpty',
+  'truthy',
+  'falsy',
+  'in',
+  'notIn',
+  'and',
+  'or',
+  'not',
+] as const satisfies readonly Condition['op'][]
+
+const OPERAND_KIND_LIST = [
+  'literal',
+  'ref',
+  'context',
+] as const satisfies readonly Operand['kind'][]
+
+const ACTION_REF_TYPE_LIST = ['code', 'builtin'] as const satisfies readonly ActionRef['type'][]
+
+const BIDI_LIST = ['ltr', 'rtl'] as const satisfies readonly Language['bidi'][]
+
+/*
+ * `scope` has no name of its own in the type, so this one is spelled from the
+ * member rather than from an alias. It is two strings and it is checked the
+ * same way.
+ */
+const ROW_SCOPE_LIST = ['form', 'row'] as const satisfies readonly ('form' | 'row')[]
+
+const FIELD_TYPES_COVER_THE_UNION: Covers<FieldSchema['type'], (typeof FIELD_TYPE_LIST)[number]> =
+  true
+const DEVICES_COVER_THE_UNION: Covers<Device, (typeof DEVICE_LIST)[number]> = true
+const EVENTS_COVER_THE_UNION: Covers<EventName, (typeof EVENT_NAME_LIST)[number]> = true
+const OPS_COVER_THE_UNION: Covers<Condition['op'], (typeof CONDITION_OP_LIST)[number]> = true
+const OPERANDS_COVER_THE_UNION: Covers<Operand['kind'], (typeof OPERAND_KIND_LIST)[number]> = true
+const ACTION_TYPES_COVER_THE_UNION: Covers<
+  ActionRef['type'],
+  (typeof ACTION_REF_TYPE_LIST)[number]
+> = true
+const BIDI_COVERS_THE_UNION: Covers<Language['bidi'], (typeof BIDI_LIST)[number]> = true
+
+void FIELD_TYPES_COVER_THE_UNION
+void DEVICES_COVER_THE_UNION
+void EVENTS_COVER_THE_UNION
+void OPS_COVER_THE_UNION
+void OPERANDS_COVER_THE_UNION
+void ACTION_TYPES_COVER_THE_UNION
+void BIDI_COVERS_THE_UNION
+
+const FIELD_TYPES: ReadonlySet<string> = new Set(FIELD_TYPE_LIST)
+const DEVICES: ReadonlySet<string> = new Set(DEVICE_LIST)
+const EVENT_NAMES: ReadonlySet<string> = new Set(EVENT_NAME_LIST)
+const CONDITION_OPS: ReadonlySet<string> = new Set(CONDITION_OP_LIST)
+const OPERAND_KINDS: ReadonlySet<string> = new Set(OPERAND_KIND_LIST)
+const ACTION_REF_TYPES: ReadonlySet<string> = new Set(ACTION_REF_TYPE_LIST)
+const BIDI: ReadonlySet<string> = new Set(BIDI_LIST)
+const ROW_SCOPES: ReadonlySet<string> = new Set(ROW_SCOPE_LIST)
+
 export function validateDocument(doc: FormDocument): StructuralError[] {
   const errors: StructuralError[] = []
   const seen = new Set<string>()
@@ -369,8 +466,57 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
     return errors
   }
 
+  /*
+   * The envelope. Everything outside the tree that something reads without
+   * asking whether it is there — `version` decides how the rest is interpreted,
+   * `settings.errorType` is looked up in a kit, `name` is rendered.
+   *
+   * `id` and `name` have to be text and `name` may be empty: a form nobody has
+   * titled yet is a real state, and refusing it would make the panel unable to
+   * open the document you were about to name.
+   */
+  if (candidate['version'] !== '1') {
+    malformed(
+      'version is ' +
+        JSON.stringify(candidate['version']) +
+        ', and this library writes version "1".',
+    )
+  }
+  if (typeof candidate['id'] !== 'string') malformed('id must be text.')
+  if (typeof candidate['name'] !== 'string') malformed('name must be text.')
+
+  const settings = candidate['settings']
+  if (settings !== undefined) {
+    if (!isRecord(settings)) {
+      malformed('settings must be an object.')
+    } else {
+      for (const field of ['errorType', 'tooltipType'] as const) {
+        const value = settings[field]
+        if (value !== undefined && typeof value !== 'string') {
+          malformed('settings.' + field + ' must be a component type.')
+        }
+      }
+    }
+  }
+
   const actions = isRecord(candidate['actions']) ? candidate['actions'] : undefined
   if (candidate['actions'] !== undefined && !actions) malformed('actions must be an object.')
+
+  /*
+   * An action is JavaScript the host will run in its sandbox. A `body` that is
+   * not a string reaches that sandbox as whatever it is.
+   */
+  for (const [name, action] of Object.entries(actions ?? {})) {
+    if (!isRecord(action)) {
+      malformed('actions.' + name + ' is not an action.')
+      continue
+    }
+    if (typeof action['name'] !== 'string') malformed('actions.' + name + ' needs a name.')
+    if (typeof action['body'] !== 'string') malformed('actions.' + name + ' needs a body.')
+    if (action['params'] !== undefined && !isRecord(action['params'])) {
+      malformed('actions.' + name + ' has params that are not an object.')
+    }
+  }
 
   /*
    * The bundles a translation is looked up in, checked all the way down.
@@ -474,7 +620,7 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       }
 
       visitEvents(value['events'], key, path)
-      visitTags(value, key, path)
+      visitShape(value, key, path)
     }
 
     const children = value['children']
@@ -500,34 +646,177 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
    * The runtime readings are fixed too, in `visibility.ts` and `validation.ts`.
    * This is the answer that means nobody has to rely on them.
    */
-  const visitTags = (node: Record<string, unknown>, key: string, path: string): void => {
+  /**
+   * Everything on a node that is read at render time without a guard.
+   *
+   * `PropValue`, `ValidationRule`, `Condition` and `Operand` are closed unions,
+   * so every consumer switches over one exhaustively and TypeScript proves the
+   * switch total. That proof is about values the compiler made. A document is
+   * data — hand-editable JSON, a paste, a row out of a database — so the tag can
+   * be anything and the payload can be missing.
+   *
+   * The line this draws: refuse what is **malformed**, meaning a shape no
+   * version of this library ever wrote. Do not refuse what is merely unusual. A
+   * gate that rejects a document somebody is holding is worse than the render it
+   * was protecting, and the panel is where a broken document goes to be fixed.
+   */
+  const visitShape = (node: Record<string, unknown>, key: string, path: string): void => {
+    const where = (what: string): string => what + ' on ' + key
+
+    const oneOf = (value: unknown, allowed: ReadonlySet<string>, what: string): boolean => {
+      if (typeof value === 'string' && allowed.has(value)) return true
+      malformed(
+        where(what) +
+          ' is ' +
+          JSON.stringify(value) +
+          ', which is not one of ' +
+          [...allowed].join(', ') +
+          '.',
+      )
+      return false
+    }
+
+    const text = (value: unknown, what: string): void => {
+      if (typeof value !== 'string') malformed(where(what) + ' must be text.')
+    }
+
+    /** One `PropValue`: the tag, and the single field that tag promises. */
     const binding = (value: unknown, what: string): void => {
       if (value === undefined) return
       if (!isRecord(value)) {
-        malformed(what + ' on ' + key + ' must be an object.')
+        malformed(where(what) + ' must be an object.')
         return
       }
-      if (!BINDING_KINDS.has(value['kind'] as string)) {
-        malformed(
-          what +
-            ' on ' +
-            key +
-            ' has kind ' +
-            JSON.stringify(value['kind']) +
-            ', which is not one of ' +
-            [...BINDING_KINDS].join(', ') +
-            '.',
-        )
+      if (!oneOf(value['kind'], BINDING_KINDS, what + "'s kind")) return
+
+      switch (value['kind']) {
+        case 'static':
+          /*
+           * The one payload left unconstrained, deliberately. A prop can be a
+           * list of options or a nested object and the kit decides what it
+           * means, so there is nothing here to check beyond its presence.
+           */
+          if (!('value' in value)) malformed(where(what) + ' is static with no value.')
+          return
+        case 'computed':
+          text(value['expression'], what + "'s expression")
+          return
+        case 'i18n':
+          text(value['key'], what + "'s key")
+          return
+        default:
+          condition(value['condition'], what + "'s condition")
       }
     }
 
+    /** One side of a comparison. */
+    const operand = (value: unknown, what: string): void => {
+      if (!isRecord(value)) {
+        malformed(where(what) + ' must be an object.')
+        return
+      }
+      if (!oneOf(value['kind'], OPERAND_KINDS, what + "'s kind")) return
+
+      if (value['kind'] === 'ref') {
+        text(value['dataKey'], what + "'s data key")
+        // Absent means the form, which is what every ref written before
+        // repeaters existed already meant.
+        if (value['scope'] !== undefined) oneOf(value['scope'], ROW_SCOPES, what + "'s scope")
+        return
+      }
+      if (value['kind'] === 'context') text(value['path'], what + "'s path")
+      // A literal holds any JSON, including none: `{ kind: 'literal' }` reads as
+      // undefined, which is what an unanswered field reads as too.
+    }
+
+    /**
+     * One condition, and everything under it.
+     *
+     * Recursive, because a malformed condition three levels down is exactly as
+     * reachable at render time as one at the top, and `evaluateCondition`
+     * descends into every one of them.
+     */
+    const condition = (value: unknown, what: string): void => {
+      if (!isRecord(value)) {
+        malformed(where(what) + ' must be an object.')
+        return
+      }
+      const op = value['op']
+      if (!oneOf(op, CONDITION_OPS, what + "'s operator")) return
+
+      if (op === 'and' || op === 'or') {
+        const inner = value['conditions']
+        if (!Array.isArray(inner)) {
+          malformed(where(what) + ' must hold a list of conditions.')
+          return
+        }
+        inner.forEach((each, i) => condition(each, what + '[' + String(i) + ']'))
+        return
+      }
+      if (op === 'not') {
+        condition(value['condition'], what + "'s inner condition")
+        return
+      }
+      if (op === 'in' || op === 'notIn') {
+        operand(value['value'], what + "'s subject")
+        if (!Array.isArray(value['options'])) {
+          malformed(where(what) + ' must hold a list of options.')
+        }
+        return
+      }
+      if (
+        op === 'eq' ||
+        op === 'ne' ||
+        op === 'gt' ||
+        op === 'gte' ||
+        op === 'lt' ||
+        op === 'lte'
+      ) {
+        operand(value['left'], what + "'s left side")
+        operand(value['right'], what + "'s right side")
+        return
+      }
+      operand(value['value'], what + "'s subject")
+    }
+
+    const props = node['props']
+    if (!isRecord(props)) {
+      malformed(path + '.props must be an object.')
+    } else {
+      for (const [name, value] of Object.entries(props)) binding(value, 'property ' + name)
+    }
+
     binding(node['renderWhen'], 'renderWhen')
+
+    const css = node['css']
+    if (css !== undefined) {
+      if (!isRecord(css)) {
+        malformed(where('css') + ' must be an object keyed by breakpoint.')
+      } else {
+        for (const [device, declarations] of Object.entries(css)) {
+          oneOf(device, DEVICES, 'a css breakpoint')
+          /*
+           * Only that it is text. Whether the text is *safe* is a different
+           * judgement and a later one: `safeDeclarations` drops a block that
+           * could escape its rule, and the Style tab says so. Refusing it here
+           * would make the panel that exists to repair such a document the one
+           * place it cannot be opened.
+           */
+          text(declarations, 'the css for ' + device)
+        }
+      }
+    }
 
     const schema = node['schema']
     if (schema === undefined) return
     if (!isRecord(schema)) {
       malformed(path + '.schema must be an object.')
       return
+    }
+
+    oneOf(schema['type'], FIELD_TYPES, "the field's data type")
+    if (schema['autoValidate'] !== undefined && typeof schema['autoValidate'] !== 'boolean') {
+      malformed(where('autoValidate') + ' must be true or false.')
     }
 
     const validations = schema['validations']
@@ -542,16 +831,27 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
         malformed(path + '.schema.validations holds an entry that is not a rule.')
         continue
       }
-      if (!RULE_KEYS.has(rule['key'] as string)) {
-        malformed(
-          'Component ' +
-            key +
-            ' has a rule keyed ' +
-            JSON.stringify(rule['key']) +
-            ', which is not a rule this library has.',
-        )
+
+      const named = 'rule ' + JSON.stringify(rule['key'])
+      if (!oneOf(rule['key'], RULE_KEYS, 'a rule key')) continue
+
+      /*
+       * The parameter each rule promises. `minLength` compares with `<`, so a
+       * string bound compares lexicographically and reports nothing; `pattern`
+       * goes to `RegExp`. Both are wrong quietly, which is the failure this
+       * whole gate exists for.
+       */
+      const k = rule['key']
+      if (k === 'minLength' || k === 'maxLength' || k === 'min' || k === 'max') {
+        if (typeof rule['value'] !== 'number') malformed(where(named) + ' needs a number.')
+      } else if (k === 'pattern') {
+        text(rule['value'], named + "'s pattern")
+      } else if (k === 'custom') {
+        text(rule['expression'], named + "'s expression")
       }
-      binding(rule['when'], 'a rule guard')
+
+      if (rule['message'] !== undefined) text(rule['message'], named + "'s message")
+      binding(rule['when'], named + "'s guard")
     }
   }
 
@@ -562,7 +862,17 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       return
     }
 
-    for (const refs of Object.values(events)) {
+    for (const [event, refs] of Object.entries(events)) {
+      if (!EVENT_NAMES.has(event)) {
+        malformed(
+          'Component ' +
+            key +
+            ' subscribes to ' +
+            JSON.stringify(event) +
+            ', which is not an event this library raises.',
+        )
+        continue
+      }
       if (!Array.isArray(refs)) {
         malformed(path + '.events must map each event to an array.')
         continue
@@ -573,7 +883,28 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
           continue
         }
         const name = ref['name']
-        if (ref['type'] !== 'code' || typeof name !== 'string') continue
+        if (typeof name !== 'string') {
+          malformed(path + '.events holds an action reference with no name.')
+          continue
+        }
+        if (!ACTION_REF_TYPES.has(ref['type'] as string)) {
+          malformed(
+            'Component ' +
+              key +
+              ' references ' +
+              name +
+              ' as ' +
+              JSON.stringify(ref['type']) +
+              ', which is neither code nor builtin.',
+          )
+          continue
+        }
+        /*
+         * Only a `code` reference names something on the document. A `builtin`
+         * names something the host supplies, which core deliberately knows
+         * nothing about.
+         */
+        if (ref['type'] !== 'code') continue
         if (!actions || actions[name] === undefined) {
           errors.push({
             code: 'unknown-action',
@@ -607,6 +938,22 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
 
   const tags = languages.map((language) => {
     if (!isRecord(language) || typeof language['code'] !== 'string') return undefined
+
+    /*
+     * The other two fields are read as well: `name` is what the language
+     * selector draws, and `bidi` becomes the `dir` attribute. A language with
+     * neither is a language the toolbar renders as a blank option.
+     */
+    if (typeof language['name'] !== 'string') malformed('every language needs a name.')
+    if (!BIDI.has(language['bidi'] as string)) {
+      malformed(
+        'language ' +
+          String(language['code']) +
+          ' is ' +
+          JSON.stringify(language['bidi']) +
+          ', and a language reads left to right or right to left.',
+      )
+    }
     // Same shape as languageTag, spelled out because the input is untrusted here.
     const dialect = language['dialect']
     return typeof dialect === 'string' ? language['code'] + '-' + dialect : language['code']

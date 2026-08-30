@@ -7,8 +7,8 @@
  * draws the result. That comes in as a RendererKit.
  */
 
-import { createContext, useCallback, useContext, useId, useMemo } from 'react'
-import type { ComponentType, ReactNode } from 'react'
+import { Component, createContext, useCallback, useContext, useId, useMemo } from 'react'
+import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import {
   NO_ROWS,
   addressOf,
@@ -112,6 +112,8 @@ interface RenderContext {
    */
   options: EvalOptions
   onChange: (address: string, value: JsonValue) => void
+  /** Told when a node's render threw, so a host can put it in its own telemetry. */
+  onError: ((error: Error, key: string) => void) | undefined
 }
 
 const Ctx = createContext<RenderContext | null>(null)
@@ -198,9 +200,73 @@ function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
  */
 const RowCtx = createContext<RowContext | undefined>(undefined)
 
+/**
+ * One node's blast radius.
+ *
+ * A kit is third-party code and a host's evaluator is arbitrary JavaScript, so
+ * a render here can throw for reasons this package does not control. React 19
+ * unmounts the whole tree when nothing catches that, which means one bad
+ * component blanks whatever page the form was embedded in — and there was no
+ * boundary anywhere in this repository.
+ *
+ * Per node rather than around the form, and the difference is not academic. A
+ * form-level boundary saves the host's page and still throws away every answer
+ * already typed into the fields that were fine. On the canvas it is worse: the
+ * component that broke becomes unselectable, and selecting it is the one thing
+ * an author needs in order to delete it.
+ *
+ * So the fallback carries `data-fs-key` and `data-fs-type` itself. The canvas
+ * hit-tests with `closest('[data-fs-key]')` and there is nothing else in the DOM
+ * that identifies a node; without them a broken component is unreachable from
+ * both the canvas and the tree.
+ *
+ * A class, because that is the only way to catch a render error in React. It is
+ * the only one in this repository and it is not a style anybody should copy.
+ */
+interface NodeBoundaryProps {
+  node: ComponentNode
+  scope: string
+  onError: ((error: Error, key: string) => void) | undefined
+  children: ReactNode
+}
+
+class NodeBoundary extends Component<NodeBoundaryProps, { failed: boolean }> {
+  override state = { failed: false }
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true }
+  }
+
+  override componentDidCatch(error: Error, _info: ErrorInfo): void {
+    /*
+     * Reported rather than logged. A host that is watching wants this in its own
+     * telemetry, and React has already written its own copy to the console — so
+     * swallowing it here would hide it and logging it again would double it.
+     */
+    this.props.onError?.(error, this.props.node.key)
+  }
+
+  override render(): ReactNode {
+    if (!this.state.failed) return this.props.children
+
+    return (
+      <div
+        role="alert"
+        data-fs-key={this.props.node.key}
+        data-fs-type={this.props.node.type}
+        data-fs-scope={this.props.scope}
+        style={{ padding: 8, border: '1px dashed currentColor', opacity: 0.7 }}
+      >
+        <code>{this.props.node.type}</code> (key <code>{this.props.node.key}</code>) could not be
+        rendered.
+      </div>
+    )
+  }
+}
+
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
-  const { scope, revealHidden, kit, data, errors, translations, options, onChange } = ctx
+  const { scope, revealHidden, kit, data, errors, translations, options, onChange, onError } = ctx
   const row = useContext(RowCtx)
 
   // Everything a rule reads has to know which row it is in, or the renderer and
@@ -284,18 +350,20 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     : node.children?.map((child) => <RenderNode key={child.key} node={child} />)
 
   return (
-    <Component
-      node={node}
-      props={props}
-      nodeProps={nodeProps}
-      // Value by data key, error by node key. Two components may share a data
-      // key; they can still fail for different reasons.
-      value={valueOf(row?.values ?? data, dataKey)}
-      error={errors[addressOf(row?.path ?? NO_ROWS, node.key)]}
-      onChange={handleChange}
-    >
-      {children}
-    </Component>
+    <NodeBoundary node={node} scope={scope} onError={onError}>
+      <Component
+        node={node}
+        props={props}
+        nodeProps={nodeProps}
+        // Value by data key, error by node key. Two components may share a data
+        // key; they can still fail for different reasons.
+        value={valueOf(row?.values ?? data, dataKey)}
+        error={errors[addressOf(row?.path ?? NO_ROWS, node.key)]}
+        onChange={handleChange}
+      >
+        {children}
+      </Component>
+    </NodeBoundary>
   )
 }
 
@@ -343,6 +411,14 @@ export interface FormRendererProps {
    */
   context?: FormContext
   /**
+   * A node's render threw, and its component was replaced with a notice.
+   *
+   * The form keeps rendering and the answers already typed are kept. Passing
+   * this is how a host learns it happened at all: React writes its own copy to
+   * the console and nothing else here does.
+   */
+  onError?: (error: Error, key: string) => void
+  /**
    * One field changed, reported at an address.
    *
    * Outside a repeater the address is the bare key, which is why this went
@@ -365,6 +441,7 @@ export function FormRenderer({
   evaluate,
   device,
   context,
+  onError,
   onChange,
 }: FormRendererProps): ReactNode {
   /*
@@ -397,8 +474,8 @@ export function FormRenderer({
   const options = useMemo<EvalOptions>(() => ({ evaluate, context }), [evaluate, context])
 
   const ctx = useMemo<RenderContext>(
-    () => ({ scope, revealHidden, kit, data, errors, translations, options, onChange }),
-    [scope, revealHidden, kit, data, errors, translations, options, onChange],
+    () => ({ scope, revealHidden, kit, data, errors, translations, options, onChange, onError }),
+    [scope, revealHidden, kit, data, errors, translations, options, onChange, onError],
   )
 
   /*

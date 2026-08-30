@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 7 — an unreadable union tag reads as "no rule", and the gate refuses it
+- **Last completed:** item 8 — the gate reads the whole document, and a throwing node no longer takes the page
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -99,7 +99,7 @@ Root causes. Each collapses several individual findings, so these come before th
       _Check:_ a test per switch feeding an unrecognised tag, asserting the safe reading rather than silent
       omission, and asserting the document gate rejects the tag up front. Standing gate.
 
-- [ ] **8. `validateDocument` inspects the whole document, and a hostile one cannot crash React.** Theme 3.
+- [x] **8. `validateDocument` inspects the whole document, and a hostile one cannot crash React.** Theme 3.
       It checks none of `renderWhen`, `props`, `schema.validations`, `translations`, `version`, `settings`,
       `css`, and there is no error boundary anywhere in the repository.
       _Check:_ a test per unchecked branch; a component test proving a document that passes the gate cannot
