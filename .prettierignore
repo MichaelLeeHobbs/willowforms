@@ -2,3 +2,8 @@ dist
 node_modules
 pnpm-lock.yaml
 *.tsbuildinfo
+
+# Vendored skills are copied verbatim from upstream. Formatting them here would
+# fork them, and the next re-sync would revert whatever prettier did.
+.claude/skills/codebase-design
+.claude/skills/steelman
