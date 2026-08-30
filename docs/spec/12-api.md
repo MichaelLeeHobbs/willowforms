@@ -55,18 +55,18 @@ filling in a form.
 import { FormRenderer } from '@formsmith/renderer'
 ```
 
-| Prop           | Type                                      | Required | Meaning                                               |
-| -------------- | ----------------------------------------- | -------- | ----------------------------------------------------- |
-| `document`     | `FormDocument`                            | yes      | The form                                              |
-| `kit`          | `RendererKit`                             | yes      | Renderers                                             |
-| `data`         | `FormData`                                | yes      | Current values, flat, keyed by node                   |
-| `onChange`     | `(key: string, value: JsonValue) => void` | yes      | One field changed                                     |
-| `errors`       | `FormErrors`                              | no       | Messages to display, keyed by node                    |
-| `language`     | `string`                                  | no       | BCP 47 tag; defaults to the document                  |
-| `evaluate`     | `Evaluator`                               | no       | Sandbox for computed props                            |
-| `device`       | `Device`                                  | no       | Render `css` for one device, not by media query       |
-| `context`      | `FormContext`                             | no       | What the host knows and does not submit               |
-| `revealHidden` | `boolean`                                 | no       | Draw what `renderWhen` hides. Authoring surfaces only |
+| Prop           | Type                                          | Required | Meaning                                                     |
+| -------------- | --------------------------------------------- | -------- | ----------------------------------------------------------- |
+| `document`     | `FormDocument`                                | yes      | The form                                                    |
+| `kit`          | `RendererKit`                                 | yes      | Renderers                                                   |
+| `data`         | `FormData`                                    | yes      | Current values, keyed by node; rows nest under the repeater |
+| `onChange`     | `(address: string, value: JsonValue) => void` | yes      | One field changed, at an address                            |
+| `errors`       | `FormErrors`                                  | no       | Messages to display, keyed by address                       |
+| `language`     | `string`                                      | no       | BCP 47 tag; defaults to the document                        |
+| `evaluate`     | `Evaluator`                                   | no       | Sandbox for computed props                                  |
+| `device`       | `Device`                                      | no       | Render `css` for one device, not by media query             |
+| `context`      | `FormContext`                                 | no       | What the host knows and does not submit                     |
+| `revealHidden` | `boolean`                                     | no       | Draw what `renderWhen` hides. Authoring surfaces only       |
 
 ### The host owns the data
 
@@ -82,9 +82,21 @@ const [errors, setErrors] = useState<FormErrors>({})
   kit={renderers}
   data={data}
   errors={errors}
-  onChange={(key, value) => setData((d) => ({ ...d, [key]: value }))}
+  onChange={(address, value) => setData((d) => applyChange(d, address, value))}
 />
 ```
+
+### What `onChange` reports is an address, not a key
+
+Outside a repeater an address is the bare key and nothing has changed. Inside one it carries the row
+it came from, outermost first: `addresses[1].line1`. `errors` is keyed the same way, so a message can
+name the row it belongs to.
+
+Use `applyChange` from `@formsmith/core` to write one. Spreading the address into an object literal,
+`{ ...d, [address]: value }`, is the mistake this shape invites: it creates a property whose name is
+the literal text `addresses[1].line1` rather than updating the row, and the form then looks like it is
+discarding every keystroke inside a repeater. `applyChange` also refuses a reserved name and returns
+the input unchanged when the address cannot be placed, so a hostile index cannot mint a sparse array.
 
 Submitting is `setErrors(validateForm(doc.root, data))` and checking whether the result is empty. That is
 the same call a server makes on the same document, which is the whole reason validation lives in core.

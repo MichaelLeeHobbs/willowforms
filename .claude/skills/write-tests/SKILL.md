@@ -1,6 +1,6 @@
 ---
 name: write-tests
-description: Write or fix a test in Formsmith without writing one that passes while proving nothing — vacuous assertions, tests that encode the bug, green from two cancelling faults, unscoped queries, fixtures the product never produces, fixtures whose two names are the same string so the branch under test is invisible, geometry or browser behaviour checked in jsdom, and guards that name a DOM scope the DOM has since moved. Use whenever authoring a test, changing one, or asking whether a green suite actually means anything.
+description: Write or fix a test in Formsmith without writing one that passes while proving nothing — vacuous assertions, tests that encode the bug, green from two cancelling faults, unscoped queries, fixtures the product never produces, fixtures whose two names are the same string so the branch under test is invisible, geometry or browser behaviour checked in jsdom, guards that name a DOM scope the DOM has since moved, and positional tests that pass only because the fixture happens to fit on screen. Use whenever authoring a test, changing one, or asking whether a green suite actually means anything.
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write
 ---
 
@@ -201,6 +201,31 @@ same rule at the same place — and watch it go red.
 
 ---
 
+## Trap 13 — a test that passes because the fixture happens to fit on screen
+
+`canvas.spec.ts` drags Checkbox out of the palette. Adding Step and Repeater made the Layout group
+one row taller, which pushed the Selection group past the bottom of a 720px viewport. Linux renders
+that list just tall enough to clip it and Windows does not, so the test failed every CI run and
+passed every local one, including three on demand.
+
+Nothing reported a missing element. `boundingBox()` returns page coordinates whether or not the
+element is on screen, so an off-screen palette entry hands back a perfectly plausible rectangle,
+`mouse.down()` presses a point outside the window, and the gesture becomes a text selection across
+the canvas. The assertion then fails on the document, several steps downstream of the actual cause.
+
+The failure looks exactly like flake, and it is not: it is deterministic per platform. Two
+plausible fixes went in and were refuted by CI before the screenshot settled it — the first blamed
+a race against React's commit, the second bounding-box stability. Both are real phenomena. Neither
+was this.
+
+**Rule:** a positional test depends on its fixture fitting in the viewport, and nothing enforces
+that. Scroll the element you are about to press into view rather than trusting it is there. When a
+browser test fails only on CI, read the screenshot before theorising: it is in the artifact, it
+takes a minute, and it outranks any story about timing. Retrying a test whose real cause is layout
+just buys the same failure twice.
+
+---
+
 ## Before you open the PR
 
 - [ ] **Break the fix and watch the right test fail.** Not the suite — the specific test that
@@ -212,4 +237,5 @@ same rule at the same place — and watch it go red.
 - [ ] Grep your diff for the tells: an assertion that would hold with the feature removed, a
       `getBy*` with no scope, a fixture literal where a factory exists, a `getBoundingClientRect`
       in a `.test.ts`, a new "must" in the spec with no test behind it, a fixture whose two names
-      are the same string, and any claim about what a browser accepts asserted in jsdom.
+      are the same string, any claim about what a browser accepts asserted in jsdom, and a
+      `boundingBox()` on something nothing scrolled into view.
