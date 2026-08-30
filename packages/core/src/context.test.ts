@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { contextKeys, contextValues, missingContext } from './context.js'
+import { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
 import { validateForm } from './validation.js'
 import type { ComponentNode, Condition, Operand } from './types.js'
 
@@ -246,5 +246,127 @@ describe('contextValues collects broadly on purpose', () => {
     ])
 
     expect(contextValues(root, 'step')).toEqual(['two'])
+  })
+})
+
+/**
+ * What a document needs an evaluator for, asked once at startup.
+ *
+ * `missingContext` exists because a condition reading a path the host never
+ * supplies quietly hides its component and takes it out of validation. A
+ * `computed` binding with no evaluator does exactly the same thing and had no
+ * matching question: `isVisible` returns false for one, so the node and its
+ * whole subtree leave `validateForm` — on the server, where nobody is looking.
+ *
+ * It is worse than the context case in one way. A host may inject an evaluator
+ * in the browser and not on the server, and then the two disagree: the browser
+ * shows a business-only section and validates it, the server validates nothing
+ * beneath it and answers `{ok: true}`.
+ */
+describe('evaluatorKeys', () => {
+  const doc = (children: ComponentNode[]): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children,
+  })
+
+  it('names a node whose visibility is an expression', () => {
+    const root = doc([
+      {
+        key: 'business',
+        type: 'Field',
+        props: {},
+        renderWhen: { kind: 'computed', expression: 'data.kind === "business"' },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['business'])
+  })
+
+  it('names a node whose rule is guarded by an expression', () => {
+    const root = doc([
+      {
+        key: 'vat',
+        type: 'Field',
+        props: {},
+        schema: {
+          type: 'string',
+          validations: [{ key: 'required', when: { kind: 'computed', expression: 'x' } }],
+        },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['vat'])
+  })
+
+  it('names a node carrying a custom rule, which is an expression by definition', () => {
+    const root = doc([
+      {
+        key: 'confirm',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [{ key: 'custom', expression: 'a === b' }] },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['confirm'])
+  })
+
+  it('names a node with a computed property', () => {
+    const root = doc([
+      { key: 'label', type: 'Field', props: { text: { kind: 'computed', expression: 'x' } } },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['label'])
+  })
+
+  it('names each node once, however many expressions it holds', () => {
+    const root = doc([
+      {
+        key: 'busy',
+        type: 'Field',
+        props: { text: { kind: 'computed', expression: 'x' } },
+        renderWhen: { kind: 'computed', expression: 'y' },
+        schema: { type: 'string', validations: [{ key: 'custom', expression: 'z' }] },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['busy'])
+  })
+
+  it('says nothing about a document that needs no evaluator', () => {
+    /*
+     * The control, and the reason the structured condition vocabulary exists: a
+     * form with conditional visibility and guarded rules works in a host that
+     * injected nothing at all.
+     */
+    const root = doc([
+      {
+        key: 'spouse',
+        type: 'Field',
+        props: { text: { kind: 'static', value: 'Spouse' } },
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } },
+        },
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual([])
+  })
+
+  it('is total on a document that never passed the gate', () => {
+    // Same obligation as `contextKeys`: a host is told to call this at startup,
+    // which is before anything else has had a chance to refuse the document.
+    const broken = {
+      key: 'root',
+      type: 'Screen',
+      props: 5,
+      children: 7,
+    } as unknown as ComponentNode
+
+    expect(evaluatorKeys(broken)).toEqual([])
   })
 })

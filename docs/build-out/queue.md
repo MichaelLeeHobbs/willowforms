@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 12 — stage 2 complete. `data-fs-row` is the canvas coordinate; the tree's is `data-fs-tree-row`
+- **Last completed:** item 13 — the 14 HIGH findings in core areas 1 and 2
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -133,7 +133,8 @@ Everything at HIGH in `tmp/formsmith-review-2026-08-30.md` not already covered a
 item: **every HIGH in these areas is fixed, or recorded in `triage.md` with a one-line reason**; print
 `fixed N / triaged M / total T`, and T must match the count given. Standing gate on each.
 
-- [ ] **13. Core — areas 1 and 2.** T = 14.
+- [x] **13. Core — areas 1 and 2.** T = 14. _fixed 13 / triaged 1 / total 14._ The triaged one, the
+      pattern-rule backtracking, also received a partial fix; what remains is in `triage.md`.
 - [ ] **14. Renderer and both kits — areas 3 and 4.** T = 5.
 - [ ] **15. Designer shell, canvas and panels — areas 5, 6, 7.** T = 14.
 - [ ] **16. Apps, configuration, e2e — area 8.** T = 2.

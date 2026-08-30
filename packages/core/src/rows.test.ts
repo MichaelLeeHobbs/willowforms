@@ -521,3 +521,90 @@ describe('a repeater whose two names differ', () => {
     })
   })
 })
+
+/**
+ * The third place a condition lives.
+ *
+ * A document holds conditions in three places: `renderWhen`, a `PropValue` on a
+ * property, and a validation rule's `when` guard. `contextKeys` sweeps all
+ * three. `rowScopeProblems` swept the first two, so a rule guard authored
+ * inside a repeater and left at form scope was never reported — and that is the
+ * worst of the three to miss, because the failure is the rule silently never
+ * applying, on the server, which is the exact thing this check exists for.
+ */
+describe('a rule guard inside a repeater', () => {
+  const doc = (scope: 'form' | 'row' | undefined): FormDocument => ({
+    ...createDocument('Rows', 'rows'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'orderList',
+          dataKey: 'orders',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [
+            {
+              key: 'businessBox',
+              dataKey: 'business',
+              type: 'Checkbox',
+              props: {},
+              schema: { type: 'boolean', validations: [] },
+            },
+            {
+              key: 'vatField',
+              dataKey: 'vat',
+              type: 'TextField',
+              props: {},
+              schema: {
+                type: 'string',
+                validations: [
+                  {
+                    key: 'required',
+                    when: {
+                      kind: 'condition',
+                      condition: {
+                        op: 'truthy',
+                        value: { kind: 'ref', dataKey: 'business', ...(scope ? { scope } : {}) },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  })
+
+  it('reports a guard that reads a row field at form scope', () => {
+    const errors = validateDocument(doc(undefined))
+
+    expect(errors.map((e) => e.code)).toEqual(['row-scope'])
+    expect(errors[0]?.key).toBe('vatField')
+  })
+
+  it('says nothing once the guard is scoped to the row', () => {
+    expect(validateDocument(doc('row'))).toEqual([])
+  })
+
+  it('reports a guard on a property binding too', () => {
+    // The second of the three sites, which was already swept. Kept as a control
+    // so a change that narrows the sweep shows up here rather than nowhere.
+    const withProp = doc('row')
+    const vat = withProp.root.children?.[0]?.children?.[1]
+    if (!vat) throw new Error('fixture lost its field')
+    vat.props = {
+      disabled: {
+        kind: 'condition',
+        condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'business' } },
+      },
+    }
+
+    expect(validateDocument(withProp).map((e) => e.code)).toEqual(['row-scope'])
+  })
+})

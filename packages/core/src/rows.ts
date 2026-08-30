@@ -251,7 +251,19 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
         node.props && typeof node.props === 'object' && !Array.isArray(node.props)
           ? Object.values(node.props)
           : []
-      for (const value of [node.renderWhen, ...props]) {
+
+      /*
+       * All three places a document holds a condition, which is what
+       * `contextKeys` already sweeps. A rule's `when` guard was the one missing,
+       * and it is the worst of the three to miss: the failure is not a component
+       * quietly disappearing, it is a rule that never applies — on the server,
+       * where nobody is looking.
+       */
+      const guards = Array.isArray(node.schema?.validations)
+        ? node.schema.validations.map((rule) => rule?.when)
+        : []
+
+      for (const value of [node.renderWhen, ...props, ...guards]) {
         if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
         for (const ref of formScopedRefs(value.condition)) {
           if (enclosing.has(ref) && !formKeys.has(ref)) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { evaluateCondition } from './condition.js'
-import type { Condition, FormData } from './types.js'
+import type { Condition, FormData, Operand } from './types.js'
 
 const data: FormData = {
   country: 'GB',
@@ -334,6 +334,71 @@ describe('what the host knows', () => {
         { op: 'or', conditions: [{ op: 'not', condition: isAdmin }] },
         data,
         context,
+      ),
+    ).toBe(false)
+  })
+})
+
+/**
+ * An operand this code cannot read at all.
+ *
+ * `evaluate` already tells "cannot read this" apart from "false", and the file
+ * says why: negating a malformed condition turned false into true and **showed**
+ * a component whose rule the code could not read. That distinction was made for
+ * a malformed *condition* and never reached a malformed *operand* — an operand
+ * whose `kind` is a typo returned `undefined`, which every branch then treated
+ * as a value it had successfully read.
+ *
+ * So `not` inverted it, and two of them compared equal to each other.
+ * `validateDocument` refuses these now; this is the answer for the document
+ * that never went through it.
+ */
+describe('a malformed operand', () => {
+  const bad = { kind: 'refs', dataKey: 'a' } as unknown as Operand
+  const alsoBad = { kind: 'ref' } as unknown as Operand
+
+  it('makes the condition false, not true', () => {
+    expect(evaluateCondition({ op: 'truthy', value: bad }, { a: 1 })).toBe(false)
+  })
+
+  it('is not turned into "shown" by a not', () => {
+    // The failure. `not` is the one operator that can turn "I could not read
+    // this" into "show it", which is the opposite of what every other unreadable
+    // thing here does.
+    expect(
+      evaluateCondition({ op: 'not', condition: { op: 'truthy', value: bad } }, { a: 1 }),
+    ).toBe(false)
+  })
+
+  it('does not compare equal to another one', () => {
+    // Both read as `undefined`, and `undefined` equals `undefined`, so two
+    // unreadable operands used to satisfy an `eq` and show the component.
+    expect(evaluateCondition({ op: 'eq', left: bad, right: alsoBad }, {})).toBe(false)
+  })
+
+  it('does not satisfy an emptiness test', () => {
+    // `empty` on an unreadable operand is not "the field is empty". It is "there
+    // is no field here", and answering true shows the component.
+    expect(evaluateCondition({ op: 'empty', value: bad }, {})).toBe(false)
+    expect(evaluateCondition({ op: 'notEmpty', value: bad }, {})).toBe(false)
+  })
+
+  it('does not let a membership test pass on nothing', () => {
+    expect(evaluateCondition({ op: 'notIn', value: bad, options: ['x'] }, {})).toBe(false)
+  })
+
+  it('leaves a readable operand that holds nothing alone', () => {
+    /*
+     * The control, and the distinction that matters. A `ref` naming a field
+     * nobody has filled in is perfectly readable and reads as `undefined` —
+     * that is an unanswered question, not a broken document, and `empty` on it
+     * is true.
+     */
+    expect(evaluateCondition({ op: 'empty', value: { kind: 'ref', dataKey: 'a' } }, {})).toBe(true)
+    expect(
+      evaluateCondition(
+        { op: 'not', condition: { op: 'empty', value: { kind: 'ref', dataKey: 'a' } } },
+        {},
       ),
     ).toBe(false)
   })

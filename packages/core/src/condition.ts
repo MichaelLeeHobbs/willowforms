@@ -41,25 +41,45 @@ function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
 }
 
 /**
+ * An operand this code cannot read at all.
+ *
+ * Told apart from an operand that reads `undefined`, and the two are genuinely
+ * different questions. A `ref` naming a field nobody has filled in is perfectly
+ * readable and reads as nothing — that is an unanswered question, and `empty`
+ * on it is true. An operand whose `kind` is a typo is not an operand.
+ *
+ * Collapsing the two is how `not` turned "I could not read this" into "show
+ * it": `truthy` on an unreadable operand was false, and negating false is true.
+ * This file already made that distinction for a malformed *condition*, with a
+ * comment saying exactly why; it never reached the operands inside one.
+ */
+const UNREADABLE = Symbol('unreadable operand')
+
+type Reading = JsonValue | undefined | typeof UNREADABLE
+
+/**
  * Both operand shapes, and anything else.
  *
  * A document is data and reaches here straight from the JSON editor, so an
- * operand can be missing, a string, or a shape nobody designed. Treating that
- * as "no value" keeps this function total. `validateDocument` is the place to
- * tell an author their condition is malformed; the renderer's job is to stay
- * on screen, because a form that crashes cannot be fixed by the person filling
- * it in.
+ * operand can be missing, a string, or a shape nobody designed. Saying so keeps
+ * this function total. `validateDocument` is the place to tell an author their
+ * condition is malformed; the renderer's job is to stay on screen, because a
+ * form that crashes cannot be fixed by the person filling it in.
  */
 function operand(
   value: Operand | undefined,
   data: FormData,
   context: FormContext | undefined,
   row: RowContext | undefined,
-): JsonValue | undefined {
-  if (!value || typeof value !== 'object') return undefined
-  if (value.kind === 'literal') return value.value
+): Reading {
+  if (!value || typeof value !== 'object') return UNREADABLE
+  if (value.kind === 'literal') {
+    // A literal with no `value` at all reads as nothing, which is a value: an
+    // author who cleared the box meant the empty answer.
+    return value.value
+  }
   if (value.kind === 'ref') {
-    if (typeof value.dataKey !== 'string') return undefined
+    if (typeof value.dataKey !== 'string') return UNREADABLE
 
     /*
      * `row` reads the enclosing row and nothing else. There is deliberately no
@@ -81,10 +101,10 @@ function operand(
    * names every path a document reads, and a host asserts against it once.
    */
   if (value.kind === 'context') {
-    if (typeof value.path !== 'string') return undefined
+    if (typeof value.path !== 'string') return UNREADABLE
     return readPath(context, value.path)
   }
-  return undefined
+  return UNREADABLE
 }
 
 /**
@@ -141,20 +161,34 @@ function evaluate(
 ): boolean | undefined {
   if (!condition || typeof condition !== 'object') return undefined
 
-  const read = (value: Operand | undefined): JsonValue | undefined =>
-    operand(value, data, context, row)
+  const read = (value: Operand | undefined): Reading => operand(value, data, context, row)
+
+  /*
+   * Every branch below asks this before it answers. An operand nobody can read
+   * makes the whole condition unreadable, which the boundary turns into false
+   * and `not` passes through rather than inverting.
+   */
+  const unreadable = (...readings: Reading[]): boolean =>
+    readings.some((reading) => reading === UNREADABLE)
 
   switch (condition.op) {
     case 'eq':
-      return same(read(condition.left), read(condition.right))
-    case 'ne':
-      return !same(read(condition.left), read(condition.right))
+    case 'ne': {
+      const left = read(condition.left)
+      const right = read(condition.right)
+      if (unreadable(left, right)) return undefined
+      const equal = same(left as JsonValue | undefined, right as JsonValue | undefined)
+      return condition.op === 'eq' ? equal : !equal
+    }
 
     case 'gt':
     case 'gte':
     case 'lt':
     case 'lte': {
-      const delta = order(read(condition.left), read(condition.right))
+      const left = read(condition.left)
+      const right = read(condition.right)
+      if (unreadable(left, right)) return undefined
+      const delta = order(left as JsonValue | undefined, right as JsonValue | undefined)
       if (delta === undefined) return false
       if (condition.op === 'gt') return delta > 0
       if (condition.op === 'gte') return delta >= 0
@@ -163,9 +197,12 @@ function evaluate(
     }
 
     case 'empty':
-      return isEmpty(read(condition.value))
-    case 'notEmpty':
-      return !isEmpty(read(condition.value))
+    case 'notEmpty': {
+      const value = read(condition.value)
+      if (unreadable(value)) return undefined
+      const empty = isEmpty(value as JsonValue | undefined)
+      return condition.op === 'empty' ? empty : !empty
+    }
 
     /*
      * JavaScript truthiness, deliberately, because that is what an author who
@@ -173,9 +210,11 @@ function evaluate(
      * string is falsy and empty, but `0` is falsy and an answer.
      */
     case 'truthy':
-      return Boolean(read(condition.value))
-    case 'falsy':
-      return !read(condition.value)
+    case 'falsy': {
+      const value = read(condition.value)
+      if (unreadable(value)) return undefined
+      return condition.op === 'truthy' ? Boolean(value) : !value
+    }
 
     /*
      * An empty list is a real answer: nothing is in it, and everything is not
@@ -185,7 +224,13 @@ function evaluate(
     case 'in':
     case 'notIn': {
       if (!Array.isArray(condition.options)) return false
-      const held = condition.options.some((option) => same(read(condition.value), option))
+      const value = read(condition.value)
+      if (unreadable(value)) return undefined
+      /*
+       * Read once. It was read inside `.some()`, so a context operand walked
+       * `readPath` again for every option in the list.
+       */
+      const held = condition.options.some((option) => same(value as JsonValue | undefined, option))
       return condition.op === 'in' ? held : !held
     }
 

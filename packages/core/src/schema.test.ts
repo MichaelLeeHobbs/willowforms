@@ -254,7 +254,10 @@ describe('a repeater in the exported schema', () => {
     const schema = toJsonSchema(doc())
     expect(schema.properties['lines']).toEqual({
       type: 'array',
-      minLength: 1,
+      // A repeater holds a list, so a length rule on it counts rows. It used to
+      // export `minLength`, which every JSON Schema validator ignores on an
+      // array — the form enforced a minimum the exported schema did not.
+      minItems: 1,
       items: {
         type: 'object',
         properties: { sku: { type: 'string' }, qty: { type: 'number' } },
@@ -282,5 +285,120 @@ describe('a repeater in the exported schema', () => {
     const schema = toJsonSchema(plain)
     expect(schema.properties).toEqual({ email: { type: 'string' } })
     expect(schema.required).toEqual(['email'])
+  })
+})
+
+/**
+ * Two ways the export said something the form does not mean.
+ *
+ * The exported schema is what a server validates a real payload against, so a
+ * constraint it states and the form does not — or the other way round — is a
+ * disagreement between two validators nobody is comparing.
+ *
+ * `unexportableRules` exists to tell an author what the export could not carry.
+ * Both of these were absent from it, so the dialog said the export was
+ * lossless while it was wrong.
+ */
+describe('what the export cannot carry', () => {
+  const doc = (root: ComponentNode): FormDocument => ({
+    ...createDocument('Export', 'export'),
+    root,
+  })
+
+  describe('a field made conditional by renderWhen', () => {
+    const conditional = (): ComponentNode => ({
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'married',
+          type: 'Checkbox',
+          props: {},
+          schema: { type: 'boolean', validations: [] },
+        },
+        {
+          key: 'spouse',
+          type: 'TextField',
+          props: {},
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+          renderWhen: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } },
+          },
+        },
+      ],
+    })
+
+    it('is not exported as unconditionally required', () => {
+      /*
+       * A guarded *rule* was already excluded, with a comment saying why:
+       * JSON Schema's `required` is unconditional, so exporting one the form
+       * applies only sometimes rejects payloads the form itself accepts. A
+       * field hidden by `renderWhen` is the same fact reached from the node
+       * rather than from the rule — and `validateForm` does not require it.
+       */
+      expect(toJsonSchema(doc(conditional())).required ?? []).toEqual([])
+    })
+
+    it('is reported as lossy, so the dialog stops calling the export complete', () => {
+      expect(unexportableRules(doc(conditional()))).toEqual([{ key: 'spouse', rule: 'required' }])
+    })
+
+    it('still exports a field nothing hides', () => {
+      // The control. Dropping every `required` would pass both tests above.
+      const plain = conditional()
+      delete plain.children?.[1]?.renderWhen
+
+      expect(toJsonSchema(doc(plain)).required).toEqual(['spouse'])
+      expect(unexportableRules(doc(plain))).toEqual([])
+    })
+  })
+
+  describe('a length rule on a field that holds a list', () => {
+    const multi = (rules: ComponentNode['schema']): ComponentNode => ({
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        { key: 'colours', type: 'MultiSelect', props: {}, ...(rules ? { schema: rules } : {}) },
+      ],
+    })
+
+    it('exports as a count of items rather than a length of text', () => {
+      /*
+       * `minLength` on an `array` is ignored by every JSON Schema validator —
+       * the keyword for a list is `minItems`. The form counts items, so the
+       * export was dropping a constraint the form enforces.
+       */
+      const schema = toJsonSchema(
+        doc(
+          multi({
+            type: 'array',
+            validations: [
+              { key: 'minLength', value: 2 },
+              { key: 'maxLength', value: 4 },
+            ],
+          }),
+        ),
+      )
+
+      expect(schema.properties['colours']).toMatchObject({
+        type: 'array',
+        minItems: 2,
+        maxItems: 4,
+      })
+      expect(schema.properties['colours']).not.toHaveProperty('minLength')
+    })
+
+    it('still exports a length as a length on text', () => {
+      // The control: the same two rules on a string mean characters.
+      const schema = toJsonSchema(
+        doc(multi({ type: 'string', validations: [{ key: 'minLength', value: 2 }] })),
+      )
+
+      expect(schema.properties['colours']).toMatchObject({ type: 'string', minLength: 2 })
+      expect(schema.properties['colours']).not.toHaveProperty('minItems')
+    })
   })
 })

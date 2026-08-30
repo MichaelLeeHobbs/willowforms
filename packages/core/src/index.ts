@@ -47,7 +47,7 @@ export {
   styleSheetFor,
 } from './css.js'
 
-export { contextKeys, contextValues, missingContext } from './context.js'
+export { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
 
 export { KEY_PATTERN, RESERVED_KEYS, keyProblem } from './keys.js'
 

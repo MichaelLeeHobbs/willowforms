@@ -21,6 +21,16 @@ export interface JsonSchemaProperty {
   title?: string
   minLength?: number
   maxLength?: number
+  /**
+   * The list keywords, for the same two rules on a field that holds one.
+   *
+   * `minLength` on an `array` is ignored by every validator, and `lengthOf` in
+   * `validation.ts` counts an array's items — so a multi-select with
+   * `minLength: 2` means two choices and used to export a constraint nothing
+   * read.
+   */
+  minItems?: number
+  maxItems?: number
   minimum?: number
   maximum?: number
   pattern?: string
@@ -64,8 +74,16 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
         lossy.push({ key: node.key, rule: rule.key })
         continue
       }
-      // A guarded rule applies only sometimes, and no keyword expresses that.
-      if (rule.when) lossy.push({ key: node.key, rule: rule.key })
+      /*
+       * A rule that applies only sometimes, and no keyword expresses that. Two
+       * ways a rule gets there: its own guard, or a `renderWhen` on the node
+       * that holds it. The second was missing, so a required field behind a
+       * condition exported as unconditionally required and the dialog reported
+       * the export as lossless.
+       */
+      if (rule.when || node.renderWhen !== undefined) {
+        lossy.push({ key: node.key, rule: rule.key })
+      }
     }
   })
   return lossy
@@ -93,13 +111,27 @@ function baseType(type: FieldSchema['type']): JsonSchemaProperty {
   }
 }
 
-/** Fold one rule into the property it constrains. */
+/**
+ * Fold one rule into the property it constrains.
+ *
+ * `minLength` and `maxLength` are the two whose keyword depends on what the
+ * field holds. `lengthOf` in `validation.ts` counts an array's items, so a
+ * multi-select with `minLength: 2` means two choices — but `minLength` on an
+ * `array` is ignored by every JSON Schema validator, which drops a constraint
+ * the form does enforce. The keyword for a list is `minItems`.
+ */
 function applyRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchemaProperty {
+  const counting = property.type === 'array'
+
   switch (rule.key) {
     case 'minLength':
-      return { ...property, minLength: rule.value }
+      return counting
+        ? { ...property, minItems: rule.value }
+        : { ...property, minLength: rule.value }
     case 'maxLength':
-      return { ...property, maxLength: rule.value }
+      return counting
+        ? { ...property, maxItems: rule.value }
+        : { ...property, maxLength: rule.value }
     case 'min':
       return { ...property, minimum: rule.value }
     case 'max':
@@ -173,6 +205,19 @@ function objectFor(root: ComponentNode): {
     // The submitted name, which is the node's key unless the author renamed it.
     const name = dataKeyOf(node)
 
+    /*
+     * A node the document can hide is a node whose rules apply only sometimes,
+     * which is the same fact a guarded rule states one level down. JSON Schema's
+     * `required` is unconditional, so exporting it rejects payloads the form
+     * itself accepts — `validateForm` does not require a field `isVisible` says
+     * is not on screen.
+     *
+     * Read from the node rather than from the rule, and `renderWhen` present at
+     * all is enough: a static `true` is a document that could hold anything
+     * tomorrow, and the export is not the place to start evaluating conditions.
+     */
+    const conditional = node.renderWhen !== undefined
+
     for (const rule of field.validations) {
       property = applyRule(property, rule)
       /*
@@ -180,7 +225,7 @@ function objectFor(root: ComponentNode): {
        * applies sometimes, and JSON Schema's `required` is unconditional, so
        * exporting it would reject payloads the form itself accepts.
        */
-      if (rule.key === 'required' && !rule.when && !required.includes(name)) {
+      if (rule.key === 'required' && !rule.when && !conditional && !required.includes(name)) {
         required.push(name)
       }
     }

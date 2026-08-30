@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { jsonToString, optionValue, readPath, safeHref } from './json.js'
+import { isEmpty, jsonToString, optionValue, readPath, safeHref } from './json.js'
 
 describe('jsonToString', () => {
   it('passes strings through and renders primitives', () => {
@@ -187,5 +187,37 @@ describe('readPath', () => {
     expect(readPath(context, 'user.')).toBeUndefined()
     expect(readPath(undefined, 'user.role')).toBeUndefined()
     expect(readPath(context, 42 as unknown as string)).toBeUndefined()
+  })
+})
+
+/**
+ * An object with nothing in it is no answer.
+ *
+ * `isEmpty` fell through to `false` for anything that was not a string or an
+ * array, so `{}` counted as an answer and `required` was satisfied by it. A
+ * client posting `{"consent": {}}` had its required consent accepted — the same
+ * class of failure as the unticked-checkbox bug that Trap 2 in this repository's
+ * test skill was written about, arriving by a different value.
+ *
+ * "Empty" has to mean one thing, because validation uses it for the rule that
+ * every rule but `required` passes on an empty value, and conditions use it for
+ * `empty` and `notEmpty`. Two definitions let a field be empty enough to skip a
+ * `minLength` and full enough to satisfy a visibility condition.
+ */
+describe('isEmpty and objects', () => {
+  it('reads an object with no keys as no answer', () => {
+    expect(isEmpty({})).toBe(true)
+  })
+
+  it('reads an object that holds something as an answer', () => {
+    expect(isEmpty({ a: 1 })).toBe(false)
+    expect(isEmpty({ a: null })).toBe(false)
+  })
+
+  it('still reads false and 0 as answers', () => {
+    // The control, and the policy this file already had: an unticked checkbox
+    // is a `false` somebody chose, and `0` is a number somebody typed.
+    expect(isEmpty(false)).toBe(false)
+    expect(isEmpty(0)).toBe(false)
   })
 })

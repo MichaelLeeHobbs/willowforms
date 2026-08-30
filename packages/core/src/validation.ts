@@ -103,7 +103,112 @@ const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
  * server. An unfinished pattern matches nothing, which is the same answer the
  * rule would give once the author closes the bracket.
  */
+/**
+ * The longest answer a pattern is ever run against.
+ *
+ * A form field's answer is a name, a postcode, a reference number. Nothing a
+ * pattern is written for is twenty thousand characters, and matching time grows
+ * with the input on every engine — so the input is bounded before the engine
+ * sees it. This does not make an exponential pattern safe; it caps every
+ * polynomial one.
+ */
+const PATTERN_INPUT_LIMIT = 4096
+
+/**
+ * Whether a quantifier at this position permits unboundedly many repetitions.
+ *
+ * `*`, `+` and `{n,}`. A bounded one — `{3}`, `{2,5}` — is what real patterns
+ * are full of and is not the shape that goes exponential, because there is a
+ * fixed amount for the engine to try.
+ */
+function unboundedAt(source: string, at: number): boolean {
+  const ch = source[at]
+  if (ch === '*' || ch === '+') return true
+  if (ch !== '{') return false
+  const close = source.indexOf('}', at)
+  return close !== -1 && /^\{\d+,\s*\}$/.test(source.slice(at, close + 1))
+}
+
+/**
+ * A pattern with an unbounded quantifier inside another one.
+ *
+ * `(a+)+`, `(a*)*`, `((a+)*)+`. This is the shape that makes a backtracking
+ * engine try exponentially many ways to split the same input: matching
+ * `^(a+)+$` against thirty-one `a`s and one `X` does not finish, which was
+ * measured here by hanging the test run for five minutes.
+ *
+ * The scan is deliberately structural and deliberately narrow. It skips escapes
+ * and character classes, so `\(` and `[+*]` are text rather than syntax, and it
+ * asks only whether an unbounded quantifier is applied to a group whose body
+ * holds another one. `(\d{3}-)+` — a phone number — passes, because the inner
+ * repetition has a fixed length.
+ *
+ * It is not a decision procedure. `(a|a)*` blows up too and is not caught here,
+ * and no cheap syntactic rule separates a dangerous alternation from
+ * `(ab|cd)+`. See `docs/build-out/triage.md` for what is left and why closing
+ * it needs a different regex engine rather than a better heuristic.
+ */
+function nestedUnbounded(source: string): boolean {
+  /** Where each open group started, and whether it holds an unbounded quantifier. */
+  const stack: { unbounded: boolean }[] = []
+  let inClass = false
+
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i]
+
+    if (ch === '\\') {
+      i += 1
+      continue
+    }
+    if (inClass) {
+      if (ch === ']') inClass = false
+      continue
+    }
+    if (ch === '[') {
+      inClass = true
+      continue
+    }
+    if (ch === '(') {
+      stack.push({ unbounded: false })
+      continue
+    }
+    if (ch === ')') {
+      const group = stack.pop()
+      if (!group) continue
+
+      // `)` may be followed by a quantifier, optionally made lazy with `?`.
+      const quantified = unboundedAt(source, i + 1)
+      if (quantified && group.unbounded) return true
+
+      // A quantified group is itself an unbounded repetition as far as any
+      // group enclosing it is concerned.
+      if (quantified) {
+        const outer = stack[stack.length - 1]
+        if (outer) outer.unbounded = true
+      }
+      continue
+    }
+    if (unboundedAt(source, i)) {
+      const group = stack[stack.length - 1]
+      if (group) group.unbounded = true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Whether the value matches, or `false` for a pattern this will not run.
+ *
+ * Three reasons not to run one, and all three answer the same way: the rule
+ * fails. A pattern that cannot be trusted has not been satisfied, and passing
+ * silently is how a constraint stops applying on the server, which is the
+ * failure this whole project is organised against.
+ */
 function matchesPattern(pattern: string, value: string): boolean {
+  if (value.length > PATTERN_INPUT_LIMIT) return false
+  if (nestedUnbounded(pattern)) return false
+
   try {
     return new RegExp(pattern).test(value)
   } catch {
@@ -274,7 +379,14 @@ export function validateForm(
   data: FormData,
   options: EvalOptions = {},
 ): FormErrors {
-  const errors: FormErrors = {}
+  /*
+   * No prototype, for the reason `submittedData` has none. A field keyed
+   * `__proto__` is refused by `validateDocument` and reachable anyway, because
+   * nothing on the render or validate path calls it — and on an object literal
+   * `errors['__proto__'] = message` runs the inherited setter, creates no own
+   * property, and hands back a form that reads as valid.
+   */
+  const errors: FormErrors = Object.create(null) as FormErrors
 
   const visit = (node: ComponentNode, scope: EvalOptions): void => {
     if (!isVisible(node, data, scope)) return

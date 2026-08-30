@@ -111,6 +111,15 @@ export function isEmpty(value: JsonValue | undefined): boolean {
   if (value === undefined || value === null) return true
   if (typeof value === 'string') return value.trim() === ''
   if (Array.isArray(value)) return value.length === 0
+  /*
+   * An object with nothing in it is nothing, the same way an empty list is. The
+   * fall-through used to answer `false` for every object, so `{"consent": {}}`
+   * satisfied a required consent — a client could post it and be accepted.
+   *
+   * Own keys, because a value out of a request body can carry a prototype and
+   * an inherited key is not an answer somebody gave.
+   */
+  if (typeof value === 'object') return Object.keys(value).length === 0
   return false
 }
 

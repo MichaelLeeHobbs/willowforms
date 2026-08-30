@@ -81,6 +81,56 @@ export function contextKeys(root: ComponentNode): Set<string> {
 }
 
 /**
+ * Every node in this document that cannot be evaluated without a sandbox.
+ *
+ * The sibling of `contextKeys`, and it exists for the same failure. A condition
+ * reading a path the host never supplied hides its component and takes it out of
+ * validation; a `computed` binding with no evaluator does exactly that —
+ * `isVisible` answers false for one, so the node and its whole subtree leave
+ * `validateForm`.
+ *
+ * It is the worse of the two, because a host can inject an evaluator in one
+ * place and not the other. The browser then shows a section, validates it, and
+ * submits; the server validates nothing beneath it and answers that the form is
+ * fine. Nothing at evaluation time can notice, which is why this is a question
+ * asked once at startup.
+ *
+ * Node keys rather than expressions, because the expression is the evaluator's
+ * business and the node is what a host can go and look at.
+ *
+ * Total on a malformed document, like everything else here: a host is told to
+ * call this at startup, which is before anything has refused the document.
+ */
+export function evaluatorKeys(root: ComponentNode): string[] {
+  const keys = new Set<string>()
+
+  const walkNode = (node: ComponentNode): void => {
+    if (!node || typeof node !== 'object') return
+
+    const needs = (value: PropValue | undefined): boolean => value?.kind === 'computed'
+
+    const props =
+      node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+        ? Object.values(node.props)
+        : []
+
+    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+
+    const expression =
+      needs(node.renderWhen) ||
+      props.some(needs) ||
+      rules.some((rule) => needs(rule?.when) || rule?.key === 'custom')
+
+    if (expression && typeof node.key === 'string') keys.add(node.key)
+
+    for (const child of Array.isArray(node.children) ? node.children : []) walkNode(child)
+  }
+  walkNode(root)
+
+  return [...keys]
+}
+
+/**
  * The paths this document reads that the context does not hold.
  *
  * Call it once at startup and fail loudly. An empty set is the only result a

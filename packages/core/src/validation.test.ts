@@ -683,3 +683,135 @@ describe('a validation tag this code cannot read', () => {
     expect(validateForm(root, { a: 'anything' })).toEqual({ a: UNREADABLE_RULE })
   })
 })
+
+/**
+ * Two ways a required answer stopped being required, both silent, both on the
+ * server.
+ *
+ * The first is an empty object: `isEmpty` fell through to `false` for anything
+ * that was not a string or an array, so `{"consent": {}}` satisfied `required`.
+ * The second is a key named `__proto__`: the error message was computed
+ * correctly and then assigned into a plain object literal, where `__proto__` is
+ * a setter rather than a slot, so the assignment evaporated and `validateForm`
+ * returned an empty object — a valid form.
+ *
+ * `validateDocument` refuses that key. Nothing on the render or validate path
+ * calls `validateDocument`, which is what makes it reachable.
+ */
+describe('a required answer that was not required', () => {
+  const field = (key: string): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'required' }] },
+  })
+
+  const root = (children: ComponentNode[]): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children,
+  })
+
+  it('is not satisfied by an empty object', () => {
+    expect(validateForm(root([field('consent')]), { consent: {} })).toEqual({
+      consent: DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('is satisfied by an object that holds something', () => {
+    // The control. Reading every object as empty would be its own bug: an
+    // object-typed field with an answer in it is answered.
+    expect(validateForm(root([field('consent')]), { consent: { agreed: true } })).toEqual({})
+  })
+
+  it('reports a field whose key is __proto__', () => {
+    /*
+     * The message was always computed. It was the *assignment* that vanished:
+     * `errors['__proto__'] = message` on an object literal runs the inherited
+     * setter and creates no own property, so the result had zero keys and read
+     * as a valid form.
+     */
+    const errors = validateForm(root([field('__proto__')]), {})
+
+    expect(Object.keys(errors)).toEqual(['__proto__'])
+    expect(Object.hasOwn(errors, '__proto__')).toBe(true)
+  })
+
+  it('does not let a hostile key reshape the errors it returns', () => {
+    const errors = validateForm(root([field('__proto__'), field('email')]), {})
+
+    // The other field still reports, and nothing has been written onto a
+    // prototype that a later `errors[key]` read could pick up.
+    expect(Object.keys(errors).sort()).toEqual(['__proto__', 'email'])
+    expect(({} as Record<string, unknown>)['email']).toBeUndefined()
+  })
+})
+
+/**
+ * A pattern is authored in a document and run on the server against text an
+ * attacker chose.
+ *
+ * `new RegExp(pattern).test(value)` with no cap on either side. The classic
+ * shape is an unbounded quantifier wrapped in another one — `^(a+)+$` against
+ * forty non-matching characters pins a thread, and a form runs one of these per
+ * field per row of every repeater.
+ *
+ * Nothing here can make a backtracking engine linear, so the answer is narrower
+ * and it is stated rather than implied: the shapes that go exponential are
+ * refused when the rule is applied, and the text a pattern is run against is
+ * bounded. `docs/build-out/triage.md` records what that still leaves.
+ */
+describe('a pattern rule', () => {
+  const pattern = (value: string, against: string): string | undefined =>
+    check({ key: 'pattern', value }, against)
+
+  it('still does what a pattern is for', () => {
+    expect(pattern('^[A-Z]{2}\\d{4}$', 'AB1234')).toBeUndefined()
+    expect(pattern('^[A-Z]{2}\\d{4}$', 'nope')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it.each([
+    ['a quantified group that is itself quantified', '^(a+)+$'],
+    ['the same shape with a star', '^(a*)*$'],
+    ['a nested group', '^((a+)*)+$'],
+  ])('refuses %s rather than running it', (_what, source) => {
+    /*
+     * Refused means the rule fails, not that it passes. A pattern the engine
+     * cannot be trusted with has not been satisfied, and a silent pass is how a
+     * constraint stops applying on the server.
+     */
+    expect(pattern(source, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it('does not catch every blowup, and says so', () => {
+    /*
+     * `(a|a)*` is exponential too and is not refused: no cheap syntactic rule
+     * separates a dangerous alternation from `(ab|cd)+`. It is here so the
+     * limit is written down in the suite rather than only in a comment — if a
+     * later change does start catching it, this test says so.
+     */
+    expect(pattern('^(ab|cd)+$', 'abcd')).toBeUndefined()
+  })
+
+  it('allows a bounded inner quantifier, which is what real patterns look like', () => {
+    // `(\d{3}-)+` is a phone number, not an attack: the inner repetition has a
+    // fixed length, so there is nothing for the engine to try two ways.
+    expect(pattern('^(\\d{3}-)+\\d{4}$', '123-456-7890')).toBeUndefined()
+    expect(pattern('^(\\d{3}-)+\\d{4}$', 'nope')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it('does not run a pattern against unbounded text', () => {
+    // An answer to a form field is not a megabyte. Bounding the input does not
+    // make an exponential pattern safe, but it does cap every polynomial one.
+    const long = 'a'.repeat(20_000)
+    expect(pattern('^a*$', long)).toBe(DEFAULT_MESSAGES.pattern)
+    expect(pattern('^a*$', 'a'.repeat(100))).toBeUndefined()
+  })
+
+  it('still refuses a pattern that is not a pattern', () => {
+    // The existing behaviour, kept: an unfinished pattern matches nothing,
+    // which is the same answer it gives once the author closes the bracket.
+    expect(pattern('^(a', 'a')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+})

@@ -13,7 +13,13 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { FormContext, FormData, FormDocument } from '@formsmith/core'
-import { contextValues, missingContext, validateAcross, validateDocument } from '@formsmith/core'
+import {
+  contextValues,
+  evaluatorKeys,
+  missingContext,
+  validateAcross,
+  validateDocument,
+} from '@formsmith/core'
 
 const STORE = new URL('../forms.json', import.meta.url)
 const PORT = Number(process.env['PORT'] ?? 5181)
@@ -126,6 +132,30 @@ app.post('/api/forms/:id/submit', async (c) => {
   const missing = [...new Set(scopes.flatMap((scope) => missingContext(doc.root, scope.context)))]
   if (missing.length > 0) {
     return c.json({ error: 'This form reads context this server does not supply', missing }, 500)
+  }
+
+  /*
+   * The same question about expressions, and this server is the case that makes
+   * it worth asking: it injects no evaluator, deliberately, because there is no
+   * `eval` default anywhere in this project and a sandbox is the host's to
+   * choose.
+   *
+   * Without the check the failure is silent and permissive in the direction
+   * that matters. `isVisible` reads a `computed` visibility rule as *hidden*
+   * when there is nothing to evaluate it with, so the node and its whole
+   * subtree leave validation here — while the browser, which may well have an
+   * evaluator, showed those fields and checked them. The submit then succeeds
+   * with required answers missing.
+   */
+  const needsEvaluator = evaluatorKeys(doc.root)
+  if (needsEvaluator.length > 0) {
+    return c.json(
+      {
+        error: 'This form needs an expression evaluator and this server has none',
+        components: needsEvaluator,
+      },
+      500,
+    )
   }
 
   const data = await c.req.json<FormData>()
