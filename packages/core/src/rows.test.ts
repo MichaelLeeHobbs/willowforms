@@ -7,6 +7,7 @@ import {
   decodeAddress,
   decodeRow,
   encodeRow,
+  keyScopesFor,
   pushRow,
   rowContext,
   rowsOf,
@@ -326,5 +327,112 @@ describe('writing an answer at an address', () => {
     expect(decodeAddress('addresses[1].postcode')?.name).toBe('postcode')
     expect(encodeRow(decodeAddress('addresses[1].postcode')?.path ?? NO_ROWS)).toBe('addresses[1]')
     expect(decodeAddress('addresses[1]')).toBeUndefined()
+  })
+})
+
+/**
+ * Which keys a condition authored on a given node can name.
+ *
+ * The picker asks this. A ref inside a row that is left at the default scope
+ * reads the top level, finds nothing, hides its component, and `validateForm`
+ * then skips the rule — a required answer becoming advisory on the server. So
+ * the panel has to be able to tell the two sets apart before it draws them.
+ */
+describe('keyScopesFor', () => {
+  /*
+   * Every name differs from every other name on purpose. The repeater's node
+   * key is not its data key, and no field's key is its data key, so a lookup
+   * that confuses the two cannot pass by coincidence.
+   */
+  const tree = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'nameField',
+        type: 'Field',
+        props: {},
+        dataKey: 'fullName',
+        schema: { type: 'string', validations: [] },
+      },
+      {
+        key: 'contactList',
+        type: 'Repeater',
+        props: {},
+        dataKey: 'contacts',
+        schema: { type: 'array', validations: [] },
+        children: [
+          {
+            key: 'rowEmail',
+            type: 'Field',
+            props: {},
+            dataKey: 'email',
+            schema: { type: 'string', validations: [] },
+          },
+          {
+            key: 'rowKind',
+            type: 'Field',
+            props: {},
+            dataKey: 'kind',
+            schema: { type: 'string', validations: [] },
+          },
+        ],
+      },
+    ],
+  })
+
+  it('offers only the top level to a node outside every row', () => {
+    const scopes = keyScopesFor(tree(), 'nameField')
+
+    expect(scopes.form).toEqual(['fullName', 'contacts'])
+    // Not an empty list: there is no enclosing row to read at all.
+    expect(scopes.row).toBeUndefined()
+  })
+
+  it('offers the enclosing row as well, to a node inside one', () => {
+    const scopes = keyScopesFor(tree(), 'rowEmail')
+
+    expect(scopes.row).toEqual(['email', 'kind'])
+    // The row's keys are not top-level keys, which is the whole distinction.
+    expect(scopes.form).toEqual(['fullName', 'contacts'])
+  })
+
+  it('names the row by the repeater data key rather than its node key', () => {
+    // `contactList` is the node key and `contacts` is the answer's name. A
+    // scope list built from identity rather than from storage would say the
+    // former, and every fixture in this repository used to hide the difference.
+    expect(keyScopesFor(tree(), 'rowEmail').form).toContain('contacts')
+    expect(keyScopesFor(tree(), 'rowEmail').form).not.toContain('contactList')
+  })
+
+  it('reads the innermost row, and stops at a nested repeater', () => {
+    const root = tree()
+    const list = root.children?.[1]
+    list?.children?.push({
+      key: 'noteList',
+      type: 'Repeater',
+      props: {},
+      dataKey: 'notes',
+      schema: { type: 'array', validations: [] },
+      children: [
+        {
+          key: 'noteBody',
+          type: 'Field',
+          props: {},
+          dataKey: 'body',
+          schema: { type: 'string', validations: [] },
+        },
+      ],
+    })
+
+    // The nested repeater's own key is an answer in the outer row; what it
+    // holds is not, because that lives one row deeper.
+    expect(keyScopesFor(root, 'rowEmail').row).toEqual(['email', 'kind', 'notes'])
+    expect(keyScopesFor(root, 'noteBody').row).toEqual(['body'])
+  })
+
+  it('says nothing about a key that is not in the tree', () => {
+    expect(keyScopesFor(tree(), 'nowhere').row).toBeUndefined()
   })
 })

@@ -48,6 +48,11 @@ export interface BindingModeProps {
   componentKey: string
   /** A field the condition mode can start by testing. Empty means it cannot. */
   firstDataKey?: string
+  /**
+   * Which scope that field lives in. `row` inside a repeater, where a seed at
+   * form scope names a key the top level does not hold and is false on arrival.
+   */
+  firstDataKeyScope?: 'form' | 'row'
   onChange: (value: PropValue | undefined) => void
 }
 
@@ -58,6 +63,7 @@ export function BindingMode({
   value,
   componentKey,
   firstDataKey,
+  firstDataKeyScope,
   onChange,
 }: BindingModeProps): ReactNode {
   const modes = modesFor(schema)
@@ -91,7 +97,10 @@ export function BindingMode({
            * worst. It is reachable only for a property whose schema opts in.
            */
           if (kind === 'condition' && firstDataKey) {
-            onChange({ kind: 'condition', condition: emptyCondition(firstDataKey) })
+            onChange({
+              kind: 'condition',
+              condition: emptyCondition(firstDataKey, firstDataKeyScope),
+            })
           }
         }}
       >

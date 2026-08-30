@@ -14,7 +14,13 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { indexKit, readDeclaration, safeDeclarations, setDeclaration } from '@formsmith/core'
+import {
+  indexKit,
+  keyScopesFor,
+  readDeclaration,
+  safeDeclarations,
+  setDeclaration,
+} from '@formsmith/core'
 import type { Device, Kit } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
@@ -66,6 +72,9 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
   const def = indexKit(kit).get(node.type)
   const styleProps = (def?.props ?? []).filter((prop) => prop.section === 'style')
   const text = node.css?.[device] ?? ''
+  // A style property can be bound to a condition too, and one authored inside a
+  // repeater has to be able to name that row's answers.
+  const scopes = keyScopesFor(api.document.root, node.key)
 
   return (
     <section className="fs-style">
@@ -77,7 +86,7 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
       {styleProps.length > 0 && (
         <>
           <h3 className="fs-style__heading">From this component</h3>
-          <PropRows api={api} node={node} schemas={styleProps} />
+          <PropRows api={api} node={node} schemas={styleProps} scopes={scopes} />
         </>
       )}
 

@@ -27,7 +27,11 @@ function Field({ nodeProps }: NodeRendererProps): ReactNode {
   return <div {...nodeProps} />
 }
 
-const rendererKit: RendererKit = { id: 'fake', renderers: { Screen: Screen_, Field } }
+function List({ nodeProps, children }: NodeRendererProps): ReactNode {
+  return <div {...nodeProps}>{children}</div>
+}
+
+const rendererKit: RendererKit = { id: 'fake', renderers: { Screen: Screen_, Field, List } }
 
 const kit: Kit = {
   id: 'fake',
@@ -72,6 +76,23 @@ const kit: Kit = {
       props: [],
       events: [],
     },
+    /*
+     * A repeater: a container whose data type is `array`, which is what core
+     * reads as row scope. It is here so a condition can be authored *inside* a
+     * row, which is the only place `scope: 'row'` means anything.
+     */
+    {
+      type: 'List',
+      label: 'List',
+      icon: 'stack',
+      group: 'layout',
+      container: true,
+      dataBound: true,
+      dataType: 'array',
+      defaultProps: {},
+      props: [],
+      events: [],
+    },
   ],
 }
 
@@ -79,6 +100,10 @@ interface Harness {
   user: ReturnType<typeof userEvent.setup>
   latest: () => ComponentNode | undefined
   select: () => Promise<void>
+  /** Select any node in the tree, not only the first child of the root. */
+  selectKey: (key: string) => Promise<void>
+  /** Any node in the current document, by key. */
+  node: (key: string) => ComponentNode | undefined
 }
 
 function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
@@ -110,14 +135,27 @@ function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
   // test starts where it used to, rather than repeating the click in each.
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
+  const clickRow = async (key: string): Promise<void> => {
+    const row = view.container.querySelector<HTMLElement>('[data-fs-row="' + key + '"]')
+    if (!row) throw new Error('no tree row for ' + key)
+    await user.click(row)
+  }
+
+  const find = (key: string, from: ComponentNode): ComponentNode | undefined => {
+    if (from.key === key) return from
+    for (const child of from.children ?? []) {
+      const hit = find(key, child)
+      if (hit) return hit
+    }
+    return undefined
+  }
+
   return {
     user,
     latest: (): ComponentNode | undefined => current.root.children?.[0],
-    select: async (): Promise<void> => {
-      const row = view.container.querySelector<HTMLElement>('[data-fs-row="' + node.key + '"]')
-      if (!row) throw new Error('no tree row')
-      await user.click(row)
-    },
+    select: (): Promise<void> => clickRow(node.key),
+    selectKey: clickRow,
+    node: (key: string): ComponentNode | undefined => find(key, current.root),
   }
 }
 
@@ -465,8 +503,8 @@ describe('the visibility row', () => {
     await harness.select()
 
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
-    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
-      (o) => o.value,
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map((o) =>
+      o.value.replace(/^(form|row):/, ''),
     )
 
     expect(options).toContain('country')
@@ -533,8 +571,8 @@ describe('the visibility row', () => {
     const harness = await withSibling()
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
 
-    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
-      (o) => o.value,
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map((o) =>
+      o.value.replace(/^(form|row):/, ''),
     )
     expect(options).toContain('firstName')
     expect(options).not.toContain('website')
@@ -798,5 +836,157 @@ describe('removing a nested condition', () => {
 
     const remaining = screen.getAllByLabelText('Options, one per line')
     expect(remaining[0]).toHaveProperty('value', 'second')
+  })
+})
+
+/**
+ * Authoring a condition inside a repeater's row.
+ *
+ * A `ref` carries an optional scope, and absent means the top level. So a
+ * condition authored inside a row and left at the default reads a key the top
+ * level does not hold, resolves to nothing, hides its component, and
+ * `validateForm` then skips every rule beneath it. A required answer becomes
+ * advisory on the server, where nobody is looking.
+ *
+ * The panel answers that by never offering the choice loosely: inside a row the
+ * field list is two groups, and which group an option came from is what decides
+ * the scope. There is no default to leave wrong.
+ */
+describe('a condition authored inside a row', () => {
+  /*
+   * Not one name in this fixture is reused. The repeater's key is `contactList`
+   * and its data key is `contacts`; every field's key differs from its data key
+   * too. Every repeater fixture in this repository used to set the two to the
+   * same string, which made the row-addressing design and its opposite produce
+   * identical output across the whole suite.
+   */
+  const field = (key: string, dataKey: string): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    dataKey,
+    schema: { type: 'string', validations: [] },
+  })
+
+  const list = (renderWhen?: ComponentNode['renderWhen']): ComponentNode => ({
+    key: 'contactList',
+    type: 'List',
+    props: {},
+    dataKey: 'contacts',
+    schema: { type: 'array', validations: [] },
+    children: [
+      { ...field('rowEmail', 'email'), ...(renderWhen ? { renderWhen } : {}) },
+      field('rowKind', 'kind'),
+      field('rowNote', 'note'),
+    ],
+  })
+
+  const topLevel = field('nameField', 'fullName')
+
+  const rowScoped = (dataKey: string): ComponentNode['renderWhen'] => ({
+    kind: 'condition',
+    condition: { op: 'truthy', value: { kind: 'ref', dataKey, scope: 'row' } },
+  })
+
+  const subject = (): HTMLElement => screen.getByLabelText('Subject')
+
+  it('keeps the row scope when the field it tests is changed', async () => {
+    /*
+     * The CRITICAL. The field select rebuilt the operand from scratch, so
+     * changing which field a row-scoped condition tested silently re-pointed it
+     * at the form — the same rule, reading a different place, with nothing on
+     * screen saying so.
+     */
+    const harness = setup(list(rowScoped('kind')), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(subject(), 'row:note')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'note', scope: 'row' } },
+    })
+  })
+
+  it('can author the row scope in the first place', async () => {
+    // Starting from a form-scoped condition, so the assertion is that the
+    // picker *wrote* the scope rather than that it was already there.
+    const harness = setup(
+      list({
+        kind: 'condition',
+        condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'fullName' } },
+      }),
+      [topLevel],
+    )
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(subject(), 'row:kind')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'kind', scope: 'row' } },
+    })
+  })
+
+  it('seeds a fresh condition on the row rather than on the form', async () => {
+    // The default is the failure: a condition seeded at form scope inside a row
+    // names a key the top level does not hold, so it is false on arrival and
+    // hides the component it was just authored on.
+    const harness = setup(list(), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'kind', scope: 'row' } },
+    })
+  })
+
+  it('writes no scope for a field at the top level, because absent means the form', async () => {
+    // The other half of the same control. If the picker wrote `row` whenever it
+    // could, the test above would pass and the feature would still be broken.
+    const harness = setup(list(rowScoped('kind')), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(subject(), 'form:fullName')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'fullName' } },
+    })
+  })
+
+  it('separates the row from the form in the list it offers', async () => {
+    const harness = setup(list(rowScoped('kind')), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    const groups = Array.from(subject().querySelectorAll('optgroup')).map((group) => [
+      group.label,
+      Array.from(group.querySelectorAll('option')).map((option) => option.value),
+    ])
+
+    // `email` is absent from the row group: a component cannot test its own
+    // field, whichever scope the field is in.
+    expect(groups).toEqual([
+      ['This row', ['row:kind', 'row:note']],
+      // Document order, and the repeater's own key is a top-level answer: it
+      // holds the list, which `is empty` is a fair thing to test.
+      ['This form', ['form:contacts', 'form:fullName']],
+    ])
+  })
+
+  it('offers no groups at all outside a row', async () => {
+    // Nothing changes for the document that has no repeater in it, which is
+    // every document written before this existed.
+    const harness = setup(topLevel, [field('other', 'phone')])
+    await harness.select()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    expect(subject().querySelectorAll('optgroup')).toHaveLength(0)
+    expect(harness.node('nameField')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'phone' } },
+    })
   })
 })

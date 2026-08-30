@@ -122,9 +122,17 @@ function asCondition(value: Condition | undefined): Condition {
   return value
 }
 
-/** The default a fresh condition starts from: the commonest thing anyone writes. */
-export function emptyCondition(dataKey: string): Condition {
-  return { op: 'truthy', value: { kind: 'ref', dataKey } }
+/**
+ * The default a fresh condition starts from: the commonest thing anyone writes.
+ *
+ * The scope is passed rather than defaulted, for the reason `switchKind` gives:
+ * seeded at form scope inside a row, the condition is false from the moment it
+ * is created and everything under it stops being validated.
+ */
+export function emptyCondition(dataKey: string, scope?: 'form' | 'row'): Condition {
+  const ref: Operand =
+    scope === 'row' ? { kind: 'ref', dataKey, scope: 'row' } : { kind: 'ref', dataKey }
+  return { op: 'truthy', value: ref }
 }
 
 interface OperandFieldProps {
@@ -132,7 +140,39 @@ interface OperandFieldProps {
   label: string
   value: Operand
   dataKeys: string[]
+  /**
+   * The enclosing row's data keys, when this condition is authored inside one.
+   *
+   * Absent means there is no row here, which is not the same as a row that
+   * holds nothing: the first draws one list and the second draws two.
+   */
+  rowDataKeys?: string[] | undefined
   onChange: (next: Operand) => void
+}
+
+/**
+ * A field option's value, carrying the scope the choice implies.
+ *
+ * The scope is not a second control. A ref names an answer, and inside a row
+ * the same name can mean two answers, so the option the author picked has to
+ * say which — otherwise the panel is guessing, and the guess that reads
+ * plausibly and tests the wrong place is the whole failure mode here.
+ *
+ * Safe to split on the first `:` because a data key is a JavaScript identifier
+ * and cannot hold one; `keyProblem` enforces that on both a paste and a rename.
+ */
+function encodeRef(scope: 'form' | 'row', dataKey: string): string {
+  return scope + ':' + dataKey
+}
+
+function decodeRef(encoded: string): Operand {
+  const at = encoded.indexOf(':')
+  const dataKey = encoded.slice(at + 1)
+  // Absent rather than `'form'`, because absent is what every ref written
+  // before repeaters existed already means and no document should change.
+  return encoded.slice(0, at) === 'row'
+    ? { kind: 'ref', dataKey, scope: 'row' }
+    : { kind: 'ref', dataKey }
 }
 
 /**
@@ -150,11 +190,28 @@ interface OperandFieldProps {
  * schema for something it does not own. `missingContext` is where a wrong path
  * gets caught, at the host's boot rather than in the panel.
  */
-function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFieldProps): ReactNode {
+function OperandField({
+  id,
+  label,
+  value: raw,
+  dataKeys,
+  rowDataKeys,
+  onChange,
+}: OperandFieldProps): ReactNode {
   const value = asOperand(raw)
   const isRef = value.kind === 'ref'
   const isContext = value.kind === 'context'
-  const known = isRef && dataKeys.includes(value.dataKey)
+  const scope: 'form' | 'row' = isRef && value.scope === 'row' ? 'row' : 'form'
+  // Judged within the scope the ref claims. A row key that also exists at the
+  // top level is a different answer, so matching it against the wrong list
+  // would hide a stale ref behind a name that happens to appear twice.
+  const known = isRef && (scope === 'row' ? (rowDataKeys ?? []) : dataKeys).includes(value.dataKey)
+
+  const option = (key: string, of: 'form' | 'row'): ReactNode => (
+    <option key={of + ':' + key} value={encodeRef(of, key)}>
+      {key}
+    </option>
+  )
 
   return (
     <div className="fs-condition__operand">
@@ -164,7 +221,7 @@ function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFiel
       <select
         id={id + '-kind'}
         value={value.kind}
-        onChange={(e) => onChange(switchKind(value, e.target.value, dataKeys))}
+        onChange={(e) => onChange(switchKind(value, e.target.value, dataKeys, rowDataKeys))}
       >
         <option value="ref">Field</option>
         <option value="literal">Value</option>
@@ -177,15 +234,31 @@ function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFiel
       {isRef && (
         <select
           id={id}
-          value={value.dataKey}
-          onChange={(e) => onChange({ kind: 'ref', dataKey: e.target.value })}
+          value={encodeRef(scope, value.dataKey)}
+          onChange={(e) => onChange(decodeRef(e.target.value))}
         >
-          {!known && <option value={value.dataKey}>{value.dataKey || '(none)'}</option>}
-          {dataKeys.map((key) => (
-            <option key={key} value={key}>
-              {key}
-            </option>
-          ))}
+          {/*
+            A hand-edited document may name a key that is not on the list. It is
+            shown as it stands, in the scope it claims, rather than the select
+            falling back to the first real option: quietly re-pointing a rule at
+            a different field is worse than showing an unfamiliar name.
+          */}
+          {!known && (
+            <option value={encodeRef(scope, value.dataKey)}>{value.dataKey || '(none)'}</option>
+          )}
+          {rowDataKeys === undefined ? (
+            dataKeys.map((key) => option(key, 'form'))
+          ) : (
+            <>
+              {/*
+                The row first, because a condition authored inside a row almost
+                always means this row's answer, and because the group an option
+                sits in is the only thing that decides the scope written.
+              */}
+              <optgroup label="This row">{rowDataKeys.map((key) => option(key, 'row'))}</optgroup>
+              <optgroup label="This form">{dataKeys.map((key) => option(key, 'form'))}</optgroup>
+            </>
+          )}
         </select>
       )}
       {isContext && (
@@ -217,8 +290,23 @@ function OperandField({ id, label, value: raw, dataKeys, onChange }: OperandFiel
  * `email` becoming the context path `email` is a rule that reads plausibly and
  * tests something else entirely. Starting empty is visibly unfinished.
  */
-function switchKind(current: Operand, kind: string, dataKeys: string[]): Operand {
-  if (kind === 'ref') return { kind: 'ref', dataKey: dataKeys[0] ?? '' }
+function switchKind(
+  current: Operand,
+  kind: string,
+  dataKeys: string[],
+  rowDataKeys?: string[],
+): Operand {
+  /*
+   * Inside a row, a fresh ref starts on the row. Starting it on the form is the
+   * one default that fails silently: it reads a key the top level does not
+   * hold, the condition is false, the component is hidden, and validation then
+   * skips every rule under it.
+   */
+  if (kind === 'ref') {
+    const inRow = rowDataKeys?.[0]
+    if (inRow !== undefined) return { kind: 'ref', dataKey: inRow, scope: 'row' }
+    return { kind: 'ref', dataKey: dataKeys[0] ?? '' }
+  }
   if (kind === 'context') return { kind: 'context', path: '' }
   return literal(current.kind === 'literal' ? current.value : '')
 }
@@ -321,6 +409,8 @@ export interface ConditionEditorProps {
   value: Condition
   /** Every data key in the document, so a condition can only name a real one. */
   dataKeys: string[]
+  /** The enclosing row's data keys, when this condition sits inside a row. */
+  rowDataKeys?: string[] | undefined
   onChange: (next: Condition) => void
   /** Nesting level, for indentation only. */
   depth?: number
@@ -330,6 +420,7 @@ export function ConditionEditor({
   id,
   value: raw,
   dataKeys,
+  rowDataKeys,
   onChange,
   depth = 0,
 }: ConditionEditorProps): ReactNode {
@@ -346,6 +437,7 @@ export function ConditionEditor({
             label="Left"
             value={value.left}
             dataKeys={dataKeys}
+            rowDataKeys={rowDataKeys}
             onChange={(left) => onChange({ ...value, left })}
           />
         )}
@@ -355,6 +447,7 @@ export function ConditionEditor({
             label="Subject"
             value={value.value}
             dataKeys={dataKeys}
+            rowDataKeys={rowDataKeys}
             onChange={(next) => onChange({ ...value, value: next })}
           />
         )}
@@ -381,6 +474,7 @@ export function ConditionEditor({
             label="Right"
             value={value.right}
             dataKeys={dataKeys}
+            rowDataKeys={rowDataKeys}
             onChange={(right) => onChange({ ...value, right })}
           />
         )}
@@ -414,6 +508,7 @@ export function ConditionEditor({
                 id={id + '-' + String(index)}
                 value={inner}
                 dataKeys={dataKeys}
+                rowDataKeys={rowDataKeys}
                 depth={depth + 1}
                 onChange={(next) =>
                   onChange({
@@ -442,7 +537,12 @@ export function ConditionEditor({
             onClick={() =>
               onChange({
                 ...value,
-                conditions: [...asList(value.conditions), emptyCondition(dataKeys[0] ?? '')],
+                conditions: [
+                  ...asList(value.conditions),
+                  rowDataKeys?.[0] !== undefined
+                    ? emptyCondition(rowDataKeys[0], 'row')
+                    : emptyCondition(dataKeys[0] ?? ''),
+                ],
               })
             }
           >
@@ -457,6 +557,7 @@ export function ConditionEditor({
             id={id + '-inner'}
             value={value.condition}
             dataKeys={dataKeys}
+            rowDataKeys={rowDataKeys}
             depth={depth + 1}
             onChange={(condition) => onChange({ ...value, condition })}
           />

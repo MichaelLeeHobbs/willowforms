@@ -148,6 +148,72 @@ export function rowContext(path: RowPath, value: JsonValue | undefined): RowCont
   return { path, values }
 }
 
+/** The two sets of data keys a condition authored on one node can name. */
+export interface KeyScopes {
+  /** Every answer the top level holds, which is what an absent scope reads. */
+  form: string[]
+  /**
+   * The enclosing row's answers, or absent when the node is not inside a row.
+   *
+   * Absent and empty mean different things and the panel draws them
+   * differently: absent is "there is no row here", empty is "there is a row and
+   * it holds nothing else yet".
+   */
+  row?: string[]
+}
+
+/**
+ * What a condition authored on this node is allowed to name, by scope.
+ *
+ * The picker's half of the answer to the quiet failure below. That one reports
+ * the mistake at boot; this one stops it being authorable, by telling the panel
+ * which names belong to the row and which to the form so that choosing a field
+ * is also choosing a scope. An author never types a scope and never leaves one
+ * at a default that reads the wrong place.
+ *
+ * Row keys stop at a nested repeater. The nested repeater's own data key is an
+ * answer in this row — it holds the inner list — but what is inside it is one
+ * row further down and no ref from here can name it.
+ */
+export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
+  const kids = (node: ComponentNode): ComponentNode[] =>
+    Array.isArray(node?.children) ? node.children : []
+
+  /** The answers one row of this repeater holds, not counting the list itself. */
+  const rowKeysOf = (repeater: ComponentNode): string[] => {
+    const names: string[] = []
+    const gather = (node: ComponentNode, isRepeater: boolean): void => {
+      if (!node || typeof node !== 'object') return
+      if (!isRepeater) {
+        if (node.schema) names.push(dataKeyOf(node))
+        // Its children are answers in *its* rows, not in this one.
+        if (isRowScopeNode(node)) return
+      }
+      for (const child of kids(node)) gather(child, false)
+    }
+    gather(repeater, true)
+    return names
+  }
+
+  const form: string[] = []
+  let row: string[] | undefined
+
+  const visit = (node: ComponentNode, enclosing: ComponentNode | undefined): void => {
+    if (!node || typeof node !== 'object') return
+    if (!enclosing && node.schema) form.push(dataKeyOf(node))
+    if (node.key === nodeKey && enclosing) row = rowKeysOf(enclosing)
+    // The innermost repeater wins, which is what `scope: 'row'` names.
+    const deeper = isRowScopeNode(node) ? node : enclosing
+    for (const child of kids(node)) visit(child, deeper)
+  }
+  visit(root, undefined)
+
+  // Deduplicated, because data keys may legally repeat: two fields behind
+  // opposite guards can write one answer, and as names to test they are one.
+  const unique = (names: string[]): string[] => [...new Set(names)]
+  return row === undefined ? { form: unique(form) } : { form: unique(form), row: unique(row) }
+}
+
 /**
  * Refs that will read nothing, reported before anyone submits.
  *

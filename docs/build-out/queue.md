@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 1 — `safeStyleValue` in core, called at both kit sinks
+- **Last completed:** item 2 — the condition picker writes `scope`, by grouping the field list
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -62,7 +62,7 @@ These have a decided design in `docs/decisions.md`. Implement what is written th
       _Check:_ a core test proving `background: red}html{display:none}.x{` is refused; a kit-mui test that
       serialises the emitted stylesheet and asserts one rule, not two; a matching kit-html test. Standing gate.
 
-- [ ] **2. The condition picker writes `scope`, and stops discarding it.** CRITICAL C10,
+- [x] **2. The condition picker writes `scope`, and stops discarding it.** CRITICAL C10,
       `ConditionEditor.tsx:181`. Changing which field a condition tests must not silently re-point a
       row-scoped condition at the form.
       _Check:_ a designer test that authors a row-scoped ref, changes the field, and asserts `scope: 'row'`

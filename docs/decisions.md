@@ -4,6 +4,35 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The scope is chosen by which group a field is picked from, not by a second control
+
+- **Decided:** inside a repeater the condition picker draws its field list as two `<optgroup>`s, `This
+row` and `This form`, and the group an option came from is what writes `scope`. Outside a repeater
+  nothing changes: one flat list, no scope written. A fresh condition seeded inside a row starts on the
+  row.
+- **Why:** the risk the row-addressing design was signed off with is a ref authored inside a row and left
+  at the default scope. It reads a key the top level does not hold, resolves to `undefined`, hides its
+  component, and `validateForm` then skips every rule beneath it. A separate scope select keeps that
+  default and relies on the boot-time check to catch it afterwards; grouping removes the default
+  entirely, because there is no way to pick a field without also having said where it lives.
+- **The option value carries the scope**, as `row:email` / `form:email`. A data key is a JavaScript
+  identifier and cannot hold a `:`, which `keyProblem` enforces on both a paste and a rename, so the
+  split is unambiguous. Nothing of this encoding is stored; it exists between the `<option>` and the
+  handler.
+- **Rejected: a scope `<select>` beside the field select.** Smaller, and it is the shape the type
+  suggests, but it ships the wrong default in a 288px pane and answers the failure with a warning
+  somewhere else. `rowScopeProblems` stays as the backstop for hand-edited documents; it is not a reason
+  to hand an author the mistake.
+- **Rejected: inferring the scope from the name.** Already rejected once in this file, for leading-dot
+  anchoring. Inference is the same mistake wearing different syntax.
+- **Core owns the split.** `keyScopesFor(root, nodeKey)` returns the top-level keys and, when the node is
+  inside a repeater, the enclosing row's. Row keys stop at a nested repeater: that repeater's own data
+  key is an answer in this row because it holds the inner list, but what is inside it is one row further
+  down and no ref from here can name it.
+- **Reversal:** cheap. One core function, one prop threaded through the panel, and the grouping in one
+  `<select>`. No document changes: `scope` was already in the type and absent already means the form.
+- **When:** 2026-08-30.
+
 ### The value refusal also refuses a backslash
 
 A refinement to the entry below rather than a reversal of it, recorded because it widens a refusal set
