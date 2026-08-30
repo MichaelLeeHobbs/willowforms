@@ -85,8 +85,10 @@ Say in the transcript that you did. A test written after the fix, never seen to 
 - `docs/build-out/found.md` — work discovered that is outside the frozen queue. Does not gate completion.
 - `docs/build-out/triage.md` — a review finding you decided not to fix, with a one-line reason. This
   counts as handling it, and it is the only honest way to close out 200 LOW and NOTE findings.
-- The resume block in `CLAUDE.md` — keep the date and the last completed item current. A resume pointer
-  describing last week is worse than none.
+- The **Run status** block at the top of `docs/build-out/queue.md` — keep the started date and the last
+  completed item current. A resume pointer describing last week is worse than none. It lives there rather
+  than in `CLAUDE.md` so that the file which declares itself repo facts only stays that way; `CLAUDE.md`
+  holds a pointer that never needs editing.
 
 ## Git
 

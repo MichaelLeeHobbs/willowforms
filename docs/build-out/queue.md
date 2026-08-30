@@ -9,6 +9,19 @@ transcript. Finishing an item means starting the next one, never stopping. Do no
 shells or subagents that outlive a turn. Follow docs/build-out/RUN.md.
 ```
 
+## Run status
+
+The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointer at this file, because
+a status line in a file that calls itself repo facts only is a status line nobody updates.
+
+- **Started:** 2026-08-30
+- **Last completed:** nothing yet, the run has not started
+- **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
+
+Keep these three current as items are ticked off.
+
+---
+
 **Frozen 2026-08-30.** Nothing may be added to this queue or dropped from it during the run. Work
 discovered along the way goes to `docs/build-out/found.md`, which does not gate completion. A review
 finding judged not worth fixing goes to `docs/build-out/triage.md` with a one-line reason, which counts

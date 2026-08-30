@@ -6,11 +6,10 @@ renderer, because every competitor paywalls exactly that piece.
 > Working agreement and personal defaults live in the global `~/.claude/CLAUDE.md`. This file is repo
 > facts only.
 
-> **Mid build-out** (started 2026-08-30, last completed: nothing yet, the run has not started). Frozen
-> queue and the `/goal` line: `docs/build-out/queue.md`. The run contract: `docs/build-out/RUN.md`.
-> Decisions: `docs/decisions.md`. The work list is `tmp/formsmith-review-2026-08-30.md`, which is
-> gitignored and exists in one working copy only. If no goal is active, tell me to paste the line at the
-> top of the queue file.
+> **A build-out is in progress.** The frozen queue, the `/goal` line to paste, and how far the run has
+> got: `docs/build-out/queue.md`. The contract it follows: `docs/build-out/RUN.md`. Decisions:
+> `docs/decisions.md`. If no goal is active, tell me to paste the line at the top of the queue file.
+> Delete this block when the queue empties.
 
 ## Read first
 
