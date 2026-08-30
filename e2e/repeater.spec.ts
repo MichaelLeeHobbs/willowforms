@@ -25,6 +25,8 @@ test('a field dropped into a repeater lands in the authored row, once', async ({
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
   const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
+  // Only the source is scrolled, for the reason dragOnto explains.
+  await palette.scrollIntoViewIfNeeded()
   const target = await stableBox(designer.node('repeater'))
   const start = await stableBox(palette)
 
@@ -55,6 +57,9 @@ test('preview draws a row per answer and keeps them apart', async ({ designer })
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
   const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
+  // Both scrolled before either is measured, for the reason dragOnto explains.
+  await palette.scrollIntoViewIfNeeded()
+  await designer.node('repeater').scrollIntoViewIfNeeded()
   const target = await stableBox(designer.node('repeater'))
   const start = await stableBox(palette)
 
