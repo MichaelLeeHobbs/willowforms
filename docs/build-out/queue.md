@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 4 — a row frame carries the repeater data key, with fixtures that can see the difference
+- **Last completed:** item 6 — the MUI kit stops rescaling authored lengths. Item 5 landed on main as PR #23.
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -80,11 +80,11 @@ These have a decided design in `docs/decisions.md`. Implement what is written th
       there is not one today, which is why the suite could not tell the two designs apart. Keystrokes in such
       a repeater must land. Standing gate, e2e included.
 
-- [ ] **5. Ignore `apps/demo-server/forms.json`, on main.** `docs/decisions.md` — _The demo store stays in
+- [x] **5. Ignore `apps/demo-server/forms.json`, on main.** `docs/decisions.md` — _The demo store stays in
       the repo; the ignore line has to land on main_. The earlier fix went to a branch that was later deleted.
       _Check:_ on main, `git check-ignore -v apps/demo-server/forms.json` exits 0.
 
-- [ ] **6. Fix the MUI corner radius.** HIGH, addendum. `docs/decisions.md` — _The MUI kit halves every
+- [x] **6. Fix the MUI corner radius.** HIGH, addendum. `docs/decisions.md` — _The MUI kit halves every
       corner radius_. It divides by 8 where MUI multiplies by 4.
       _Check:_ a kit contract test that renders the same authored `radius` through both kits and asserts the
       same computed pixel value. Standing gate.

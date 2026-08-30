@@ -43,6 +43,26 @@ const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : 
 const bool = (v: unknown): boolean => v === true
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback)
 
+/**
+ * Lengths as CSS strings, not as theme multiples.
+ *
+ * `sx` reads a bare number as a multiple of a theme value — `padding` through
+ * `theme.spacing`, `borderRadius` through `theme.shape.borderRadius` — so the
+ * kit used to divide by the scale to get back to the pixels the document
+ * authored. That round-trips only under the defaults it was written against,
+ * and MUI's whole point is that a host replaces them: under `spacing: 3` an
+ * authored 8px drew at 3px. One of the two divisions was against the wrong
+ * default and was wrong even under the defaults, dividing `radius` by 8 where
+ * MUI multiplies by 4, so an authored 24 drew at 12.
+ *
+ * A string is passed through untouched, so the document's number is the number
+ * on the page in every theme. `Grid` already carries a note about the same
+ * failure — "made the same document lay out differently in the two kits" — and
+ * this was the same failure two functions below it, undetected because no test
+ * rendered one document through both kits and compared what came out.
+ */
+const px = (value: number): string => String(value) + 'px'
+
 /*
  * The message a field is described by.
  *
@@ -256,7 +276,7 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
         // auto-fit with a floor: columns collapse when they cannot fit, so the
         // author never writes a breakpoint.
         gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
-        gap: gap / 8,
+        gap: px(gap),
         // `columns` caps how many can ever fit, which is what makes it mean
         // something alongside auto-fit. Ignoring it here made the same document
         // lay out differently in the two kits.
@@ -273,9 +293,9 @@ function BoxNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
     <Box
       {...nodeProps}
       sx={{
-        padding: num(props['padding'], 16) / 8,
+        padding: px(num(props['padding'], 16)),
         background: safeStyleValue(str(props['background'])),
-        borderRadius: num(props['radius'], 0) / 8,
+        borderRadius: px(num(props['radius'], 0)),
       }}
     >
       {children}

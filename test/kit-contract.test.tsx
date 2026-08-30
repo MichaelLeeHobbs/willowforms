@@ -16,6 +16,8 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { prop } from '@formsmith/core'
 import { describe, expect, it, vi } from 'vitest'
 import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
@@ -85,6 +87,91 @@ describe('the two kits in this repository agree', () => {
       expect([...a.events].sort()).toEqual([...b.events].sort())
     },
   )
+})
+
+/**
+ * A length authored once means the same number of pixels in every kit.
+ *
+ * This is the divergence the `Grid` comment two functions above `Box` was
+ * written to prevent, sitting undetected below it. `borderRadius` in an MUI `sx`
+ * block is multiplied by `theme.shape.borderRadius`, which defaults to 4, while
+ * the kit divided by 8: an authored `radius: 24` rendered 12px in MUI against
+ * 24px in the HTML kit. Nothing caught it because no test rendered one document
+ * through both kits and compared what came out.
+ *
+ * The declarations are read out of what each kit emitted rather than out of
+ * `getComputedStyle`. jsdom has no cascade worth trusting and no layout engine,
+ * so the question here is deliberately the narrower one it can answer: what CSS
+ * did this kit write.
+ */
+describe('a length means the same thing in both kits', () => {
+  const box = (): ComponentNode => ({
+    key: 'target',
+    type: 'Box',
+    props: { padding: prop(8), radius: prop(24), background: prop('') },
+    children: [],
+  })
+
+  function formOf(renderers: RendererKit): ReactElement {
+    return (
+      <FormRenderer
+        document={documentOf(box())}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />
+    )
+  }
+
+  /** The declarations one kit wrote for the Box, whichever sink it used. */
+  function declarationsFor(renderers: RendererKit): string {
+    /*
+     * Nothing is cleared between renders, deliberately. Emotion caches by
+     * content hash and will not re-insert a rule it believes is already on the
+     * page, so removing its style tags makes the *next* render emit nothing and
+     * the reading come back empty. The sheets are matched by the element's own
+     * class instead, which is exact and does not care what else is mounted.
+     */
+    const { container } = render(formOf(renderers))
+
+    const el = container.querySelector('[data-fs-key="target"]')
+    if (!el) throw new Error('the Box did not render')
+
+    // The HTML kit writes a style attribute; the MUI kit writes an emotion rule
+    // for the class it put on the element.
+    const inline = el.getAttribute('style') ?? ''
+    const classes = (el.getAttribute('class') ?? '')
+      .split(/\s+/)
+      .filter((c) => c.startsWith('css-'))
+    const sheets = Array.from(document.querySelectorAll('style'))
+      .map((tag) => tag.textContent ?? '')
+      .filter((text) => classes.some((c) => text.includes('.' + c)))
+      .join('')
+
+    return (inline + ';' + sheets).replace(/\s+/g, '')
+  }
+
+  /** One declaration's value, normalised, or nothing if the kit did not write it. */
+  function valueOfDeclaration(css: string, name: string): string | undefined {
+    return new RegExp('[;{]' + name + ':([^;}]+)').exec(';' + css)?.[1]
+  }
+
+  it('renders an authored radius as the same pixels through both kits', () => {
+    const mui = declarationsFor(muiRendererKit)
+    const html = declarationsFor(htmlRendererKit)
+
+    expect(valueOfDeclaration(html, 'border-radius')).toBe('24px')
+    expect(valueOfDeclaration(mui, 'border-radius')).toBe(valueOfDeclaration(html, 'border-radius'))
+  })
+
+  it('renders an authored padding as the same pixels through both kits', () => {
+    const mui = declarationsFor(muiRendererKit)
+    const html = declarationsFor(htmlRendererKit)
+
+    expect(valueOfDeclaration(html, 'padding')).toBe('8px')
+    expect(valueOfDeclaration(mui, 'padding')).toBe(valueOfDeclaration(html, 'padding'))
+  })
 })
 
 describe.each(KITS)('$name', ({ kit, renderers }) => {

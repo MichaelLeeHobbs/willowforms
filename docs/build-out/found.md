@@ -48,3 +48,33 @@ Out of scope because the queue was frozen before it happened, and because the fi
 rather than a defect. A check that fails when the palette exceeds the viewport would say it directly.
 Recorded as Trap 13 in the write-tests skill either way, since the reasoning is worth more than the
 check.
+
+## `gap` means one thing in kit-mui and another in kit-html
+
+`packages/kit-mui/src/renderers.tsx` and `packages/kit-html/src/renderers.tsx` — `Stack`, `Container`
+and `Step` pass `gap` straight to MUI's `gap` prop, which reads it as a multiple of `theme.spacing`
+(default 8), while the HTML kit reads it as pixels. So an authored `gap: 2` is 16px in one kit and 2px
+in the other, and a document authored against one and rendered through the other lays out differently.
+
+`test/kit-contract.test.tsx` already names this and treats it as deliberate, and for the _defaults_ it
+is: a kit is entitled to its own `defaultProps`, and 2 and 16 are both right in their own kit. What is
+not deliberate is the **authored** value meaning two different things, which is the same class of
+defect as the corner radius fixed in item 6 — that one was found only because someone measured it.
+
+Out of scope because item 6 is the radius, the queue is frozen, and this needs a decision rather than a
+fix: either `gap` becomes pixels everywhere, which is a breaking change to every MUI document, or the
+prop is documented as kit-relative and the designer stops pretending one number travels. Bad to leave:
+it is invisible until someone switches kits, which is the one thing this project advertises.
+
+## The kit contract table counts a row that is not a kit obligation
+
+`test/docs.test.ts` — the guard slices `kit-contract.test.tsx` from `describe.each(KITS)` to the end of
+the file and counts every `it(` in it, then requires one row per case in the table in
+`docs/spec/02-kit-contract.md`. Anything written after the per-kit block is counted too, so the
+"a default copied between kits" case has a row in the table describing an obligation no third-party kit
+has: it is about these two kits agreeing with each other.
+
+Found while adding the cross-kit length test for item 6, which the guard also miscounted until it was
+moved above the per-kit block. Out of scope because the queue is frozen and nothing is wrong today.
+Cheap to fix: end the slice at the closing of the per-kit describe rather than at the end of the file,
+and drop the row that then has no rule.

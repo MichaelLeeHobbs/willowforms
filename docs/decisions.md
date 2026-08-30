@@ -4,6 +4,26 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### A length in the MUI kit is a CSS string, not a theme multiple
+
+A widening of the entry below, which decided only that `borderRadius` must stop being divided by 8.
+
+- **Decided:** `Box`'s `padding` and `radius` and `Grid`'s `gap` are emitted as `px` strings rather than
+  as bare numbers. `sx` passes a string through untouched, so the number the document authored is the
+  number on the page under every theme.
+- **Why more than the radius:** the radius was wrong under the default theme too, and the other two were
+  wrong under any other one. Dividing by the scale round-trips only under `spacing: 8` and
+  `shape.borderRadius: 4`, and MUI's whole point is that a host replaces them. Measured under
+  `createTheme({ spacing: 3 })`: an authored 8px drew at 3px.
+- **Rejected:** dividing by the theme's own values read from `useTheme`. It is arithmetic to undo
+  arithmetic, it makes every length depend on a hook, and it still cannot express a length the theme has
+  no unit for.
+- **Not changed: `Stack`'s `gap`,** which is a real MUI spacing-scale prop rather than an `sx` length,
+  and which diverges from the HTML kit in a way that needs a decision rather than a fix. Recorded in
+  `docs/build-out/found.md`.
+- **Reversal:** one helper and four call sites.
+- **When:** 2026-08-30.
+
 ### The scope is chosen by which group a field is picked from, not by a second control
 
 - **Decided:** inside a repeater the condition picker draws its field list as two `<optgroup>`s, `This
