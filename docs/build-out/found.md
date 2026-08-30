@@ -32,3 +32,19 @@ stopped moving, and that is fixed. The race is real but latent, and fixing it bl
 which change actually mattered.
 
 Worth doing when something else forces a harness change. Cheap: wait a frame inside those two readers.
+
+## Nothing enforces that the palette fits on screen
+
+`e2e/canvas.spec.ts` and `e2e/repeater.spec.ts` drag entries out of the component palette. Whether
+those entries are on screen depends on how many components the palette holds, how tall the platform
+renders the list, and a 720px viewport. Adding Step and Repeater pushed the Selection group past the
+bottom edge, which broke the palette drag on Linux CI while it kept passing on Windows.
+
+The drags now scroll their source into view, so the suite is no longer wrong. What is missing is
+anything that says so out loud: add three more components and a category drops off the bottom again,
+and the next person also gets a failure that looks like flake and is not.
+
+Out of scope because the queue was frozen before it happened, and because the fix is a judgement call
+rather than a defect. A check that fails when the palette exceeds the viewport would say it directly.
+Recorded as Trap 13 in the write-tests skill either way, since the reasoning is worth more than the
+check.
