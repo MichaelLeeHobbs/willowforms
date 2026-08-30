@@ -311,7 +311,16 @@ export function applyRule(
    */
   if (!KNOWN_RULES.has(rule.key)) return UNREADABLE_RULE
 
-  const fail = (): string => rule.message ?? DEFAULT_MESSAGES[rule.key]
+  /*
+   * `||`, not `??`. An empty string is not nullish, so `message: ""` was kept
+   * as the message — and `validateForm` records an error only `if (error)`, so
+   * an empty one silently stopped the rule failing. A pasted `"message": ""`
+   * turned a required field optional on the server with nothing to see.
+   *
+   * A message nobody wrote and a message that says nothing are the same thing
+   * to a person filling in the form: the default is what both should give them.
+   */
+  const fail = (): string => rule.message || DEFAULT_MESSAGES[rule.key]
 
   if (rule.key === 'required') return isMissing(value) ? fail() : undefined
   if (isEmpty(value)) return undefined

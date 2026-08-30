@@ -815,3 +815,132 @@ describe('a pattern rule', () => {
     expect(pattern('^(a', 'a')).toBe(DEFAULT_MESSAGES.pattern)
   })
 })
+
+/**
+ * Three holes in this file, each one a branch nothing executed.
+ *
+ * Every case here was written by mutating the source and watching the suite
+ * stay green. That is the only evidence a test is doing anything, and it is how
+ * these were found: `guardPasses`' whole condition branch could be replaced with
+ * `return false` and nothing went red.
+ */
+describe('branches this file used to leave unexecuted', () => {
+  const field = (key: string, validations: ValidationRule[]): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations },
+  })
+
+  const root = (children: ComponentNode[]): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children,
+  })
+
+  describe('a rule whose message is empty', () => {
+    it('still fails, with the default message', () => {
+      /*
+       * `rule.message ?? DEFAULT` keeps `''`, because `''` is not nullish — and
+       * `validateForm` records an error only `if (error)`, so an empty string
+       * made the rule stop failing. A pasted `"message": ""` turned a required
+       * field optional on the server with nothing to see.
+       */
+      expect(check({ key: 'required', message: '' }, '')).toBe(DEFAULT_MESSAGES.required)
+    })
+
+    it('reaches validateForm, which is where it mattered', () => {
+      const errors = validateForm(root([field('email', [{ key: 'required', message: '' }])]), {})
+
+      expect(errors).toEqual({ email: DEFAULT_MESSAGES.required })
+    })
+
+    it('still prefers a message the author wrote', () => {
+      // The control. Ignoring `message` entirely would pass both tests above.
+      expect(check({ key: 'required', message: 'We need this.' }, '')).toBe('We need this.')
+    })
+  })
+
+  describe('a rule guarded by a structured condition', () => {
+    /*
+     * The whole no-sandbox story, and no test executed it. `guardPasses`'
+     * `condition` branch could be replaced with `return false` and the entire
+     * repository suite stayed green — which would have made every guarded rule
+     * silently stop applying.
+     */
+    const guarded = (): ComponentNode =>
+      field('vat', [
+        {
+          key: 'required',
+          when: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'business' } },
+          },
+        },
+      ])
+
+    it('applies when the condition holds, with no evaluator anywhere', () => {
+      const errors = validateForm(root([guarded()]), { business: true })
+
+      expect(errors).toEqual({ vat: DEFAULT_MESSAGES.required })
+    })
+
+    it('does not apply when the condition does not hold', () => {
+      expect(validateForm(root([guarded()]), { business: false })).toEqual({})
+    })
+
+    it('reads the condition rather than merely noticing there is one', () => {
+      // Both directions above, on one fixture, which is what makes this a test
+      // of the branch and not of its presence.
+      expect(validateForm(root([guarded()]), {})).toEqual({})
+    })
+  })
+
+  describe('submittedData over a repeater', () => {
+    /*
+     * The row branch had no fixture at all: deleting the `isRowScope` case left
+     * every test green. Named so the two names differ, because a fixture that
+     * spells them the same cannot see the branch that tells them apart.
+     */
+    const withRows = (): ComponentNode =>
+      root([
+        {
+          key: 'addressList',
+          dataKey: 'addresses',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [field('street', []), field('postal', [])].map((node, i) => ({
+            ...node,
+            dataKey: i === 0 ? 'line1' : 'postcode',
+          })),
+        },
+        field('email', []),
+      ])
+
+    it('keeps one object per row, under the answer name', () => {
+      const data = {
+        addresses: [{ line1: '1 High Street', postcode: 'SW1A 1AA' }, { line1: '2 Low Street' }],
+        email: 'a@b.co',
+      }
+
+      expect(submittedData(withRows(), data)).toEqual(data)
+    })
+
+    it('drops what a row no longer asks for', () => {
+      // The point of `submittedData`: it projects the document over the data,
+      // so an answer to a question that has been deleted does not survive.
+      const data = { addresses: [{ line1: 'kept', removed: 'gone' }], email: '' }
+
+      expect(submittedData(withRows(), data)).toEqual({ addresses: [{ line1: 'kept' }], email: '' })
+    })
+
+    it('reads a repeater whose stored value is not a list as no rows', () => {
+      expect(submittedData(withRows(), { addresses: 'nonsense', email: '' })).toEqual({
+        addresses: [],
+        email: '',
+      })
+    })
+  })
+})

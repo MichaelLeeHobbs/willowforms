@@ -402,3 +402,67 @@ describe('what the export cannot carry', () => {
     })
   })
 })
+
+/**
+ * The other half of `unexportableRules`, which no fixture executed.
+ *
+ * Deleting the `rule.when` line left both of this file's tests green, so a host
+ * could be told a lossy export was lossless — which is the one thing this
+ * function exists to prevent.
+ */
+describe('a rule that applies only sometimes', () => {
+  const guarded = (): FormDocument => ({
+    ...createDocument('Export', 'export'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'business',
+          type: 'Checkbox',
+          props: {},
+          schema: { type: 'boolean', validations: [] },
+        },
+        {
+          key: 'vat',
+          type: 'TextField',
+          props: {},
+          schema: {
+            type: 'string',
+            validations: [
+              {
+                key: 'required',
+                when: {
+                  kind: 'condition',
+                  condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'business' } },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  })
+
+  it('is reported as lossy', () => {
+    expect(unexportableRules(guarded())).toEqual([{ key: 'vat', rule: 'required' }])
+  })
+
+  it('is not exported as unconditionally required', () => {
+    // The same fact from the other side: JSON Schema's `required` cannot say
+    // "sometimes", so exporting it rejects payloads the form itself accepts.
+    expect(toJsonSchema(guarded()).required ?? []).toEqual([])
+  })
+
+  it('says nothing about the same rule unguarded', () => {
+    // The control. Reporting every `required` as lossy would pass both tests
+    // above and make the dialog's warning meaningless.
+    const plain = guarded()
+    const vat = plain.root.children?.[1]
+    if (vat?.schema) vat.schema.validations = [{ key: 'required' }]
+
+    expect(unexportableRules(plain)).toEqual([])
+    expect(toJsonSchema(plain).required).toEqual(['vat'])
+  })
+})

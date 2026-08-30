@@ -64,6 +64,47 @@ function totals(text: string): number[] {
   return counts
 }
 
+/**
+ * Every end-to-end total a document quotes.
+ *
+ * The unit total above is caught by the `\d{2,4} tests` pattern. The end-to-end
+ * one was not, three times over: it is under a hundred so the `>= 100` filter
+ * discarded it, and two of the three documents phrase it without the word
+ * `tests` at all — "67 more, in a real browser" and "runs 67 in a real browser".
+ * So the figure lived in three files, was compared in none, and this file's own
+ * checklist claimed otherwise.
+ *
+ * Matched on the phrase they do share, which is the browser.
+ */
+function browserTotals(text: string): number[] {
+  return [...text.matchAll(/(\d{2,4})(?: more| tests)?,? in a real browser/g)].map((match) =>
+    Number(match[1]),
+  )
+}
+
+describe('documented end-to-end counts', () => {
+  const DOCS_WITH_BROWSER_COUNTS = ['README.md', 'CLAUDE.md', 'docs/ROADMAP.md']
+
+  it('agree with each other', () => {
+    const quoted = DOCS_WITH_BROWSER_COUNTS.map((path) => ({
+      path,
+      counts: browserTotals(read(path)),
+    }))
+
+    // Every one of them has to say something, or "they agree" is a claim about
+    // an empty set — which is how this went unnoticed for as long as it did.
+    for (const entry of quoted) {
+      expect(entry.counts.length, entry.path + ' quotes no end-to-end total').toBeGreaterThan(0)
+    }
+
+    const found = quoted.flatMap((entry) => entry.counts)
+    expect(
+      new Set(found).size,
+      'documents disagree: ' + quoted.map((e) => e.path + ' says ' + e.counts.join('/')).join(', '),
+    ).toBe(1)
+  })
+})
+
 describe('documented test counts', () => {
   it('quotes the same total everywhere it is mentioned', () => {
     const quoted = DOCS_WITH_COUNTS.map((path) => ({ path, counts: totals(read(path)) }))
@@ -178,6 +219,9 @@ describe('the specification index', () => {
   })
 })
 
+/** How many obligations the kit contract states. See the assertion that uses it. */
+const CONTRACT_RULES = 20
+
 describe('the kit contract table', () => {
   it('has one row for every rule the contract suite runs', () => {
     /*
@@ -200,6 +244,19 @@ describe('the kit contract table', () => {
     const cases = [...rules.matchAll(/^\s+it(?:\.each)?\(/gm)].length
 
     expect(rows, 'the rule table and the contract suite disagree').toBe(cases)
+
+    /*
+     * And both against a number stated here, because the comparison above is
+     * two integers and nothing else. Deleting a test *and* an unrelated table
+     * row leaves them equal to each other while the table documents a rule
+     * nothing runs — which is the Trap 7 condition this guard exists to prevent,
+     * reached through the guard itself.
+     *
+     * One number to maintain rather than thirty-eight strings, and adding a rule
+     * is meant to be a deliberate act in three places: the spec, the suite, and
+     * here.
+     */
+    expect(rows, 'a contract rule was added or removed; say so here as well').toBe(CONTRACT_RULES)
   })
 })
 
