@@ -57,13 +57,21 @@ Call the Skill tool with `steelman` for a real either/or, or with `codebase-desi
 `DESIGN-IT-TWICE.md` for an open-ended question about shape. Subagents that finish inside the turn are
 fine; the rule above is about ones that outlive it.
 
+Both of those are personal skills under `~/.claude/skills`, not part of this repository, so a fresh
+clone will not have them and neither will anyone else who reads this file. If they are missing, the
+method still is not optional: spawn one subagent per position with instructions to argue it at full
+strength and without hedging, plus one that gathers evidence and is explicitly not arguing, then judge
+against criteria you wrote down before reading any of them. The evidence-gatherer is the part that makes
+it work. Without it you are picking whichever brief reads better.
+
 ## The tests are the point, and this repository knows how they lie
 
 Read `.claude/skills/write-tests/SKILL.md` before writing a test. Twelve traps in it are incidents from
 this repository, several found by the very review you are now remediating. Two matter most here:
 
 - **Trap 11.** A fixture that collapses the distinction under test. Every repeater fixture sets
-  `key === dataKey`, so 911 unit tests and 65 e2e tests cannot tell the two row designs apart. Item 4
+  `key === dataKey`, so neither the unit suite nor the end-to-end suite can tell the two row designs
+  apart, however many tests either of them grows to. Item 4
   fixes the design; it is not done until a fixture exists that would have caught it.
 - **Trap 12.** A guard that names its DOM scope as a string and cannot notice the scope moved. The
   invariant 3 test still checks `.fs-shell` and `.fs-canvas__surface` while the form renders inside
