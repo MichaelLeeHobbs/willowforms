@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 11 — the lint guardrails are executed by a test, and three holes are closed
+- **Last completed:** item 12 — stage 2 complete. `data-fs-row` is the canvas coordinate; the tree's is `data-fs-tree-row`
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -122,7 +122,7 @@ Root causes. Each collapses several individual findings, so these come before th
       _Check:_ a `.tsx` file in core importing React fails `pnpm lint`; so does `react-dom/client`; `store.ts`
       is covered, and whatever `exhaustive-deps` then reports is fixed. Standing gate.
 
-- [ ] **12. Decide what `data-fs-row` means, and give the other one a different name.** MEDIUM, addendum.
+- [x] **12. Decide what `data-fs-row` means, and give the other one a different name.** MEDIUM, addendum.
       Two meanings in one DOM: the row coordinate in the renderer and the row key in the Tree panel.
       _Check:_ a test asserting the two attributes are distinct names, and that no selector reads the wrong
       one. Standing gate, e2e included.

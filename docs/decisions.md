@@ -4,6 +4,29 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### `data-fs-row` is the canvas coordinate; the tree's rows are `data-fs-tree-row`
+
+- **Decided:** the renderer keeps `data-fs-row`, holding a repeater coordinate like `addresses[1]`. The
+  Tree panel's list rows become `data-fs-tree-row`, holding a node key.
+- **Why that way round:** the renderer's is the published one. It is a field on `NodeAttributes`, which
+  is the type every kit spreads onto its outermost element, so renaming it is a breaking change to the
+  kit contract for the benefit of a panel nobody outside this repository can see. And there "row" means
+  an actual row of data, while the panel's rows are rows of a list — a different word that happens to be
+  spelled the same.
+- **The collision was live, and it fails quietly.** `[data-fs-row][tabindex="0"]` is how the keyboard
+  specs find the focused tree row, and `Canvas.test.tsx` reads `[data-fs-row]` _specifically_ to get the
+  tree's projection rather than the canvas's — the distinction Trap 9 exists for. Both start matching
+  canvas elements the moment a document holds a repeater. Neither would throw; they would silently
+  measure a longer list.
+- **Rejected: renaming the renderer's** to something like `data-fs-row-index` and leaving the panel
+  alone. It is the same rename count and it lands on the public half.
+- **Rejected: one attribute for both,** distinguished by the value's shape. A coordinate always carries
+  an index and a node key never can, so it is _decidable_ — and that is exactly the kind of rule that
+  reads plausibly, works, and then does not, which is the argument this project already accepted against
+  a path grammar in `Operand`.
+- **Reversal:** a rename across nine files, all internal.
+- **When:** 2026-08-30.
+
 ### The gate refuses what is malformed, not what is unusual; and the boundary is per node
 
 Two decisions from item 8, which are the same decision seen from both ends: what a document has to be

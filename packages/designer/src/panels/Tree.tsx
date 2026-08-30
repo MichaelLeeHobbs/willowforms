@@ -79,7 +79,9 @@ export function Tree({
       const rows: TreeRow[] = []
 
       const visit = (node: ComponentNode, parentKey: string | undefined, index: number): void => {
-        const element = list.querySelector<HTMLElement>(`[data-fs-row="${CSS.escape(node.key)}"]`)
+        const element = list.querySelector<HTMLElement>(
+          `[data-fs-tree-row="${CSS.escape(node.key)}"]`,
+        )
         if (element) {
           const box = element.getBoundingClientRect()
           rows.push({
@@ -124,7 +126,9 @@ export function Tree({
   const focusRow = useCallback(
     (key: string) => {
       onSelect(key)
-      listRef.current?.querySelector<HTMLElement>(`[data-fs-row="${CSS.escape(key)}"]`)?.focus()
+      listRef.current
+        ?.querySelector<HTMLElement>(`[data-fs-tree-row="${CSS.escape(key)}"]`)
+        ?.focus()
     },
     [onSelect],
   )
@@ -334,7 +338,7 @@ function TreeItem({
     <li role="none">
       <div
         role="treeitem"
-        data-fs-row={node.key}
+        data-fs-tree-row={node.key}
         aria-selected={selected}
         aria-level={depth + 1}
         aria-expanded={children.length > 0 ? true : undefined}

@@ -137,8 +137,8 @@ function setup(): Harness {
    */
   const keys = (): string[] => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
-    return Array.from(view.container.querySelectorAll('[data-fs-row]'))
-      .map((el) => (el as HTMLElement).dataset['fsRow'])
+    return Array.from(view.container.querySelectorAll('[data-fs-tree-row]'))
+      .map((el) => (el as HTMLElement).dataset['fsTreeRow'])
       .filter((key): key is string => Boolean(key) && key !== 'root')
   }
   return { user, view, node, frame, hoverFrame, keys }

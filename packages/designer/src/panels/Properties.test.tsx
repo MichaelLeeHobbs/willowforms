@@ -136,7 +136,7 @@ function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const clickRow = async (key: string): Promise<void> => {
-    const row = view.container.querySelector<HTMLElement>('[data-fs-row="' + key + '"]')
+    const row = view.container.querySelector<HTMLElement>('[data-fs-tree-row="' + key + '"]')
     if (!row) throw new Error('no tree row for ' + key)
     await user.click(row)
   }

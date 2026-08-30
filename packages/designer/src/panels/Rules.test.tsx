@@ -104,7 +104,7 @@ function setup(validations: ValidationRule[] = []): Harness {
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const selectRow = async (key: string): Promise<void> => {
-    const row = view.container.querySelector<HTMLElement>(`[data-fs-row="${key}"]`)
+    const row = view.container.querySelector<HTMLElement>(`[data-fs-tree-row="${key}"]`)
     if (!row) throw new Error(`no tree row for ${key}`)
     await user.click(row)
   }

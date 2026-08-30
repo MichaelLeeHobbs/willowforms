@@ -100,7 +100,7 @@ function setup(languages?: Language[]): Harness {
     user,
     latest: () => current,
     select: async () => {
-      const row = view.container.querySelector<HTMLElement>('[data-fs-row="email"]')
+      const row = view.container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
       if (!row) throw new Error('no tree row for email')
       await user.click(row)
     },

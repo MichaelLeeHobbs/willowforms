@@ -12,6 +12,7 @@
  * a focus that has not moved.
  */
 
+import { readdirSync, readFileSync } from 'node:fs'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -118,7 +119,7 @@ function setup(): Harness {
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const row = (key: string): HTMLElement => {
-    const element = view.container.querySelector<HTMLElement>(`[data-fs-row="${key}"]`)
+    const element = view.container.querySelector<HTMLElement>(`[data-fs-tree-row="${key}"]`)
     if (!element) throw new Error('no tree row for ' + key)
     return element
   }
@@ -130,15 +131,15 @@ function setup(): Harness {
     row,
     focused: () =>
       document.activeElement instanceof HTMLElement
-        ? document.activeElement.dataset['fsRow']
+        ? document.activeElement.dataset['fsTreeRow']
         : undefined,
     live: () => {
       const region = view.container.querySelector('[aria-live="polite"]')
       return (region?.textContent ?? '').replace(new RegExp(String.fromCharCode(0x200b), 'g'), '')
     },
     keys: () =>
-      Array.from(view.container.querySelectorAll('[data-fs-row]')).map(
-        (el) => (el as HTMLElement).dataset['fsRow'] ?? '',
+      Array.from(view.container.querySelectorAll('[data-fs-tree-row]')).map(
+        (el) => (el as HTMLElement).dataset['fsTreeRow'] ?? '',
       ),
   }
 }
@@ -157,12 +158,12 @@ function childrenOf(doc: FormDocument, key: string): string[] {
 describe('tree keyboard navigation', () => {
   it('exposes exactly one tab stop for the whole tree', () => {
     const { view } = setup()
-    const rows = Array.from(view.container.querySelectorAll('[data-fs-row]'))
+    const rows = Array.from(view.container.querySelectorAll('[data-fs-tree-row]'))
     const stops = rows.filter((r) => r.getAttribute('tabindex') === '0')
 
     // Every row being a tab stop buries the rest of the page behind them.
     expect(stops).toHaveLength(1)
-    expect((stops[0] as HTMLElement).dataset['fsRow']).toBe('root')
+    expect((stops[0] as HTMLElement).dataset['fsTreeRow']).toBe('root')
   })
 
   it('moves the tab stop to whatever is selected', async () => {
@@ -170,11 +171,11 @@ describe('tree keyboard navigation', () => {
 
     await user.click(row('footer'))
 
-    const stops = Array.from(view.container.querySelectorAll('[data-fs-row]')).filter(
+    const stops = Array.from(view.container.querySelectorAll('[data-fs-tree-row]')).filter(
       (r) => r.getAttribute('tabindex') === '0',
     )
     expect(stops).toHaveLength(1)
-    expect((stops[0] as HTMLElement).dataset['fsRow']).toBe('footer')
+    expect((stops[0] as HTMLElement).dataset['fsTreeRow']).toBe('footer')
   })
 
   it('walks down the flattened tree, stepping into containers', async () => {
@@ -399,5 +400,132 @@ describe('landmarks and names', () => {
     })
 
     expect(unlabelled.map((c) => c.outerHTML)).toEqual([])
+  })
+})
+
+/**
+ * Two kinds of row, two attribute names.
+ *
+ * `data-fs-tree-row` meant two different things in one DOM. On the canvas it is a
+ * repeater coordinate — `addresses[1]`, written by the renderer and part of the
+ * public `NodeAttributes` — and in this panel it was the key of a list row.
+ * Neither name was wrong on its own; having one name was.
+ *
+ * The collision is not theoretical. `[data-fs-tree-row][tabindex="0"]` is how the
+ * keyboard specs find the focused tree row, and `Canvas.test.tsx` reads
+ * `[data-fs-tree-row]` specifically to get the tree's projection rather than the
+ * canvas's — a distinction Trap 9 exists for. Both start matching canvas
+ * elements the moment a document holds a repeater, and neither would fail
+ * loudly: they would silently be measuring a longer list.
+ *
+ * The renderer keeps the name. It is the published one, it is in the type a kit
+ * spreads, and there "row" means an actual row of data. The panel's rows are
+ * rows of a list, which is a different word wearing the same spelling.
+ */
+describe('the tree rows and the canvas rows are told apart', () => {
+  /** A document with a repeater, so both attributes are in the DOM at once. */
+  function withRepeater(): FormDocument {
+    return {
+      ...makeDocument(),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'addressList',
+            dataKey: 'addresses',
+            type: 'Stack',
+            props: {},
+            schema: { type: 'array', validations: [] },
+            children: [
+              {
+                key: 'street',
+                dataKey: 'line1',
+                type: 'Field',
+                props: {},
+                schema: { type: 'string', validations: [] },
+              },
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  function renderBoth(): ReturnType<typeof render> {
+    const view = render(
+      <Designer
+        initialDocument={withRepeater()}
+        kit={kit}
+        rendererKit={rendererKit}
+        onChange={() => undefined}
+      />,
+    )
+    fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
+    return view
+  }
+
+  it('puts both attributes in the DOM, so this is not measuring an empty page', () => {
+    const view = renderBoth()
+
+    expect(view.container.querySelectorAll('[data-fs-tree-row]').length).toBeGreaterThan(0)
+    expect(view.container.querySelectorAll('[data-fs-row]').length).toBeGreaterThan(0)
+  })
+
+  it('never puts both on one element', () => {
+    const view = renderBoth()
+
+    const both = Array.from(view.container.querySelectorAll('[data-fs-row][data-fs-tree-row]'))
+    expect(both).toEqual([])
+  })
+
+  it('is never written by the designer, which owns only the tree one', () => {
+    /*
+     * The runtime check above needs a repeater in the fixture to see anything.
+     * This one needs nothing: `data-fs-row` belongs to the renderer, it is part
+     * of the `NodeAttributes` a kit spreads, and the designer neither writes it
+     * nor selects on it. A selector added here would go back to matching both
+     * lists, and the tests that care read the *longer* list without complaining.
+     */
+    // From the repository root: this file runs under jsdom, where
+    // `import.meta.url` is not a file URL and cannot be resolved against.
+    const src = process.cwd() + '/packages/designer/src/'
+    const offenders: string[] = []
+
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = dir + entry.name
+        if (entry.isDirectory()) {
+          walk(path + '/')
+          continue
+        }
+        if (!/\.tsx?$/.test(entry.name)) continue
+        // `data-fs-row` and nothing longer: `data-fs-tree-row` is this panel's.
+        if (/data-fs-row(?!-)/.test(readFileSync(path, 'utf8'))) offenders.push(entry.name)
+      }
+    }
+    walk(src)
+
+    // This file names it in its own assertions, which is the one place it should
+    // appear: it is what the canvas half of the comparison above is reading.
+    expect(offenders).toEqual(['Tree.test.tsx'])
+  })
+
+  it('gives the canvas a coordinate and the tree a key', () => {
+    const view = renderBoth()
+
+    // The canvas says which row of which answer. The tree says which node.
+    const canvas = Array.from(view.container.querySelectorAll('[data-fs-row]')).map((el) =>
+      el.getAttribute('data-fs-row'),
+    )
+    const tree = Array.from(view.container.querySelectorAll('[data-fs-tree-row]')).map((el) =>
+      el.getAttribute('data-fs-tree-row'),
+    )
+
+    expect(canvas).toContain('addresses[0]')
+    expect(tree).toEqual(['root', 'addressList', 'street'])
+    // The names cannot overlap: a coordinate always carries an index.
+    expect(tree.filter((key) => canvas.includes(key))).toEqual([])
   })
 })

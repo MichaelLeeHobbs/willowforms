@@ -67,11 +67,11 @@ export const test = base.extend<{ designer: Designer }>({
      * Components tab themselves.
      */
     await page.getByRole('tab', { name: 'Tree' }).click()
-    await expect(page.locator('[data-fs-row="root"]')).toBeVisible()
+    await expect(page.locator('[data-fs-tree-row="root"]')).toBeVisible()
 
     const designer: Designer = {
       page,
-      row: (key) => page.locator(`[data-fs-row="${key}"]`),
+      row: (key) => page.locator(`[data-fs-tree-row="${key}"]`),
       node: (key) => page.locator(`[data-fs-key="${key}"]`),
 
       rootChildren: async () =>

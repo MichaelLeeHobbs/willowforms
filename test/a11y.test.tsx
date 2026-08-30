@@ -148,7 +148,7 @@ describe('axe audit of the designer', () => {
     const container = renderDesigner()
 
     await user.click(screen.getByRole('tab', { name: 'Tree' }))
-    const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
 
@@ -160,7 +160,7 @@ describe('axe audit of the designer', () => {
     const container = renderDesigner()
 
     await user.click(screen.getByRole('tab', { name: 'Tree' }))
-    const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
     await user.click(screen.getByRole('tab', { name: 'Rules' }))

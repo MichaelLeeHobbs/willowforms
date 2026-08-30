@@ -97,7 +97,7 @@ function setup(node: ComponentNode): Harness {
     user,
     latest: () => current.root.children?.[0],
     openStyle: async () => {
-      const row = view.container.querySelector<HTMLElement>('[data-fs-row="' + node.key + '"]')
+      const row = view.container.querySelector<HTMLElement>('[data-fs-tree-row="' + node.key + '"]')
       if (!row) throw new Error('no tree row')
       await user.click(row)
       await user.click(screen.getByRole('tab', { name: 'Style' }))
@@ -199,7 +199,7 @@ describe('the Style tab', () => {
 describe('property sections', () => {
   it('folds advanced properties away instead of giving them equal weight', async () => {
     const harness = setup(field())
-    const row = document.querySelector<HTMLElement>('[data-fs-row="email"]')
+    const row = document.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
     if (!row) throw new Error('no tree row')
     await harness.user.click(row)
 
