@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 3 — the gate checks `translations`, and the render path survives one that does not
+- **Last completed:** item 4 — a row frame carries the repeater data key, with fixtures that can see the difference
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -73,7 +73,7 @@ These have a decided design in `docs/decisions.md`. Implement what is written th
       _Check:_ a core test where a malformed `translations` is rejected by the gate, and a component test
       proving the render path survives one that gets through. Standing gate.
 
-- [ ] **4. A row frame carries the repeater data key, not its node key.** HIGH C2, theme 2.
+- [x] **4. A row frame carries the repeater data key, not its node key.** HIGH C2, theme 2.
       `docs/decisions.md` — _A row frame carries the repeater data key, not its node key_. `rows.ts` already
       holds the correct mapper, `rowValue`, with no caller anywhere.
       _Check:_ every repeater fixture in the suite gains a sibling where `key !== dataKey` — the report proves

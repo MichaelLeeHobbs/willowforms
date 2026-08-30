@@ -15,7 +15,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormContext, FormDocument } from '@formsmith/core'
+import type { ComponentNode, FormContext, FormData, FormDocument } from '@formsmith/core'
+import { applyChange } from '@formsmith/core'
 
 import { FormRenderer } from './index.js'
 import type { NodeRendererProps, RendererKit } from './index.js'
@@ -548,5 +549,116 @@ describe('a document whose translations are not a bundle', () => {
     expect(screen.getByLabelText('greeting').closest('[data-fs-key]')?.textContent).not.toContain(
       'not-a-bundle',
     )
+  })
+})
+
+/**
+ * A repeater drawn and written when its two names differ.
+ *
+ * The read path already descended with `dataKeyOf`; the write path built the
+ * row coordinate from `node.key`. So the address the renderer emitted named a
+ * list the data does not hold, and `applyChange` — which is where the
+ * coordinate is dereferenced, and dereferenced as data — returned the input
+ * unchanged. Every keystroke in every row of such a repeater was discarded, in
+ * silence.
+ */
+describe('a repeater whose two names differ', () => {
+  const repeating = (): FormDocument =>
+    documentOf([
+      field('email'),
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [field('street', 'line1')],
+      },
+    ])
+
+  const twoRows: FormData = {
+    email: 'a@b.co',
+    addresses: [{ line1: 'one' }, { line1: 'two' }],
+  }
+
+  it('reads each row under the answer name', () => {
+    render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+
+    const inputs = screen.getAllByLabelText('street')
+    expect(inputs.map((input) => (input as HTMLInputElement).value)).toEqual(['one', 'two'])
+  })
+
+  it('marks the row with the answer name', () => {
+    const { container } = render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+
+    const rows = [...container.querySelectorAll('[data-fs-key="street"]')].map((el) =>
+      el.getAttribute('data-fs-row'),
+    )
+    expect(rows).toEqual(['addresses[0]', 'addresses[1]'])
+  })
+
+  it('lands a keystroke, rather than reporting one nothing can place', () => {
+    /*
+     * The assertion that matters, and the reason it goes through `applyChange`
+     * rather than stopping at the emitted string: an address is only correct if
+     * the writer the host is promised can dereference it. Asserting the string
+     * alone would let a plausible-looking wrong address pass.
+     */
+    const onChange = vi.fn()
+    render(<FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={onChange} />)
+
+    fireEvent.change(screen.getAllByLabelText('street')[1] as HTMLElement, {
+      target: { value: 'edited' },
+    })
+
+    const [address, value] = onChange.mock.calls[0] as [string, string]
+    const next = applyChange(twoRows, address, value)
+
+    expect(next).not.toBe(twoRows)
+    expect((next['addresses'] as FormData[])[1]).toEqual({ line1: 'edited' })
+  })
+
+  it('does not write a row edit into an unrelated list that shares the node key', () => {
+    /*
+     * Worse than losing the keystroke. `addressList` here is a real top-level
+     * answer belonging to something else, and a coordinate built from the node
+     * key writes the row edit straight into it — the exact opposite of what the
+     * "a write that cannot be placed returns the input unchanged" comment
+     * promises.
+     */
+    const shared: FormData = { ...twoRows, addressList: [{ line1: 'not this one' }] }
+    const onChange = vi.fn()
+    render(<FormRenderer document={repeating()} kit={kit} data={shared} onChange={onChange} />)
+
+    fireEvent.change(screen.getAllByLabelText('street')[0] as HTMLElement, {
+      target: { value: 'edited' },
+    })
+
+    const [address, value] = onChange.mock.calls[0] as [string, string]
+    const next = applyChange(shared, address, value)
+
+    expect(next['addressList']).toEqual([{ line1: 'not this one' }])
+    expect((next['addresses'] as FormData[])[0]).toEqual({ line1: 'edited' })
+  })
+
+  it('keys an error by the row answer name and the node own key', () => {
+    const { container } = render(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={twoRows}
+        errors={{ 'addresses[1].street': 'Wrong.' }}
+        onChange={() => undefined}
+      />,
+    )
+
+    const messages = [...container.querySelectorAll('[data-testid="street-error"]')].map(
+      (el) => el.textContent,
+    )
+    expect(messages).toEqual(['', 'Wrong.'])
   })
 })

@@ -21,7 +21,19 @@ import { keyProblem } from './keys.js'
 import { dataKeyOf } from './tree.js'
 import type { ComponentNode, Condition, FormData, JsonValue } from './types.js'
 
-/** One repetition. `key` is the repeater's node key: identity, not data. */
+/**
+ * One repetition.
+ *
+ * `key` is the repeater's **data** key, not its node key. The coordinate is
+ * dereferenced in exactly one place — `applyChange` — and it is dereferenced as
+ * data; everywhere else it is a label. Built from identity instead, a repeater
+ * whose two names differ discarded every row edit, and could write an answer
+ * into an unrelated list that happened to share the name.
+ *
+ * The **leaf** of an error key stays the node key. The prefix disambiguates
+ * rows; the leaf carries identity, and two components may share a data key and
+ * still fail for different reasons.
+ */
 export interface RowFrame {
   key: string
   index: number
@@ -94,38 +106,6 @@ export function decodeRow(text: string): RowPath | undefined {
 /** The rows a repeater holds right now, or none when its value is not a list. */
 export function rowsOf(value: JsonValue | undefined): JsonValue[] {
   return Array.isArray(value) ? value : []
-}
-
-/**
- * A row's own object, for reading a field scoped to that row.
- *
- * An own-property read landing on a plain object at every step, the rule
- * `readPath` already states and for the same reasons: a row arrives from a
- * request body, so `__proto__` is reachable, and a path must not walk into a
- * string's `length`.
- */
-export function rowValue(
-  data: FormData,
-  path: RowPath,
-  dataKeyOfRepeater: (nodeKey: string) => string,
-): JsonValue | undefined {
-  let current: JsonValue | undefined = data
-
-  for (const frame of path) {
-    if (current === null || typeof current !== 'object' || Array.isArray(current)) return undefined
-
-    const key = dataKeyOfRepeater(frame.key)
-    if (!Object.hasOwn(current, key)) return undefined
-
-    const list: JsonValue | undefined = current[key]
-    if (!Array.isArray(list)) return undefined
-
-    const row: JsonValue | undefined = list[frame.index]
-    if (row === undefined) return undefined
-    current = row
-  }
-
-  return current
 }
 
 /**

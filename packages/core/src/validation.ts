@@ -247,7 +247,7 @@ export function validateForm(
       rows.forEach((row, index) => {
         const inner: EvalOptions = {
           ...scope,
-          row: rowContext(pushRow(path, { key: node.key, index }), row),
+          row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
         for (const child of node.children ?? []) visit(child, inner)
       })
@@ -358,7 +358,7 @@ export function submittedData(
       into[key] = rows.map((row, index) => {
         const inner: EvalOptions = {
           ...scope,
-          row: rowContext(pushRow(path, { key: node.key, index }), row),
+          row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
         const kept: FormData = Object.create(null) as FormData
         for (const child of node.children ?? []) collect(child, inner, kept)

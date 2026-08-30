@@ -260,7 +260,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     ? drawn.map((value, index) => (
         <RowCtx.Provider
           key={index}
-          value={rowContext(pushRow(row?.path ?? NO_ROWS, { key: node.key, index }), value)}
+          value={rowContext(pushRow(row?.path ?? NO_ROWS, { key: dataKeyOf(node), index }), value)}
         >
           {node.children?.map((child) => (
             <RenderNode key={child.key} node={child} />

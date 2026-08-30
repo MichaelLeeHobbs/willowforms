@@ -12,7 +12,7 @@ import {
   rowContext,
   rowsOf,
 } from './rows.js'
-import { DEFAULT_MESSAGES, isRowScope, validateForm } from './validation.js'
+import { DEFAULT_MESSAGES, isRowScope, submittedData, validateForm } from './validation.js'
 import { createDocument } from './factory.js'
 import { validateDocument } from './tree.js'
 import type { ComponentNode, FormData, FormDocument } from './types.js'
@@ -434,5 +434,90 @@ describe('keyScopesFor', () => {
 
   it('says nothing about a key that is not in the tree', () => {
     expect(keyScopesFor(tree(), 'nowhere').row).toBeUndefined()
+  })
+})
+
+/**
+ * A repeater whose node key is not its data key.
+ *
+ * Trap 11 in this repository's own test skill: every repeater fixture here set
+ * `key` and `dataKey` to the same string, so the row-addressing design and its
+ * opposite produced byte-identical output across the entire suite. The suite
+ * could not see the defect it was written to prevent.
+ *
+ * So every name in this fixture differs from every other. `addressList` is
+ * identity; `addresses` is what the payload calls the answer; `street` is a
+ * node key and `line1` is its answer's name.
+ */
+describe('a repeater whose two names differ', () => {
+  const rowField = (key: string, dataKey: string, required = false): ComponentNode => ({
+    key,
+    dataKey,
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations: required ? [{ key: 'required' }] : [] },
+  })
+
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [rowField('street', 'line1', true), rowField('postal', 'postcode')],
+      },
+    ],
+  }
+
+  const data: FormData = {
+    addresses: [{ line1: '1 High Street', postcode: 'SW1A 1AA' }, { postcode: 'X' }],
+  }
+
+  it('addresses a row by the answer name, not by the component name', () => {
+    /*
+     * The coordinate is dereferenced in exactly one place, `applyChange`, and it
+     * is dereferenced as data. Built from the node key it names a list the data
+     * does not have — or worse, an unrelated list that happens to share the
+     * name.
+     */
+    const errors = validateForm(root, data)
+
+    expect(Object.keys(errors)).toEqual(['addresses[1].street'])
+    expect(Object.keys(errors).some((key) => key.startsWith('addressList'))).toBe(false)
+  })
+
+  it('keeps the node key at the leaf, because that is identity', () => {
+    // The prefix disambiguates rows; the leaf carries identity. Two components
+    // may share a data key and still fail for different reasons.
+    expect(validateForm(root, data)['addresses[1].street']).toBe(DEFAULT_MESSAGES.required)
+  })
+
+  it('lands a keystroke in the row it was typed in', () => {
+    // The whole point. Under the node key this returned the input unchanged and
+    // every edit inside a row was silently discarded.
+    const address = 'addresses[1].line1'
+    const next = applyChange(data, address, '2 Low Street')
+
+    expect(next).not.toBe(data)
+    expect((next['addresses'] as FormData[])[1]).toEqual({
+      postcode: 'X',
+      line1: '2 Low Street',
+    })
+    // The row it was not typed in is untouched.
+    expect((next['addresses'] as FormData[])[0]).toEqual({
+      line1: '1 High Street',
+      postcode: 'SW1A 1AA',
+    })
+  })
+
+  it('collects the answer under the answer name', () => {
+    expect(submittedData(root, data)).toEqual({
+      addresses: [{ line1: '1 High Street', postcode: 'SW1A 1AA' }, { postcode: 'X' }],
+    })
   })
 })

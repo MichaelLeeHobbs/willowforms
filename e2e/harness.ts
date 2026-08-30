@@ -42,6 +42,8 @@ interface FormDocumentShape {
 
 interface NodeShape {
   key: string
+  /** The answer's name, when it has been renamed away from the key. */
+  dataKey?: string
   type: string
   props: Record<string, { kind: string; value?: unknown; key?: string; expression?: string }>
   children?: NodeShape[]

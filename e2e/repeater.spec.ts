@@ -76,3 +76,43 @@ test('preview draws a row per answer and keeps them apart', async ({ designer })
   // No rows in the data yet, so a person filling it in sees none.
   await expect(designer.page.locator('[data-fs-key="textField"]')).toHaveCount(0)
 })
+
+/**
+ * The two names kept apart, in a real browser.
+ *
+ * Every repeater fixture in this repository used to set `key` and `dataKey` to
+ * the same string, so the row-addressing design and its opposite produced
+ * byte-identical output across the whole suite — a patched build of the wrong
+ * one stayed green. This is the end-to-end half of the fixture that can tell
+ * them apart: the answer is renamed away from the component, and the row
+ * coordinate has to follow the answer.
+ */
+test('a row is addressed by the repeater data key, not its node key', async ({ designer }) => {
+  await designer.openTab('Components')
+  await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
+  // Adding while the repeater is selected puts the field inside it, which is
+  // the same placement the drag test proves the drag achieves.
+  await designer.page.getByRole('button', { name: 'Text field', exact: true }).click()
+
+  // While the two names are still the same string, and this is exactly the
+  // reading that made the defect invisible.
+  await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'repeater[0]')
+
+  await designer.openTab('Tree')
+  await designer.select('repeater')
+  await designer.openTab('Properties')
+
+  const dataKey = designer.page.getByLabel('Data key')
+  await dataKey.fill('contacts')
+  await dataKey.press('Enter')
+
+  // The coordinate names the answer. Under the node key it would still say
+  // `repeater[0]`, naming a list the submitted data does not have.
+  await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'contacts[0]')
+
+  const doc = await designer.document()
+  const repeater = doc.root.children?.find((child) => child.key === 'repeater')
+  // The component is still `repeater`; only its answer was renamed. A fixture
+  // where the rename also moved the key would prove nothing.
+  expect(repeater?.dataKey).toBe('contacts')
+})

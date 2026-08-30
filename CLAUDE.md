@@ -57,12 +57,12 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 972 tests
+pnpm test          # vitest, 981 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
 pnpm build         # tsc --build, then copies designer.css
-pnpm e2e           # playwright, 65 tests in a real browser
+pnpm e2e           # playwright, 66 tests in a real browser
 ```
 
 CI runs exactly these, in that order, plus a check that every package emitted `dist/index.js` and
