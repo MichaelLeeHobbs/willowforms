@@ -353,10 +353,28 @@ export function FormRenderer({
   context,
   onChange,
 }: FormRendererProps): ReactNode {
-  const translations = useMemo(
-    () => document.translations[language ?? document.defaultLanguage] ?? NO_TRANSLATIONS,
-    [document.translations, document.defaultLanguage, language],
-  )
+  /*
+   * Total against a document that never passed the gate.
+   *
+   * `validateDocument` reports a malformed `translations`, and a host is
+   * supposed to call it — but the designer renders a document the instant it is
+   * pasted, and a host is free not to. An unguarded index here throws during
+   * render, and a throw during render in React 19 unmounts the whole tree
+   * rather than the one node, so the page a form was embedded in goes blank.
+   *
+   * A bundle that is not an object holds no translation for anything, so it
+   * reads as none: `resolveProp` then falls back to the key, which is what an
+   * untranslated string already does.
+   */
+  const translations = useMemo(() => {
+    const bundles: unknown = document.translations
+    if (!bundles || typeof bundles !== 'object' || Array.isArray(bundles)) return NO_TRANSLATIONS
+    const bundle: unknown = (bundles as Record<string, unknown>)[
+      language ?? document.defaultLanguage
+    ]
+    if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return NO_TRANSLATIONS
+    return bundle as Record<string, string>
+  }, [document.translations, document.defaultLanguage, language])
 
   // Stable across renders, unique per instance, and the same on the server and
   // the client, which a counter or a random string would not be.

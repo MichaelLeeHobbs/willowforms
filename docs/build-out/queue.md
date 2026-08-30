@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 2 — the condition picker writes `scope`, by grouping the field list
+- **Last completed:** item 3 — the gate checks `translations`, and the render path survives one that does not
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -68,7 +68,7 @@ These have a decided design in `docs/decisions.md`. Implement what is written th
       _Check:_ a designer test that authors a row-scoped ref, changes the field, and asserts `scope: 'row'`
       survives; a second proving the picker can author row scope at all. Standing gate.
 
-- [ ] **3. `documentProblems` checks `translations`.** CRITICAL C11. A document that passes the gate can
+- [x] **3. `documentProblems` checks `translations`.** CRITICAL C11. A document that passes the gate can
       still take the React root down through an unguarded `document.translations[...]`.
       _Check:_ a core test where a malformed `translations` is rejected by the gate, and a component test
       proving the render path survives one that gets through. Standing gate.

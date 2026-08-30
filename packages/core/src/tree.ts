@@ -316,6 +316,42 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
   const actions = isRecord(candidate['actions']) ? candidate['actions'] : undefined
   if (candidate['actions'] !== undefined && !actions) malformed('actions must be an object.')
 
+  /*
+   * The bundles a translation is looked up in, checked all the way down.
+   *
+   * The renderer reads `document.translations[tag]` on every render, so a
+   * document that is missing the field entirely throws during render rather
+   * than rendering wrong — and a throw during render in React 19 unmounts the
+   * whole tree, not the one node. Required rather than optional, because
+   * `createDocument` writes `{}` and an absent field is what a hand-edited
+   * document looks like when a key was deleted.
+   *
+   * The leaves are checked too. `resolveProp` hands a translation straight to a
+   * kit as a label, so a number renders as a number and an object renders as
+   * `[object Object]` — wrong in a way nobody reports, which is the failure
+   * this project treats as worse than a crash.
+   *
+   * Which languages the bundles name is deliberately not checked: a bundle for
+   * an undeclared language is a half-finished translation, and deleting a
+   * language should not make the document invalid.
+   */
+  const translations = candidate['translations']
+  if (!isRecord(translations)) {
+    malformed('translations must be an object mapping each language tag to its bundle.')
+  } else {
+    for (const [tag, bundle] of Object.entries(translations)) {
+      if (!isRecord(bundle)) {
+        malformed('translations.' + tag + ' must be an object.')
+        continue
+      }
+      for (const [key, text] of Object.entries(bundle)) {
+        if (typeof text !== 'string') {
+          malformed('translations.' + tag + '.' + key + ' must be a string.')
+        }
+      }
+    }
+  }
+
   const visit = (value: unknown, path: string): void => {
     if (!isRecord(value)) {
       malformed(path + ' is not a component node.')

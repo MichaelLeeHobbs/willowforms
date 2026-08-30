@@ -494,3 +494,59 @@ describe('a repeater on an authoring surface', () => {
     expect(screen.getAllByLabelText('line1')).toHaveLength(2)
   })
 })
+
+/**
+ * A malformed `translations` does not take the root down.
+ *
+ * The gate is the first answer and this is the second. They are not the same
+ * answer: `validateDocument` is something a host has to remember to call, the
+ * designer renders a document the moment it is pasted, and an unguarded
+ * `document.translations[tag]` on a document that skipped the gate throws
+ * during render — which in React 19 unmounts the whole tree, not one node.
+ */
+describe('a document whose translations are not a bundle', () => {
+  const brokenDocument = (translations: unknown): FormDocument =>
+    ({
+      ...documentOf([
+        { key: 'greeting', type: 'Field', props: { label: { kind: 'i18n', key: 'hello' } } },
+      ]),
+      translations,
+    }) as unknown as FormDocument
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['a string', 'nope'],
+    ['an array', []],
+  ])('still renders the form when translations are %s', (_what, translations) => {
+    render(
+      <FormRenderer
+        document={brokenDocument(translations)}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    // The component is on the page, which is the claim: the render completed
+    // rather than the root being torn down.
+    expect(screen.getByLabelText('greeting')).toBeTruthy()
+  })
+
+  it('falls back to the key when the bundle for the language is not one', () => {
+    // `resolveProp` returns the key when there is no translation for it, and a
+    // bundle that is not an object holds no translation for anything.
+    render(
+      <FormRenderer
+        document={brokenDocument({ en: 'not-a-bundle' })}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(screen.getByLabelText('greeting').closest('[data-fs-key]')?.textContent).not.toContain(
+      'not-a-bundle',
+    )
+  })
+})

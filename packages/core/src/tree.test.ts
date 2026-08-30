@@ -687,3 +687,63 @@ describe('a key that only looks unique', () => {
     expect(validateDocument(document).map((e) => e.code)).toContain('invalid-key')
   })
 })
+
+/**
+ * The gate's opinion about `translations`.
+ *
+ * `validateDocument` checked the tree, the actions and the languages, and said
+ * nothing about the bundle those languages are looked up in. So a document could
+ * pass the gate and still take the React root down on the first render, because
+ * the renderer reads `document.translations[tag]` with nothing in front of it.
+ *
+ * A document is data — hand-edited JSON, a paste, a row out of a database — so
+ * "the type says it is a record" is not a check.
+ */
+describe('validateDocument and translations', () => {
+  const withTranslations = (translations: unknown): FormDocument =>
+    ({ ...createDocument('Contact', 'doc'), translations }) as unknown as FormDocument
+
+  const codes = (translations: unknown): string[] =>
+    validateDocument(withTranslations(translations)).map((e) => e.code)
+
+  it('accepts the shape the factory produces', () => {
+    expect(validateDocument(createDocument('Contact', 'doc'))).toEqual([])
+    expect(codes({ 'en-US': { greeting: 'Hello' } })).toEqual([])
+    // An empty bundle for a language is a language nobody has translated yet.
+    expect(codes({ 'en-US': {} })).toEqual([])
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['a string', 'nope'],
+    ['an array', []],
+    ['a number', 7],
+  ])('rejects translations that are %s', (_what, translations) => {
+    expect(codes(translations)).toContain('malformed')
+  })
+
+  it.each([
+    ['a string', { 'en-US': 'nope' }],
+    ['null', { 'en-US': null }],
+    ['an array', { 'en-US': [] }],
+  ])('rejects a language bundle that is %s', (_what, translations) => {
+    expect(codes(translations)).toContain('malformed')
+  })
+
+  it('rejects a translation that is not text', () => {
+    // `resolveProp` returns this straight to a kit as a label. A number renders;
+    // an object renders as [object Object], and a React element would throw.
+    expect(codes({ 'en-US': { greeting: 7 } })).toContain('malformed')
+    expect(codes({ 'en-US': { greeting: { nested: 'x' } } })).toContain('malformed')
+  })
+
+  it('does not care which languages the bundle names', () => {
+    /*
+     * A bundle for a language the document does not declare is dead weight, not
+     * a fault: it is what a half-finished translation looks like, and deleting
+     * a language should not make the document invalid.
+     */
+    expect(codes({ fr: { greeting: 'Bonjour' } })).toEqual([])
+  })
+})
