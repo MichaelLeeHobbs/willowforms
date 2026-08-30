@@ -40,6 +40,7 @@ export {
   printDeclarations,
   readDeclaration,
   safeDeclarations,
+  safeStyleValue,
   setDeclaration,
   styleSheetFor,
 } from './css.js'

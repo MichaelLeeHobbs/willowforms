@@ -19,7 +19,7 @@
 
 import { createContext, createElement, useContext, useId } from 'react'
 import type { ReactNode } from 'react'
-import { jsonToString, optionValue, safeHref } from '@formsmith/core'
+import { jsonToString, optionValue, safeHref, safeStyleValue } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -329,7 +329,7 @@ function Box({ props, nodeProps, children }: NodeRendererProps): ReactNode {
       className="fsh-box"
       style={{
         padding: num(props['padding'], 16),
-        background: str(props['background']) || undefined,
+        background: safeStyleValue(str(props['background'])),
         borderRadius: num(props['radius'], 0),
       }}
     >

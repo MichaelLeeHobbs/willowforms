@@ -4,6 +4,21 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The value refusal also refuses a backslash
+
+A refinement to the entry below rather than a reversal of it, recorded because it widens a refusal set
+that was settled by measurement.
+
+- **Decided:** `safeStyleValue` refuses `\` alongside the decided set.
+- **Why:** the steelman checked backslash escapes against _escaping the class block_, and they did not.
+  It did not check them against the fetch refusal, and `\75 rl(https://…)` is a valid CSS escape for
+  `url(` in which the three letters never appear, so a substring check for `url(` alone does not see it.
+  Nothing legitimate on a prop whose declared editor is `color` needs a backslash.
+- **Rejected:** decoding CSS escapes before testing, which is a second parser to get wrong for a value
+  that has no use for the syntax.
+- **Reversal:** one character in one regex.
+- **When:** 2026-08-30.
+
 ### A document's CSS values are refused in core, not made safe by the rendering shape
 
 Settled by a steelman: two briefs at full strength against a neutral agent that ran the real

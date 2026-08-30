@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** nothing yet, the run has not started
+- **Last completed:** item 1 — `safeStyleValue` in core, called at both kit sinks
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -47,7 +47,7 @@ Run it against the unfixed code first and say so in the transcript. Read
 
 ## Stage 0 — clear the base
 
-- [ ] **0. Land PR #21 and PR #22, then cut the branch for this run from an updated main.**
+- [x] **0. Land PR #21 and PR #22, then cut the branch for this run from an updated main.**
       #21 is the steps work; #22 is this queue and the run contract. Wait for Copilot on each, answer every
       finding, merge both. They touch `CLAUDE.md` in different places and merge cleanly in either order.
       _Check:_ `gh pr view 21 --json state --jq .state` and the same for 22 both print `MERGED`, and the
@@ -57,7 +57,7 @@ Run it against the unfixed code first and say so in the transcript. Read
 
 These have a decided design in `docs/decisions.md`. Implement what is written there; do not re-litigate.
 
-- [ ] **1. Refuse hostile CSS values in core, and call it from both kit sinks.** CRITICAL C1.
+- [x] **1. Refuse hostile CSS values in core, and call it from both kit sinks.** CRITICAL C1.
       `docs/decisions.md` — _A document CSS value is refused in core, not made safe by the rendering shape_.
       _Check:_ a core test proving `background: red}html{display:none}.x{` is refused; a kit-mui test that
       serialises the emitted stylesheet and asserts one rule, not two; a matching kit-html test. Standing gate.

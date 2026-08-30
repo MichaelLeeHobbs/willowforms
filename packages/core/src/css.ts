@@ -74,6 +74,60 @@ export function safeDeclarations(text: string | undefined): string | undefined {
 }
 
 /**
+ * Characters that would let a single value stop being a single value.
+ *
+ * A superset of `FORBIDDEN`, and deliberately not the same regex. That one
+ * judges a declaration *list*, where `;` separates and a `data:` URI needs one
+ * in the middle of it. This one judges one value on one prop, where `;` starts a
+ * second declaration the author did not write and nothing legitimate needs it.
+ * Two sinks, two grammars.
+ *
+ * `!` goes with them because `!important` on a value the author did not mark is
+ * a document overriding the page, and `/*` because a comment can swallow the
+ * rest of the block. Control characters end a CSS string, and a backslash is how
+ * `url(` is written as `\75 rl(` without the letters ever appearing.
+ */
+// eslint-disable-next-line no-control-regex
+const FORBIDDEN_VALUE = /[{}<@;!\\]|\/\*|[\u0000-\u001f\u007f]/
+
+/**
+ * Value functions that fetch, or that paint something the author did not author.
+ *
+ * Refused on top of the character set, because a fetch is not an injection and
+ * the character set does not catch one. `url(https://…)` is well-formed CSS that
+ * both sinks accept, and on a page whose whole purpose is collecting answers,
+ * `[data-fs-key="ssn"]{background:url(…)}` is an exfiltration channel rather
+ * than a broken rule.
+ *
+ * These are refused rather than escaped for the same reason the declaration
+ * list refuses braces, and the domain agrees: the only string-typed style value
+ * either kit exposes is `background`, whose declared editor is `color`, and a
+ * URL is not a colour. The Style tab remains the channel for real CSS.
+ *
+ * Written as substrings so a vendor prefix is covered by the unprefixed name.
+ */
+const FETCHING = /(url|image-set|element|cross-fade)\s*\(/i
+
+/**
+ * One style value, or nothing if it could be more than one.
+ *
+ * Called at the sink rather than at document load, because `resolveProp`
+ * evaluates a `computed` binding through the host's evaluator at render time, so
+ * the string a kit is handed need not appear in the document at all.
+ *
+ * Nothing rather than a cleaned-up value, for the reason `safeDeclarations`
+ * gives: an author who wrote something refusable is better served by the
+ * property being absent than by a value they did not write.
+ */
+export function safeStyleValue(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (FORBIDDEN_VALUE.test(trimmed) || FETCHING.test(trimmed)) return undefined
+  return trimmed
+}
+
+/**
  * A key, as a CSS string, safe to place inside a `<style>` element.
  *
  * Keys are validated as non-empty and nothing else, and a document is data, so

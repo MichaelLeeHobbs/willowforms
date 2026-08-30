@@ -33,7 +33,7 @@ import Typography from '@mui/material/Typography'
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 
-import { jsonToString, optionValue, safeHref } from '@formsmith/core'
+import { jsonToString, optionValue, safeHref, safeStyleValue } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -274,7 +274,7 @@ function BoxNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
       {...nodeProps}
       sx={{
         padding: num(props['padding'], 16) / 8,
-        background: str(props['background']) || undefined,
+        background: safeStyleValue(str(props['background'])),
         borderRadius: num(props['radius'], 0) / 8,
       }}
     >

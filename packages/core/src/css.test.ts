@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   parseDeclarations,
+  safeStyleValue,
   readDeclaration,
   safeDeclarations,
   setDeclaration,
@@ -248,5 +249,64 @@ describe('declarations round-trip, so two editors can share one string', () => {
     const text = setDeclaration(setDeclaration('', 'padding', '8px'), 'color', 'red')
     expect(safeDeclarations(text)).toBe(text)
     expect(styleSheetFor(root([node('card', { any: text })]))).toContain('padding: 8px')
+  })
+})
+
+describe('safeStyleValue', () => {
+  it('refuses a value that closes its block and opens a rule of its own', () => {
+    // The CRITICAL. A `Box`'s `background` reaches emotion, which concatenates
+    // it into stylesheet text, so a value holding a brace authors a second
+    // top-level rule against the whole page.
+    expect(safeStyleValue('red}html{display:none}.x{')).toBeUndefined()
+  })
+
+  it.each([
+    ['a brace', 'red}'],
+    ['a closing angle bracket to leave CSS', 'red</style'],
+    ['an at-rule', '@import url(https://evil.example/x.css)'],
+    ['a second declaration', 'red;position:fixed'],
+    ['an importance flag', 'red !important'],
+    ['a comment opener', 'red/*'],
+    ['a NUL', 'red\u0000'],
+    ['a newline', 'red\nposition:fixed'],
+    ['a backslash escape', '\\75 rl(https://evil.example/p.png)'],
+  ])('refuses %s', (_what, value) => {
+    expect(safeStyleValue(value)).toBeUndefined()
+  })
+
+  it.each([
+    ['a bare url', 'url(https://evil.example/p.png)'],
+    ['a url behind a custom property fallback', 'var(--x, url(https://evil.example/p.png))'],
+    ['an image-set', 'image-set("https://evil.example/p.png" 1x)'],
+    ['a prefixed image-set', '-webkit-image-set("https://evil.example/p.png" 1x)'],
+    ['an element reference', 'element(#somewhere)'],
+    ['a cross-fade', 'cross-fade(url(https://evil.example/p.png), red)'],
+    ['a data uri', 'url(data:image/svg+xml;base64,AAA)'],
+  ])('refuses %s, because a fetch is exfiltration on a form', (_what, value) => {
+    // The rendering shape does not close this one: a React `style` object takes
+    // `url()` happily, and the outbound request fires the same either way.
+    expect(safeStyleValue(value)).toBeUndefined()
+  })
+
+  it.each([
+    'red',
+    '#ff0000',
+    '#ff000080',
+    'rgb(255 0 0)',
+    'rgba(255, 0, 0, 0.5)',
+    'hsl(0deg 100% 50%)',
+    'transparent',
+    'currentColor',
+    'linear-gradient(to right, red, blue)',
+    'var(--brand)',
+  ])('keeps the legitimate value %s', (value) => {
+    expect(safeStyleValue(value)).toBe(value)
+  })
+
+  it('trims, and reads an empty value as no value', () => {
+    expect(safeStyleValue('  red  ')).toBe('red')
+    expect(safeStyleValue('   ')).toBeUndefined()
+    expect(safeStyleValue('')).toBeUndefined()
+    expect(safeStyleValue(undefined)).toBeUndefined()
   })
 })
