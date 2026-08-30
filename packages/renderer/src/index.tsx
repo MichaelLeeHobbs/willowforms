@@ -110,7 +110,7 @@ interface RenderContext {
    * too, and a condition reads it without an evaluator at all.
    */
   options: EvalOptions
-  onChange: (key: string, value: JsonValue) => void
+  onChange: (address: string, value: JsonValue) => void
 }
 
 const Ctx = createContext<RenderContext | null>(null)
@@ -328,7 +328,17 @@ export interface FormRendererProps {
    * discovering that per submit.
    */
   context?: FormContext
-  onChange: (key: string, value: JsonValue) => void
+  /**
+   * One field changed, reported at an address.
+   *
+   * Outside a repeater the address is the bare key, which is why this went
+   * unnoticed. Inside one it carries the row: `addresses[1].line1`. The
+   * parameter is named `address` rather than `key` because the old name is an
+   * invitation to write `{ ...data, [key]: value }`, which then creates a
+   * property called `addresses[1].line1` and silently drops every answer in the
+   * repeater. Write it with `applyChange` from `@formsmith/core`.
+   */
+  onChange: (address: string, value: JsonValue) => void
 }
 
 export function FormRenderer({
