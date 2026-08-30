@@ -47,6 +47,35 @@ export function optionValue(options: readonly JsonValue[], submitted: string): J
 }
 
 /**
+ * One entry of an options list, as the two strings a control needs.
+ *
+ * Every kit drew its own version of this and every one of them read `.value`
+ * off the entry without asking what the entry was, so a `null` in the array
+ * threw during render — in four places across two kits. The guarded read
+ * already existed here, in `optionValue`, which is the function these controls
+ * hand their answer back through; it was just not the one they used to draw.
+ *
+ * The rules are `optionValue`'s, exactly, because the two have to be inverses.
+ * An entry that is not an object has no declared value, and an option with no
+ * declared value falls back to its position — so the value a control submits is
+ * the string this returns.
+ */
+export function optionEntry(
+  option: JsonValue | undefined,
+  index: number,
+): { value: string; label: string } {
+  const record =
+    option !== null && typeof option === 'object' && !Array.isArray(option) ? option : undefined
+
+  const declared = record?.['value']
+  const value = declared === undefined ? String(index) : jsonToString(declared)
+  // The value is the fallback label, so an option always draws as something.
+  const label = typeof record?.['label'] === 'string' ? record['label'] : value
+
+  return { value, label }
+}
+
+/**
  * A link address that is safe to put in `href`, or undefined.
  *
  * A document is data, and a form author is not always the person deploying the

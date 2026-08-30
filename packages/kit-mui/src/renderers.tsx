@@ -33,8 +33,7 @@ import Typography from '@mui/material/Typography'
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 
-import { jsonToString, optionValue, safeHref, safeStyleValue } from '@formsmith/core'
-import type { JsonValue } from '@formsmith/core'
+import { jsonToString, optionEntry, optionValue, safeHref, safeStyleValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
@@ -232,21 +231,30 @@ function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
       fullWidth
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
-      value={str(value)}
+      /*
+       * `jsonToString`, not `str`. `str` answers `''` for a number, so a stored
+       * answer of `2` rendered as nothing selected: the user picks an option,
+       * the data holds it, the control shows blank, and the choice can never be
+       * made to stick. `optionValue` in core exists so a numeric option value
+       * survives the round trip, and this was the one end that dropped it —
+       * `RadioGroupNode` in this same file already had it right.
+       */
+      value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
       slotProps={{ formHelperText: alertWhenError(error) }}
       onChange={(e) => onChange(optionValue(options, e.target.value))}
     >
       {options.map((option, i) => {
-        const o = option as { label?: unknown; value?: JsonValue }
-        // jsonToString, not a fallback to the array index: a numeric option
-        // value used to become its own position, so the first option submitted
-        // "0" whatever it said.
-        const v = o.value === undefined ? String(i) : jsonToString(o.value)
+        /*
+         * `optionEntry` in core, which is `optionValue`'s inverse: the two have
+         * to agree on what an entry means or a choice cannot round-trip. Read
+         * inline here, it also threw on a `null` in the array.
+         */
+        const { value: v, label } = optionEntry(option, i)
         return (
           <MenuItem key={v || String(i)} value={v}>
-            {str(o.label, v)}
+            {label}
           </MenuItem>
         )
       })}
@@ -461,15 +469,9 @@ function RadioGroupNode({
         onChange={(e) => onChange(optionValue(options, e.target.value))}
       >
         {options.map((option, i) => {
-          const o = option as { label?: unknown; value?: JsonValue }
-          const v = o.value === undefined ? String(i) : jsonToString(o.value)
+          const { value: v, label } = optionEntry(option, i)
           return (
-            <FormControlLabel
-              key={v || String(i)}
-              value={v}
-              control={<Radio />}
-              label={typeof o.label === 'string' ? o.label : v}
-            />
+            <FormControlLabel key={v || String(i)} value={v} control={<Radio />} label={label} />
           )
         })}
         {/* Children are RadioItems, for options that need their own layout. */}
@@ -644,9 +646,15 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   return (
     <Breadcrumbs {...nodeProps} aria-label="Breadcrumb">
       {items.map((item, i) => {
-        const entry = item as { label?: unknown; href?: JsonValue }
-        const text = typeof entry.label === 'string' ? entry.label : String(i + 1)
-        const href = safeHref(entry.href)
+        /*
+         * Guarded like an option, and for the same reason: a crumb comes out of
+         * a document. Reading `.label` off a `null` threw during render, and the
+         * HTML kit had the identical line — one shared test found both.
+         */
+        const entry =
+          item !== null && typeof item === 'object' && !Array.isArray(item) ? item : undefined
+        const text = typeof entry?.['label'] === 'string' ? entry['label'] : String(i + 1)
+        const href = safeHref(entry?.['href'])
         // The last crumb is where you are, so it is text and says so.
         return i === last || !href ? (
           <Typography

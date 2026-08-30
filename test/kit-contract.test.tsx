@@ -174,6 +174,179 @@ describe('a length means the same thing in both kits', () => {
   })
 })
 
+/**
+ * A list of options is a document's list, and a document is data.
+ *
+ * Every kit maps over `props.options` and reads `.value` off each entry. A
+ * `null` in that array threw during render — and core has `optionValue`
+ * precisely because these entries cannot be trusted, so the guard existed one
+ * layer down and was not used here.
+ *
+ * The error boundary added for theme 3 keeps a throw inside its own node now, so
+ * this is a lost control rather than a lost page. A lost control is still the
+ * question the form was asking.
+ */
+/**
+ * A list of options is a document's list, and a document is data.
+ *
+ * Every kit mapped over `props.options` and read `.value` off each entry, so a
+ * `null` in that array threw during render — in four places across two kits.
+ * Core has `optionValue` precisely because these entries cannot be trusted, so
+ * the guarded read existed one layer down and was not the one the controls used
+ * to draw. They share `optionEntry` now, which is `optionValue`'s inverse.
+ *
+ * The error boundary added for theme 3 keeps a throw inside its own node, so
+ * this is a lost control rather than a lost page. A lost control is still the
+ * question the form was asking.
+ */
+describe('a component whose options a document got wrong', () => {
+  /** Everything a hand-edited document has plausibly been seen to hold. */
+  const RUBBISH: unknown[] = [null, undefined, 'a bare string', 42, [], { label: 'fine', value: 7 }]
+
+  function listNode(type: string, propName: string): ComponentNode {
+    return {
+      key: 'target',
+      type,
+      props: { [propName]: prop(RUBBISH as never), label: prop('Pick one') },
+      schema: { type: 'string', validations: [] },
+    }
+  }
+
+  /** The type each kit gives its list to, and the prop that list arrives on. */
+  const LISTY: [string, string][] = [
+    ['Select', 'options'],
+    ['RadioGroup', 'options'],
+    ['Breadcrumbs', 'items'],
+  ]
+
+  it.each(
+    KITS.flatMap(({ name, kit, renderers }) =>
+      LISTY.filter(([type]) => kit.components.some((def) => def.type === type)).map(
+        ([type, propName]) => [name + ' ' + type, renderers, type, propName] as const,
+      ),
+    ),
+  )('%s renders anyway', (_what, renderers, type, propName) => {
+    const onError = vi.fn()
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(listNode(type, propName))}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onError={onError}
+        onChange={() => undefined}
+      />,
+    )
+
+    // Not merely "the page survived" — the boundary would give us that. The
+    // component itself has to still be the component.
+    expect(onError).not.toHaveBeenCalled()
+    expect(container.querySelector('[data-fs-key="target"]')?.getAttribute('role')).not.toBe(
+      'alert',
+    )
+  })
+
+  it.each(KITS)('$name still shows an option it can read', ({ kit, renderers }) => {
+    /*
+     * The control. Dropping every entry would pass the test above and leave a
+     * select with nothing in it, which is the same lost question by a quieter
+     * route.
+     */
+    if (!kit.components.some((def) => def.type === 'Select')) return
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(listNode('Select', 'options'))}
+        kit={renderers}
+        data={{ target: 7 }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(chosenText(container)).toContain('fine')
+  })
+})
+
+/**
+ * The chosen option, however this kit chooses to draw one.
+ *
+ * The HTML kit renders a native `<select>`, whose options are in the document
+ * and whose selection is `selectedOptions`. MUI renders a combobox and keeps
+ * its options in a menu that is not open, so the only thing on the page is the
+ * label of whatever is selected. Reading `container.textContent` finds the
+ * options in one kit and nothing in the other, which is how a cross-kit
+ * assertion ends up measuring two different things.
+ */
+function chosenText(container: HTMLElement): string {
+  const combobox = container.querySelector('[role="combobox"]')
+  if (combobox) return combobox.textContent ?? ''
+
+  const select = container.querySelector('select')
+  return select?.selectedOptions[0]?.textContent ?? ''
+}
+
+/**
+ * A numeric option value survives being chosen.
+ *
+ * `str()` answers `''` for a number, so a select whose stored answer was `2`
+ * rendered as nothing selected: the user picks an option, the data holds it,
+ * the control shows blank, and the choice can never be made to stick.
+ * `optionValue` in core exists so a numeric value survives the round trip, and
+ * this was the one end that dropped it — the radio group in the same kit
+ * already had it right, which is how one control drifts from its neighbour.
+ */
+describe('a select holding a number', () => {
+  function numeric(): ComponentNode {
+    return {
+      key: 'target',
+      type: 'Select',
+      props: {
+        label: prop('Quantity'),
+        options: prop([
+          { label: 'One', value: 1 },
+          { label: 'Two', value: 2 },
+        ]),
+      },
+      schema: { type: 'number', validations: [] },
+    }
+  }
+
+  it.each(KITS)('$name shows the option the data names', ({ kit, renderers }) => {
+    if (!kit.components.some((def) => def.type === 'Select')) return
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(numeric())}
+        kit={renderers}
+        data={{ target: 2 }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(chosenText(container)).toBe('Two')
+  })
+
+  it.each(KITS)('$name shows nothing when the data names no option', ({ kit, renderers }) => {
+    // The control: "shows Two" must not be something it would say regardless.
+    if (!kit.components.some((def) => def.type === 'Select')) return
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(numeric())}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(chosenText(container)).not.toContain('Two')
+  })
+})
+
 describe.each(KITS)('$name', ({ kit, renderers }) => {
   const container = kit.components.find((c) => c.container)
 

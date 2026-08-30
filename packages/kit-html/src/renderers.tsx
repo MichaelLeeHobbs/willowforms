@@ -19,7 +19,7 @@
 
 import { createContext, createElement, useContext, useId } from 'react'
 import type { ReactNode } from 'react'
-import { jsonToString, optionValue, safeHref, safeStyleValue } from '@formsmith/core'
+import { jsonToString, optionEntry, optionValue, safeHref, safeStyleValue } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -267,17 +267,16 @@ function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
         >
           <option value="">Choose…</option>
           {options.map((option, i) => {
-            const o = option as { label?: unknown; value?: JsonValue }
             /*
-             * jsonToString, not a fallback to the array index. Numeric option
-             * values are the natural thing to type into the JSON editor, and
-             * treating them as missing made every value its own position:
-             * choosing the first option submitted "0" whatever it said.
+             * `optionEntry` in core, which is `optionValue`'s inverse: the two
+             * have to agree on what an entry means or a choice cannot
+             * round-trip. Read inline here, it also threw on a `null` in the
+             * array, and a document is data.
              */
-            const v = o.value === undefined ? String(i) : jsonToString(o.value)
+            const { value: v, label } = optionEntry(option, i)
             return (
               <option key={v || String(i)} value={v}>
-                {str(o.label, v)}
+                {label}
               </option>
             )
           })}
@@ -531,8 +530,7 @@ function RadioGroupNode({
       >
         <div className={'fsh-radios fsh-radios--' + str(props['direction'], 'column')}>
           {options.map((option, i) => {
-            const o = option as { label?: unknown; value?: JsonValue }
-            const v = o.value === undefined ? String(i) : jsonToString(o.value)
+            const { value: v, label } = optionEntry(option, i)
             return (
               <label key={v || String(i)} className="fsh-radio">
                 <input
@@ -542,7 +540,7 @@ function RadioGroupNode({
                   checked={jsonToString(value) === v}
                   onChange={() => onChange(optionValue(options, v))}
                 />
-                <span>{typeof o.label === 'string' ? o.label : v}</span>
+                <span>{label}</span>
               </label>
             )
           })}
@@ -727,9 +725,14 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <nav {...nodeProps} aria-label="Breadcrumb">
       <ol className="fsh-breadcrumbs">
         {items.map((item, i) => {
-          const entry = item as { label?: unknown; href?: JsonValue }
-          const text = typeof entry.label === 'string' ? entry.label : String(i + 1)
-          const href = safeHref(entry.href)
+          /*
+           * Guarded like an option, and for the same reason: a crumb comes out
+           * of a document. Reading `.label` off a `null` threw during render.
+           */
+          const entry =
+            item !== null && typeof item === 'object' && !Array.isArray(item) ? item : undefined
+          const text = typeof entry?.['label'] === 'string' ? entry['label'] : String(i + 1)
+          const href = safeHref(entry?.['href'])
           return (
             <li key={text + ':' + String(i)}>
               {/* The last crumb is where you are, so it is text and says so. */}

@@ -320,9 +320,27 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   /*
    * A repeater draws its children once per row, each under that row's scope.
    * The rows come out of the data, so the count is never something a caller
-   * claims. Keyed by index, which remounts rows below a deletion — the cost of
-   * refusing to put a generated row id inside `data`, where it would be a
-   * non-answer in the payload.
+   * claims.
+   *
+   * Keyed by index, and here is what that actually costs. This comment used to
+   * say index keys "remount rows below a deletion", which is the opposite of
+   * what React does: it *reuses* the component instance at each index and
+   * unmounts only the last one. So after deleting row 0, the instance that drew
+   * row 0 now draws row 1.
+   *
+   * Everything a kit derives from `value` follows the data and is fine. Anything
+   * the browser owns does not: the file a `type="file"` input is holding, an IME
+   * composition in progress, a text selection, the scroll position of a long
+   * control. Those stay with the index and now belong to the wrong row.
+   *
+   * There is no better key available, and that is a consequence of a decision
+   * rather than an oversight. A key would have to be stable for the row's
+   * lifetime, and the two candidates both fail: a generated row id would be a
+   * non-answer living inside `data` and in the payload, which `12-api.md`
+   * refuses by name, and the row object's own identity changes every time that
+   * row is edited, which would remount it on every keystroke.
+   *
+   * Recorded in `docs/build-out/triage.md` with what closing it would take.
    */
   /*
    * An authoring surface draws one row for an empty repeater.

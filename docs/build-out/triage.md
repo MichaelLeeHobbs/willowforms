@@ -33,3 +33,26 @@ dependency that does not work in the browser, where this same code runs.
 That is a dependency decision with a cross-platform cost, and it belongs to whoever owns the project
 rather than to a remediation run. The mitigation above removes the shape the report demonstrated and
 every polynomial case; what remains is an alternation an author has to write deliberately.
+
+## Rows are keyed by index, and browser-owned state follows the index — `renderer/index.tsx`
+
+**HIGH, area 3.** React reuses the component instance at each index and unmounts only the last, so
+deleting row 0 leaves the instance that drew row 0 drawing row 1. Anything a kit derives from `value`
+follows the data and is fine; anything the browser owns does not. The vehicle the review named is
+`FileUploadNode`, which renders `type="file"` with no `value` — the input still shows `a.pdf` while the
+data holds `b.pdf`. Focus, text selection and IME composition ride along.
+
+**Not fixed, and this is the entry.** There is no better key available, and that is a consequence of a
+decision rather than an oversight. A React key has to be stable for the row's lifetime, and both
+candidates fail: a generated row id would be a non-answer living inside `data` and in the submitted
+payload, which `12-api.md` refuses by name and the row-addressing decision rejected explicitly; and the
+row object's own identity changes every time that row is edited, so keying on it would remount the row
+on every keystroke.
+
+**What was done:** the comment defending the choice stated the opposite of what React does — that index
+keys "remount rows below a deletion" — which is why nobody had noticed. It now says what actually
+happens and what it costs.
+
+**What would close it:** a row identity that lives outside `data`, held by the renderer for the lifetime
+of the mount. That is a real design, it is not small, and it reopens a decision that was settled with
+reasons. It belongs to whoever owns the project, not to a remediation run.
