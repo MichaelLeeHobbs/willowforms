@@ -8,7 +8,7 @@
  * @formsmith/core run in Node for server-side validation.
  */
 
-import type { EventName, FieldSchema, JsonValue } from './types.js'
+import type { EventName, FieldSchema, JsonValue, PropValue } from './types.js'
 
 export type PaletteGroup =
   'inputs' | 'selection' | 'layout' | 'display' | 'feedback' | 'navigation' | 'custom'
@@ -103,6 +103,19 @@ export interface ComponentDef {
   icon?: IconName
   /** Accepts children. */
   container?: boolean
+  /**
+   * A visibility rule a freshly dropped instance starts with.
+   *
+   * For a component that only means something under a condition. A `Step` is a
+   * container shown when `context.step` equals its own key, and that condition
+   * is the entire difference between a step and a box — so a kit states it here
+   * rather than asking every author to write it by hand in the picker and get
+   * the path right.
+   *
+   * A starting value, not a constraint. The Rules tab edits it afterwards like
+   * any other `renderWhen`, including deleting it.
+   */
+  defaultRenderWhen?: (key: string) => PropValue
   /**
    * The document root. Exactly one component per kit declares this, and it is
    * the type `emptyRoot()` produces. It is never offered in the palette: the

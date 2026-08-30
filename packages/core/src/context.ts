@@ -19,7 +19,14 @@
 
 import { readPath } from './json.js'
 import { flatten } from './tree.js'
-import type { ComponentNode, Condition, FormContext, Operand, PropValue } from './types.js'
+import type {
+  ComponentNode,
+  Condition,
+  FormContext,
+  JsonValue,
+  Operand,
+  PropValue,
+} from './types.js'
 
 /** Every context path a condition anywhere in this condition reads. */
 function fromCondition(condition: Condition | undefined, out: Set<string>): void {
@@ -90,4 +97,82 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
     if (readPath(context, path) === undefined) missing.push(path)
   }
   return missing.sort()
+}
+
+/**
+ * Every value a document compares one context path against.
+ *
+ * The primitive a multi-step form needs, without core learning what a step is.
+ * A step is a container shown when `context.step` equals its own name, so the
+ * set of steps is the set of names the document compares that path against:
+ * `contextValues(root, 'step')` is the flow.
+ *
+ * It matters that this reads the document rather than taking a list. A server
+ * validating a submit has to check every step, and asking the browser which
+ * steps exist would let a client that names one step have the other steps go
+ * unchecked. The document is the thing both sides already agree on.
+ *
+ * Structural, like `contextKeys`, and for the same reason: a document is data.
+ * Any comparison contributes the literal on its other side, and `in`/`notIn`
+ * contribute their options. That deliberately includes operators nobody would
+ * write against a step name — `gt` on one is meaningless, and it is still
+ * collected.
+ *
+ * Collecting too much is the safe direction and collecting too little is not.
+ * The caller is `validateAcross`, so a name that turns out not to be a step
+ * costs one extra pass over a tree in which nothing matches it, while a name
+ * this missed is a step whose required fields never get checked. The same
+ * reasoning as reading structurally rather than by `op`: a new operator must
+ * not fall silently out of a check that exists to catch omissions.
+ *
+ * An operator comparing a context path to a field contributes nothing, because
+ * there is no name there to collect.
+ */
+export function contextValues(root: ComponentNode, path: string): JsonValue[] {
+  const seen: JsonValue[] = []
+
+  const add = (value: JsonValue | undefined): void => {
+    if (value === undefined) return
+    if (!seen.some((held) => held === value)) seen.push(value)
+  }
+
+  const reads = (operand: unknown): boolean =>
+    typeof operand === 'object' &&
+    operand !== null &&
+    (operand as Operand).kind === 'context' &&
+    (operand as { path?: unknown }).path === path
+
+  const literal = (operand: unknown): JsonValue | undefined =>
+    typeof operand === 'object' && operand !== null && (operand as Operand).kind === 'literal'
+      ? (operand as { value: JsonValue }).value
+      : undefined
+
+  const visit = (condition: Condition | undefined): void => {
+    if (!condition || typeof condition !== 'object') return
+    const shape = condition as Partial<Record<string, unknown>>
+
+    // Either side may be the one reading the context.
+    if (reads(shape['left'])) add(literal(shape['right']))
+    if (reads(shape['right'])) add(literal(shape['left']))
+
+    if (reads(shape['value']) && Array.isArray(shape['options'])) {
+      for (const option of shape['options'] as JsonValue[]) add(option)
+    }
+
+    if (Array.isArray(shape['conditions'])) {
+      for (const inner of shape['conditions'] as Condition[]) visit(inner)
+    }
+    visit(shape['condition'] as Condition | undefined)
+  }
+
+  for (const { node } of flatten(root)) {
+    const collect = (value: PropValue | undefined): void => {
+      if (value && typeof value === 'object' && value.kind === 'condition') visit(value.condition)
+    }
+    collect(node.renderWhen)
+    for (const value of Object.values(node.props ?? {})) collect(value)
+    for (const rule of node.schema?.validations ?? []) collect(rule.when)
+  }
+
+  return seen
 }

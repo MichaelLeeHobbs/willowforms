@@ -55,17 +55,18 @@ filling in a form.
 import { FormRenderer } from '@formsmith/renderer'
 ```
 
-| Prop       | Type                                      | Required | Meaning                                         |
-| ---------- | ----------------------------------------- | -------- | ----------------------------------------------- |
-| `document` | `FormDocument`                            | yes      | The form                                        |
-| `kit`      | `RendererKit`                             | yes      | Renderers                                       |
-| `data`     | `FormData`                                | yes      | Current values, flat, keyed by node             |
-| `onChange` | `(key: string, value: JsonValue) => void` | yes      | One field changed                               |
-| `errors`   | `FormErrors`                              | no       | Messages to display, keyed by node              |
-| `language` | `string`                                  | no       | BCP 47 tag; defaults to the document            |
-| `evaluate` | `Evaluator`                               | no       | Sandbox for computed props                      |
-| `device`   | `Device`                                  | no       | Render `css` for one device, not by media query |
-| `context`  | `FormContext`                             | no       | What the host knows and does not submit         |
+| Prop           | Type                                          | Required | Meaning                                                     |
+| -------------- | --------------------------------------------- | -------- | ----------------------------------------------------------- |
+| `document`     | `FormDocument`                                | yes      | The form                                                    |
+| `kit`          | `RendererKit`                                 | yes      | Renderers                                                   |
+| `data`         | `FormData`                                    | yes      | Current values, keyed by node; rows nest under the repeater |
+| `onChange`     | `(address: string, value: JsonValue) => void` | yes      | One field changed, at an address                            |
+| `errors`       | `FormErrors`                                  | no       | Messages to display, keyed by address                       |
+| `language`     | `string`                                      | no       | BCP 47 tag; defaults to the document                        |
+| `evaluate`     | `Evaluator`                                   | no       | Sandbox for computed props                                  |
+| `device`       | `Device`                                      | no       | Render `css` for one device, not by media query             |
+| `context`      | `FormContext`                                 | no       | What the host knows and does not submit                     |
+| `revealHidden` | `boolean`                                     | no       | Draw what `renderWhen` hides. Authoring surfaces only       |
 
 ### The host owns the data
 
@@ -81,9 +82,21 @@ const [errors, setErrors] = useState<FormErrors>({})
   kit={renderers}
   data={data}
   errors={errors}
-  onChange={(key, value) => setData((d) => ({ ...d, [key]: value }))}
+  onChange={(address, value) => setData((d) => applyChange(d, address, value))}
 />
 ```
+
+### What `onChange` reports is an address, not a key
+
+Outside a repeater an address is the bare key and nothing has changed. Inside one it carries the row
+it came from, outermost first: `addresses[1].line1`. `errors` is keyed the same way, so a message can
+name the row it belongs to.
+
+Use `applyChange` from `@formsmith/core` to write one. Spreading the address into an object literal,
+`{ ...d, [address]: value }`, is the mistake this shape invites: it creates a property whose name is
+the literal text `addresses[1].line1` rather than updating the row, and the form then looks like it is
+discarding every keystroke inside a repeater. `applyChange` also refuses a reserved name and returns
+the input unchanged when the address cannot be placed, so a hostile index cannot mint a sparse array.
 
 Submitting is `setErrors(validateForm(doc.root, data))` and checking whether the result is empty. That is
 the same call a server makes on the same document, which is the whole reason validation lives in core.
@@ -225,19 +238,45 @@ node nobody can reach.
 
 ## Keys
 
-**Status: partial**, and the loosest contract here.
+**Status: built.** A node's `key` is its identity, and a `dataKey` is what the payload calls an answer.
+Between them they are the property name in exported JSON Schema, the key in `FormData` and `FormErrors`,
+the value of `data-fs-key`, part of a CSS selector, and a name an expression can mention. Uniqueness used
+to be the only rule enforced, so a key holding a space, a quote or a newline made a legal document and an
+awkward everything-else.
 
-A node's `key` is its identity. It is the property name in exported JSON Schema, the key in `FormData`
-and `FormErrors`, the value of `data-fs-key`, and part of a CSS selector the designer builds. Today
-`renameKey` accepts any non-empty string once trimmed, and uniqueness within the document is the only
-rule enforced.
+```
+KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
+RESERVED_KEYS = ['__proto__', 'constructor', 'prototype']
+```
 
-That is more permissive than what depends on it. A key holding a space or a quote makes a legal document
-today and an awkward JSON Schema property tomorrow. The selectors are already defended: `CSS.escape` is
-used everywhere a key becomes one, which is the only reason this has not broken yet.
+It judges the key **as stored**, not a trimmed reading of it. Trimming is an input convenience in the
+panel, which stores what it trimmed, so a key that reaches a document still wearing spaces was never
+typed through the panel — and it is not the same string as its trimmed twin anywhere it is used, while a
+rename of the same field would produce the trimmed one. Two components could otherwise hold what
+everything downstream treats as one name, with the duplicate check unable to see it.
 
-**Planned:** a stated grammar, checked in `validateDocument` so a pasted document is judged by the same
-rule as a rename. Until then, treat anything outside `[A-Za-z_][A-Za-z0-9_]*` as working by accident.
+`keyProblem(key)` returns the reason or nothing, and both callers show it to someone: the Properties
+panel refuses a rename with it, and `validateDocument` reports `invalid-key` or `invalid-data-key`
+against a pasted document. One rule, so a rename and a paste are judged the same way — which is what the
+previous version of this section said was missing.
+
+**The grammar is the JavaScript identifier subset, and the reason is the evaluator rather than
+tidiness.** A hyphen is the tempting addition, because real forms are full of `first-name`, and it is
+exactly the one that breaks: `computed` bindings are host-evaluated JavaScript, so `first-name` in an
+expression is a subtraction, silently, with no error anywhere. A key namespace expressions can name has
+to be an identifier namespace.
+
+**`.`, `[` and `]` are left free deliberately.** Row addressing needs them, and settling this before
+repeated scope is why the key grammar comes first: a path grammar layered on a key grammar that does not
+exist is how the libraries that had to break their addressing twice got there. See `docs/decisions.md`.
+
+`__proto__` passes the pattern and is refused by name. Assigning it does not add a property, it sets the
+prototype, so an answer under that key vanishes from the payload and the payload inherits whatever it
+pointed at. `submittedData` builds on a null prototype to survive that; refusing the name is the other
+half, and the cheaper one.
+
+This is a breaking change for a document holding a key outside the grammar, and it is deliberate while
+nothing is published.
 
 ## Undo
 

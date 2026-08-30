@@ -24,6 +24,7 @@ import {
   findParent,
   insertNode,
   instantiate,
+  keyProblem,
   languageTag,
   moveNode,
   removeNode,
@@ -286,7 +287,13 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     (key: string, nextKey: string): RenameResult => {
       const trimmed = nextKey.trim()
       if (trimmed === key) return { ok: true }
-      if (!trimmed) return { ok: false, reason: 'A component key cannot be empty.' }
+
+      /*
+       * The same rule `validateDocument` applies to a pasted document, so the
+       * panel cannot create a key a paste would be told off for.
+       */
+      const problem = keyProblem(trimmed)
+      if (problem) return { ok: false, reason: problem }
 
       /*
        * Checked against the current document rather than inside the updater. A

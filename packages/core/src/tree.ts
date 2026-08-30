@@ -5,6 +5,8 @@
  * designer's undo stack holds references to prior states. Nothing here mutates.
  */
 
+import { keyProblem } from './keys.js'
+import { rowScopeProblems } from './rows.js'
 import type { ComponentNode, FormDocument } from './types.js'
 
 /** Depth-first walk, parents before children. */
@@ -19,20 +21,35 @@ export function walk(
   visit(node)
 }
 
+/*
+ * First match, in document order.
+ *
+ * Keys are unique — `validateDocument` reports a duplicate and the panel refuses
+ * a rename that would make one — but reporting is not preventing, and a host can
+ * render a document it never validated. These used to assign on every match with
+ * no early exit, so they returned the *last* one while `pathTo` below returned
+ * the first. Two functions in this file disagreeing about which node a key means
+ * is a bug with no defensible reading, whichever answer is right.
+ *
+ * First, because that is what `pathTo` already does and what `querySelector`
+ * does in `geometry.ts`, so all three now agree.
+ */
 export function findNode(root: ComponentNode, key: string): ComponentNode | undefined {
-  let found: ComponentNode | undefined
-  walk(root, (n) => {
-    if (n.key === key) found = n
-  })
-  return found
+  if (root.key === key) return root
+  for (const child of root.children ?? []) {
+    const hit = findNode(child, key)
+    if (hit) return hit
+  }
+  return undefined
 }
 
 export function findParent(root: ComponentNode, key: string): ComponentNode | undefined {
-  let found: ComponentNode | undefined
-  walk(root, (n, parent) => {
-    if (n.key === key) found = parent
-  })
-  return found
+  for (const child of root.children ?? []) {
+    if (child.key === key) return root
+    const hit = findParent(child, key)
+    if (hit) return hit
+  }
+  return undefined
 }
 
 /** Keys from the root down to the target, inclusive. Empty if not found. */
@@ -258,6 +275,9 @@ export interface StructuralError {
     | 'unknown-action'
     | 'empty-key'
     | 'empty-data-key'
+    | 'invalid-key'
+    | 'invalid-data-key'
+    | 'row-scope'
     | 'unknown-language'
     | 'malformed'
   message: string
@@ -324,6 +344,16 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       seen.add(key)
 
       /*
+       * The same rule a rename is judged by, so a pasted document cannot hold a
+       * key the panel would have refused. Reported after the emptiness check
+       * above, which says something more specific about the same failure.
+       */
+      const problem = keyProblem(key)
+      if (problem) {
+        errors.push({ code: 'invalid-key', message: 'Component ' + key + ': ' + problem, key })
+      }
+
+      /*
        * A present dataKey has to be usable as a name. It is not checked for
        * uniqueness: sharing one is legal, and it is what lets two guarded
        * fields write the same answer.
@@ -335,6 +365,20 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
           message: 'Component ' + key + ' has an empty data key.',
           key,
         })
+      } else if (dataKey !== undefined) {
+        /*
+         * Held to the same grammar, and it matters more here: a data key is a
+         * property name in the exported JSON Schema and a key in the submitted
+         * payload, so it leaves the document in a way a node key never does.
+         */
+        const problem = keyProblem(dataKey)
+        if (problem) {
+          errors.push({
+            code: 'invalid-data-key',
+            message: 'Component ' + key + ' has an invalid data key: ' + problem,
+            key,
+          })
+        }
       }
 
       visitEvents(value['events'], key, path)
@@ -380,6 +424,18 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
   }
 
   visit(candidate['root'], 'root')
+
+  /*
+   * A condition inside a repeater that reads a row's field at form scope reads
+   * nothing, hides its component, and takes it out of validation. Decidable
+   * from the tree, so it is reported here rather than discovered per submit.
+   */
+  const rootNode = candidate['root']
+  if (isRecord(rootNode)) {
+    for (const found of rowScopeProblems(rootNode as unknown as ComponentNode)) {
+      errors.push({ code: 'row-scope', message: found.problem, key: found.key })
+    }
+  }
 
   const languages = candidate['languages']
   if (!Array.isArray(languages)) {

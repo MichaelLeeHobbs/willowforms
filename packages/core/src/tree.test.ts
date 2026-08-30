@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { createDocument, emptyRoot, prop } from './factory.js'
+import { createDocument, emptyRoot, instantiate, prop } from './factory.js'
+import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument } from './types.js'
 import {
   collectKeys,
@@ -530,5 +531,159 @@ describe('validateDocument and data keys', () => {
 
   it('accepts an absent data key', () => {
     expect(validateDocument(withDataKey(undefined))).toEqual([])
+  })
+
+  it('rejects a data key the grammar does not allow', () => {
+    /*
+     * It matters more here than for a node key: a data key is a property name
+     * in the exported JSON Schema and a key in the submitted payload, so it
+     * leaves the document in a way a node key never does.
+     */
+    expect(validateDocument(withDataKey('first-name')).map((e) => e.code)).toEqual([
+      'invalid-data-key',
+    ])
+    expect(validateDocument(withDataKey('__proto__')).map((e) => e.code)).toEqual([
+      'invalid-data-key',
+    ])
+  })
+
+  it('rejects a component key the grammar does not allow', () => {
+    // The same rule a rename is judged by, so a pasted document cannot hold a
+    // key the panel would have refused.
+    const document: FormDocument = {
+      ...createDocument('Keys', 'keys'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'first-name', type: 'TextField', props: {} }],
+      },
+    }
+
+    const errors = validateDocument(document)
+    expect(errors.map((e) => e.code)).toEqual(['invalid-key'])
+    expect(errors[0]?.key).toBe('first-name')
+  })
+})
+
+describe('a component that arrives with a visibility rule', () => {
+  /*
+   * A Step is a container shown when `context.step` equals its own key. That
+   * condition is the whole difference between a step and a box, so a kit states
+   * it rather than asking every author to write it by hand and get the path
+   * right. It has to be applied after the key is generated, because the rule
+   * names the node.
+   */
+  const stepDef: ComponentDef = {
+    type: 'Step',
+    label: 'Step',
+    icon: 'box',
+    group: 'layout',
+    container: true,
+    defaultRenderWhen: (key) => ({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: key },
+      },
+    }),
+    defaultProps: {},
+    props: [],
+    events: [],
+  }
+
+  const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [] }
+
+  it('names the node the rule is on, not the type', () => {
+    const node = instantiate(stepDef, root)
+
+    expect(node.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: node.key },
+      },
+    })
+  })
+
+  it('gives two steps different rules, so they are different steps', () => {
+    // Generated from the key, so a second one cannot silently share the first's
+    // condition and show at the same time.
+    const first = instantiate(stepDef, root)
+    const withFirst: ComponentNode = { ...root, children: [first] }
+    const second = instantiate(stepDef, withFirst)
+
+    expect(second.key).not.toBe(first.key)
+    expect(second.renderWhen).not.toEqual(first.renderWhen)
+  })
+
+  it('leaves a component that declares none without one', () => {
+    const plain: ComponentDef = { ...stepDef, type: 'Box' }
+    delete (plain as { defaultRenderWhen?: unknown }).defaultRenderWhen
+
+    expect(instantiate(plain, root).renderWhen).toBeUndefined()
+  })
+})
+
+describe('two lookups for one key', () => {
+  /*
+   * Keys are unique: validateDocument reports a duplicate and the panel refuses
+   * a rename that would make one. But reporting is not preventing, and a host
+   * can render a document it never validated — so what these do when a document
+   * is wrong is worth pinning, because they used to do different things.
+   *
+   * findNode and findParent assigned on every match with no early exit, so they
+   * answered with the last match while pathTo answered with the first. Two
+   * functions in one file disagreeing about which node a key means is a bug
+   * whichever answer is correct.
+   */
+  const twins: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      { key: 'group', type: 'Stack', props: {}, children: [{ key: 'twin', type: 'A', props: {} }] },
+      { key: 'other', type: 'Stack', props: {}, children: [{ key: 'twin', type: 'B', props: {} }] },
+    ],
+  }
+
+  it('agrees with pathTo about which node a repeated key means', () => {
+    expect(findNode(twins, 'twin')?.type).toBe('A')
+    expect(pathTo(twins, 'twin')).toEqual(['root', 'group', 'twin'])
+    expect(findParent(twins, 'twin')?.key).toBe('group')
+  })
+
+  it('still finds the root and a unique node', () => {
+    expect(findNode(twins, 'root')?.key).toBe('root')
+    expect(findNode(twins, 'other')?.type).toBe('Stack')
+    expect(findNode(twins, 'nobody')).toBeUndefined()
+    expect(findParent(twins, 'root')).toBeUndefined()
+  })
+})
+
+describe('a key that only looks unique', () => {
+  it('refuses a pasted key wearing whitespace, which its twin would not have', () => {
+    /*
+     * `email` and ` email ` are two components as far as the duplicate check is
+     * concerned, and one name everywhere downstream: the panel would store the
+     * trimmed form for either, so a rename of one silently becomes the other.
+     * The stored key is judged as stored.
+     */
+    const document: FormDocument = {
+      ...createDocument('Keys', 'keys'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          { key: 'email', type: 'TextField', props: {} },
+          { key: ' email ', type: 'TextField', props: {} },
+        ],
+      },
+    }
+
+    expect(validateDocument(document).map((e) => e.code)).toContain('invalid-key')
   })
 })

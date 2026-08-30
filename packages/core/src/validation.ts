@@ -13,6 +13,8 @@
 
 import { evaluateCondition } from './condition.js'
 import { isEmpty, jsonToString, valueOf } from './json.js'
+import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
+import type { RowContext } from './rows.js'
 import { dataKeyOf, flatten } from './tree.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -46,6 +48,13 @@ export type Evaluator = (expression: string, data: FormData, context?: FormConte
 export interface EvalOptions {
   evaluate?: Evaluator | undefined
   context?: FormContext | undefined
+  /**
+   * Which repeater row this evaluation is inside. Absent at the top level.
+   *
+   * Set by the walk that enters a row, never by a caller: a host passing one
+   * would be claiming a position in data it does not control.
+   */
+  row?: RowContext | undefined
 }
 
 export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
@@ -96,6 +105,24 @@ function isMissing(value: JsonValue | undefined): boolean {
   return value === false || isEmpty(value)
 }
 
+/**
+ * How long an answer is, for the two rules that ask.
+ *
+ * An array counts its items. Without this it went through `jsonToString`, which
+ * returns `''` for anything that is not a string, number or boolean — so a
+ * multi-select with two options chosen measured zero, `minLength: 2` failed
+ * every time and `maxLength` passed every time. Silently: the value was there
+ * on screen and the message said it was too short.
+ *
+ * Counting items is what an author writing "at least two" on a multi-select
+ * means. A repeater may still want `minItems` and `maxItems` of its own, which
+ * map onto the JSON Schema keywords of those names; this is not that, it is the
+ * existing rule no longer being wrong about a value it already receives.
+ */
+function lengthOf(value: JsonValue | undefined): number {
+  return Array.isArray(value) ? value.length : asString(value).length
+}
+
 function asString(value: JsonValue | undefined): string {
   return jsonToString(value)
 }
@@ -119,7 +146,7 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       return true
     // No sandbox needed, so a guarded rule works where an expression would not.
     case 'condition':
-      return evaluateCondition(when.condition, data, options.context)
+      return evaluateCondition(when.condition, data, options.context, options.row)
   }
 }
 
@@ -145,9 +172,9 @@ export function applyRule(
 
   switch (rule.key) {
     case 'minLength':
-      return asString(value).length < rule.value ? fail() : undefined
+      return lengthOf(value) < rule.value ? fail() : undefined
     case 'maxLength':
-      return asString(value).length > rule.value ? fail() : undefined
+      return lengthOf(value) > rule.value ? fail() : undefined
     case 'min':
       return asNumber(value) < rule.value ? fail() : undefined
     case 'max':
@@ -173,8 +200,10 @@ export function validateField(
   options: EvalOptions = {},
 ): string | undefined {
   if (!node.schema) return undefined
+  // A field inside a row holds its answer in that row, not at the top level.
+  const held = valueOf(options.row?.values ?? data, dataKeyOf(node))
   for (const rule of node.schema.validations) {
-    const error = applyRule(rule, valueOf(data, dataKeyOf(node)), data, options)
+    const error = applyRule(rule, held, data, options)
     if (error) return error
   }
   return undefined
@@ -196,17 +225,56 @@ export function validateForm(
 ): FormErrors {
   const errors: FormErrors = {}
 
-  const visit = (node: ComponentNode): void => {
-    if (!isVisible(node, data, options)) return
+  const visit = (node: ComponentNode, scope: EvalOptions): void => {
+    if (!isVisible(node, data, scope)) return
 
-    const error = validateField(node, data, options)
-    if (error) errors[node.key] = error
+    const path = scope.row?.path ?? NO_ROWS
+    const error = validateField(node, data, scope)
+    if (error) errors[addressOf(path, node.key)] = error
 
-    for (const child of node.children ?? []) visit(child)
+    /*
+     * A repeater validates its children once per row, each under that row's
+     * own scope, so a required answer missing from row two is reported against
+     * row two rather than against the one authored node they share.
+     *
+     * The rows come out of the data. Nothing asks the browser how many there
+     * are, which is the same discipline `validateAcross` follows for steps: a
+     * count from the request would let a client submit one row and have the
+     * rest go unchecked.
+     */
+    if (isRowScope(node)) {
+      const rows = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+      rows.forEach((row, index) => {
+        const inner: EvalOptions = {
+          ...scope,
+          row: rowContext(pushRow(path, { key: node.key, index }), row),
+        }
+        for (const child of node.children ?? []) visit(child, inner)
+      })
+      return
+    }
+
+    for (const child of node.children ?? []) visit(child, scope)
   }
 
-  visit(root)
+  visit(root, options)
   return errors
+}
+
+/**
+ * A node whose children are drawn once per row.
+ *
+ * Recognised from the node rather than from a type string, because component
+ * types are kit-scoped and core must not learn the word `Repeater`. A
+ * data-bound container holding a list is the only thing that shape can mean.
+ */
+export function isRowScope(node: ComponentNode): boolean {
+  return node.schema?.type === 'array' && node.children !== undefined
+}
+
+/** The record a node's own value is read from: a row's object, or the form's data. */
+function rowData(data: FormData, scope: EvalOptions): FormData {
+  return scope.row?.values ?? data
 }
 
 /**
@@ -271,18 +339,85 @@ export function submittedData(
    * key on a plain object, and a host does not receive something surprising
    * back from a function it will hand straight to `JSON.stringify`.
    */
-  const kept: FormData = Object.create(null) as FormData
+  const collect = (node: ComponentNode, scope: EvalOptions, into: FormData): void => {
+    if (!isVisible(node, data, scope)) return
 
-  const visit = (node: ComponentNode): void => {
-    if (!isVisible(node, data, options)) return
+    const held = scope.row?.values ?? data
+
+    /*
+     * A repeater keeps its rows, and each row keeps only the answers that row
+     * still asks for. Row order is preserved and no row is dropped: a row the
+     * user filled in is not a question the form stopped asking, it is one of
+     * several answers to the same one.
+     */
+    if (isRowScope(node)) {
+      const key = dataKeyOf(node)
+      const rows = rowsOf(valueOf(held, key))
+      const path = scope.row?.path ?? NO_ROWS
+
+      into[key] = rows.map((row, index) => {
+        const inner: EvalOptions = {
+          ...scope,
+          row: rowContext(pushRow(path, { key: node.key, index }), row),
+        }
+        const kept: FormData = Object.create(null) as FormData
+        for (const child of node.children ?? []) collect(child, inner, kept)
+        return { ...kept }
+      })
+      return
+    }
+
     if (node.schema) {
       const key = dataKeyOf(node)
-      const value = valueOf(data, key)
-      if (value !== undefined) kept[key] = value
+      const value = valueOf(held, key)
+      if (value !== undefined) into[key] = value
     }
-    for (const child of node.children ?? []) visit(child)
+    for (const child of node.children ?? []) collect(child, scope, into)
   }
 
-  visit(root)
+  const kept: FormData = Object.create(null) as FormData
+  collect(root, options, kept)
   return { ...kept }
+}
+
+/**
+ * Validate one document under several evaluation environments, merged.
+ *
+ * A multi-step form needs two different answers from the same rules. While the
+ * user is on step two, only step two should be checked, and that is
+ * `validateForm(stepNode, data)` — it already takes any node as its root. At
+ * submit, every step has to be checked, and `validateForm(root, data)` will not
+ * do it: the other steps are hidden, hidden means not validated, and the form is
+ * accepted with required answers missing from steps nobody is looking at.
+ *
+ * That is `isVisible` behaving exactly as specified, and wrong here, because an
+ * earlier step is not *unwanted*, it is *already done*. `renderWhen` false means
+ * the author excluded this; a step the user is not on means not yet. The two
+ * need different treatment and this is where they get it.
+ *
+ * No new concept: run the existing walk once per environment and merge. Steps
+ * partition the tree, so a key appears under at most one of them and the merge
+ * has nothing to resolve. Where scopes do overlap the first answer wins, which
+ * matches the first-failing-rule order everywhere else.
+ *
+ * **The server enumerates the environments from the document, never from the
+ * request.** A `validateForm` that took a step would let a client name step one
+ * and have the rest go unchecked, and unlike a blocked submit that failure is
+ * invisible. `contextValues(root, 'step')` reads the flow out of the document,
+ * which is the thing both sides already agree on.
+ */
+export function validateAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormErrors {
+  const merged: FormErrors = {}
+
+  for (const scope of scopes) {
+    for (const [key, message] of Object.entries(validateForm(root, data, scope))) {
+      merged[key] ??= message
+    }
+  }
+
+  return merged
 }

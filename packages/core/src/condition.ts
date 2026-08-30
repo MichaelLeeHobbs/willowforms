@@ -15,6 +15,7 @@
  */
 
 import { isEmpty, readPath, valueOf } from './json.js'
+import type { RowContext } from './rows.js'
 import type { Condition, FormContext, FormData, JsonValue, Operand } from './types.js'
 
 /** Deep equality over JSON, which is the only equality a document can express. */
@@ -53,11 +54,21 @@ function operand(
   value: Operand | undefined,
   data: FormData,
   context: FormContext | undefined,
+  row: RowContext | undefined,
 ): JsonValue | undefined {
   if (!value || typeof value !== 'object') return undefined
   if (value.kind === 'literal') return value.value
   if (value.kind === 'ref') {
     if (typeof value.dataKey !== 'string') return undefined
+
+    /*
+     * `row` reads the enclosing row and nothing else. There is deliberately no
+     * fallback to the form when the row has no such field: once a name can mean
+     * either, no caller can tell which one it got, and the fix is always another
+     * flavour of path. An unreadable ref is `undefined`, like every other one.
+     */
+    if (value.scope === 'row') return row ? valueOf(row.values, value.dataKey) : undefined
+
     return valueOf(data, value.dataKey)
   }
   /*
@@ -104,8 +115,9 @@ export function evaluateCondition(
   condition: Condition,
   data: FormData,
   context?: FormContext,
+  row?: RowContext,
 ): boolean {
-  return evaluate(condition, data, context) ?? false
+  return evaluate(condition, data, context, row) ?? false
 }
 
 /**
@@ -125,10 +137,12 @@ function evaluate(
   condition: Condition,
   data: FormData,
   context: FormContext | undefined,
+  row: RowContext | undefined,
 ): boolean | undefined {
   if (!condition || typeof condition !== 'object') return undefined
 
-  const read = (value: Operand | undefined): JsonValue | undefined => operand(value, data, context)
+  const read = (value: Operand | undefined): JsonValue | undefined =>
+    operand(value, data, context, row)
 
   switch (condition.op) {
     case 'eq':
@@ -187,13 +201,15 @@ function evaluate(
     case 'and':
     case 'or': {
       if (!Array.isArray(condition.conditions)) return undefined
-      const answers = condition.conditions.map((inner) => evaluate(inner, data, context))
+      const answers = condition.conditions.map((inner) => evaluate(inner, data, context, row))
       if (answers.includes(undefined)) return undefined
       return condition.op === 'and' ? answers.every(Boolean) : answers.some(Boolean)
     }
 
     case 'not': {
-      const inner = condition.condition ? evaluate(condition.condition, data, context) : undefined
+      const inner = condition.condition
+        ? evaluate(condition.condition, data, context, row)
+        : undefined
       return inner === undefined ? undefined : !inner
     }
 

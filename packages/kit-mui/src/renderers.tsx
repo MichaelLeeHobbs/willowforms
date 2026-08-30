@@ -76,6 +76,50 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
   )
 }
 
+/*
+ * A step draws as a plain column. Everything that makes it a step is the
+ * condition on it, which core evaluates, so there is nothing here for a kit to
+ * decide beyond how a group of fields stacks up.
+ */
+/*
+ * A repeater draws the rows it was handed and nothing else. The renderer has
+ * already expanded them, so a kit never counts rows, never sees an index, and
+ * never learns what an address is.
+ */
+function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps): ReactNode {
+  const id = useId()
+  const messageId = id + '-message'
+  return (
+    <Stack {...nodeProps} direction="column" gap={num(props['gap'], 2)}>
+      {/*
+       * A repeater is data-bound: its value is the list, so a rule about the
+       * list is its own error, not any row's. "Add at least one address" has
+       * nowhere else to appear, which is why the kit contract's message
+       * obligation applies here like anywhere else.
+       */}
+      <Stack
+        direction="column"
+        gap={num(props['gap'], 2)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={messageId}
+      >
+        {children}
+      </Stack>
+      <FormHelperText id={messageId} error={Boolean(error)} {...(error ? { role: 'alert' } : {})}>
+        {error ?? ''}
+      </FormHelperText>
+    </Stack>
+  )
+}
+
+function StepNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  return (
+    <Stack {...nodeProps} direction="column" gap={num(props['gap'], 2)}>
+      {children}
+    </Stack>
+  )
+}
+
 function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
   const level = str(props['level'], 'h5') as Variant
   return (
@@ -605,6 +649,8 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack: StackNode,
+  Step: StepNode,
+  Repeater: RepeaterNode,
   Heading,
   TextField: TextFieldNode,
   NumberField: NumberFieldNode,

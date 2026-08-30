@@ -54,6 +54,58 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   )
 }
 
+/*
+ * A step draws as a plain column. Everything that makes it a step is the
+ * condition on it, which core evaluates, so there is nothing here for a kit to
+ * decide beyond how a group of fields stacks up.
+ */
+/*
+ * A repeater draws the rows it was handed and nothing else. The renderer has
+ * already expanded them, so a kit never counts rows, never sees an index, and
+ * never learns what an address is.
+ */
+function Repeater({ props, nodeProps, children, error }: NodeRendererProps): ReactNode {
+  const id = useId()
+  const messageId = id + '-message'
+  return (
+    <div {...nodeProps}>
+      {/*
+       * A repeater is data-bound: its value is the list, so a rule about the
+       * list is its own error, not any row's. "Add at least one address" has
+       * nowhere else to appear, which is why the kit contract's message
+       * obligation applies here like anywhere else.
+       */}
+      <div
+        className="fsh-stack"
+        style={{ flexDirection: 'column', gap: num(props['gap'], 16) }}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={messageId}
+      >
+        {children}
+      </div>
+      <p
+        id={messageId}
+        className={'fsh-field__message' + (error ? ' is-error' : '')}
+        {...(error ? { role: 'alert' } : {})}
+      >
+        {error ?? ''}
+      </p>
+    </div>
+  )
+}
+
+function Step({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+  return (
+    <div
+      {...nodeProps}
+      className="fsh-stack"
+      style={{ flexDirection: 'column', gap: num(props['gap'], 16) }}
+    >
+      {children}
+    </div>
+  )
+}
+
 const LEVELS: Level[] = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
 
 function isLevel(value: string): value is Level {
@@ -699,6 +751,8 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 const renderers: Record<string, NodeRenderer> = {
   Screen,
   Stack,
+  Step,
+  Repeater,
   Heading,
   TextField: TextFieldNode,
   NumberField: NumberFieldNode,

@@ -269,3 +269,228 @@ describe('the host context', () => {
     expect(evaluate).toHaveBeenCalledWith('ctx.user.role', {}, { user: { role: 'admin' } })
   })
 })
+
+describe('revealing what a condition hides', () => {
+  /*
+   * An authoring surface has to show a component a user would not see, or it
+   * cannot be arranged. The runtime must not, which is why this is a prop and
+   * not a default.
+   */
+  const conditional = (): FormDocument =>
+    documentOf([
+      field('always'),
+      {
+        ...field('sometimes'),
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'consent' } },
+        },
+      },
+    ])
+
+  it('leaves it out by default, which is what a person filling in the form gets', () => {
+    render(<FormRenderer document={conditional()} kit={kit} data={{}} onChange={() => undefined} />)
+
+    expect(screen.getByLabelText('always')).toBeTruthy()
+    expect(screen.queryByLabelText('sometimes')).toBeNull()
+  })
+
+  it('draws it when asked, marked so the surface can tell it apart', () => {
+    const { container } = render(
+      <FormRenderer
+        document={conditional()}
+        kit={kit}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(screen.getByLabelText('sometimes')).toBeTruthy()
+    expect(
+      container.querySelector('[data-fs-key="sometimes"]')?.getAttribute('data-fs-hidden'),
+    ).toBe('true')
+  })
+
+  it('does not mark a component the condition actually shows', () => {
+    // Without this the attribute would say "hidden" for everything and the
+    // surface could not tell the two apart, which is the whole point of it.
+    const { container } = render(
+      <FormRenderer
+        document={conditional()}
+        kit={kit}
+        data={{ consent: true }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(
+      container.querySelector('[data-fs-key="sometimes"]')?.hasAttribute('data-fs-hidden'),
+    ).toBe(false)
+    expect(container.querySelector('[data-fs-key="always"]')?.hasAttribute('data-fs-hidden')).toBe(
+      false,
+    )
+  })
+
+  it('reveals a hidden container and everything under it', () => {
+    // Hiding a container hides its subtree, so revealing one has to reveal the
+    // subtree too or a conditional Stack is still an unreachable hole.
+    const doc = documentOf([
+      {
+        key: 'box',
+        type: 'Screen',
+        props: {},
+        renderWhen: { kind: 'static', value: false },
+        children: [field('buried')],
+      },
+    ])
+
+    render(
+      <FormRenderer document={doc} kit={kit} data={{}} revealHidden onChange={() => undefined} />,
+    )
+
+    expect(screen.getByLabelText('buried')).toBeTruthy()
+  })
+})
+
+describe('a repeater', () => {
+  const repeating = (): FormDocument =>
+    documentOf([
+      field('email'),
+      {
+        key: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [field('line1')],
+      },
+    ])
+
+  const twoRows = { email: 'a@b.co', addresses: [{ line1: 'one' }, { line1: 'two' }] }
+
+  it('draws its children once per row, with each row holding its own answer', () => {
+    render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+
+    const inputs = screen.getAllByLabelText('line1')
+    expect(inputs).toHaveLength(2)
+    expect(inputs[0]).toHaveProperty('value', 'one')
+    expect(inputs[1]).toHaveProperty('value', 'two')
+  })
+
+  it('draws nothing for a value that is not a list', () => {
+    // Rows come out of the data, and a document is data, so a repeater whose
+    // value is a string has no rows rather than throwing at the person filling
+    // in the form.
+    render(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={{ addresses: 'nonsense' }}
+        onChange={() => undefined}
+      />,
+    )
+    expect(screen.queryByLabelText('line1')).toBeNull()
+  })
+
+  it('marks which row an element is in', () => {
+    const { container } = render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+
+    const rows = [...container.querySelectorAll('[data-fs-key="line1"]')].map((el) =>
+      el.getAttribute('data-fs-row'),
+    )
+    expect(rows).toEqual(['addresses[0]', 'addresses[1]'])
+    // Absent outside a repeater, so every existing selector is unchanged.
+    expect(container.querySelector('[data-fs-key="email"]')?.hasAttribute('data-fs-row')).toBe(
+      false,
+    )
+  })
+
+  it('reports a change at an address naming the row', () => {
+    /*
+     * The one real migration. Outside a repeater the address is the data key,
+     * byte-identical, so nothing breaks until a repeater exists — and then a
+     * bare `{...d, [key]: v}` writes a literal 'addresses[1].line1' property,
+     * which is visible in the first submit rather than silent.
+     */
+    const onChange = vi.fn()
+    render(<FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={onChange} />)
+
+    fireEvent.change(screen.getAllByLabelText('line1')[1] as HTMLElement, {
+      target: { value: 'edited' },
+    })
+
+    expect(onChange).toHaveBeenCalledWith('addresses[1].line1', 'edited')
+  })
+
+  it('gives each row its own error', () => {
+    const { container } = render(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={twoRows}
+        errors={{ 'addresses[1].line1': 'Wrong.' }}
+        onChange={() => undefined}
+      />,
+    )
+
+    const messages = [...container.querySelectorAll('[data-testid="line1-error"]')].map(
+      (el) => el.textContent,
+    )
+    expect(messages).toEqual(['', 'Wrong.'])
+  })
+})
+
+describe('a repeater on an authoring surface', () => {
+  const empty = (): FormDocument =>
+    documentOf([
+      {
+        key: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [field('line1')],
+      },
+    ])
+
+  it('draws nothing for a person filling in the form', () => {
+    render(<FormRenderer document={empty()} kit={kit} data={{}} onChange={() => undefined} />)
+    expect(screen.queryByLabelText('line1')).toBeNull()
+  })
+
+  it('draws one row while editing, so the subtree can be reached', () => {
+    /*
+     * The canvas renders with empty data, so without this a repeater's children
+     * never render: the authored subtree would be invisible and nothing could
+     * be dropped into it. Exactly the hole `revealHidden` closed for a
+     * conditional component, so it is the same flag.
+     */
+    render(
+      <FormRenderer
+        document={empty()}
+        kit={kit}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    expect(screen.getAllByLabelText('line1')).toHaveLength(1)
+  })
+
+  it('does not invent a row when there is real data to draw', () => {
+    render(
+      <FormRenderer
+        document={empty()}
+        kit={kit}
+        data={{ addresses: [{ line1: 'a' }, { line1: 'b' }] }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    expect(screen.getAllByLabelText('line1')).toHaveLength(2)
+  })
+})

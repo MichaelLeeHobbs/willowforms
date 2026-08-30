@@ -107,11 +107,70 @@ export const test = base.extend<{ designer: Designer }>({
 })
 
 /**
+ * Measure an element only once it has stopped moving.
+ *
+ * `boundingBox()` waits for an element to be attached and visible but not for it
+ * to be still; stability is part of Playwright's actionability and a bare
+ * measurement does not get it. That matters here because `dragOnto` now scrolls
+ * before it measures, and a scroll takes frames to land.
+ *
+ * Two consecutive equal readings, the same definition of stable actionability
+ * uses. It does not scroll anything itself: the caller has to finish all its
+ * scrolling before any measuring starts, for the reason given there.
+ */
+export async function stableBox(
+  target: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  let previous = await target.boundingBox()
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await target
+      .page()
+      .evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+    const current = await target.boundingBox()
+    if (
+      previous &&
+      current &&
+      previous.x === current.x &&
+      previous.y === current.y &&
+      previous.width === current.width &&
+      previous.height === current.height
+    ) {
+      return current
+    }
+    previous = current
+  }
+
+  throw new Error(
+    previous
+      ? 'An element never stopped moving, so it cannot be dragged reliably.'
+      : 'Cannot drag something that is not on screen.',
+  )
+}
+
+/**
  * Drag one element onto another with real mouse events.
  *
  * Steps through intermediate positions rather than jumping: the drag controller
  * needs a move to cross its threshold, and the drop zones measure on the moves
  * that follow. A single jump is not a gesture any user performs.
+ *
+ * The source is scrolled into view first; the target deliberately is not.
+ *
+ * `boundingBox()` reports page coordinates whether or not the element is on
+ * screen, so a palette entry below the fold yields a perfectly plausible box
+ * that `mouse.down()` then presses at a point outside the window, turning the
+ * whole gesture into a text selection across the canvas. That is what took out
+ * the palette drag: the Step and Repeater entries this branch adds made the
+ * Layout group a row taller, which pushed Selection past the bottom of a 720px
+ * viewport. Linux CI renders it just tall enough; Windows does not, which is why
+ * it failed every CI run and passed every local one.
+ *
+ * The target needs no such help, and giving it some actively breaks things. A
+ * press has to land on the source, but the target is only ever approached by
+ * moving the mouse, which the drag controller already handles. Scrolling it
+ * moves whatever was measured before it and pushes the source off screen when
+ * both live in the canvas: that failed two passing canvas drags twice here, once
+ * by measuring before scrolling and once by scrolling both.
  */
 export async function dragOnto(
   page: Page,
@@ -119,9 +178,10 @@ export async function dragOnto(
   to: Locator,
   where: 'top' | 'middle' | 'bottom' = 'middle',
 ): Promise<void> {
-  const start = await from.boundingBox()
-  const end = await to.boundingBox()
-  if (!start || !end) throw new Error('Cannot drag something that is not on screen.')
+  await from.scrollIntoViewIfNeeded()
+
+  const start = await stableBox(from)
+  const end = await stableBox(to)
 
   const targetY =
     where === 'top'

@@ -1,6 +1,6 @@
 ---
 name: write-tests
-description: Write or fix a test in Formsmith without writing one that passes while proving nothing — vacuous assertions, tests that encode the bug, green from two cancelling faults, unscoped queries, fixtures the product never produces, geometry checked where there is no layout. Use whenever authoring a test, changing one, or asking whether a green suite actually means anything.
+description: Write or fix a test in Formsmith without writing one that passes while proving nothing — vacuous assertions, tests that encode the bug, green from two cancelling faults, unscoped queries, fixtures the product never produces, fixtures whose two names are the same string so the branch under test is invisible, geometry or browser behaviour checked in jsdom, guards that name a DOM scope the DOM has since moved, and positional tests that pass only because the fixture happens to fit on screen. Use whenever authoring a test, changing one, or asking whether a green suite actually means anything.
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write
 ---
 
@@ -114,6 +114,15 @@ toolbar, which made three working buttons read as dead.
 **Rule:** positional and event-capture behaviour goes in `e2e/`. Unit-test the arithmetic on
 fixture rectangles — `dnd.ts` takes measured rects and touches no DOM precisely so it can be.
 
+**And it is not only the layout engine.** jsdom's CSS parser is stricter than a browser's: it
+rejects `image-set()`, `data:` URLs and `!important` that Chromium accepts. So a test asserting
+"the browser refuses this value" passes in jsdom for values a browser takes. That was measured
+while checking whether a React `style` object stops a CSS injection — it does, but jsdom also
+"stopped" three legitimate values, so the instrument agreed with the answer for the wrong
+reason. **Any assertion about what a browser accepts or rejects — CSS values, URL parsing,
+`inert`, a `<dialog>`'s Escape handling — belongs in `e2e/`.** jsdom implements a subset, and
+a subset is exactly the shape that makes a security test pass while the browser stays open.
+
 ## Trap 7 — a suite that never runs the rule it states
 
 `02-kit-contract.md` listed accessibility obligations every kit "must" satisfy. Nothing
@@ -157,16 +166,76 @@ arrived as `1821`, and a multi-line list could not be entered at all.
 value it last saw changes. `KeyField` and `JsonEditor` are the shape; test that a newline, a
 partial edit and an undo all survive.
 
+## Trap 11 — a fixture that collapses the distinction under test
+
+Every repeater fixture in the repository sets `key` and `dataKey` to the same string. So the
+row-addressing design and its opposite produce **byte-identical output across all 911 unit tests
+and 65 end-to-end tests** — a patched build of the alternative design was run and the whole suite
+stayed green. The suite could not have caught the defect that prompted the question: a repeater
+whose two names differ silently discards every keystroke in its rows.
+
+This is not Trap 5. The fixture is one the product builds readily — the Data key editor is
+offered on any node with a schema, and a `Repeater` has one. It is producible, it is realistic,
+and it is useless, because the two names it should have kept apart are the same string.
+
+**Rule:** when a test covers code that distinguishes two things, the fixture has to make them
+different. Ask what the code branches on — a key against a data key, a node against its row, a
+default against an override — and build the fixture so that branch is observable. If you can
+swap the two and the test still passes, the test is not about them.
+
+## Trap 12 — the guard that checks the wrong ancestor
+
+`designer.css.test.ts` enforces invariant 3 by testing whether a selector reaches past
+`.fs-shell` or `.fs-canvas__surface`. The form is rendered inside `.fs-canvas__frame`, one level
+below the surface. So `.fs-canvas__frame input { padding: 5px 8px }` — the exact rule that broke
+MUI's notched outline and caused the invariant to be written — contains neither base string, and
+all four assertions stay green.
+
+The guard was correct when the DOM had one fewer wrapper. Nothing failed when the wrapper was
+added, because a guard that names its scopes as strings cannot notice that the scopes moved.
+
+**Rule:** a guard written against a DOM shape has to be re-derived when the shape changes, and
+the cheapest way to force that is to make it fail loudly on an unknown ancestor rather than pass
+quietly. Break the guard the way the original incident broke the code — not a variant of it, the
+same rule at the same place — and watch it go red.
+
+---
+
+## Trap 13 — a test that passes because the fixture happens to fit on screen
+
+`canvas.spec.ts` drags Checkbox out of the palette. Adding Step and Repeater made the Layout group
+one row taller, which pushed the Selection group past the bottom of a 720px viewport. Linux renders
+that list just tall enough to clip it and Windows does not, so the test failed every CI run and
+passed every local one, including three on demand.
+
+Nothing reported a missing element. `boundingBox()` returns page coordinates whether or not the
+element is on screen, so an off-screen palette entry hands back a perfectly plausible rectangle,
+`mouse.down()` presses a point outside the window, and the gesture becomes a text selection across
+the canvas. The assertion then fails on the document, several steps downstream of the actual cause.
+
+The failure looks exactly like flake, and it is not: it is deterministic per platform. Two
+plausible fixes went in and were refuted by CI before the screenshot settled it — the first blamed
+a race against React's commit, the second bounding-box stability. Both are real phenomena. Neither
+was this.
+
+**Rule:** a positional test depends on its fixture fitting in the viewport, and nothing enforces
+that. Scroll the element you are about to press into view rather than trusting it is there. When a
+browser test fails only on CI, read the screenshot before theorising: it is in the artifact, it
+takes a minute, and it outranks any story about timing. Retrying a test whose real cause is layout
+just buys the same failure twice.
+
 ---
 
 ## Before you open the PR
 
 - [ ] **Break the fix and watch the right test fail.** Not the suite — the specific test that
       names the behaviour. This is the only step that distinguishes a test from a comment.
-- [ ] **Run `pnpm e2e` too.** 58 of these checks are the only ones that see layout, real event
+- [ ] **Run `pnpm e2e` too.** 65 of these checks are the only ones that see layout, real event
       capture, and focus. jsdom will not tell you.
 - [ ] **Check the counts.** `pnpm test` and `pnpm e2e` totals appear in `README.md`,
       `CLAUDE.md` and `docs/ROADMAP.md`, and `test/docs.test.ts` compares them.
 - [ ] Grep your diff for the tells: an assertion that would hold with the feature removed, a
       `getBy*` with no scope, a fixture literal where a factory exists, a `getBoundingClientRect`
-      in a `.test.ts`, a new "must" in the spec with no test behind it.
+      in a `.test.ts`, a new "must" in the spec with no test behind it, a fixture whose two names
+      are the same string, any claim about what a browser accepts asserted in jsdom, and a
+      `boundingBox()` on something nothing scrolled into view.

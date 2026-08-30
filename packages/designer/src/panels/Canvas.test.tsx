@@ -20,7 +20,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import type { FormDocument, Kit, PropValue } from '@formsmith/core'
+import type { ComponentNode, FormDocument, Kit, PropValue } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
@@ -31,7 +31,7 @@ function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
   return <div {...nodeProps}>{children}</div>
 }
 
-function Field({ nodeProps, props, value, onChange }: NodeRendererProps): ReactNode {
+function Field({ nodeProps, props, value, error, onChange }: NodeRendererProps): ReactNode {
   const label = typeof props['label'] === 'string' ? props['label'] : ''
   // A wrapper with the input nested inside it, so a click lands on a descendant
   // of the element carrying data-fs-key rather than on the element itself.
@@ -44,6 +44,12 @@ function Field({ nodeProps, props, value, onChange }: NodeRendererProps): ReactN
           onChange={(e) => onChange(e.target.value)}
         />
       </label>
+      {/*
+       * Displaying the error is a kit obligation, so the fixture has to do it
+       * too. It did not, which is why nothing here noticed the canvas computing
+       * errors without the context it hands the renderer.
+       */}
+      <span data-testid={nodeProps['data-fs-key'] + '-error'}>{error ?? ''}</span>
     </div>
   )
 }
@@ -377,5 +383,166 @@ describe('release handling', () => {
       await user.pointer([{ target: from, keys: '[/MouseLeft]' }])
       expect(view.container.querySelector('.fs-drag-label')).toBeNull()
     }
+  })
+})
+
+describe('a component a condition hides', () => {
+  /*
+   * Shipped broken. The canvas renders through the same FormRenderer as
+   * preview, with `data` that starts empty, and edit mode swallows pointer
+   * events so a click selects rather than types. Nothing on the canvas can ever
+   * satisfy a condition, so a component with `renderWhen` set was absent from
+   * the DOM entirely: not visible, not selectable there, and skipped by
+   * `measureTree` so nothing could be dropped into it.
+   *
+   * The tests already knew half of this — `keys()` above reads the tree rather
+   * than the canvas because "a node hidden by renderWhen is a row here and no
+   * element there" — written as a caution about testing, without anyone noticing
+   * it described an authoring hole.
+   */
+  const conditional = (): FormDocument => {
+    const doc = makeDocument()
+    doc.root.children![1]!.renderWhen = {
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'consent' } },
+    }
+    return doc
+  }
+
+  const open = (): ReturnType<typeof render> =>
+    render(<Designer initialDocument={conditional()} kit={kit} rendererKit={rendererKit} />)
+
+  it('is on the canvas while editing, so it can be seen and arranged', () => {
+    const view = open()
+    const element = view.container.querySelector('[data-fs-key="second"]')
+
+    expect(element).not.toBeNull()
+    expect(element?.getAttribute('data-fs-hidden')).toBe('true')
+  })
+
+  it('is selectable on the canvas, not only through the tree', async () => {
+    const user = userEvent.setup()
+    const view = open()
+    const element = view.container.querySelector<HTMLElement>('[data-fs-key="second"]')
+
+    await user.click(element!)
+
+    expect(view.container.querySelector('.fs-selection--active')).not.toBeNull()
+    // The properties panel is the observable proof that the store selection moved.
+    expect(screen.getByDisplayValue('Second')).toBeTruthy()
+  })
+
+  it('leaves the canvas in preview, which is what a user would see', () => {
+    const view = open()
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+    expect(view.container.querySelector('[data-fs-key="second"]')).toBeNull()
+    expect(view.container.querySelector('[data-fs-key="first"]')).not.toBeNull()
+  })
+
+  it('marks only the component the condition hides', () => {
+    const view = open()
+
+    expect(
+      view.container.querySelector('[data-fs-key="first"]')?.hasAttribute('data-fs-hidden'),
+    ).toBe(false)
+  })
+})
+
+describe('a document with steps', () => {
+  /*
+   * A step is a container shown when `context.step` equals its own name. The
+   * canvas has to supply that context or preview shows an empty form and the
+   * author cannot check their own wizard.
+   */
+  const stepped = (): FormDocument => {
+    const doc = makeDocument()
+    const step = (name: string, child: ComponentNode): ComponentNode => ({
+      key: 'step-' + name,
+      type: 'Screen',
+      props: {},
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: name },
+        },
+      },
+      children: [child],
+    })
+    doc.root.children = [
+      step('one', {
+        key: 'first',
+        type: 'Field',
+        props: { label: staticProp('First') },
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      }),
+      step('two', { key: 'second', type: 'Field', props: { label: staticProp('Second') } }),
+    ]
+    return doc
+  }
+
+  const open = (): ReturnType<typeof render> =>
+    render(<Designer initialDocument={stepped()} kit={kit} rendererKit={rendererKit} />)
+
+  it('offers a switcher naming the steps the document declares', () => {
+    open()
+    const select = screen.getByLabelText('Step')
+
+    expect([...select.querySelectorAll('option')].map((o) => o.value)).toEqual(['one', 'two'])
+  })
+
+  it('shows no switcher for a form that declares no steps', () => {
+    // It reads the flow out of the document, so an ordinary form gets nothing.
+    render(<Designer initialDocument={makeDocument()} kit={kit} rendererKit={rendererKit} />)
+
+    expect(screen.queryByLabelText('Step')).toBeNull()
+  })
+
+  it('previews the chosen step, which needs the canvas to supply the context', async () => {
+    const user = userEvent.setup()
+    const view = open()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(view.container.querySelector('[data-fs-key="step-one"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-fs-key="step-two"]')).toBeNull()
+
+    await user.selectOptions(screen.getByLabelText('Step'), 'two')
+
+    expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-fs-key="step-one"]')).toBeNull()
+  })
+
+  it('validates the step preview is showing, rather than treating it as hidden', async () => {
+    /*
+     * The canvas gives the renderer a context and has to give validateForm the
+     * same one. Without it the renderer draws step one while validateForm calls
+     * it hidden and reports nothing, so Validate on an empty required field
+     * comes back clean. That is the disagreement isVisible exists to prevent,
+     * arriving through an argument list rather than a second code path.
+     */
+    const user = userEvent.setup()
+    const view = open()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(view.container.querySelector('[data-fs-key="first"]')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Validate' }))
+
+    expect(view.container.querySelector('[data-testid="first-error"]')?.textContent).toBe(
+      'This field is required.',
+    )
+  })
+
+  it('shows every step while editing, so all of them can be arranged', () => {
+    // Editing reveals what a condition hides, so a step the author is not
+    // previewing is still there to drop into.
+    const view = open()
+
+    expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
+    expect(
+      view.container.querySelector('[data-fs-key="step-two"]')?.getAttribute('data-fs-hidden'),
+    ).toBe('true')
   })
 })

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import type { Device, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
-import { autoValidateKeys, findParent, indexKit, validateForm } from '@formsmith/core'
+import type { Device, FormContext, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
+import {
+  autoValidateKeys,
+  contextValues,
+  findParent,
+  indexKit,
+  validateForm,
+} from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -86,6 +92,35 @@ export function Canvas({
   language,
 }: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
+
+  /*
+   * The steps this document declares, read out of it rather than configured.
+   *
+   * A step is a container shown when `context.step` equals its own name, so the
+   * names the document compares that path against are the flow. Empty for a
+   * form with no steps, which is why the switcher only appears when there is
+   * something to switch between.
+   */
+  const steps = useMemo(
+    () =>
+      contextValues(api.document.root, 'step').filter(
+        (name): name is string => typeof name === 'string',
+      ),
+    [api.document.root],
+  )
+  const [step, setStep] = useState<string | undefined>(undefined)
+
+  /*
+   * The canvas supplies the context, or a form whose visibility depends on the
+   * host renders as nothing in preview and the author cannot check their work.
+   * Only `step` for now: the rest of a host's context is not knowable here, and
+   * inventing values would be worse than showing none.
+   */
+  const current = step !== undefined && steps.includes(step) ? step : steps[0]
+  const context = useMemo<FormContext | undefined>(
+    () => (current === undefined ? undefined : { step: current }),
+    [current],
+  )
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
   /** Fields the user has changed. A field validates while typing only after it is touched. */
@@ -144,7 +179,14 @@ export function Canvas({
    * meant doing that on every keystroke in preview.
    */
   const errors = useMemo(() => {
-    const all = validateForm(api.document.root, data)
+    /*
+     * The same context the renderer was given, or the two disagree about what
+     * is on screen — which is the bug `isVisible` exists to prevent, arriving
+     * through an argument list. Preview draws the current step, so validating
+     * without the context would treat that step as hidden and report nothing:
+     * Validate on an empty required field would come back clean.
+     */
+    const all = validateForm(api.document.root, data, context ? { context } : {})
     if (validated) return all
 
     /*
@@ -161,7 +203,7 @@ export function Canvas({
       shown[key] = all[key] as string
     }
     return shown ?? NO_ERRORS
-  }, [validated, api.document.root, data, touched])
+  }, [validated, api.document.root, data, touched, context])
 
   const onChange = useCallback((key: string, value: JsonValue) => {
     setData((d) => ({ ...d, [key]: value }))
@@ -302,6 +344,19 @@ export function Canvas({
           {preview ? 'Back to editing' : 'Preview'}
         </button>
 
+        {steps.length > 1 && (
+          <label className="fs-canvas__step">
+            Step
+            <select value={current ?? ''} onChange={(e) => setStep(e.target.value)}>
+              {steps.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         {preview && (
           <>
             <button type="button" onClick={() => setValidated(true)}>
@@ -353,11 +408,27 @@ export function Canvas({
           data-fs-viewport={viewport}
           style={frameWidth === undefined ? undefined : { width: frameWidth }}
         >
+          {/*
+           * `revealHidden` while editing, never in preview.
+           *
+           * The canvas renders with empty data and swallows pointer events so a
+           * click selects rather than types, so nothing here can ever satisfy a
+           * condition. A component with `renderWhen` set was therefore absent
+           * from the DOM: invisible, unselectable on the canvas, and skipped by
+           * `measureTree`, so nothing could be dropped into it either. The tree
+           * was the only way to reach it.
+           *
+           * Arranging a form means arranging every component in it, including
+           * the ones a given user will not see. Showing what a user sees is
+           * what Preview is for, and Preview still hides them.
+           */}
           <FormRenderer
             document={api.document}
             kit={rendererKit}
             data={data}
             errors={errors}
+            revealHidden={editing}
+            {...(context ? { context } : {})}
             onChange={onChange}
             {...(language ? { language } : {})}
             {...(viewport ? { device: viewport } : {})}

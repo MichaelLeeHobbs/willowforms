@@ -46,5 +46,8 @@ export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNo
   if (def.container) node.children = []
   if (def.dataBound) node.schema = { type: def.dataType ?? 'string', validations: [] }
 
+  // After the key, because a rule that names the node needs one to name.
+  if (def.defaultRenderWhen) node.renderWhen = def.defaultRenderWhen(node.key)
+
   return node
 }

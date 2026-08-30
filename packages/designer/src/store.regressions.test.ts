@@ -158,13 +158,42 @@ describe('renameKey', () => {
     expect(result.current.selectedKey).toBe('email')
   })
 
+  it('refuses a key the grammar does not allow, with the reason', () => {
+    /*
+     * The same rule `validateDocument` applies to a pasted document, so the
+     * panel cannot create a key a paste would be told off for. A hyphen is the
+     * one an author will actually try, and it is refused because a `computed`
+     * expression is JavaScript, where `first-name` is a subtraction.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+    let outcome: ReturnType<typeof result.current.renameKey> | undefined
+    act(() => {
+      outcome = result.current.renameKey('email', 'first-name')
+    })
+
+    expect(outcome?.ok).toBe(false)
+    expect(outcome?.ok === false && outcome.reason).toContain('subtraction')
+    // Refused means unchanged, not silently renamed to something legal.
+    expect(result.current.document.root.children?.some((c) => c.key === 'email')).toBe(true)
+  })
+
+  it('refuses __proto__, which passes the grammar and still must not be used', () => {
+    const { result } = renderHook(() => useDesigner(doc()))
+    let outcome: ReturnType<typeof result.current.renameKey> | undefined
+    act(() => {
+      outcome = result.current.renameKey('email', '__proto__')
+    })
+
+    expect(outcome?.ok).toBe(false)
+  })
+
   it('refuses an empty key with a reason', () => {
     const { result } = renderHook(() => useDesigner(doc()))
     let outcome: ReturnType<typeof result.current.renameKey> | undefined
     act(() => {
       outcome = result.current.renameKey('email', '   ')
     })
-    expect(outcome).toEqual({ ok: false, reason: 'A component key cannot be empty.' })
+    expect(outcome).toEqual({ ok: false, reason: 'A key cannot be empty.' })
   })
 
   it('pushes no history entry for a refused rename', () => {

@@ -62,7 +62,23 @@ export type Condition =
  */
 export type Operand =
   | { kind: 'literal'; value: JsonValue }
-  | { kind: 'ref'; dataKey: string }
+  | {
+      kind: 'ref'
+      dataKey: string
+      /**
+       * Which answer this names when it is evaluated inside a repeater's row.
+       *
+       * `form` reads the top level and `row` reads the enclosing row. Absent
+       * means `form`, which is what every `ref` written before repeaters existed
+       * already meant, so no document has to change.
+       *
+       * A discriminant rather than a path grammar in the document. Once a name
+       * could mean either, something has to decide which, and every mechanism
+       * for deciding reads plausibly and tests something else — which is how a
+       * library ends up with eight flavours of path per component.
+       */
+      scope?: 'form' | 'row'
+    }
   | { kind: 'context'; path: string }
 
 export interface ActionRef {

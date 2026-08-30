@@ -149,11 +149,20 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         const node = instantiate(def, root ?? { key: 'r', type: 'r', props: {} })
         node.key = 'target'
 
+        /*
+         * `revealHidden`, because this asks whether the renderer spreads
+         * nodeProps, which has nothing to do with whether a condition shows the
+         * node. A kit may ship a component that is conditional the moment it is
+         * dropped — `Step` is one, hidden until `context.step` names it — and
+         * without this the contract would be unsatisfiable for that whole class
+         * of component rather than merely unmet.
+         */
         const { container: dom } = render(
           <FormRenderer
             document={documentOf(node)}
             kit={renderers}
             data={{}}
+            revealHidden
             onChange={() => undefined}
           />,
         )
@@ -185,6 +194,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
             document={documentOf(node)}
             kit={renderers}
             data={{}}
+            revealHidden
             onChange={() => undefined}
           />,
         )
@@ -410,5 +420,26 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
 
   it('builds a palette index without collisions', () => {
     expect(indexKit(kit).size).toBe(kit.components.length)
+  })
+})
+
+describe('a default copied between kits', () => {
+  /*
+   * There is no general rule here to check: MUI's `gap` is a spacing-scale
+   * multiplier and the HTML kit's is pixels, so 16 is right in one and 128
+   * pixels in the other, and MUI's `Grid` legitimately uses pixels because its
+   * renderer converts them.
+   *
+   * What is checkable is narrower and is the mistake that actually happened.
+   * `Step` renders as a `Stack` in both kits — same element, same pass-through
+   * of `gap` — so the two must agree within a kit. `Step` arrived carrying the
+   * HTML kit's 16 into MUI, where it is 128 pixels.
+   */
+  it.each(KITS)('$name gives Step the same gap as the Stack it renders as', ({ kit }) => {
+    const gapOf = (type: string): unknown =>
+      kit.components.find((def) => def.type === type)?.defaultProps['gap']
+
+    expect(gapOf('Step'), 'Step has no gap default').toBeTypeOf('number')
+    expect(gapOf('Step')).toBe(gapOf('Stack'))
   })
 })

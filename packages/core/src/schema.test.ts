@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { createDocument } from './factory.js'
 import { toJsonSchema, unexportableRules } from './schema.js'
 import type { ComponentNode, FormDocument, ValidationRule } from './types.js'
 
@@ -201,5 +202,85 @@ describe('dataKey in the export', () => {
     const schema = toJsonSchema(doc([a, b]))
 
     expect(Object.keys(schema.properties)).toEqual(['email'])
+  })
+})
+
+describe('a repeater in the exported schema', () => {
+  /*
+   * Repetition is cardinality, and cardinality is the one structural thing JSON
+   * Schema expresses natively. The flat projection named a repeater's fields at
+   * the top level, so a server validating a real payload against the export
+   * would have rejected every submission — silently, because the export looked
+   * perfectly well-formed.
+   */
+  const doc = (): FormDocument => ({
+    ...createDocument('Order', 'order'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'email',
+          type: 'TextField',
+          props: {},
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+        },
+        {
+          key: 'lines',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [{ key: 'minLength', value: 1 }] },
+          children: [
+            {
+              key: 'sku',
+              type: 'TextField',
+              props: {},
+              schema: { type: 'string', validations: [{ key: 'required' }] },
+            },
+            {
+              key: 'qty',
+              type: 'NumberField',
+              props: {},
+              schema: { type: 'number', validations: [] },
+            },
+          ],
+        },
+      ],
+    },
+  })
+
+  it('nests the row shape under items', () => {
+    const schema = toJsonSchema(doc())
+    expect(schema.properties['lines']).toEqual({
+      type: 'array',
+      minLength: 1,
+      items: {
+        type: 'object',
+        properties: { sku: { type: 'string' }, qty: { type: 'number' } },
+        required: ['sku'],
+      },
+    })
+  })
+
+  it('keeps a row field out of the document properties', () => {
+    // The bug this replaces: `sku` sitting at the top level, where no real
+    // payload has it.
+    const schema = toJsonSchema(doc())
+    expect(Object.keys(schema.properties)).toEqual(['email', 'lines'])
+  })
+
+  it('requires a row field of each row, not of the payload', () => {
+    const schema = toJsonSchema(doc())
+    expect(schema.required).toEqual(['email'])
+    expect(schema.properties['lines']?.items?.required).toEqual(['sku'])
+  })
+
+  it('leaves a form with no repeater exactly as it was', () => {
+    const plain = doc()
+    plain.root.children = [plain.root.children?.[0] as never]
+    const schema = toJsonSchema(plain)
+    expect(schema.properties).toEqual({ email: { type: 'string' } })
+    expect(schema.required).toEqual(['email'])
   })
 })

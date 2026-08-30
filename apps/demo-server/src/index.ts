@@ -13,7 +13,7 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { FormContext, FormData, FormDocument } from '@formsmith/core'
-import { missingContext, validateDocument, validateForm } from '@formsmith/core'
+import { contextValues, missingContext, validateAcross, validateDocument } from '@formsmith/core'
 
 const STORE = new URL('../forms.json', import.meta.url)
 const PORT = Number(process.env['PORT'] ?? 5181)
@@ -90,13 +90,46 @@ app.post('/api/forms/:id/submit', async (c) => {
   if (!doc) return c.json({ error: 'Not found' }, 404)
 
   const context = contextFor()
-  const missing = missingContext(doc.root, context)
+
+  /*
+   * Every step, not the one the browser happens to be on.
+   *
+   * The steps come out of the document, never out of the request. Asking the
+   * browser which steps exist would let a client name one and have the rest go
+   * unchecked, and that failure is silent: the submit succeeds with required
+   * answers missing. A form with no steps yields no scopes, so it validates
+   * once, which is the ordinary case.
+   */
+  /*
+   * Strings only. A step is a name, and a document comparing the path against a
+   * number or an object is not naming one — running a scope per value would be
+   * work with nothing to find, and a hand-edited document could ask for a lot
+   * of it.
+   */
+  const steps = contextValues(doc.root, 'step').filter(
+    (step): step is string => typeof step === 'string',
+  )
+  const scopes = steps.length
+    ? steps.map((step) => ({ context: { ...context, step } }))
+    : [{ context }]
+
+  /*
+   * Checked against the contexts this will actually evaluate in, not against
+   * the bare session context.
+   *
+   * `step` is a path the server fills in itself, once per scope, so against the
+   * base context it reads as missing and every wizard is refused. The question
+   * the check is really asking is whether every path a document reads can be
+   * read under the environments it will be evaluated in, and that is what a
+   * scope is.
+   */
+  const missing = [...new Set(scopes.flatMap((scope) => missingContext(doc.root, scope.context)))]
   if (missing.length > 0) {
     return c.json({ error: 'This form reads context this server does not supply', missing }, 500)
   }
 
   const data = await c.req.json<FormData>()
-  const errors = validateForm(doc.root, data, { context })
+  const errors = validateAcross(doc.root, data, scopes)
   if (Object.keys(errors).length > 0) return c.json({ ok: false, errors }, 422)
 
   return c.json({ ok: true, received: data })
