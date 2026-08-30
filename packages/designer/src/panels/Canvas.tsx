@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { Device, FormContext, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
 import {
+  applyChange,
   autoValidateKeys,
+  decodeAddress,
   contextValues,
   findParent,
   indexKit,
@@ -195,19 +197,42 @@ export function Canvas({
      * it: showing "This field is required" on a field nobody has reached yet
      * is how a form greets someone with a wall of red.
      */
+    /*
+     * `autoValidateKeys` answers in node keys, because that is all a document
+     * can say — which row a field is in comes from the data. Errors are keyed by
+     * address, so comparing the two directly meant no field inside a repeater
+     * ever validated while typing: `addresses[1].street` is not `street`.
+     *
+     * The leaf of an address is the node key, so that is what is compared.
+     */
     const eager = autoValidateKeys(api.document.root)
     let shown: FormErrors | undefined
-    for (const key of Object.keys(all)) {
-      if (!eager.has(key) || !touched.has(key)) continue
+    for (const address of Object.keys(all)) {
+      const key = decodeAddress(address)?.name ?? address
+      if (!eager.has(key) || !touched.has(address)) continue
       shown ??= {}
-      shown[key] = all[key] as string
+      shown[address] = all[address] as string
     }
     return shown ?? NO_ERRORS
   }, [validated, api.document.root, data, touched, context])
 
-  const onChange = useCallback((key: string, value: JsonValue) => {
-    setData((d) => ({ ...d, [key]: value }))
-    setTouched((t) => (t.has(key) ? t : new Set(t).add(key)))
+  const onChange = useCallback((address: string, value: JsonValue) => {
+    /*
+     * `applyChange`, not a flat write.
+     *
+     * The renderer reports a change at an *address* — `addresses[1].line1`
+     * inside a repeater, and outside one the bare data key, byte-identical. A
+     * flat `{...d, [address]: value}` therefore worked everywhere until a
+     * repeater existed, and then wrote a literal `"addresses[1].line1"` property
+     * that the renderer never reads back: every keystroke in a row vanished as
+     * it was typed.
+     *
+     * Core ships `applyChange` as the writer a host uses in `onChange`, and it
+     * had no caller anywhere in this repository — including in the one host
+     * this repository ships.
+     */
+    setData((d) => applyChange(d, address, value))
+    setTouched((t) => (t.has(address) ? t : new Set(t).add(address)))
   }, [])
 
   const { select } = api

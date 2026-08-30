@@ -186,3 +186,35 @@ describe('a renderWhen this code cannot read', () => {
     expect(Object.keys(validateForm(root, {}))).toEqual(['a'])
   })
 })
+
+/**
+ * A host's evaluator is arbitrary JavaScript, and it can throw.
+ *
+ * `matchesPattern` two files over catches for exactly this, and its comment
+ * records the incident: an uncaught throw "took Preview down in the browser and
+ * surfaced as an unhandled 500 on the server". This called `options.evaluate`
+ * with nothing around it, so an author's half-written expression did the same
+ * thing from a different place.
+ */
+describe('an evaluator that throws', () => {
+  const boom: Evaluator = () => {
+    throw new Error('half-written expression')
+  }
+
+  const computed = (): ComponentNode => field('a', { kind: 'computed', expression: 'data.x.y' })
+
+  it('does not take the caller down', () => {
+    expect(() => isVisible(computed(), {}, { evaluate: boom })).not.toThrow()
+  })
+
+  it('reads as hidden, which is what no answer already means here', () => {
+    // The same answer a missing evaluator gets, one case up: this function
+    // agrees with what the renderer draws, and the renderer draws nothing.
+    expect(isVisible(computed(), {}, { evaluate: boom })).toBe(false)
+  })
+
+  it('still uses an evaluator that works', () => {
+    const evaluate: Evaluator = () => true
+    expect(isVisible(computed(), {}, { evaluate })).toBe(true)
+  })
+})

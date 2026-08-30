@@ -608,3 +608,105 @@ describe('a rule guard inside a repeater', () => {
     expect(validateDocument(withProp).map((e) => e.code)).toEqual(['row-scope'])
   })
 })
+
+/**
+ * The mirror of the quiet failure, which was skipped by design.
+ *
+ * A form-scoped ref to a key that only exists in a row is reported. The reverse
+ * — a `scope: 'row'` ref on a node that is not inside any repeater — was not,
+ * and it always reads nothing: `operand` answers `undefined` when there is no
+ * row, so the condition is false and the component is hidden forever.
+ *
+ * It is not a hypothetical. Dragging a conditional field out of a repeater
+ * produces exactly this, and nothing about the document looks wrong afterwards.
+ */
+describe('a row-scoped ref outside every row', () => {
+  const doc = (scope: 'form' | 'row'): FormDocument => ({
+    ...createDocument('Rows', 'rows'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'business',
+          type: 'Checkbox',
+          props: {},
+          schema: { type: 'boolean', validations: [] },
+        },
+        {
+          key: 'vat',
+          type: 'TextField',
+          props: {},
+          schema: { type: 'string', validations: [] },
+          renderWhen: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'business', scope } },
+          },
+        },
+      ],
+    },
+  })
+
+  it('is reported', () => {
+    const errors = validateDocument(doc('row'))
+
+    expect(errors.map((e) => e.code)).toEqual(['row-scope'])
+    expect(errors[0]?.key).toBe('vat')
+  })
+
+  it('says nothing about the same ref at form scope', () => {
+    // The control: at the top level, form scope is simply correct.
+    expect(validateDocument(doc('form'))).toEqual([])
+  })
+})
+
+/**
+ * How many rows a submitted body can ask to be validated.
+ *
+ * The row count comes out of the data, which is right — asking the browser
+ * would let a client submit one row and have the rest go unchecked. But it is
+ * the *request body* that decides how much work happens, with no cap, and rows
+ * nest multiplicatively.
+ */
+describe('validateForm and a body with too many rows', () => {
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          {
+            key: 'street',
+            dataKey: 'line1',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'required' }] },
+          },
+        ],
+      },
+    ],
+  }
+
+  it('validates a plausible number of rows', () => {
+    const data: FormData = { addresses: Array.from({ length: 200 }, () => ({})) }
+
+    expect(Object.keys(validateForm(root, data))).toHaveLength(200)
+  })
+
+  it('stops before a body can turn into unbounded work', () => {
+    const data: FormData = { addresses: Array.from({ length: 100_000 }, () => ({})) }
+    const errors = validateForm(root, data)
+
+    expect(Object.keys(errors).length).toBeLessThan(100_000)
+    // And says so, rather than quietly validating a prefix: a row nobody
+    // checked is the permissive failure this project is organised against.
+    expect(Object.values(errors).join(' ')).toContain('rows')
+  })
+})

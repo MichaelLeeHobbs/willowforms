@@ -310,3 +310,69 @@ describe('safeStyleValue', () => {
     expect(safeStyleValue(undefined)).toBeUndefined()
   })
 })
+
+/**
+ * A comment is a way out of a declaration too.
+ *
+ * `FORBIDDEN` covers `{`, `}`, `<` and `@` — everything that ends the block.
+ * It did not cover `/*`, which does not end the block so much as swallow it:
+ * `color: red /*` on one node and `*` + `/ ; outline: none` on another are
+ * concatenated into one stylesheet, and everything between them disappears
+ * inside the comment. A third node's rule is deleted, and one node's
+ * declaration lands under another node's selector.
+ *
+ * It cannot reach outside the form, so this is not the injection the value
+ * refusal is for. What it breaks is the sentence this file opens with: a
+ * component's styling affects that component.
+ */
+describe('safeDeclarations and comments', () => {
+  it('refuses an unterminated comment', () => {
+    expect(safeDeclarations('color: red /*')).toBeUndefined()
+  })
+
+  it('refuses a comment that closes, because the pair is what does the damage', () => {
+    // Refused as a set rather than balanced, for the reason the braces are:
+    // deciding which comment is safe invites an argument this does not need.
+    expect(safeDeclarations('color: red /* a note */')).toBeUndefined()
+    expect(safeDeclarations('*/ ; outline: none')).toBeUndefined()
+  })
+
+  it('keeps declarations that merely contain a slash or a star', () => {
+    // The control. Refusing either character alone would take out real values.
+    expect(safeDeclarations('font: 12px/1.5 sans-serif')).toBe('font: 12px/1.5 sans-serif')
+    expect(safeDeclarations('grid-area: 1 / 2 / 3 / 4')).toBe('grid-area: 1 / 2 / 3 / 4')
+  })
+})
+
+/**
+ * A custom property's name is case-sensitive; a CSS property's is not.
+ *
+ * `parseDeclarations` lowercased every name, and `setDeclaration` wrote the
+ * lowercased form back — so `--brandColor` became `--brandcolor` the first time
+ * any structured control was touched, and stopped matching the `var()` that
+ * read it. Silently: the declaration is still there and still valid.
+ */
+describe('declaration names and case', () => {
+  it('keeps a custom property spelled the way it was written', () => {
+    expect(parseDeclarations('--brandColor: red')).toEqual([['--brandColor', 'red']])
+  })
+
+  it('still matches an ordinary property however it was capitalised', () => {
+    // The control, and why the lowercasing was there: CSS property names are
+    // case-insensitive, and a control looking for `padding` has to find it.
+    expect(parseDeclarations('PADDING: 8px')).toEqual([['padding', '8px']])
+    expect(readDeclaration('Padding: 8px', 'padding')).toBe('8px')
+  })
+
+  it('does not rewrite a custom property when an unrelated control is used', () => {
+    const text = setDeclaration('--brandColor: red', 'padding', '8px')
+
+    expect(text).toContain('--brandColor: red')
+    expect(readDeclaration(text, '--brandColor')).toBe('red')
+  })
+
+  it('reads a custom property back only by its exact name', () => {
+    expect(readDeclaration('--brandColor: red', '--brandcolor')).toBe('')
+    expect(readDeclaration('--brandColor: red', '--brandColor')).toBe('red')
+  })
+})

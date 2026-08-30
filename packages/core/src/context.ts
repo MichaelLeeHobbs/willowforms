@@ -18,7 +18,6 @@
  */
 
 import { readPath } from './json.js'
-import { flatten } from './tree.js'
 import type {
   ComponentNode,
   Condition,
@@ -71,11 +70,29 @@ function fromPropValue(value: PropValue | undefined, out: Set<string>): void {
 export function contextKeys(root: ComponentNode): Set<string> {
   const keys = new Set<string>()
 
-  for (const { node } of flatten(root)) {
+  /*
+   * Walked here rather than through `flatten`, which assumes `children` is an
+   * array and throws when a document says otherwise. A host is told to call
+   * this at startup, which is before anything has had a chance to refuse the
+   * document — so throwing is the one thing it must not do.
+   */
+  const visit = (node: ComponentNode): void => {
+    if (!node || typeof node !== 'object') return
+
     fromPropValue(node.renderWhen, keys)
-    for (const value of Object.values(node.props ?? {})) fromPropValue(value, keys)
-    for (const rule of node.schema?.validations ?? []) fromPropValue(rule.when, keys)
+
+    const props =
+      node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+        ? Object.values(node.props)
+        : []
+    for (const value of props) fromPropValue(value, keys)
+
+    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+    for (const rule of rules) fromPropValue(rule?.when, keys)
+
+    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
   }
+  visit(root)
 
   return keys
 }
@@ -178,11 +195,26 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * An operator comparing a context path to a field contributes nothing, because
  * there is no name there to collect.
  */
+/**
+ * How many distinct values this will collect for one path.
+ *
+ * `contextValues(root, 'step')` is how a host discovers a form's steps, and the
+ * reference server runs one full validation pass per value it gets back. A
+ * hundred thousand distinct literals is a few seconds to author in the JSON
+ * editor and a hundred thousand passes to submit against.
+ *
+ * Far past any real flow: a wizard with more than a thousand steps is not a
+ * wizard. The `add` below also compares with `===`, so structurally equal object
+ * literals each count, and a document can reach the cap faster than the number
+ * suggests — which is an argument for the cap rather than against it.
+ */
+const MAX_CONTEXT_VALUES = 1000
+
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
   const seen: JsonValue[] = []
 
   const add = (value: JsonValue | undefined): void => {
-    if (value === undefined) return
+    if (value === undefined || seen.length >= MAX_CONTEXT_VALUES) return
     if (!seen.some((held) => held === value)) seen.push(value)
   }
 
@@ -215,14 +247,32 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
     visit(shape['condition'] as Condition | undefined)
   }
 
-  for (const { node } of flatten(root)) {
+  /*
+   * The same defensive walk `contextKeys` does, and for the same reason: this is
+   * called at a host's startup, before anything has refused the document, so
+   * `flatten` assuming `children` is an array is an assumption it cannot make.
+   */
+  const walkNode = (node: ComponentNode): void => {
+    if (!node || typeof node !== 'object') return
+
     const collect = (value: PropValue | undefined): void => {
       if (value && typeof value === 'object' && value.kind === 'condition') visit(value.condition)
     }
+
     collect(node.renderWhen)
-    for (const value of Object.values(node.props ?? {})) collect(value)
-    for (const rule of node.schema?.validations ?? []) collect(rule.when)
+
+    const props =
+      node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+        ? Object.values(node.props)
+        : []
+    for (const value of props) collect(value)
+
+    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+    for (const rule of rules) collect(rule?.when)
+
+    for (const child of Array.isArray(node.children) ? node.children : []) walkNode(child)
   }
+  walkNode(root)
 
   return seen
 }

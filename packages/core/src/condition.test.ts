@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { evaluateCondition } from './condition.js'
-import type { Condition, FormData, Operand } from './types.js'
+import type { Condition, FormData, JsonValue, Operand } from './types.js'
 
 const data: FormData = {
   country: 'GB',
@@ -401,5 +401,58 @@ describe('a malformed operand', () => {
         {},
       ),
     ).toBe(false)
+  })
+})
+
+/**
+ * A condition nested deeper than anything can walk.
+ *
+ * `evaluate` and `same` both recurse with no bound, in a function whose whole
+ * contract is that it is total. A document is data, so the nesting is whatever
+ * somebody stored — and a `RangeError` out of `isVisible` is an unhandled 500 on
+ * submit and a blank form in the browser, which is the one outcome "total"
+ * exists to rule out.
+ */
+describe('a condition nested beyond any reasonable depth', () => {
+  /** `not(not(not(…)))`, n deep. */
+  const deep = (n: number): Condition => {
+    let condition: Condition = { op: 'truthy', value: { kind: 'literal', value: true } }
+    for (let i = 0; i < n; i += 1) condition = { op: 'not', condition }
+    return condition
+  }
+
+  it('answers rather than throwing', () => {
+    expect(() => evaluateCondition(deep(50_000), {})).not.toThrow()
+  })
+
+  it('answers false, because it could not read it', () => {
+    // The same answer every unreadable condition gets, and for the same reason:
+    // hidden is what this project says about a rule it cannot evaluate.
+    expect(evaluateCondition(deep(50_000), {})).toBe(false)
+  })
+
+  it('still evaluates a condition a person would write', () => {
+    // The control. A limit low enough to catch real authoring would be worse
+    // than the crash: it would silently hide components.
+    expect(evaluateCondition(deep(20), {})).toBe(true)
+  })
+
+  it('does not throw comparing deeply nested values either', () => {
+    const nest = (n: number): JsonValue => {
+      let value: JsonValue = 1
+      for (let i = 0; i < n; i += 1) value = { inner: value }
+      return value
+    }
+
+    expect(() =>
+      evaluateCondition(
+        {
+          op: 'eq',
+          left: { kind: 'literal', value: nest(50_000) },
+          right: { kind: 'literal', value: 1 },
+        },
+        {},
+      ),
+    ).not.toThrow()
   })
 })

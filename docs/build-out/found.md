@@ -78,3 +78,23 @@ Found while adding the cross-kit length test for item 6, which the guard also mi
 moved above the per-kit block. Out of scope because the queue is frozen and nothing is wrong today.
 Cheap to fix: end the slice at the closing of the per-kit describe rather than at the end of the file,
 and drop the row that then has no rule.
+
+## A repeater's rows cannot be reached in the designer
+
+No kit renders an "add row" control, and the canvas starts with empty data, so a repeater has no rows in
+preview and exactly one — drawn by `revealHidden` so the authored subtree can be selected — in edit mode,
+where the canvas deliberately swallows keystrokes so a click selects rather than types.
+
+The result is that **no keystroke can reach a repeater row anywhere in this product**. Rows exist for a
+host rendering the form outside the designer with data that already has some.
+
+Found while trying to write an end-to-end test for item 19's canvas fix, which routes `onChange` through
+`applyChange`. The fix is right and the renderer tests prove the address is placed correctly; what could
+not be written is a browser test, because the gesture does not exist. That is also the reason the write
+path could be wrong for as long as it was: nobody could type into a row to notice.
+
+Out of scope because it is a feature — an add/remove-row affordance, which is a kit component, a
+document-model question about who owns the button, and a decision about whether the designer seeds
+preview data. All three are real design work rather than remediation. Bad to leave: `Repeater` is
+described as built in `03-components.md`, and a component whose rows nobody can create is built only in
+the sense that it renders.

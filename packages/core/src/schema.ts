@@ -86,6 +86,23 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
       }
     }
   })
+
+  /*
+   * Two components submitting one answer collapse in the export, and the
+   * collapse is silent. Sharing a `dataKey` is deliberate and documented — two
+   * fields behind opposite guards write one answer — but a JSON Schema property
+   * is one property, so the last one visited wins and the first's type, format
+   * and constraints are discarded. Reported rather than resolved: which of two
+   * authored schemas is the real one is not a question this can answer.
+   */
+  const claimed = new Set<string>()
+  walk(document.root, (node) => {
+    if (!node.schema) return
+    const name = dataKeyOf(node)
+    if (claimed.has(name)) lossy.push({ key: node.key, rule: 'a schema for ' + name })
+    claimed.add(name)
+  })
+
   return lossy
 }
 

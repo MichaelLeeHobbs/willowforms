@@ -164,6 +164,47 @@ function baseOf(key: string): string {
  * are immutable, so an edit to either copy replaces the value rather than
  * writing through to the other.
  */
+/**
+ * A binding with every literal naming `from` changed to name `to`.
+ *
+ * Structural and total, because a document is data: anything unreadable is
+ * returned as it stands rather than throwing. Only literals are touched, and
+ * only ones equal to the old key — a `ref` names a data key, which the copy
+ * shares deliberately.
+ */
+function repoint(value: PropValue, from: string, to: string): PropValue {
+  if (value.kind !== 'condition') return value
+
+  const inCondition = (condition: Condition): Condition => {
+    if (!condition || typeof condition !== 'object') return condition
+
+    const operand = (side: Operand | undefined): Operand | undefined =>
+      side?.kind === 'literal' && side.value === from ? { kind: 'literal', value: to } : side
+
+    const shape = condition as unknown as Record<string, unknown>
+    const next: Record<string, unknown> = { ...shape }
+
+    for (const name of ['left', 'right', 'value'] as const) {
+      if (shape[name] !== undefined) next[name] = operand(shape[name] as Operand)
+    }
+    if (Array.isArray(shape['conditions'])) {
+      next['conditions'] = (shape['conditions'] as Condition[]).map(inCondition)
+    }
+    if (shape['condition'] !== undefined) {
+      next['condition'] = inCondition(shape['condition'] as Condition)
+    }
+    if (Array.isArray(shape['options'])) {
+      next['options'] = (shape['options'] as unknown[]).map((option) =>
+        option === from ? to : option,
+      )
+    }
+
+    return next as unknown as Condition
+  }
+
+  return { kind: 'condition', condition: inCondition(value.condition) }
+}
+
 export function duplicateNode(root: ComponentNode, key: string): ComponentNode | undefined {
   const source = findNode(root, key)
   if (!source) return undefined
@@ -175,6 +216,22 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
     taken.add(nextKey)
 
     const next: ComponentNode = { ...node, key: nextKey, props: { ...node.props } }
+
+    /*
+     * A condition that names this node's own key follows the copy.
+     *
+     * `Step` ships with a `renderWhen` comparing `context.step` against its own
+     * key — that is what makes it a step. Copied by reference, the duplicate was
+     * shown by the *original's* name: two steps render at once and the copy can
+     * never be reached by its own. `factory.ts` applies `defaultRenderWhen`
+     * after the key for exactly this reason, and duplication is the same moment
+     * arriving by a different route.
+     *
+     * Only a literal equal to the old key, and only in `renderWhen`. Rewriting
+     * every literal that happens to match would corrupt a condition testing an
+     * unrelated field whose value is the copied key.
+     */
+    if (node.renderWhen) next.renderWhen = repoint(node.renderWhen, node.key, nextKey)
     if (node.schema) next.schema = { ...node.schema, validations: [...node.schema.validations] }
     if (node.children) next.children = node.children.map(copy)
     return next
@@ -201,8 +258,20 @@ export function updateNode(
   if (root.key === key) return update(root)
   if (!root.children) return root
 
+  /*
+   * The first match, and only the first.
+   *
+   * `findNode`, `findParent` and `pathTo` all deliberately take the first, with
+   * a comment above them saying why: two functions disagreeing about which node
+   * a key means is a bug whichever answer is right. This one edited *every*
+   * match, so with duplicate keys — which `validateDocument` reports but cannot
+   * prevent, because a host can render a document it never validated — one edit
+   * landed twice, and `moveNode` composes remove and insert, so a single node
+   * ended up at two places in the tree.
+   */
   let changed = false
   const children = root.children.map((child) => {
+    if (changed) return child
     const next = updateNode(child, key, update)
     if (next !== child) changed = true
     return next
@@ -231,12 +300,17 @@ export function removeNode(root: ComponentNode, key: string): ComponentNode {
   if (root.key === key) return root
   if (!root.children) return root
 
+  // The first match only, for the reason `updateNode` gives.
   let changed = false
   const children: ComponentNode[] = []
 
   for (const child of root.children) {
-    if (child.key === key) {
+    if (!changed && child.key === key) {
       changed = true
+      continue
+    }
+    if (changed) {
+      children.push(child)
       continue
     }
     const next = removeNode(child, key)
@@ -449,6 +523,18 @@ const ACTION_REF_TYPES: ReadonlySet<string> = new Set(ACTION_REF_TYPE_LIST)
 const BIDI: ReadonlySet<string> = new Set(BIDI_LIST)
 const ROW_SCOPES: ReadonlySet<string> = new Set(ROW_SCOPE_LIST)
 
+/**
+ * How deep a document this gate will walk before refusing it.
+ *
+ * Its own walk recursed over `children` with no bound, in the function whose
+ * entire job is to be the thing that never throws on a document — so a deep
+ * enough one produced a `RangeError` out of the gate itself.
+ *
+ * Far past anything a form has: a hundred levels of nesting is a layout nobody
+ * can use, and the panel draws depth by indentation in a 288px pane.
+ */
+const MAX_TREE_DEPTH = 500
+
 export function validateDocument(doc: FormDocument): StructuralError[] {
   const errors: StructuralError[] = []
   const seen = new Set<string>()
@@ -554,9 +640,13 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
     }
   }
 
-  const visit = (value: unknown, path: string): void => {
+  const visit = (value: unknown, path: string, depth = 0): void => {
     if (!isRecord(value)) {
       malformed(path + ' is not a component node.')
+      return
+    }
+    if (depth > MAX_TREE_DEPTH) {
+      malformed(path + ' is nested deeper than this library will walk.')
       return
     }
 
@@ -629,7 +719,9 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       malformed(path + '.children must be an array.')
       return
     }
-    children.forEach((child, index) => visit(child, path + '.children[' + String(index) + ']'))
+    children.forEach((child, index) =>
+      visit(child, path + '.children[' + String(index) + ']', depth + 1),
+    )
   }
 
   /**
@@ -724,7 +816,19 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
         if (value['scope'] !== undefined) oneOf(value['scope'], ROW_SCOPES, what + "'s scope")
         return
       }
-      if (value['kind'] === 'context') text(value['path'], what + "'s path")
+      if (value['kind'] === 'context') {
+        /*
+         * Non-empty, unlike every other string here. `readPath(context, '')` is
+         * `undefined` forever, so a condition reading it is permanently false
+         * and its component permanently unvalidated — and `contextKeys` skips
+         * it, correctly, because it is not a path. Skipping it meant nothing
+         * reported it at all.
+         */
+        const path = value['path']
+        if (typeof path !== 'string' || path === '') {
+          malformed(where(what + "'s path") + ' must be a path the host can hold.')
+        }
+      }
       // A literal holds any JSON, including none: `{ kind: 'literal' }` reads as
       // undefined, which is what an unanswered field reads as too.
     }
@@ -905,7 +1009,14 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
          * nothing about.
          */
         if (ref['type'] !== 'code') continue
-        if (!actions || actions[name] === undefined) {
+        /*
+         * `Object.hasOwn`, not a plain lookup. `actions['toString']` finds
+         * `Object.prototype.toString`, so an event referencing `toString`
+         * passed the unknown-action check and named an action the document does
+         * not have — the same own-property rule `valueOf` and `readPath` follow
+         * everywhere else in this package.
+         */
+        if (!actions || !Object.hasOwn(actions, name)) {
           errors.push({
             code: 'unknown-action',
             message: 'Component ' + key + ' references undefined action ' + name + '.',
@@ -954,9 +1065,21 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
           ', and a language reads left to right or right to left.',
       )
     }
-    // Same shape as languageTag, spelled out because the input is untrusted here.
+    /*
+     * The same rule `languageTag` uses, and it has to be the same rule. That one
+     * is truthiness, so an empty dialect is no dialect and the tag is `en`; this
+     * copy said `typeof dialect === 'string'`, which is true for `''`, so the
+     * gate computed `en-` and compared *that* against `defaultLanguage`. A
+     * document with an empty dialect validated clean and then had no resolvable
+     * default language at runtime.
+     *
+     * Spelled out rather than calling `languageTag`, because the input here is
+     * untrusted and that function takes a `Language`.
+     */
     const dialect = language['dialect']
-    return typeof dialect === 'string' ? language['code'] + '-' + dialect : language['code']
+    return typeof dialect === 'string' && dialect
+      ? language['code'] + '-' + dialect
+      : language['code']
   })
 
   if (tags.some((tag) => tag === undefined)) malformed('every language needs a string code.')

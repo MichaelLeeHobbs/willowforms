@@ -209,6 +209,17 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
  * boot-time answer `missingContext` takes. Unlike context, this one is decidable
  * from the tree alone, so `validateDocument` reports it rather than a host.
  */
+/**
+ * How deep this will walk before stopping.
+ *
+ * Same reason as the gate's own bound, and the same number: this runs from
+ * `validateDocument`, so an unbounded walk here throws a `RangeError` out of the
+ * function whose whole job is never to throw on a document. Stopping quietly is
+ * right — the gate has already refused a document this deep, and reporting the
+ * depth twice helps nobody.
+ */
+const MAX_TREE_DEPTH = 500
+
 export function rowScopeProblems(root: ComponentNode): { key: string; problem: string }[] {
   const problems: { key: string; problem: string }[] = []
 
@@ -223,29 +234,30 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
 
   const rowKeys = (node: ComponentNode): Set<string> => {
     const names = new Set<string>()
-    const gather = (inner: ComponentNode): void => {
+    const gather = (inner: ComponentNode, depth: number): void => {
+      if (depth > MAX_TREE_DEPTH) return
       if (inner !== node && inner?.schema) names.add(dataKeyOf(inner))
-      for (const child of kids(inner)) gather(child)
+      for (const child of kids(inner)) gather(child, depth + 1)
     }
-    gather(node)
+    gather(node, 0)
     return names
   }
 
   const formKeys = new Set<string>()
   const inRepeater = new Set<string>()
 
-  const mark = (node: ComponentNode, repeating: boolean): void => {
-    if (!node || typeof node !== 'object') return
+  const mark = (node: ComponentNode, repeating: boolean, depth: number): void => {
+    if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     if (node.schema && !isRowScopeNode(node)) {
       ;(repeating ? inRepeater : formKeys).add(dataKeyOf(node))
     }
     const deeper = repeating || isRowScopeNode(node)
-    for (const child of kids(node)) mark(child, deeper)
+    for (const child of kids(node)) mark(child, deeper, depth + 1)
   }
-  mark(root, false)
+  mark(root, false, 0)
 
-  const visit = (node: ComponentNode, enclosing: Set<string> | undefined): void => {
-    if (!node || typeof node !== 'object') return
+  const visit = (node: ComponentNode, enclosing: Set<string> | undefined, depth = 0): void => {
+    if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     if (enclosing) {
       const props =
         node.props && typeof node.props === 'object' && !Array.isArray(node.props)
@@ -281,8 +293,40 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
       }
     }
 
+    /*
+     * The mirror case: a `scope: 'row'` ref on a node that is not inside any
+     * repeater. It always reads nothing — `operand` answers `undefined` when
+     * there is no row — so the condition is false and the component is hidden
+     * forever, with nothing about the document looking wrong. Dragging a
+     * conditional field out of a repeater produces exactly this.
+     */
+    if (!enclosing) {
+      const props =
+        node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+          ? Object.values(node.props)
+          : []
+      const guards = Array.isArray(node.schema?.validations)
+        ? node.schema.validations.map((rule) => rule?.when)
+        : []
+
+      for (const value of [node.renderWhen, ...props, ...guards]) {
+        if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
+        for (const ref of rowScopedRefs(value.condition)) {
+          problems.push({
+            key: node.key,
+            problem:
+              node.key +
+              ' tests ' +
+              ref +
+              " as this row's answer, and it is not inside a repeater. " +
+              'That reads nothing, so the component is hidden and never validated.',
+          })
+        }
+      }
+    }
+
     const scope = isRowScopeNode(node) ? rowKeys(node) : enclosing
-    for (const child of kids(node)) visit(child, scope)
+    for (const child of kids(node)) visit(child, scope, depth + 1)
   }
   visit(root, undefined)
 
@@ -291,6 +335,33 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
 
 function isRowScopeNode(node: ComponentNode): boolean {
   return node?.schema?.type === 'array' && Array.isArray(node.children)
+}
+
+/** Every data key a condition reads at row scope, however deeply nested. */
+function rowScopedRefs(condition: Condition | undefined): string[] {
+  const found: string[] = []
+
+  const operand = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return
+    const shape = value as { kind?: unknown; dataKey?: unknown; scope?: unknown }
+    if (shape.kind !== 'ref' || typeof shape.dataKey !== 'string') return
+    if (shape.scope === 'row') found.push(shape.dataKey)
+  }
+
+  const visit = (inner: Condition | undefined): void => {
+    if (!inner || typeof inner !== 'object') return
+    const shape = inner as Partial<Record<string, unknown>>
+    operand(shape['left'])
+    operand(shape['right'])
+    operand(shape['value'])
+    if (Array.isArray(shape['conditions'])) {
+      for (const nested of shape['conditions'] as Condition[]) visit(nested)
+    }
+    visit(shape['condition'] as Condition | undefined)
+  }
+  visit(condition)
+
+  return found
 }
 
 /** Every data key a condition reads at form scope, however deeply nested. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createDocument, emptyRoot, instantiate, prop } from './factory.js'
+import { unexportableRules } from './schema.js'
 import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument } from './types.js'
 import {
@@ -1087,5 +1088,337 @@ describe('validateDocument over the whole document', () => {
         codes(nodeWith({ events: { onChange: [{ name: 'submit', type: 'builtin' }] } })),
       ).toEqual([])
     })
+  })
+})
+
+/**
+ * Four ways the tree treated a duplicate key, or a key literal, as somebody
+ * else's problem.
+ */
+describe('the tree and keys that repeat or are quoted', () => {
+  const node = (key: string, children?: ComponentNode[]): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    ...(children ? { children } : {}),
+  })
+
+  const twice = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [node('same'), node('other'), node('same')],
+  })
+
+  it('updates the first match only, like every read path', () => {
+    /*
+     * `findNode`, `findParent` and `pathTo` all deliberately take the first
+     * match, with a comment saying why: two functions disagreeing about which
+     * node a key means is a bug whichever answer is right. The three mutators
+     * acted on *every* match, so with duplicate keys an edit landed twice —
+     * and `moveNode` composes remove and insert, so one node ended up at two
+     * places in the tree.
+     */
+    const next = updateNode(twice(), 'same', (n) => ({ ...n, type: 'Changed' }))
+    const kinds = (next.children ?? []).map((c) => c.type)
+
+    expect(kinds).toEqual(['Changed', 'Field', 'Field'])
+  })
+
+  it('removes the first match only', () => {
+    const next = removeNode(twice(), 'same')
+
+    expect((next.children ?? []).map((c) => c.key)).toEqual(['other', 'same'])
+  })
+
+  it('inserts into the first match only', () => {
+    const holder: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [node('box', []), node('box', [])],
+    }
+
+    const next = insertNode(holder, 'box', node('added'))
+
+    expect((next.children ?? []).map((c) => c.children?.length ?? 0)).toEqual([1, 0])
+  })
+
+  it('still edits a unique key wherever it is', () => {
+    // The control. Stopping at the first match must not mean stopping at the
+    // first child: the node may be anywhere in the tree.
+    const deep: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [node('a'), node('wrapper', [node('target')])],
+    }
+
+    const next = updateNode(deep, 'target', (n) => ({ ...n, type: 'Changed' }))
+    expect(next.children?.[1]?.children?.[0]?.type).toBe('Changed')
+  })
+
+  it('re-points a duplicated node at its own key', () => {
+    /*
+     * `Step` ships with a `renderWhen` naming its own key, which is what makes
+     * it a step. Duplicating one copied the condition by reference, so the copy
+     * was shown by the *original's* name: two steps render at once and the copy
+     * can never be reached. `factory.ts` applies `defaultRenderWhen(node.key)`
+     * after the key for exactly this reason.
+     */
+    const stepped: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'step1',
+          type: 'Step',
+          props: {},
+          children: [],
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'step' },
+              right: { kind: 'literal', value: 'step1' },
+            },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(stepped, 'step1')
+    // `baseOf` strips the trailing digits, so the copy of `step1` is `step`.
+    expect(copy?.key).toBe('step')
+
+    const when = copy?.renderWhen
+    const right =
+      when?.kind === 'condition' && 'right' in when.condition ? when.condition.right : undefined
+    expect(right).toEqual({ kind: 'literal', value: copy?.key })
+  })
+
+  it('leaves a condition that names something else alone', () => {
+    // The control. Rewriting every literal that happens to match would corrupt
+    // a condition testing an unrelated field whose value is the copied key.
+    const guarded: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'spouse',
+          type: 'Field',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(guarded, 'spouse')
+    expect(copy?.renderWhen).toEqual(guarded.children?.[0]?.renderWhen)
+  })
+})
+
+/**
+ * Two lookups in `validateDocument` that read through the prototype.
+ */
+describe('validateDocument and inherited properties', () => {
+  it('reports an action reference naming something only Object has', () => {
+    /*
+     * `actions[name] === undefined` finds `Object.prototype.toString`, so an
+     * event referencing `toString` passed the unknown-action check and named an
+     * action the document does not have.
+     */
+    const doc = {
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'field',
+            type: 'TextField',
+            props: {},
+            events: { onChange: [{ name: 'toString', type: 'code' }] },
+          },
+        ],
+      },
+    } as unknown as FormDocument
+
+    expect(validateDocument(doc).map((e) => e.code)).toContain('unknown-action')
+  })
+
+  it('still accepts a reference to an action that is there', () => {
+    const doc = {
+      ...createDocument('Contact', 'doc'),
+      actions: { go: { name: 'go', body: 'return 1', params: {} } },
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'field',
+            type: 'TextField',
+            props: {},
+            events: { onChange: [{ name: 'go', type: 'code' }] },
+          },
+        ],
+      },
+    } as unknown as FormDocument
+
+    expect(validateDocument(doc)).toEqual([])
+  })
+
+  it('reads an empty dialect the way languageTag does', () => {
+    /*
+     * The gate spelled the rule out as `typeof dialect === 'string'`, which is
+     * true for `''`, so it computed `en-` and compared that against
+     * `defaultLanguage`. `languageTag` uses truthiness and answers `en`. A
+     * document with an empty dialect validated clean and then had no resolvable
+     * default language at runtime.
+     */
+    const doc = {
+      ...createDocument('Contact', 'doc'),
+      languages: [{ code: 'en', dialect: '', name: 'English', bidi: 'ltr' }],
+      defaultLanguage: 'en',
+    } as unknown as FormDocument
+
+    expect(validateDocument(doc)).toEqual([])
+  })
+})
+
+/**
+ * A context path that can never resolve.
+ *
+ * `contextKeys` skips an empty path, deliberately — it is not a path, and
+ * `missingContext` returns a list of paths, so an empty entry in it would be a
+ * host's problem rather than an answer. But skipping it meant nothing reported
+ * it at all, and a `context` operand with an empty path reads `undefined`
+ * forever: its condition is permanently false and its component permanently
+ * unvalidated.
+ *
+ * So the gate refuses it, which is where a document that cannot work belongs.
+ */
+describe('validateDocument and an unusable context path', () => {
+  const reading = (path: unknown): FormDocument =>
+    ({
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'secret',
+            type: 'TextField',
+            props: {},
+            renderWhen: {
+              kind: 'condition',
+              condition: { op: 'truthy', value: { kind: 'context', path } },
+            },
+          },
+        ],
+      },
+    }) as unknown as FormDocument
+
+  it('refuses an empty path', () => {
+    expect(validateDocument(reading('')).map((e) => e.code)).toContain('malformed')
+  })
+
+  it('names the component, because an empty path names nothing', () => {
+    expect(
+      validateDocument(reading(''))
+        .map((e) => e.message)
+        .join(' '),
+    ).toContain('secret')
+  })
+
+  it('accepts a path the host may or may not supply', () => {
+    /*
+     * The control, and the line this draws. Whether the *host* holds
+     * `user.role` is `missingContext`'s question, asked at that host's startup
+     * against its own context. Whether the document said anything at all is
+     * this one.
+     */
+    expect(validateDocument(reading('user.role'))).toEqual([])
+  })
+})
+
+/**
+ * A document nested deeper than the stack.
+ *
+ * `validateDocument`'s own walk and `rowScopeProblems` both recurse over
+ * `children` with no bound, in the function whose entire job is to be the thing
+ * that never throws on a document. A `RangeError` here is the gate failing in
+ * the one way it exists to prevent.
+ */
+describe('validateDocument and a document nested too deep', () => {
+  const deep = (n: number): FormDocument => {
+    let node: ComponentNode = { key: 'leaf', type: 'TextField', props: {} }
+    for (let i = 0; i < n; i += 1) {
+      node = { key: 'wrap' + String(i), type: 'Screen', props: {}, children: [node] }
+    }
+    return { ...createDocument('Deep', 'deep'), root: node }
+  }
+
+  it('reports rather than throwing', () => {
+    expect(() => validateDocument(deep(20_000))).not.toThrow()
+  })
+
+  it('says what it refused', () => {
+    expect(validateDocument(deep(20_000)).map((e) => e.code)).toContain('malformed')
+  })
+
+  it('still walks a document anybody would build', () => {
+    // The control. A bound low enough to catch real nesting would refuse
+    // documents that work, which is worse than the crash.
+    expect(validateDocument(deep(30))).toEqual([])
+  })
+})
+
+/**
+ * Two components that submit the same answer, in the exported schema.
+ *
+ * Sharing a `dataKey` is deliberate and documented: two fields behind opposite
+ * guards write one answer. The export visited them in order and let the last
+ * win, so the first component's type, format and constraints were discarded
+ * with nothing reported — and `unexportableRules`, which exists to say what the
+ * export could not carry, said nothing.
+ */
+describe('toJsonSchema and a shared data key', () => {
+  const shared = (): FormDocument =>
+    ({
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'personal',
+            dataKey: 'email',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'email' }] },
+          },
+          {
+            key: 'work',
+            dataKey: 'email',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'minLength', value: 5 }] },
+          },
+        ],
+      },
+    }) as unknown as FormDocument
+
+  it('reports the collapse rather than performing it silently', () => {
+    expect(unexportableRules(shared()).map((entry) => entry.key)).toContain('work')
   })
 })

@@ -12,7 +12,7 @@
  */
 
 import { evaluateCondition } from './condition.js'
-import { isEmpty, jsonToString, valueOf } from './json.js'
+import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
 import { dataKeyOf, flatten } from './tree.js'
@@ -84,6 +84,16 @@ export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
  * because a tag was mistyped is the silent permissive failure this project is
  * organised against. Wrong and loud beats wrong and quiet.
  */
+/**
+ * How many rows of one repeater will be validated.
+ *
+ * A form asking somebody to fill in more than this many rows is not a form.
+ */
+export const MAX_ROWS = 5000
+
+/** What a repeater reports when the submitted body asks for more rows than that. */
+export const TOO_MANY_ROWS = 'This list has too many rows to check.'
+
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 
 /*
@@ -260,6 +270,38 @@ function asNumber(value: JsonValue | undefined): number {
   return typeof value === 'number' ? value : Number(value)
 }
 
+/**
+ * A value the bounds rules can actually compare, or nothing.
+ *
+ * `Number('not telling')` is `NaN`, and every comparison with `NaN` is false —
+ * so `min` and `max` both *passed* on a value that is not a number at all. The
+ * exported schema said `{"type":"number","minimum":18}` while the form accepted
+ * a sentence, which is the two validators disagreeing in the permissive
+ * direction, on the server.
+ *
+ * A number field's value legitimately arrives as a string from an `<input>`, so
+ * this coerces; what it will not do is treat "cannot be compared" as "compares
+ * fine".
+ */
+/**
+ * A URL a `url` rule should accept: parseable, and a scheme this project allows.
+ *
+ * Both halves are needed and neither is enough. `URL.canParse` answers yes to
+ * any well-formed URL including `javascript:` and `data:`, which is what the
+ * rule used to accept — telling an author their field holds a link while
+ * accepting one that runs code. `safeHref` refuses those, but it also allows a
+ * *relative* address, because a link may legitimately be one; an answer to a
+ * field labelled "your website" may not.
+ */
+function isUrl(value: string): boolean {
+  return URL.canParse(value) && safeHref(value) !== undefined
+}
+
+function comparableNumber(value: JsonValue | undefined): number | undefined {
+  const asNum = asNumber(value)
+  return Number.isNaN(asNum) ? undefined : asNum
+}
+
 /** Is a rule's `when` guard satisfied? Unguarded rules always apply. */
 function guardPasses(when: PropValue | undefined, data: FormData, options: EvalOptions): boolean {
   if (!when) return true
@@ -330,16 +372,28 @@ export function applyRule(
       return lengthOf(value) < rule.value ? fail() : undefined
     case 'maxLength':
       return lengthOf(value) > rule.value ? fail() : undefined
-    case 'min':
-      return asNumber(value) < rule.value ? fail() : undefined
-    case 'max':
-      return asNumber(value) > rule.value ? fail() : undefined
+    case 'min': {
+      const held = comparableNumber(value)
+      return held === undefined || held < rule.value ? fail() : undefined
+    }
+    case 'max': {
+      const held = comparableNumber(value)
+      return held === undefined || held > rule.value ? fail() : undefined
+    }
     case 'pattern':
       return matchesPattern(rule.value, asString(value)) ? undefined : fail()
     case 'email':
       return EMAIL.test(asString(value)) ? undefined : fail()
     case 'url':
-      return URL.canParse(asString(value)) ? undefined : fail()
+      /*
+       * `safeHref`, not `URL.canParse`. That one answers yes to any well-formed
+       * URL, scheme included, so a `url` rule accepted `javascript:` and
+       * `data:` — and `safeHref` exists in this same package, keeping an
+       * allowlist, precisely because those are the schemes that matter. Telling
+       * an author their field holds a link and then accepting one that runs
+       * code is the two halves of this project disagreeing.
+       */
+      return isUrl(asString(value)) ? undefined : fail()
     case 'uuid':
       return UUID.test(asString(value)) ? undefined : fail()
     case 'custom':
@@ -415,7 +469,26 @@ export function validateForm(
      * rest go unchecked.
      */
     if (isRowScope(node)) {
-      const rows = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+      const all = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+
+      /*
+       * The row count comes out of the data, which is right: asking the browser
+       * how many rows there are would let a client submit one and have the rest
+       * go unchecked. But that makes the *request body* the thing deciding how
+       * much work happens, with no cap, and rows nest multiplicatively — a
+       * couple of hundred kilobytes of JSON is millions of rule evaluations.
+       *
+       * Over the cap the form fails rather than validating a prefix. A row
+       * nobody checked passing silently is the permissive failure this whole
+       * project is organised against, and refusing is the only answer that is
+       * not one.
+       */
+      if (all.length > MAX_ROWS) {
+        errors[addressOf(path, node.key)] = TOO_MANY_ROWS
+        return
+      }
+
+      const rows = all
       rows.forEach((row, index) => {
         const inner: EvalOptions = {
           ...scope,

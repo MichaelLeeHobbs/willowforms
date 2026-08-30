@@ -54,10 +54,21 @@ export const DEVICE_QUERY: Record<Exclude<Device, 'any'>, string> = {
  * since this text is placed inside a `<style>` element and `</style>` closes
  * it. `@` opens an at-rule, and `@import` fetches from wherever it likes.
  *
- * Refused as a set rather than escaped, because escaping invites an argument
- * about which escape is sufficient and this needs none.
+ * A comment belongs here too, and it does not end the block so much as swallow
+ * it. One node opens a comment at the end of its declarations and another
+ * closes one at the start of its own; the two are concatenated into a single
+ * stylesheet, and everything between them disappears inside it. A third node's
+ * rule is deleted, and one node's declaration lands under another's selector.
+ *
+ * That cannot reach outside the form, so it is not the injection
+ * `safeStyleValue` is for. What it breaks is the sentence this file opens with:
+ * a component's styling affects that component.
+ *
+ * Refused as a set rather than escaped, and both halves of the pair rather than
+ * only the opener, because deciding which comment is safe invites an argument
+ * this does not need.
  */
-const FORBIDDEN = /[{}<@]/
+const FORBIDDEN = /[{}<@]|\/\*|\*\//
 
 /**
  * The declarations, or nothing if the text is not only declarations.
@@ -242,10 +253,25 @@ export function parseDeclarations(text: string | undefined): [string, string][] 
   const out: [string, string][] = []
   for (const part of splitTop(text, ';')) {
     const [name, value] = splitTop(part, ':', 1)
-    const trimmed = name?.trim().toLowerCase()
+    const trimmed = normaliseName(name)
     if (trimmed && value?.trim()) out.push([trimmed, value.trim()])
   }
   return out
+}
+
+/**
+ * A property name, folded to lower case unless it is a custom property.
+ *
+ * CSS property names are case-insensitive, so a control looking for `padding`
+ * has to find `PADDING` — which is why this folded everything. Custom property
+ * names are **not**: `--brandColor` and `--brandcolor` are two different
+ * properties. Folding them meant that touching any structured control rewrote
+ * the name, and the `var()` that read it stopped matching. Silently, because the
+ * declaration is still there and still valid CSS.
+ */
+function normaliseName(name: string | undefined): string {
+  const trimmed = name?.trim() ?? ''
+  return trimmed.startsWith('--') ? trimmed : trimmed.toLowerCase()
 }
 
 /**
@@ -302,7 +328,7 @@ export function setDeclaration(
   name: string,
   value: string | undefined,
 ): string {
-  const wanted = name.trim().toLowerCase()
+  const wanted = normaliseName(name)
   const declarations = parseDeclarations(text).filter(([key]) => key !== wanted)
   const trimmed = value?.trim()
   if (trimmed) declarations.push([wanted, trimmed])
@@ -311,6 +337,6 @@ export function setDeclaration(
 
 /** What a property is set to in this text, if anything. */
 export function readDeclaration(text: string | undefined, name: string): string {
-  const wanted = name.trim().toLowerCase()
+  const wanted = normaliseName(name)
   return parseDeclarations(text).find(([key]) => key === wanted)?.[1] ?? ''
 }

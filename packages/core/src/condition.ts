@@ -19,7 +19,10 @@ import type { RowContext } from './rows.js'
 import type { Condition, FormContext, FormData, JsonValue, Operand } from './types.js'
 
 /** Deep equality over JSON, which is the only equality a document can express. */
-function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
+function same(a: JsonValue | undefined, b: JsonValue | undefined, depth = 0): boolean {
+  // Beyond the bound, two values are not equal. Refusing to answer would make
+  // `ne` true, which shows a component whose rule could not be read.
+  if (depth > MAX_DEPTH) return false
   if (a === b) return true
   if (a === undefined || b === undefined || a === null || b === null) return false
   if (typeof a !== 'object' || typeof b !== 'object') return false
@@ -37,8 +40,23 @@ function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
    * really holds it. The same own-property rule `valueOf` follows, and missed
    * here when that one was written.
    */
-  return keys.every((key) => Object.hasOwn(b, key) && same(a[key], b[key]))
+  return keys.every((key) => Object.hasOwn(b, key) && same(a[key], b[key], depth + 1))
 }
+
+/**
+ * How deep a stored structure this will walk before giving up.
+ *
+ * `evaluate` and `same` both recurse, in functions whose whole contract is that
+ * they are total — and a document is data, so the nesting is whatever somebody
+ * stored. A `RangeError` out of `isVisible` is an unhandled 500 on submit and a
+ * blank form in the browser, which is the one outcome "total" exists to rule
+ * out.
+ *
+ * High enough that nothing a person authors can reach it: the panel draws
+ * nesting by indentation in a 288px pane, and a hundred levels is already
+ * unreadable. Low enough that the stack does not.
+ */
+const MAX_DEPTH = 200
 
 /**
  * An operand this code cannot read at all.
@@ -158,8 +176,12 @@ function evaluate(
   data: FormData,
   context: FormContext | undefined,
   row: RowContext | undefined,
+  depth = 0,
 ): boolean | undefined {
   if (!condition || typeof condition !== 'object') return undefined
+  // Unreadable rather than false, so `not` passes it through instead of
+  // inverting it into "show this".
+  if (depth > MAX_DEPTH) return undefined
 
   const read = (value: Operand | undefined): Reading => operand(value, data, context, row)
 
@@ -253,7 +275,7 @@ function evaluate(
 
     case 'not': {
       const inner = condition.condition
-        ? evaluate(condition.condition, data, context, row)
+        ? evaluate(condition.condition, data, context, row, depth + 1)
         : undefined
       return inner === undefined ? undefined : !inner
     }

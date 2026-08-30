@@ -370,3 +370,98 @@ describe('evaluatorKeys', () => {
     expect(evaluatorKeys(broken)).toEqual([])
   })
 })
+
+/**
+ * The three exported functions are told to run at a host's startup, which is
+ * before anything has had a chance to refuse the document.
+ */
+describe('the boot-time questions, on a document nobody checked', () => {
+  const broken = (patch: Record<string, unknown>): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    ...patch,
+  })
+
+  it.each([
+    ['children that are not an array', { children: 5 }],
+    ['props that are not an object', { props: 'nope' }],
+    ['validations that are not iterable', { schema: { type: 'string', validations: 5 } }],
+    ['a child that is not a node', { children: [null] }],
+  ])('answers rather than throwing on %s', (_what, patch) => {
+    expect(() => contextKeys(broken(patch))).not.toThrow()
+    expect(() => missingContext(broken(patch), {})).not.toThrow()
+    expect(() => contextValues(broken(patch), 'step')).not.toThrow()
+  })
+
+  it('still reads a document that is fine', () => {
+    // The control: a guard that answered nothing for everything would pass the
+    // whole block above and make the boot-time check useless.
+    const good: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'vat',
+          type: 'Field',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'user.role' },
+              right: { kind: 'literal', value: 'admin' },
+            },
+          },
+        },
+      ],
+    }
+
+    expect([...contextKeys(good)]).toEqual(['user.role'])
+    expect(missingContext(good, {})).toEqual(['user.role'])
+  })
+})
+
+/**
+ * How much work a document can ask a server to do.
+ *
+ * `contextValues(root, 'step')` is how the reference server discovers a form's
+ * steps, and it runs one full validation pass per value it returns. A hundred
+ * thousand distinct literals is a few seconds to author in the JSON editor and
+ * a hundred thousand passes to submit against.
+ *
+ * A cap rather than a refusal: the answer stays useful for every real document,
+ * and a document that exceeds it is one no host should be running anyway.
+ */
+describe('contextValues and a document that asks for too much', () => {
+  const many = (n: number): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: Array.from({ length: n }, (_, i) => ({
+      key: 'step' + String(i),
+      type: 'Screen',
+      props: {},
+      renderWhen: {
+        kind: 'condition' as const,
+        condition: {
+          op: 'eq' as const,
+          left: { kind: 'context' as const, path: 'step' },
+          right: { kind: 'literal' as const, value: 'step' + String(i) },
+        },
+      },
+    })),
+  })
+
+  it('stops collecting well before it becomes a denial of service', () => {
+    expect(contextValues(many(50_000), 'step').length).toBeLessThanOrEqual(1000)
+  })
+
+  it('still returns every step a real form has', () => {
+    // The control. A cap low enough to truncate a genuine flow would make the
+    // server validate fewer steps than the document has, which is the silent
+    // permissive failure this whole area is about.
+    expect(contextValues(many(40), 'step')).toHaveLength(40)
+  })
+})

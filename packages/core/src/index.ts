@@ -106,6 +106,8 @@ export {
   autoValidateKeys,
   submittedData,
   DEFAULT_MESSAGES,
+  MAX_ROWS,
+  TOO_MANY_ROWS,
   UNREADABLE_RULE,
   validateField,
   isRowScope,

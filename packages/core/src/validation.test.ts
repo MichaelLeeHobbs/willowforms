@@ -944,3 +944,50 @@ describe('branches this file used to leave unexecuted', () => {
     })
   })
 })
+
+/**
+ * Two rules that let through exactly what they exist to stop.
+ */
+describe('bounds and schemes', () => {
+  it('fails min and max on a value that is not a number', () => {
+    /*
+     * `Number('not telling')` is `NaN`, and every comparison with `NaN` is
+     * false — so `min` and `max` both passed. The exported schema says
+     * `{"type":"number","minimum":18}` while the form accepts a sentence.
+     */
+    expect(check({ key: 'min', value: 18 }, 'not telling')).toBe(DEFAULT_MESSAGES.min)
+    expect(check({ key: 'max', value: 65 }, 'not telling')).toBe(DEFAULT_MESSAGES.max)
+  })
+
+  it('still compares numbers, however they were typed', () => {
+    // The control. A number field's value can arrive as a string from an input.
+    expect(check({ key: 'min', value: 18 }, 21)).toBeUndefined()
+    expect(check({ key: 'min', value: 18 }, '21')).toBeUndefined()
+    expect(check({ key: 'min', value: 18 }, 3)).toBe(DEFAULT_MESSAGES.min)
+    expect(check({ key: 'max', value: 65 }, '70')).toBe(DEFAULT_MESSAGES.max)
+  })
+
+  it.each(['javascript:alert(1)', 'data:text/html,<script>', 'vbscript:x', 'file:///etc/passwd'])(
+    'refuses %s as a URL',
+    (value) => {
+      /*
+       * `URL.canParse` answers yes to any well-formed URL, scheme included —
+       * and `safeHref` in the same package keeps an allowlist precisely because
+       * these schemes are the ones that matter. A `url` rule that accepts
+       * `javascript:` tells an author their field holds a link.
+       */
+      expect(check({ key: 'url' }, value)).toBe(DEFAULT_MESSAGES.url)
+    },
+  )
+
+  it.each(['https://example.com', 'http://example.com/a?b=1', 'mailto:a@b.co', 'tel:+441234'])(
+    'accepts %s',
+    (value) => {
+      expect(check({ key: 'url' }, value)).toBeUndefined()
+    },
+  )
+
+  it('still refuses something that is not a URL at all', () => {
+    expect(check({ key: 'url' }, 'not a url')).toBe(DEFAULT_MESSAGES.url)
+  })
+})
