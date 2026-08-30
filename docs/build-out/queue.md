@@ -34,10 +34,11 @@ Run it against the unfixed code first and say so in the transcript. Read
 
 ## Stage 0 — clear the base
 
-- [ ] **0. Land PR #21 and cut the branch for this run from an updated main.**
-      Wait for Copilot review, answer every finding, merge.
-      _Check:_ `gh pr view 21 --json state --jq .state` prints `MERGED`, and the branch for this run is cut
-      from a main whose tip is that merge.
+- [ ] **0. Land PR #21 and PR #22, then cut the branch for this run from an updated main.**
+      #21 is the steps work; #22 is this queue and the run contract. Wait for Copilot on each, answer every
+      finding, merge both. They touch `CLAUDE.md` in different places and merge cleanly in either order.
+      _Check:_ `gh pr view 21 --json state --jq .state` and the same for 22 both print `MERGED`, and the
+      branch for this run is cut from a main that contains both.
 
 ## Stage 1 — the three CRITICALs and the four decisions already logged
 
