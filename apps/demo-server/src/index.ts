@@ -26,11 +26,42 @@ const PORT = Number(process.env['PORT'] ?? 5181)
 
 type Store = Record<string, FormDocument>
 
+/**
+ * The stored forms, or nothing at all if there is no file yet.
+ *
+ * The distinction is the point. A bare `catch { return {} }` cannot tell "no
+ * file yet" from "corrupt, or half-written by a process that was killed" — and
+ * the empty object it returns becomes the base of the next write, so one
+ * interrupted `writeFile` costs every stored form, answered with `200 {ok:true}`
+ * and no line in the log.
+ *
+ * Only "no such file" is an empty store. Anything else is a store this cannot
+ * read, and refusing to serve is the only answer that does not destroy it.
+ */
 async function readStore(): Promise<Store> {
+  let text: string
   try {
-    return JSON.parse(await readFile(STORE, 'utf8')) as Store
-  } catch {
-    return {}
+    text = await readFile(STORE, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    throw error
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('the store is not an object')
+    }
+    return parsed as Store
+  } catch (error) {
+    // Loud, because the alternative is a silent overwrite of everything.
+    throw new Error(
+      'Refusing to read ' +
+        STORE.pathname +
+        ': ' +
+        (error instanceof Error ? error.message : String(error)) +
+        '. Move it aside to start fresh.',
+    )
   }
 }
 

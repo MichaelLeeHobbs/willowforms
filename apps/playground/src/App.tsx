@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import CssBaseline from '@mui/material/CssBaseline'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
@@ -41,15 +41,44 @@ function loadDocument(): FormDocument {
 const theme = createTheme({ colorSchemes: { dark: true } })
 
 export function App(): ReactNode {
-  const [initial] = useState(loadDocument)
+  /*
+   * The document the designer is mounted with, and it has to be able to change.
+   *
+   * A kit change remounts the designer, and the designer reads
+   * `initialDocument` only at mount — so remounting with the *boot* document
+   * threw away every edit since page load. Worse, silently: the designer's mount
+   * effect fires `onChange` with what it was given, which this persists, so the
+   * loss reached `localStorage` and a reload did not recover it.
+   */
+  const [initial, setInitial] = useState(loadDocument)
   const [kitId, setKitId] = useState<string>('mui')
 
+  /*
+   * The latest document, for the remount to start from.
+   *
+   * A ref rather than state: this is written on every keystroke, and putting it
+   * in state would re-render the whole designer from up here for a value only a
+   * kit change ever reads. Written from a callback and read from a handler,
+   * never during render.
+   */
+  const latest = useRef(initial)
+
   const persist = useCallback((doc: FormDocument) => {
+    latest.current = doc
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(doc))
     } catch {
       // Private-mode browsers throw on write. Losing the draft beats crashing.
     }
+  }, [])
+
+  /*
+   * Both in one handler, so the remount happens against the current document
+   * rather than the one this component was born with.
+   */
+  const chooseKit = useCallback((id: string) => {
+    setInitial(latest.current)
+    setKitId(id)
   }, [])
 
   const active = KITS[kitId] ?? KITS['mui']
@@ -61,7 +90,7 @@ export function App(): ReactNode {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div className="pg-kit-switch">
           <label htmlFor="pg-kit">Kit</label>
-          <select id="pg-kit" value={kitId} onChange={(e) => setKitId(e.target.value)}>
+          <select id="pg-kit" value={kitId} onChange={(e) => chooseKit(e.target.value)}>
             {Object.entries(KITS).map(([id, entry]) => (
               <option key={id} value={id}>
                 {entry.label}

@@ -157,3 +157,29 @@ test('the html kit wires up its own accessibility', async ({ designer }) => {
   await expect(message).toHaveAttribute('role', 'alert')
   await expect(message).toHaveText('This field is required.')
 })
+
+test('an edit survives switching the kit', async ({ designer }) => {
+  /*
+   * The playground held its boot document in a `useState` that never updated,
+   * and remounted the designer on a kit change with `key={kitId}`. The mount
+   * effect then fired `onChange` with that stale document, which the playground
+   * persists — so switching kits discarded every edit since page load, and a
+   * reload did not bring them back.
+   *
+   * The existing kit-switch test above switches without editing first, so it
+   * could not see this. That is the whole defect: the state being thrown away
+   * is the state a test has to create before it looks.
+   */
+  await designer.openTab('Components')
+  await designer.page.getByRole('button', { name: 'Text field', exact: true }).click()
+
+  const before = await designer.rootChildren()
+  expect(before).toContain('textField')
+
+  await designer.page.locator('#pg-kit').selectOption('html')
+  await expect(designer.page.locator('.fsh-screen')).toBeVisible()
+
+  // The document the new kit is drawing, and the one that was persisted.
+  expect(await designer.rootChildren()).toEqual(before)
+  await expect(designer.node('textField')).toBeVisible()
+})
