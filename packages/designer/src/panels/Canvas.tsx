@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react'
 import type { Device, FormContext, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
 import {
   applyChange,
@@ -16,7 +21,13 @@ import type { RendererKit } from '@formsmith/renderer'
 import { resolveDrop } from '../dnd.js'
 import type { DropTarget } from '../dnd.js'
 import type { DragController } from '../drag.js'
-import { keyFromEventTarget, measureTree, originOf, toLocal } from '../geometry.js'
+import {
+  keyFromEventTarget,
+  measureTree,
+  originOf,
+  rowFromEventTarget,
+  toLocal,
+} from '../geometry.js'
 import type { Candidate, Origin } from '../geometry.js'
 import type { DesignerApi } from '../store.js'
 import { SelectionLayer } from './SelectionLayer.js'
@@ -128,6 +139,7 @@ export function Canvas({
   /** Fields the user has changed. A field validates while typing only after it is touched. */
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [hoverKey, setHoverKey] = useState<string | undefined>(undefined)
+  const [selectedRow, setSelectedRow] = useState<string | undefined>(undefined)
 
   const frameWidth = FRAME_WIDTH[viewport]
 
@@ -296,6 +308,13 @@ export function Canvas({
   const onPointerDownCapture = useCallback(
     (event: ReactPointerEvent) => {
       if (isOwnChrome(event.target)) return
+      /*
+       * The primary button only. It armed a drag for any of them, so a
+       * right-press and a small movement relocated the component under its own
+       * context menu — the menu opens, the component has already moved, and
+       * nothing about the gesture said it would.
+       */
+      if (event.button !== 0) return
       const key = keyFromEventTarget(event.target)
       // The root is the canvas itself; dragging it has nowhere to go.
       if (!key || key === api.document.root.key) return
@@ -304,12 +323,39 @@ export function Canvas({
     [api.document.root.key, begin],
   )
 
+  /*
+   * A keystroke aimed at a kit component while arranging the form.
+   *
+   * "A click selects rather than types" was enforced for pointer and mouse and
+   * nothing else, so tabbing into the canvas and typing reached the kit's own
+   * `onChange` — which seeds the preview's data while the author believes they
+   * are arranging a layout, and then the preview shows answers nobody entered.
+   *
+   * Navigation keys are let through: Tab has to move, and arrow keys and Escape
+   * belong to the shell's own shortcuts.
+   */
+  const onKeyDownCapture = useCallback((event: ReactKeyboardEvent) => {
+    if (isOwnChrome(event.target)) return
+    const navigational =
+      event.key === 'Tab' ||
+      event.key === 'Escape' ||
+      event.key.startsWith('Arrow') ||
+      event.ctrlKey ||
+      event.metaKey
+    if (navigational) return
+    event.preventDefault()
+    event.stopPropagation()
+  }, [])
+
   const onClickCapture = useCallback(
     (event: MouseEvent) => {
       if (isOwnChrome(event.target)) return
       event.stopPropagation()
       if (consumeClick()) return
       select(keyFromEventTarget(event.target))
+      // Which drawn copy was pointed at. Geometry only: the node selected is
+      // the authored one, and there is only ever one of those.
+      setSelectedRow(rowFromEventTarget(event.target))
     },
     [consumeClick, select],
   )
@@ -444,6 +490,7 @@ export function Canvas({
               onMouseDownCapture,
               onPointerDownCapture,
               onClickCapture,
+              onKeyDownCapture,
               // Measured on the first move of each drag that reaches the canvas,
               // including one that started in the palette and never touched it.
               // Doing this in an event handler rather than an effect is what
@@ -490,6 +537,7 @@ export function Canvas({
             surfaceRef={surfaceRef}
             document={api.document}
             selectedKey={api.selectedKey}
+            {...(selectedRow ? { selectedRow } : {})}
             selectedType={api.selectedNode?.type}
             hoverKey={dragState ? undefined : hoverKey}
             {...(selectionActions ? { actions: selectionActions } : {})}

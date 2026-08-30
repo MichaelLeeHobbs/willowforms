@@ -483,10 +483,14 @@ describe('the tree rows and the canvas rows are told apart', () => {
   it('is never written by the designer, which owns only the tree one', () => {
     /*
      * The runtime check above needs a repeater in the fixture to see anything.
-     * This one needs nothing: `data-fs-row` belongs to the renderer, it is part
-     * of the `NodeAttributes` a kit spreads, and the designer neither writes it
-     * nor selects on it. A selector added here would go back to matching both
-     * lists, and the tests that care read the *longer* list without complaining.
+     * This one needs nothing: `data-fs-row` belongs to the renderer and is part
+     * of the `NodeAttributes` a kit spreads, so the designer must never *write*
+     * one — a second author of the same attribute is how it came to mean two
+     * things in the first place.
+     *
+     * Reading one is a different matter and is now how the selection frame finds
+     * the row an author clicked in, so the check is for a JSX attribute rather
+     * than for any mention of the name.
      */
     // From the repository root: this file runs under jsdom, where
     // `import.meta.url` is not a file URL and cannot be resolved against.
@@ -502,14 +506,12 @@ describe('the tree rows and the canvas rows are told apart', () => {
         }
         if (!/\.tsx?$/.test(entry.name)) continue
         // `data-fs-row` and nothing longer: `data-fs-tree-row` is this panel's.
-        if (/data-fs-row(?!-)/.test(readFileSync(path, 'utf8'))) offenders.push(entry.name)
+        if (/data-fs-row=\{/.test(readFileSync(path, 'utf8'))) offenders.push(entry.name)
       }
     }
     walk(src)
 
-    // This file names it in its own assertions, which is the one place it should
-    // appear: it is what the canvas half of the comparison above is reading.
-    expect(offenders).toEqual(['Tree.test.tsx'])
+    expect(offenders).toEqual([])
   })
 
   it('gives the canvas a coordinate and the tree a key', () => {

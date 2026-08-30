@@ -268,3 +268,89 @@ describe('the click that follows a drag', () => {
     expect(result.current.consumeClick()).toBe(false)
   })
 })
+
+/**
+ * Abandoning a drag, and losing the window while one is in flight.
+ */
+describe('a drag that does not finish normally', () => {
+  const source: DragSource = { kind: 'move', key: 'heading', label: 'heading' }
+
+  it('does not let the release after Escape read as a click', async () => {
+    /*
+     * Escape raised the swallow flag and then `cancel()` cleared the state the
+     * flag was about — so the `pointerup` that followed found nothing dragging,
+     * lowered the flag again, and the click selected whatever was under the
+     * pointer. Exactly the behaviour the comment beside it says it prevents.
+     */
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      pointer('pointermove', 40, 40)
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      pointer('pointerup', 200, 200)
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(true)
+  })
+
+  it('commits nothing when the drag was abandoned', async () => {
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      pointer('pointermove', 40, 40)
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      pointer('pointerup', 200, 200)
+      await Promise.resolve()
+    })
+
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('lets go when the window does', async () => {
+    /*
+     * Bare window listeners with no pointer capture: a release outside the
+     * window is never seen, so the drag label stayed glued to the cursor and
+     * the next click in the page committed a drop nobody asked for.
+     */
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      pointer('pointermove', 40, 40)
+      pointer('pointermove', 200, 200)
+      await Promise.resolve()
+    })
+    expect(result.current.state).toBeDefined()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('blur'))
+      await Promise.resolve()
+    })
+
+    expect(result.current.state).toBeUndefined()
+  })
+
+  it('still commits a drag that ends properly', async () => {
+    // The control. Cancelling on everything would make dropping impossible.
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+})

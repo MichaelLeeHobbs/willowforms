@@ -97,6 +97,16 @@ export function useDrag(
   const moved = useRef(false)
   const swallowClick = useRef(false)
   /*
+   * Whether the drag now ending was abandoned rather than dropped.
+   *
+   * Escape raised the swallow flag and then `cancel()` cleared the state the
+   * flag was about — so the `pointerup` that inevitably followed found nothing
+   * dragging, lowered the flag again, and the click selected whatever was under
+   * the pointer. Exactly the behaviour the comment beside Escape says it
+   * prevents.
+   */
+  const abandoned = useRef(false)
+  /*
    * Held in a ref so the window listeners below never need reattaching, and
    * written in an effect rather than during render.
    *
@@ -118,6 +128,7 @@ export function useDrag(
   const begin = useCallback((source: DragSource, event: ReactPointerEvent) => {
     pending.current = { source, x: event.clientX, y: event.clientY }
     moved.current = false
+    abandoned.current = false
   }, [])
 
   const registerZone = useCallback((name: string, resolve: DropResolver) => {
@@ -176,8 +187,13 @@ export function useDrag(
       }
 
       if (dragged && press && landed) commit.current(press.source, landed)
-      // A release that moved is never also a click, whether or not it landed.
-      swallowClick.current = dragged
+      /*
+       * A release that moved is never also a click, whether or not it landed —
+       * and neither is the release after an abandoned drag, which is why the
+       * abandonment has to survive until the button actually comes up.
+       */
+      swallowClick.current = dragged || abandoned.current
+      abandoned.current = false
       cancel()
     }
 
@@ -186,6 +202,22 @@ export function useDrag(
       // Abandoning mid-drag must not then read as a click on whatever is under
       // the pointer when the button finally comes up.
       swallowClick.current = moved.current
+      abandoned.current = moved.current
+      cancel()
+    }
+
+    /*
+     * Losing the window ends the drag.
+     *
+     * These are bare window listeners with no `setPointerCapture`, so a release
+     * outside the window is never seen: the drag label stayed glued to the
+     * cursor, and the next click anywhere in the page committed a drop nobody
+     * asked for. Losing focus or visibility is the closest thing to a release
+     * this can observe.
+     */
+    const lost = (): void => {
+      if (!pending.current) return
+      abandoned.current = moved.current
       cancel()
     }
 
@@ -218,6 +250,8 @@ export function useDrag(
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('click', lowerSwallow)
     window.addEventListener('pointerdown', lowerSwallow)
+    window.addEventListener('blur', lost)
+    document.addEventListener('visibilitychange', lost)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
@@ -225,6 +259,8 @@ export function useDrag(
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('click', lowerSwallow)
       window.removeEventListener('pointerdown', lowerSwallow)
+      window.removeEventListener('blur', lost)
+      document.removeEventListener('visibilitychange', lost)
     }
   }, [])
 

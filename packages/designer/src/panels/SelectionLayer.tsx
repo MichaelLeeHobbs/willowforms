@@ -22,9 +22,9 @@ import type { Rect } from '../geometry.js'
  * selectable node currently goes invisible. If per-node CSS ever lands, a
  * `display: none` node would measure zero here and want a visibility check.
  */
-function measure(surface: HTMLElement, key: string | undefined): Rect | undefined {
+function measure(surface: HTMLElement, key: string | undefined, row?: string): Rect | undefined {
   if (!key) return undefined
-  const element = nodeElement(surface, key)
+  const element = nodeElement(surface, key, row)
   if (!element) return undefined
   return measureIn(surface, element)
 }
@@ -38,6 +38,14 @@ export interface SelectionLayerProps {
   /** Only used to re-measure after an edit changes a component's size. */
   document: FormDocument
   selectedKey: string | undefined
+  /**
+   * Which drawn copy of the selected node the author pointed at.
+   *
+   * A repeater draws one subtree per row, so a key is not unique in the DOM and
+   * the first match is row 0. Absent outside a repeater, and absent for a
+   * selection made from the tree, which names a node and no row.
+   */
+  selectedRow?: string
   /** Component type of the selection, shown on the frame's label. */
   selectedType: string | undefined
   hoverKey: string | undefined
@@ -58,6 +66,7 @@ export function SelectionLayer({
   surfaceRef,
   document,
   selectedKey,
+  selectedRow,
   selectedType,
   hoverKey,
   actions,
@@ -68,7 +77,7 @@ export function SelectionLayer({
   const remeasure = useCallback(() => {
     const surface = surfaceRef.current
     if (!surface) return
-    setSelected(measure(surface, selectedKey))
+    setSelected(measure(surface, selectedKey, selectedRow))
     // One frame is enough when the pointer is over the selection already.
     setHover(measure(surface, hoverKey === selectedKey ? undefined : hoverKey))
   }, [surfaceRef, selectedKey, hoverKey])
@@ -99,7 +108,10 @@ export function SelectionLayer({
   useLayoutEffect(() => {
     const surface = surfaceRef.current
     if (!surface || !selectedKey) return
-    nodeElement(surface, selectedKey)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    nodeElement(surface, selectedKey, selectedRow)?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    })
   }, [surfaceRef, selectedKey])
 
   return (

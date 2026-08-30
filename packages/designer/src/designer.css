@@ -317,7 +317,20 @@
   color: var(--fs-text-muted);
 }
 
+/*
+ * `touch-action: none` here as well as on the palette and the tree rows.
+ *
+ * The surface is `overflow: auto`, so on touch the browser claimed a
+ * press-and-drag as a pan, fired `pointercancel`, and canvas-to-canvas moves
+ * simply did not exist — against the spec's "pointer events throughout, so it
+ * works on touch". The palette and the tree already said this; the one surface
+ * that scrolls did not.
+ *
+ * `pan-y` rather than `none`, so the canvas can still be scrolled vertically
+ * with a finger. A horizontal drag is the gesture the designer wants.
+ */
 .fs-canvas__surface {
+  touch-action: pan-y;
   position: relative;
   flex: 1;
   overflow: auto;
@@ -788,8 +801,24 @@
  * frame drawn around a desktop canvas would be a picture of a monitor, which
  * tells the author nothing they cannot already see.
  */
+/*
+ * The frame is where the designer's own typography stops.
+ *
+ * `.fs-shell` sets `font-family`, `font-size` and `color`, and all three are
+ * *inherited* — so they flowed through the surface and this frame into whatever
+ * the kit rendered, and nothing put them back. Invariant 3 breached by
+ * inheritance rather than by a descendant selector, which is why the test that
+ * parses selectors could not see it: in dark mode an author styled and approved
+ * text that ships as the browser's default black at the browser's default size.
+ *
+ * `revert` rather than a value: the form should look the way it will look on the
+ * host's page, and this cannot know what that is.
+ */
 .fs-canvas__frame {
   margin-inline: auto;
+  font-family: revert;
+  font-size: revert;
+  color: revert;
 }
 
 .fs-canvas__frame[data-fs-viewport='tablet'],
