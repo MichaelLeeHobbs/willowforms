@@ -21,3 +21,7 @@ coverage/
 
 # Editor scratch. WebStorm and VS Code both write temp files here mid-session.
 .vscode/
+
+# Written by apps/demo-server at runtime. Running the demo must not dirty the tree,
+# and it must not fail format:check.
+apps/demo-server/forms.json
