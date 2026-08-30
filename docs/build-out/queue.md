@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 10 — four guards in `docs.test.ts`, and the five drifts they found
+- **Last completed:** item 11 — the lint guardrails are executed by a test, and three holes are closed
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -116,7 +116,7 @@ Root causes. Each collapses several individual findings, so these come before th
       on the built count, `07-bindings.md` on the language selector.
       _Check:_ `docs.test.ts` is tightened so each of those four drifts fails it, then all pass. Standing gate.
 
-- [ ] **11. Close the holes in the guards.** Theme 7. The eslint block for invariant 1 is scoped to `*.ts`
+- [x] **11. Close the holes in the guards.** Theme 7. The eslint block for invariant 1 is scoped to `*.ts`
       and exempts `.tsx`; `no-restricted-imports` uses `paths`, which matches exactly, so `react-dom/client`
       slips through; the react-hooks rules are `.tsx`-only, so `store.ts` gets no `exhaustive-deps` at all.
       _Check:_ a `.tsx` file in core importing React fails `pnpm lint`; so does `react-dom/client`; `store.ts`

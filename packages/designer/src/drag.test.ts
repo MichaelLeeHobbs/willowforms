@@ -22,7 +22,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { useDrag } from './drag.js'
-import type { DropCommit, DropResolver } from './drag.js'
+import type { DragSource, DropCommit, DropResolver } from './drag.js'
 
 const press = (x: number, y: number): ReactPointerEvent =>
   ({ clientX: x, clientY: y }) as ReactPointerEvent
@@ -155,5 +155,41 @@ describe('the drop zone handshake', () => {
 
     // A clientX of 0 is the left edge, not a missing coordinate.
     expect(resolve).toHaveBeenCalledWith(0, 0, 'a')
+  })
+})
+
+/**
+ * Which `onCommit` a release reaches.
+ *
+ * The window listeners are attached once and never reattached, so the handler
+ * they call has to be read through a ref rather than captured. That is the
+ * whole reason the ref exists, and nothing pinned it — so the ref could be
+ * written in the wrong place and every existing test would stay green, because
+ * they all pass the same handler for the life of the hook.
+ */
+describe('a commit handler replaced between renders', () => {
+  it('calls the current one, not the one the listeners were attached with', async () => {
+    const first = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const second = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const resolve = vi.fn<DropResolver>(() => ({ parentKey: 'root', index: 0 }))
+
+    const { result, rerender } = renderHook(({ onCommit }) => useDrag(onCommit), {
+      initialProps: { onCommit: first },
+    })
+
+    act(() => {
+      result.current.registerZone('tree', resolve)
+    })
+
+    // The handler a parent hands down changes on most renders: it closes over
+    // the document, and the document changes on every edit.
+    rerender({ onCommit: second })
+
+    await drag(() => {
+      result.current.begin({ kind: 'move', key: 'heading', label: 'heading' }, press(10, 10))
+    })
+
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(first).not.toHaveBeenCalled()
   })
 })

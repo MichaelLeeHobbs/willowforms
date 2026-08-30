@@ -87,30 +87,60 @@ export default tseslint.config(
   },
 
   /*
+   * The hooks rules, on every TypeScript file rather than only on the ones that
+   * hold JSX.
+   *
+   * They were `.tsx`-only, and every hook in the designer lives in `store.ts` —
+   * so the file with all the `useCallback` dependency arrays in it was the one
+   * file `exhaustive-deps` never looked at. A hook is a hook whether or not the
+   * file also returns markup.
+   *
+   * Separate from the React block below rather than folded into it, because
+   * `react` and `jsx-a11y` genuinely have nothing to say about a file with no
+   * JSX in it and would only add noise.
+   */
+  {
+    files: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: { ...reactHooks.configs.recommended.rules },
+  },
+
+  /*
    * Invariant 1. Core must run in Node for server-side validation, so it takes
    * no React and no component library. Breaking this is not caught by tsc: core
    * would keep compiling and only fail the day someone imports it on a server.
    */
   {
-    files: ['packages/core/src/**/*.ts'],
+    /*
+     * `.tsx` as well, and it was not. Core has no `.tsx` files today, which is
+     * the invariant working — but a rule scoped to `*.ts` is a rule that stops
+     * applying the moment somebody adds the first one, which is precisely when
+     * it is needed. There is nothing in the file extension that makes React
+     * acceptable.
+     */
+    files: ['packages/core/src/**/*.ts', 'packages/core/src/**/*.tsx'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [
+          /*
+           * `patterns`, not `paths`. `paths` matches a module name exactly, so
+           * a rule naming `react-dom` said nothing about `react-dom/client`,
+           * `react-dom/server` or `react/jsx-runtime` — and a subpath is how
+           * anybody actually imports those two.
+           */
+          patterns: [
             {
-              name: 'react',
+              group: ['react', 'react/*'],
               message:
                 'Invariant 1: @formsmith/core runs in Node. Server-side validation depends on it staying React-free.',
             },
             {
-              name: 'react-dom',
+              group: ['react-dom', 'react-dom/*'],
               message: 'Invariant 1: @formsmith/core runs in Node and imports no React.',
             },
+            ...noComponentLibrary('Invariant 1: @formsmith/core imports no component library.'),
           ],
-          patterns: noComponentLibrary(
-            'Invariant 1: @formsmith/core imports no component library.',
-          ),
         },
       ],
     },

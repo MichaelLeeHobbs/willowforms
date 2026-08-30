@@ -96,9 +96,24 @@ export function useDrag(
   const nextId = useRef(0)
   const moved = useRef(false)
   const swallowClick = useRef(false)
-  // Held in a ref so the window listeners below never need reattaching.
+  /*
+   * Held in a ref so the window listeners below never need reattaching, and
+   * written in an effect rather than during render.
+   *
+   * Writing it during render is the shape React's own documentation warns
+   * about: a render that is thrown away still mutates the ref, so under
+   * concurrent rendering the ref can end up holding a handler from a render
+   * that never committed. Nothing here read it during render — the listeners
+   * are installed from an effect and fire long afterwards — so this is the same
+   * behaviour, expressed somewhere it is also correct.
+   *
+   * The test below it pins what the ref is for: a release calls the handler the
+   * hook was last given, not the one the listeners were attached with.
+   */
   const commit = useRef(onCommit)
-  commit.current = onCommit
+  useEffect(() => {
+    commit.current = onCommit
+  }, [onCommit])
 
   const begin = useCallback((source: DragSource, event: ReactPointerEvent) => {
     pending.current = { source, x: event.clientX, y: event.clientY }
