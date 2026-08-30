@@ -19,7 +19,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { prop } from '@formsmith/core'
 import { describe, expect, it, vi } from 'vitest'
-import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
+import type { ComponentDef, ComponentNode, FormDocument, Kit } from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
@@ -199,6 +199,282 @@ describe('a length means the same thing in both kits', () => {
  * this is a lost control rather than a lost page. A lost control is still the
  * question the form was asking.
  */
+/**
+ * A document's string does not become a class name, a variant, or a URL.
+ *
+ * Every one of these is a value a kit interpolated or trusted because its own
+ * `defaultProps` only ever holds sensible ones. A document is data, and the same
+ * file already narrows some of them — `Text.align` has a comment saying exactly
+ * why — so what is here is the ones that were missed rather than a new rule.
+ */
+/**
+ * Three obligations every kit already had, that nothing ran.
+ */
+describe('what a data-bound control has to say about itself', () => {
+  /*
+   * Data-bound and not a container. A repeater is data-bound — its value is the
+   * list of rows — but it is not a control anybody types into, and marking a
+   * container invalid or required says nothing a screen reader can use.
+   */
+  function bound(kit: Kit): { type: string; def: ComponentDef }[] {
+    return kit.components
+      .filter((def) => def.dataBound && !def.container)
+      .map((def) => ({ type: def.type, def }))
+  }
+
+  function drawField(
+    renderers: RendererKit,
+    def: ComponentDef,
+    extra: Partial<ComponentNode>,
+  ): HTMLElement {
+    const node: ComponentNode = {
+      ...instantiate(def, { key: 'r', type: 'r', props: {} }),
+      key: 'target',
+      ...extra,
+    }
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        errors={extra.schema ? { target: 'Something is wrong.' } : {}}
+        onChange={() => undefined}
+      />,
+    )
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error(def.type + ' did not render')
+    return element
+  }
+
+  /** The control inside a component, whatever element the kit chose for it. */
+  function control(element: HTMLElement): HTMLElement | null {
+    return element.matches('input, select, textarea')
+      ? element
+      : element.querySelector('input, select, textarea')
+  }
+
+  it.each(KITS)('$name marks a failing control invalid', ({ kit, renderers }) => {
+    /*
+     * A stated obligation of the contract, and one the contract test
+     * deliberately did not cover — so three MUI components never set it while
+     * the HTML kit set it on all three. A control that looks wrong and does not
+     * say so is announced to a screen reader as fine.
+     */
+    const missing = bound(kit)
+      .filter(({ def }) => {
+        const element = drawField(renderers, def, {
+          schema: { type: def.dataType ?? 'string', validations: [] },
+        })
+        const target = control(element)
+        // Some controls are a group rather than a single input; then the
+        // element carrying the key is the one that has to say it.
+        return (
+          target?.getAttribute('aria-invalid') !== 'true' &&
+          element.getAttribute('aria-invalid') !== 'true'
+        )
+      })
+      .map(({ type }) => type)
+
+    expect(missing).toEqual([])
+  })
+
+  it.each(KITS)('$name marks a required control required', ({ kit, renderers }) => {
+    /*
+     * WCAG 3.3.2. `node` is on `NodeRendererProps` and no renderer read it, in
+     * either kit — so a required field was required in `validateForm` and
+     * ordinary in the accessibility tree, and the first anybody heard of it was
+     * a rejected submit.
+     */
+    const missing = bound(kit)
+      .filter(({ def }) => {
+        const element = drawField(renderers, def, {
+          schema: { type: def.dataType ?? 'string', validations: [{ key: 'required' }] },
+        })
+        const target = control(element)
+        return (
+          target?.getAttribute('aria-required') !== 'true' &&
+          target?.hasAttribute('required') !== true &&
+          element.getAttribute('aria-required') !== 'true'
+        )
+      })
+      .map(({ type }) => type)
+
+    expect(missing).toEqual([])
+  })
+
+  it.each(KITS)('$name leaves an unrequired control unmarked', ({ kit, renderers }) => {
+    // The control. Marking everything required would pass the test above and
+    // announce every field as mandatory.
+    const wrong = bound(kit)
+      .filter(({ def }) => {
+        const element = drawField(renderers, def, {
+          schema: { type: def.dataType ?? 'string', validations: [] },
+        })
+        const target = control(element)
+        return target?.getAttribute('aria-required') === 'true' || target?.hasAttribute('required')
+      })
+      .map(({ type }) => type)
+
+    expect(wrong).toEqual([])
+  })
+})
+
+/**
+ * A value a host seeded, shown in the control that holds it.
+ *
+ * `str(value)` answers `''` for anything that is not a string, so a host
+ * restoring `{age: 30}` saw an empty field whose data was not empty: `required`
+ * passed, the field looked unanswered, and the first keystroke overwrote an
+ * answer nobody had seen. `jsonToString` is what the rest of each kit uses.
+ */
+describe('a control holding a value that is not a string', () => {
+  const holding = (type: string, dataType: string): ComponentNode => ({
+    key: 'target',
+    type,
+    props: {},
+    schema: { type: dataType as 'string', validations: [] },
+  })
+
+  it.each(
+    KITS.flatMap(({ name, kit, renderers }) =>
+      /*
+       * Not `DatePicker`: a `type="date"` input refuses a value that is not a
+       * date and clears itself, whatever the kit hands it, so the assertion
+       * would be about the browser rather than about the kit. It reads its value
+       * the same way as its neighbours; there is just no way to see that here.
+       */
+      ['TextField', 'TextArea', 'NumberField']
+        .filter((type) => kit.components.some((def) => def.type === type))
+        .map((type) => [name + ' ' + type, renderers, type] as const),
+    ),
+  )('%s shows it', (_what, renderers, type) => {
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(holding(type, 'string'))}
+        kit={renderers}
+        data={{ target: 30 }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    const field = element?.querySelector('input, textarea') ?? element
+    expect((field as HTMLInputElement | null)?.value).toBe('30')
+  })
+})
+
+describe('a document value a kit puts somewhere structural', () => {
+  function nodeWith(type: string, props: Record<string, unknown>): ComponentNode {
+    return {
+      key: 'target',
+      type,
+      props: Object.fromEntries(Object.entries(props).map(([k, v]) => [k, prop(v as never)])),
+    }
+  }
+
+  function draw(renderers: RendererKit, node: ComponentNode): HTMLElement {
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error('the component did not render')
+    return element
+  }
+
+  it.each(KITS)('$name does not let a Text variant add classes of its own', ({ renderers }) => {
+    /*
+     * `'fsh-text fsh-text--' + variant` with an unnarrowed variant. React
+     * escapes the attribute, so this is not XSS — but on a host using a utility
+     * CSS framework, `variant: "body fixed inset-0 z-50"` is an element covering
+     * the viewport, over the real form.
+     */
+    const element = draw(
+      renderers,
+      nodeWith('Text', { text: 'hello', variant: 'body fixed inset-0 z-50' }),
+    )
+
+    expect(element.className).not.toContain('inset-0')
+  })
+
+  it.each(KITS)('$name still tells its own variants apart', ({ kit, renderers }) => {
+    /*
+     * The control. Narrowing to nothing would collapse every variant to the
+     * default and pass the test above. Two declared variants have to produce
+     * two different results — which is checkable without knowing how a kit
+     * spells them, and MUI spells them as its own class names rather than as
+     * the authored word.
+     */
+    const declared = (
+      kit.components.find((def) => def.type === 'Text')?.props.find((p) => p.name === 'variant')
+        ?.options ?? []
+    ).map((option) => (typeof option.value === 'string' ? option.value : ''))
+    if (declared.length < 2) return
+
+    const [first, second] = declared as [string, string]
+    const a = draw(renderers, nodeWith('Text', { text: 'hello', variant: first }))
+    const b = draw(renderers, nodeWith('Text', { text: 'hello', variant: second }))
+
+    expect(a.outerHTML).not.toBe(b.outerHTML)
+  })
+
+  it.each(KITS)('$name gives an unrecognised Alert severity a role anyway', ({ renderers }) => {
+    /*
+     * An unnarrowed severity also withheld `role="alert"`, because the check is
+     * `severity === 'error'`. So a document with a typo in the severity of its
+     * error banner drew the banner and announced nothing.
+     */
+    const element = draw(
+      renderers,
+      nodeWith('Alert', { text: 'Something failed', severity: 'eror' }),
+    )
+
+    // Either it is treated as the default severity, or it is announced. What it
+    // must not do is silently become a class name of its own.
+    expect(element.className).not.toContain('eror')
+  })
+
+  it.each(KITS)('$name does not put an arbitrary scheme in an image src', ({ renderers }) => {
+    // `LinkNode` runs `href` through `safeHref`; `Image` put `src` straight into
+    // the DOM. Not script execution, but an outbound request with a referrer on
+    // every render, to an address the document chose.
+    const element = draw(renderers, nodeWith('Image', { src: 'javascript:alert(1)', alt: 'x' }))
+    const img = element.tagName === 'IMG' ? element : element.querySelector('img')
+
+    expect(img?.getAttribute('src') ?? '').not.toContain('javascript:')
+  })
+
+  it.each(KITS)('$name still shows an image with an ordinary address', ({ renderers }) => {
+    const element = draw(
+      renderers,
+      nodeWith('Image', { src: 'https://example.com/a.png', alt: 'x' }),
+    )
+    const img = element.tagName === 'IMG' ? element : element.querySelector('img')
+
+    expect(img?.getAttribute('src')).toBe('https://example.com/a.png')
+  })
+
+  it.each(KITS)('$name falls back when a text prop is cleared to empty', ({ renderers }) => {
+    /*
+     * `str(v, fallback)` returns `''` when the value *is* `''`, so every "safe
+     * default" was bypassed by an emptied field — a button with no text, a link
+     * with no text, a label with nothing in it. Clearing a label in the panel is
+     * the most natural way to try to remove it.
+     */
+    const element = draw(renderers, nodeWith('Button', { text: '' }))
+
+    expect(element.textContent?.trim()).not.toBe('')
+  })
+})
+
 describe('a component whose options a document got wrong', () => {
   /** Everything a hand-edited document has plausibly been seen to hold. */
   const RUBBISH: unknown[] = [null, undefined, 'a bare string', 42, [], { label: 'fine', value: 7 }]

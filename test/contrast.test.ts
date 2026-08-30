@@ -94,7 +94,7 @@ describe("the designer's two dark blocks", () => {
     const { chosen, system } = darkBlocks(
       designerCss,
       ".fs-shell[data-fs-theme='dark']",
-      ".fs-shell:not([data-fs-theme='light'])",
+      ".fs-shell:where(:not([data-fs-theme='light']))",
     )
     expect(system, 'the two dark blocks have drifted apart').toEqual(chosen)
   })
@@ -105,7 +105,7 @@ describe.each(
     designerCss,
     '.fs-shell',
     ".fs-shell[data-fs-theme='dark']",
-    ".fs-shell:not([data-fs-theme='light'])",
+    ".fs-shell:where(:not([data-fs-theme='light']))",
   ),
 )('designer chrome, $name theme', ({ tokens }) => {
   const on = (fg: string, bg: string): number => {
@@ -171,7 +171,7 @@ describe("the HTML kit's two dark blocks", () => {
     const { chosen, system } = darkBlocks(
       kitCss,
       ".fsh-screen[data-fsh-theme='dark']",
-      ".fsh-screen:not([data-fsh-theme='light'])",
+      ".fsh-screen:where(:not([data-fsh-theme='light']))",
     )
     expect(system, 'the two dark blocks have drifted apart').toEqual(chosen)
   })
@@ -182,7 +182,7 @@ describe.each(
     kitCss,
     '.fsh-screen',
     ".fsh-screen[data-fsh-theme='dark']",
-    ".fsh-screen:not([data-fsh-theme='light'])",
+    ".fsh-screen:where(:not([data-fsh-theme='light']))",
   ),
 )('html kit, $name theme', ({ tokens }) => {
   const on = (fg: string, bg: string): number => {

@@ -389,7 +389,7 @@ export const muiKit: Kit = {
       icon: 'button',
       group: 'inputs',
       container: true,
-      defaultProps: { orientation: 'horizontal', variant: 'solid' },
+      defaultProps: { orientation: 'horizontal' },
       props: [
         {
           name: 'orientation',

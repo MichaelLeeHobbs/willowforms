@@ -28,6 +28,7 @@ import type {
   ComponentNode,
   EvalOptions,
   RowContext,
+  RowPath,
   Evaluator,
   FormContext,
   FormData,
@@ -144,10 +145,25 @@ export function resolveProp(
     case 'static':
       return value.value
     case 'i18n':
-      return translations[value.key] ?? value.key
-    // Resolves to a boolean. Meant for renderWhen, and harmless anywhere else.
+      /*
+       * An own-property read. A plain lookup finds `Object.prototype`, so an
+       * `i18n` key of `toString` resolved to a *function* — which React renders
+       * as nothing, so the label silently disappeared. The same rule `valueOf`
+       * and `readPath` follow everywhere else in this project.
+       */
+      return Object.hasOwn(translations, value.key)
+        ? (translations[value.key] ?? value.key)
+        : value.key
+    /*
+     * Resolves to a boolean. Meant for renderWhen, and harmless anywhere else.
+     *
+     * `options.row` is passed, and used not to be — so a prop bound to a
+     * condition could not read its own row while `renderWhen` could. That makes
+     * `rowScopeProblems`' advice, "set the test to read this row", work for one
+     * and silently do nothing for the other.
+     */
     case 'condition':
-      return evaluateCondition(value.condition, data, options.context)
+      return evaluateCondition(value.condition, data, options.context, options.row)
     case 'computed':
       // No sandbox means no evaluation. Render the field rather than crash the form.
       return options.evaluate ? options.evaluate(value.expression, data, options.context) : null
@@ -174,13 +190,31 @@ function resolveProps(
   options: EvalOptions,
 ): Record<string, JsonValue> {
   const out: Record<string, JsonValue> = {}
-  for (const [name, value] of Object.entries(node.props)) {
+
+  /*
+   * Guarded, because this is the only layer that was not total over an
+   * untrusted document. `Object.entries(5)` is `[]` but `Object.entries(null)`
+   * throws, and one node missing `props` used to take the whole form with it.
+   */
+  const props =
+    node.props && typeof node.props === 'object' && !Array.isArray(node.props) ? node.props : {}
+
+  for (const [name, value] of Object.entries(props)) {
     out[name] = resolveProp(value, translations, data, options)
   }
   return out
 }
 
-function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
+/**
+ * Drawn when a document names a component type the kit does not have.
+ *
+ * It carries the error, and that is not decoration. `validateForm` validates a
+ * node whatever its type, so a document naming a missing type still produces
+ * errors for it — and a required one blocks the submit. Without this the person
+ * filling in the form gets a rejected submit and nothing on screen that says
+ * which field, which is the failure this project treats as the worst.
+ */
+function MissingType({ node, nodeProps, error }: NodeRendererProps): ReactNode {
   return (
     <div
       {...nodeProps}
@@ -188,6 +222,7 @@ function MissingType({ node, nodeProps }: NodeRendererProps): ReactNode {
       style={{ padding: 8, border: '1px dashed currentColor', opacity: 0.7 }}
     >
       No renderer for component type <code>{node.type}</code> (key <code>{node.key}</code>).
+      {error ? <div>{error}</div> : null}
     </div>
   )
 }
@@ -262,6 +297,50 @@ class NodeBoundary extends Component<NodeBoundaryProps, { failed: boolean }> {
       </div>
     )
   }
+}
+
+/**
+ * One error, read as an own property.
+ *
+ * A node keyed `constructor` made `errors['constructor']` a function, so `error`
+ * was truthy: the kit put the field into an error state and drew a message that
+ * renders as nothing. A red field with no text and no way to clear it.
+ */
+function errorAt(errors: FormErrors, address: string): string | undefined {
+  return Object.hasOwn(errors, address) ? errors[address] : undefined
+}
+
+/**
+ * One row's scope, as a context value that only changes when the row does.
+ *
+ * The provider used to build its value inline, so every row got a new object
+ * identity on every render of the repeater — which defeats the four `useMemo`s
+ * in every descendant, because each of them lists `row` in its dependencies.
+ * A fifty-row repeater therefore re-ran `isVisible` and `resolveProps` for every
+ * node beneath it on every keystroke.
+ *
+ * A component rather than a `useMemo` at the call site, because the call site is
+ * inside a `.map` and a hook cannot go there.
+ */
+function Row({
+  path,
+  name,
+  index,
+  value,
+  children,
+}: {
+  path: RowPath
+  name: string
+  index: number
+  value: JsonValue
+  children: ReactNode
+}): ReactNode {
+  const context = useMemo(
+    () => rowContext(pushRow(path, { key: name, index }), value),
+    [path, name, index, value],
+  )
+
+  return <RowCtx.Provider value={context}>{children}</RowCtx.Provider>
 }
 
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
@@ -356,14 +435,17 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
 
   const children = isRowScope(node)
     ? drawn.map((value, index) => (
-        <RowCtx.Provider
+        <Row
           key={index}
-          value={rowContext(pushRow(row?.path ?? NO_ROWS, { key: dataKeyOf(node), index }), value)}
+          path={row?.path ?? NO_ROWS}
+          name={dataKeyOf(node)}
+          index={index}
+          value={value}
         >
           {node.children?.map((child) => (
             <RenderNode key={child.key} node={child} />
           ))}
-        </RowCtx.Provider>
+        </Row>
       ))
     : node.children?.map((child) => <RenderNode key={child.key} node={child} />)
 
@@ -376,7 +458,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
         // Value by data key, error by node key. Two components may share a data
         // key; they can still fail for different reasons.
         value={valueOf(row?.values ?? data, dataKey)}
-        error={errors[addressOf(row?.path ?? NO_ROWS, node.key)]}
+        error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
         onChange={handleChange}
       >
         {children}

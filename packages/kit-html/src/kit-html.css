@@ -34,7 +34,17 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .fsh-screen:not([data-fsh-theme='light']) {
+  /*
+   * `:where()`, so a host can override these.
+   *
+   * `:not()` takes its argument's specificity, so this rule was (0,2,0) while
+   * the recipe the README gives a host — `.fsh-screen { --fsh-accent: … }` — is
+   * (0,1,0). A host followed the documented instructions and its branding
+   * silently reverted for every viewer whose system is dark. `:where()`
+   * contributes nothing, which puts this at (0,1,0) and lets source order
+   * decide, which is what a host expects.
+   */
+  .fsh-screen:where(:not([data-fsh-theme='light'])) {
     --fsh-text: #eef0f4;
     --fsh-muted: #a9b1bd;
     --fsh-surface: #16181d;
@@ -421,7 +431,7 @@ fieldset.fsh-field {
 }
 
 /* Indeterminate: no width was set, so it sweeps instead of filling. */
-.fsh-progress__fill:not([style]) {
+.fsh-progress__fill--sweeping {
   inline-size: 40%;
   animation: fsh-progress-sweep 1.4s ease-in-out infinite;
 }
@@ -437,7 +447,7 @@ fieldset.fsh-field {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fsh-progress__fill:not([style]) {
+  .fsh-progress__fill--sweeping {
     animation: none;
     inline-size: 100%;
     opacity: 0.5;

@@ -110,6 +110,7 @@ export {
   TOO_MANY_ROWS,
   UNREADABLE_RULE,
   validateField,
+  isRequired,
   isRowScope,
   validateAcross,
   validateForm,

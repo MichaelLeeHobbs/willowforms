@@ -19,13 +19,55 @@
 
 import { createContext, createElement, useContext, useId } from 'react'
 import type { ReactNode } from 'react'
-import { jsonToString, optionEntry, optionValue, safeHref, safeStyleValue } from '@formsmith/core'
+import type { ComponentNode } from '@formsmith/core'
+import {
+  isRequired,
+  jsonToString,
+  optionEntry,
+  optionValue,
+  safeHref,
+  safeStyleValue,
+} from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 type Level = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
-const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
+/**
+ * A string, or the fallback.
+ *
+ * `v || fallback`, not `typeof v === 'string' ? v : fallback`. An emptied field
+ * *is* a string, so every "safe default" here was bypassed by clearing one —
+ * which is the most natural way to try to remove a label. A button with no
+ * text, a link with no text, an `aria-label` of `''` on a progress bar.
+ */
+const str = (v: unknown, fallback = ''): string => (typeof v === 'string' && v ? v : fallback)
+
+/**
+ * One of a known set, or the first of them.
+ *
+ * Every one of these values comes from a document, which is data. Interpolated
+ * into a class name, an unnarrowed one adds classes of its own: on a host using
+ * a utility CSS framework, `variant: "body fixed inset-0 z-50"` is an element
+ * covering the viewport over the real form. React escapes the attribute, so it
+ * is not script execution — it is UI redress, which is worse to debug.
+ */
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(v as T) ? (v as T) : fallback
+
+/**
+ * What a control has to say about itself beyond its value.
+ *
+ * `aria-required` rather than the platform `required`: the obligation is WCAG
+ * 3.3.2, which is about the accessibility tree, and native `required` also turns
+ * on the browser's own validation — a second validator with its own messages
+ * competing with the form's, inside whatever `<form>` a host has wrapped this
+ * in. `isRequired` is in core so the two kits cannot answer differently, and it
+ * counts only an unguarded rule: a field required sometimes cannot be announced
+ * as one that always is.
+ */
+const requiredProps = (node: ComponentNode): { 'aria-required'?: true } =>
+  isRequired(node) ? { 'aria-required': true } : {}
 const bool = (v: unknown): boolean => v === true
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback)
 
@@ -166,7 +208,14 @@ function Field({
   )
 }
 
-function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function TextFieldNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   const shared = {
     id,
@@ -176,6 +225,7 @@ function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendere
     value: jsonToString(value),
     'aria-invalid': error ? true : undefined,
     'aria-describedby': id + '-message',
+    ...requiredProps(node),
   }
 
   return (
@@ -192,6 +242,7 @@ function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendere
 }
 
 function NumberFieldNode({
+  node,
   props,
   nodeProps,
   value,
@@ -209,6 +260,7 @@ function NumberFieldNode({
           disabled={bool(props['disabled'])}
           value={jsonToString(value)}
           aria-invalid={error ? true : undefined}
+          {...requiredProps(node)}
           aria-describedby={id + '-message'}
           onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
         />
@@ -217,7 +269,14 @@ function NumberFieldNode({
   )
 }
 
-function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function CheckboxNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
   return (
@@ -230,6 +289,7 @@ function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRenderer
           disabled={bool(props['disabled'])}
           checked={value === true}
           aria-invalid={error ? true : undefined}
+          {...requiredProps(node)}
           aria-describedby={messageId}
           onChange={(e) => onChange(e.target.checked)}
         />
@@ -248,7 +308,14 @@ function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRenderer
   )
 }
 
-function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function SelectNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   const raw = props['options']
   const options = Array.isArray(raw) ? raw : []
@@ -262,6 +329,7 @@ function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
           disabled={bool(props['disabled'])}
           value={jsonToString(value)}
           aria-invalid={error ? true : undefined}
+          {...requiredProps(node)}
           aria-describedby={id + '-message'}
           onChange={(e) => onChange(optionValue(options, e.target.value))}
         >
@@ -354,8 +422,13 @@ function Card({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   )
 }
 
+// The three the palette offers. Kept beside the renderer that draws them;
+// `test/kit-contract.test.tsx` checks a kit's declared options against what it
+// actually renders.
+const TEXT_VARIANTS = ['body', 'small', 'caption'] as const
+
 function Text({ props, nodeProps }: NodeRendererProps): ReactNode {
-  const variant = str(props['variant'], 'body')
+  const variant = oneOf(props['variant'], TEXT_VARIANTS, 'body')
   // Narrowed rather than cast: the value comes from a document, which a person
   // can hand-edit, so `align: "javascript:"` has to land somewhere harmless.
   const raw = props['align']
@@ -395,7 +468,7 @@ function Image({ props, nodeProps }: NodeRendererProps): ReactNode {
     <img
       {...nodeProps}
       className="fsh-image"
-      src={str(props['src'])}
+      src={safeHref(props['src']) ?? ''}
       alt={str(props['alt'])}
       style={{
         objectFit: fit,
@@ -405,7 +478,14 @@ function Image({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
-function TextAreaNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function TextAreaNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   return (
     <div {...nodeProps}>
@@ -416,8 +496,9 @@ function TextAreaNode({ props, nodeProps, value, error, onChange }: NodeRenderer
           rows={num(props['rows'], 4)}
           placeholder={str(props['placeholder'])}
           disabled={bool(props['disabled'])}
-          value={str(value)}
+          value={jsonToString(value)}
           aria-invalid={error ? true : undefined}
+          {...requiredProps(node)}
           aria-describedby={id + '-message'}
           onChange={(e) => onChange(e.target.value)}
         />
@@ -444,7 +525,14 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
   )
 }
 
-function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function SwitchNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
   /*
@@ -463,6 +551,7 @@ function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
           checked={bool(value)}
           disabled={bool(props['disabled'])}
           aria-invalid={error ? true : undefined}
+          {...requiredProps(node)}
           aria-describedby={messageId}
           onChange={(e) => onChange(e.target.checked)}
         />
@@ -499,6 +588,7 @@ interface RadioContext {
 const RadioGroupContext = createContext<RadioContext | undefined>(undefined)
 
 function RadioGroupNode({
+  node,
   props,
   nodeProps,
   value,
@@ -522,13 +612,19 @@ function RadioGroupNode({
       className="fsh-field"
       disabled={bool(props['disabled'])}
       aria-invalid={error ? true : undefined}
+      {...requiredProps(node)}
       aria-describedby={messageId}
     >
       <legend className="fsh-field__label">{str(props['label'])}</legend>
       <RadioGroupContext.Provider
         value={{ name: id, selected: jsonToString(value), onSelect: onChange }}
       >
-        <div className={'fsh-radios fsh-radios--' + str(props['direction'], 'column')}>
+        <div
+          className={
+            'fsh-radios fsh-radios--' +
+            oneOf(props['direction'], ['row', 'column'] as const, 'column')
+          }
+        >
           {options.map((option, i) => {
             const { value: v, label } = optionEntry(option, i)
             return (
@@ -585,6 +681,7 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 }
 
 function DatePickerNode({
+  node,
   props,
   nodeProps,
   value,
@@ -602,8 +699,9 @@ function DatePickerNode({
           min={str(props['min']) || undefined}
           max={str(props['max']) || undefined}
           disabled={bool(props['disabled'])}
-          value={str(value)}
+          value={jsonToString(value)}
           aria-invalid={error ? true : undefined}
+          {...requiredProps(node)}
           aria-describedby={id + '-message'}
           onChange={(e) => onChange(e.target.value || null)}
         />
@@ -612,8 +710,31 @@ function DatePickerNode({
   )
 }
 
-function FileUploadNode({ props, nodeProps, error, onChange }: NodeRendererProps): ReactNode {
+function FileUploadNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
+  /*
+   * The names the document holds, drawn beside the input.
+   *
+   * A file input is uncontrolled by design and cannot be given a value, so a
+   * restored draft showed "No file chosen" while the payload was about to
+   * submit a filename. Nothing on screen said what the form was going to send.
+   *
+   * It is also the only thing that follows the row a value belongs to: rows are
+   * keyed by index, so the browser's own idea of which file this input holds
+   * stays with the index rather than with the data. See the note on row keys in
+   * the renderer.
+   */
+  const filesHeld = (Array.isArray(value) ? value : [value])
+    .filter((name): name is string => typeof name === 'string' && name !== '')
+    .join(', ')
+
   const multiple = bool(props['multiple'])
   /*
    * The value is the selected file's name, and nothing more. A file input is
@@ -633,19 +754,25 @@ function FileUploadNode({ props, nodeProps, error, onChange }: NodeRendererProps
           multiple={multiple}
           disabled={bool(props['disabled'])}
           aria-invalid={error ? true : undefined}
+          {...requiredProps(node)}
           aria-describedby={id + '-message'}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []).map((file) => file.name)
             onChange(multiple ? files : (files[0] ?? null))
           }}
         />
+        {filesHeld ? <p className="fsh-field__hint">Holding {filesHeld}</p> : null}
       </Field>
     </div>
   )
 }
 
 function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
-  const severity = str(props['severity'], 'info')
+  const severity = oneOf(
+    props['severity'],
+    ['info', 'success', 'warning', 'error'] as const,
+    'info',
+  )
   const title = str(props['title'])
   /*
    * Only an error announces itself. This component is authored into the form,
@@ -681,7 +808,15 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
       className={'fsh-progress' + (circular ? ' fsh-progress--circular' : '')}
     >
       <span
-        className="fsh-progress__fill"
+        /*
+         * The class says which mode this is; the stylesheet used to ask whether
+         * a `style` attribute was present. React does not remove the attribute
+         * when the object becomes `undefined` — it empties it — so a bar that
+         * went from determinate to indeterminate kept `style=""`, stopped
+         * matching `:not([style])`, and rendered permanently full. "Finished"
+         * instead of a sweep.
+         */
+        className={'fsh-progress__fill' + (determinate ? '' : ' fsh-progress__fill--sweeping')}
         style={determinate ? { inlineSize: value + '%' } : undefined}
       />
     </div>

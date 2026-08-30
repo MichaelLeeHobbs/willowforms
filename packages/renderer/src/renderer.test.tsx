@@ -826,3 +826,181 @@ describe('a component that throws while rendering', () => {
     expect(onError).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * Four things the renderer read without asking what it was reading.
+ *
+ * Each of these needs a kit that *reports* what it was handed rather than one
+ * that draws it. A function rendered as a React child produces no text at all,
+ * so a test asserting on `textContent` passes whether the renderer handed the
+ * component a message or `Object.prototype.constructor` — which is how three of
+ * these first went green while still being wrong.
+ */
+describe('the renderer over an untrusted document', () => {
+  /** A kit that writes down what it received, including the types. */
+  function Reporting({ nodeProps, props, error }: NodeRendererProps): ReactNode {
+    return (
+      <div {...nodeProps}>
+        <span data-testid={nodeProps['data-fs-key'] + '-label-type'}>{typeof props['label']}</span>
+        <span data-testid={nodeProps['data-fs-key'] + '-error-type'}>{typeof error}</span>
+        <span data-testid={nodeProps['data-fs-key'] + '-error'}>
+          {typeof error === 'string' ? error : ''}
+        </span>
+      </div>
+    )
+  }
+
+  const reportingKit: RendererKit = {
+    id: 'reporting',
+    renderers: { Screen: Screen_, Field: Reporting },
+  }
+
+  const typeOf = (container: HTMLElement, id: string): string | null =>
+    container.querySelector('[data-testid="' + id + '"]')?.textContent ?? null
+
+  it('resolves a condition-bound prop inside the row it is in', () => {
+    /*
+     * `resolveProp`'s condition case dropped `options.row`, so a prop bound to a
+     * condition could not read its own row while `renderWhen` could. That makes
+     * `rowScopeProblems`' advice — "set the test to read this row" — work for
+     * one and silently do nothing for the other.
+     */
+    const node: ComponentNode = {
+      key: 'addressList',
+      dataKey: 'addresses',
+      type: 'Screen',
+      props: {},
+      schema: { type: 'array', validations: [] },
+      children: [
+        {
+          key: 'street',
+          dataKey: 'line1',
+          type: 'Field',
+          props: {
+            disabled: {
+              kind: 'condition',
+              condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'locked', scope: 'row' } },
+            },
+          },
+          schema: { type: 'string', validations: [] },
+        },
+      ],
+    }
+
+    const seen: unknown[] = []
+    function Watching({ nodeProps, props }: NodeRendererProps): ReactNode {
+      seen.push(props['disabled'])
+      return <div {...nodeProps} />
+    }
+
+    render(
+      <FormRenderer
+        document={documentOf([node])}
+        kit={{ id: 'watching', renderers: { Screen: Screen_, Field: Watching } }}
+        data={{ addresses: [{ locked: true }, { locked: false }] }}
+        onChange={() => undefined}
+      />,
+    )
+
+    // One row locked and one not. Dropping the row makes both read the top
+    // level, find nothing, and resolve false — which is the same answer twice.
+    expect(seen).toEqual([true, false])
+  })
+
+  it('renders a node whose props are not an object', () => {
+    const node = { key: 'broken', type: 'Field', props: 'nope' } as unknown as ComponentNode
+    const onError = vi.fn()
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([node])}
+        kit={reportingKit}
+        data={{}}
+        onError={onError}
+        onChange={() => undefined}
+      />,
+    )
+
+    // The boundary would keep the page; this is about the component surviving.
+    expect(onError).not.toHaveBeenCalled()
+    expect(container.querySelector('[data-fs-key="broken"]')).toBeTruthy()
+  })
+
+  it('does not find a translation on Object.prototype', () => {
+    const node: ComponentNode = {
+      key: 'greeting',
+      type: 'Field',
+      props: { label: { kind: 'i18n', key: 'toString' } },
+      schema: { type: 'string', validations: [] },
+    }
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([node])}
+        kit={reportingKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    // A string — the key itself, which is what an untranslated key resolves to.
+    // It was a function, and a function rendered as a child draws nothing, so
+    // the label silently disappeared instead.
+    expect(typeOf(container, 'greeting-label-type')).toBe('string')
+  })
+
+  it('does not read an error off Object.prototype', () => {
+    /*
+     * A node keyed `constructor` made `errors['constructor']` a function, so
+     * `error` was truthy: the kit put the field in an error state and drew a
+     * message that renders as nothing. A red field nobody can clear.
+     */
+    const node: ComponentNode = {
+      key: 'constructor',
+      type: 'Field',
+      props: {},
+      schema: { type: 'string', validations: [] },
+    }
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([node])}
+        kit={reportingKit}
+        data={{}}
+        errors={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(typeOf(container, 'constructor-error-type')).toBe('undefined')
+  })
+
+  it('shows the error on a component whose type no kit has', () => {
+    /*
+     * `validateForm` validates a node whatever its type, so a document naming a
+     * type this kit does not have still produces errors for it. The fallback
+     * drew the type and the key and dropped the message: a blocking required
+     * error with nothing on screen saying so.
+     */
+    const node: ComponentNode = {
+      key: 'mystery',
+      type: 'NotInThisKit',
+      props: {},
+      schema: { type: 'string', validations: [{ key: 'required' }] },
+    }
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([node])}
+        kit={kit}
+        data={{}}
+        errors={{ mystery: 'This field is required.' }}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="mystery"]')?.textContent).toContain(
+      'This field is required.',
+    )
+  })
+})

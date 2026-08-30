@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 19 — the 20 MEDIUM findings in core areas 1 and 2
+- **Last completed:** item 20 — the 22 MEDIUM findings in the renderer and both kits
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -146,7 +146,7 @@ item: **every HIGH in these areas is fixed, or recorded in `triage.md` with a on
 Same rule and same reporting as stage 3.
 
 - [x] **19. Core — areas 1 and 2.** T = 20. _fixed 20 / triaged 0 / total 20._
-- [ ] **20. Renderer and both kits — areas 3, 4, addendum.** T = 22.
+- [x] **20. Renderer and both kits — areas 3, 4, addendum.** T = 22. _fixed 22 / triaged 0 / total 22._
 - [ ] **21. Designer shell, canvas and panels — areas 5, 6, 7.** T = 41.
 - [ ] **22. Apps, configuration, e2e — area 8.** T = 19.
 - [ ] **23. The test suites themselves — areas 9 and 10.** T = 42.

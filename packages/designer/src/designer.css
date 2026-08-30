@@ -35,7 +35,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .fs-shell:not([data-fs-theme='light']) {
+  /* `:where()`, for the reason the HTML kit's own dark block gives. */
+  .fs-shell:where(:not([data-fs-theme='light'])) {
     --fs-bg-app: #1b1d21;
     --fs-bg-panel: #24272c;
     --fs-bg-well: #15171a;

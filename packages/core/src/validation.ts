@@ -412,6 +412,27 @@ export function applyRule(
   }
 }
 
+/**
+ * Whether this field is required of everybody, always.
+ *
+ * For a kit to put in the accessibility tree. WCAG 3.3.2 asks that a required
+ * field say so, `node` is on `NodeRendererProps`, and no renderer in either kit
+ * read it — so a required field was required in `validateForm` and ordinary to
+ * a screen reader, and the first anybody heard of it was a rejected submit.
+ *
+ * Unguarded only, which is the same rule `toJsonSchema` applies to its
+ * `required` list and for the same reason: a rule that applies sometimes cannot
+ * be stated as one that always does. A guarded field is left unmarked rather
+ * than marked wrongly — announcing a field as mandatory when it is not is its
+ * own failure.
+ *
+ * In core rather than in each kit, so the two cannot answer differently.
+ */
+export function isRequired(node: ComponentNode): boolean {
+  const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+  return rules.some((rule) => rule?.key === 'required' && !rule.when)
+}
+
 /** First failing rule for one field, or undefined when all pass. */
 export function validateField(
   node: ComponentNode,
