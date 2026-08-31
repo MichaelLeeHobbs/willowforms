@@ -11,9 +11,11 @@
  * for themselves in ten seconds and lose all trust over.
  */
 
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+
+import { DOCS, REPORTER_MARK, totals } from './count-reporter.js'
 
 const root = new URL('../', import.meta.url)
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(path, root)), 'utf8')
@@ -36,33 +38,21 @@ function headings(text: string): string[] {
   )
 }
 
-const DOCS_WITH_COUNTS = [
-  'README.md',
-  'CLAUDE.md',
-  'docs/ROADMAP.md',
-  'docs/spec/README.md',
-  'docs/spec/08-validation.md',
-]
-
-/** Every "N tests" figure a document quotes as the size of the whole suite. */
-function totals(text: string): number[] {
-  const counts: number[] = []
-  /*
-   * Only the headline totals: "278 tests" preceded by nothing that scopes it to
-   * one area, which is how per-feature counts elsewhere in the roadmap read.
-   *
-   * The optional word before "tests" matters. This matched "345 tests" and not
-   * "345 unit tests", so a stale figure sat in the roadmap and in the spec while
-   * this test passed over both of them, in the commit that added it.
-   */
-  for (const match of text.matchAll(
-    /(?:vitest, |pnpm test\s+#[^\n]*?|\b)(\d{2,4}) (?:unit |end-to-end )?tests\b/g,
-  )) {
-    const value = Number(match[1])
-    if (value >= 100) counts.push(value)
-  }
-  return counts
-}
+/*
+ * The list and the pattern come from the reporter now.
+ *
+ * There were two of each. This file's list held five documents against the
+ * reporter's three, and two of its five -- `docs/spec/README.md` and
+ * `docs/spec/08-validation.md` -- quote no total at all and never have. A
+ * document that says nothing contributes an empty array, so the agreement check
+ * below passed over both of them: the list read as covering five documents while
+ * covering three.
+ *
+ * The reporter's own comment said the two patterns "have to stay the same",
+ * which is a note asking somebody to remember rather than a mechanism. Importing
+ * them is the mechanism.
+ */
+const DOCS_WITH_COUNTS = DOCS
 
 /**
  * Every end-to-end total a document quotes.
@@ -118,6 +108,58 @@ describe('documented test counts', () => {
       'documents disagree about the suite size: ' +
         quoted.map((e) => e.path + ' says ' + e.counts.join('/')).join(', '),
     ).toHaveLength(1)
+  })
+
+  it('has a total to compare in every document it claims to check', () => {
+    /*
+     * A document that quotes nothing contributed an empty array and passed. So a
+     * listed document could lose its figure, or never have had one, and the
+     * guard would report agreement among the documents that were left -- the
+     * same shape as a green suite that ran no tests.
+     *
+     * The reporter already refused a silent document. This file did not, and it
+     * was this file's list that had the silent ones in it.
+     */
+    const silent = DOCS_WITH_COUNTS.filter((path) => totals(read(path)).length === 0)
+
+    expect(silent, 'these are listed as stating the suite size and state none').toEqual([])
+  })
+
+  it('is being watched by a reporter that is still running', () => {
+    /*
+     * The count itself is checked by `test/count-reporter.ts`, because no test
+     * can count the run it belongs to. That leaves one question a test can
+     * answer and has to: is the reporter still being called at all?
+     *
+     * It fails by going quiet rather than by failing. Its finish hook was named
+     * for the vitest 2 API, and a version bump that renames it leaves the file
+     * loaded, the class constructed and nothing ever asked -- with the suite
+     * green and every documented figure free to rot. The reporter implements
+     * both the old name and the new one; this is what would notice if it
+     * implemented neither.
+     *
+     * A file rather than a global, because the reporter runs in the main process
+     * and this test runs in a worker.
+     *
+     * Matched on the pid rather than on the file merely existing. Deleting it
+     * after reading was the first version and it was not enough: a marker left
+     * by a filtered run seconds earlier let a deliberately disabled reporter
+     * pass, which is the stale-guard shape this whole item is about. A worker is
+     * either the main process (threads pool) or its child (forks), so the pid
+     * identifies this run in both.
+     */
+    const mark = existsSync(REPORTER_MARK)
+      ? (JSON.parse(readFileSync(REPORTER_MARK, 'utf8')) as { pid?: number })
+      : undefined
+    rmSync(REPORTER_MARK, { force: true })
+
+    expect(
+      [process.pid, process.ppid].includes(mark?.pid ?? -1),
+      'the count reporter left no mark from this run, so it is loaded and never called. ' +
+        'Check the hook names in test/count-reporter.ts against the installed vitest. ' +
+        'Mark was ' +
+        JSON.stringify(mark),
+    ).toBe(true)
   })
 })
 

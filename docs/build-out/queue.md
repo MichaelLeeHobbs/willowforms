@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 5, the lint and CI guardrails. Item 6 is next.
+- **Last completed:** item 6, the counting, documentation and contrast guards. Item 7 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/05-lint-ci-guards`
+- **Last pushed item branch:** `build-out/b/06-count-docs-contrast`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -126,7 +126,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       lint, a deliberate error in `aliases.ts` fails lint, and deleting `packages/kit-html/dist/index.js`
       fails the CI artefact step, run locally.
 
-- [ ] **6. Repair the counting, documentation and contrast guards.** HIGHs and MEDIUMs, area 15.
+- [x] **6. Repair the counting, documentation and contrast guards.** HIGHs and MEDIUMs, area 15.
       `test/count-reporter.ts` — the base already walks `apps/`, so confirm rather than re-fix, then handle
       the rest: the `\d{2,4}` capture silently covers nothing past 9 999 tests, `onFinished` is the vitest 2
       API, and `ran === 0` makes the reporter inert on a run that executed nothing.

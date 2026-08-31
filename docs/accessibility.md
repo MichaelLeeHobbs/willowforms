@@ -28,17 +28,22 @@ These fail the build, not a review.
 Measured from the stylesheets themselves, so a token change that breaks a ratio fails CI. Lowest
 measured value in each palette:
 
-| Palette         | Lowest ratio | Pair                                    |
-| --------------- | ------------ | --------------------------------------- |
-| Designer, light | 3.35:1       | scrollbar thumb on the well, needs 3:1  |
-| Designer, dark  | 3.65:1       | scrollbar thumb on the panel, needs 3:1 |
-| HTML kit, light | 4.83:1       | field border on the field, needs 3:1    |
-| HTML kit, dark  | 4.15:1       | field border on the field, needs 3:1    |
+| Palette         | Lowest ratio | Pair                                     |
+| --------------- | ------------ | ---------------------------------------- |
+| Designer, light | 3.35:1       | scrollbar thumb on the well, needs 3:1   |
+| Designer, dark  | 3.65:1       | scrollbar thumb on the panel, needs 3:1  |
+| HTML kit, light | 4.24:1       | warning stripe on the surface, needs 3:1 |
+| HTML kit, dark  | 4.15:1       | field border on the field, needs 3:1     |
 
 Each row is the lowest pair the suite asserts in that palette, and the two designer rows are user
 interface components rather than text, so 3:1 is the floor they have to clear. Body text is well above
 it: the lowest text pair is muted text on the well at 5.25:1 light. Quoting that figure as the minimum,
 which this table used to, made the designer look safer than it is.
+
+These four figures are computed rather than transcribed. `test/contrast.test.ts` records every pair it
+measures and compares the lowest in each palette against this table, so a token change that stays above
+the floor cannot leave the numbers here quietly wrong. The light row for the HTML kit was: it said
+4.83:1, the field border, while the warning stripe sat half a point below it at 4.24:1.
 
 The primary button label, which the prior-art study recorded at 3.03:1 in the product this project
 studied, sits at 5.49:1 light and 6.39:1 dark. See `docs/prior-art`.
