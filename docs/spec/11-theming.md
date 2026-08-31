@@ -48,6 +48,7 @@ fighting specificity.
 | `--fs-panel-width`            | Side pane width                                     |
 | `--fs-scrollbar-thumb`        | Scrollbar thumb; the track is transparent           |
 | `--fs-font`, `--fs-font-size` | Type                                                |
+| `--fs-font-mono`              | The JSON editor, the raw CSS box, the code editor   |
 
 ## HTML kit tokens
 
@@ -85,7 +86,8 @@ nothing. See [04-shell.md](04-shell.md#toolbar).
 **Status: built.** `test/contrast.test.ts` reads both stylesheets, folds the dark overrides onto the light
 base, and computes every ratio. A token change that breaks one fails CI.
 
-Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for interface component boundaries and focus
+Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for large text -- which is what the suite applies
+to a heading -- and 3:1 for interface component boundaries and focus
 indicators. The lowest measured value in any palette is 3.35:1 against a 3:1 requirement, and it is a
 user interface component rather than text: the scrollbar thumb on the designer's well background. The
 lowest text pair is 5.25:1 against a 4.5:1 requirement.

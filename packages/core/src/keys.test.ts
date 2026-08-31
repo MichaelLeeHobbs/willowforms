@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { KEY_PATTERN, RESERVED_KEYS, keyProblem } from './keys.js'
+import { KEY_PATTERN, MAX_KEY_LENGTH, RESERVED_KEYS, keyProblem } from './keys.js'
 
 describe('the key grammar', () => {
   it('allows an identifier', () => {
@@ -156,5 +156,39 @@ describe('the names that are refused by name', () => {
     expect(keyProblem(' __proto__ ')).toMatch(/reserved/i)
     // And a padded ordinary name is still refused, for the spacing.
     expect(keyProblem(' email ')).toMatch(/letters, numbers and underscores/)
+  })
+})
+
+/**
+ * How long a key may be.
+ *
+ * The grammar bounded the characters and not the length, so a megabyte-long
+ * `dataKey` in an imported document passed every gate and then appeared in
+ * `data-fs-key`, in a CSS selector, in `FormData` and as a property name in the
+ * exported JSON Schema. Nothing breaks -- the pattern is linear -- but a
+ * grammar is where a bound belongs, and this file is the one place a key
+ * grammar is decided.
+ */
+describe('a key longer than anything a person types', () => {
+  it('refuses a key past the bound, and says what the bound is', () => {
+    const problem = keyProblem('a'.repeat(MAX_KEY_LENGTH + 1))
+
+    expect(problem).toBeDefined()
+    expect(problem).toContain(String(MAX_KEY_LENGTH))
+  })
+
+  it('accepts one exactly at it', () => {
+    // The boundary, and the control: a bound that refused the length it names
+    // would be off by one in the direction that rejects real documents.
+    expect(keyProblem('a'.repeat(MAX_KEY_LENGTH))).toBeUndefined()
+  })
+
+  it('says it is too long rather than blaming the characters', () => {
+    /*
+     * The message a person reads. Every character in this key is legal, so
+     * reporting the grammar would send them looking for a typo that is not
+     * there.
+     */
+    expect(keyProblem('a'.repeat(MAX_KEY_LENGTH + 1))).not.toContain('must start with')
   })
 })

@@ -87,7 +87,7 @@ interface Snapshot {
   origin: Origin
 }
 
-/**
+/*
  * The canvas renders the real runtime renderer, not a design-time approximation.
  * What you see is literally what ships, which is the only way a WYSIWYG builder
  * stays honest as the kit evolves.
@@ -95,6 +95,11 @@ interface Snapshot {
  * While editing, a click is a selection gesture, so pointer events are swallowed
  * in the capture phase before the kit's components see them. Preview mode hands
  * the form back its own events untouched.
+ *
+ * (Written as a plain block, not a doc comment: it sat as one directly above
+ * `isOwnChrome`'s, so the paragraph about the canvas attached to nothing and
+ * `isOwnChrome` appeared to carry a description of the canvas. The `Canvas`
+ * component's own summary is at its declaration.)
  */
 /**
  * A click on the designer's own chrome inside the surface.
@@ -291,8 +296,16 @@ export function Canvas({
     for (const address of Object.keys(all)) {
       const key = decodeAddress(address)?.name ?? address
       if (!eager.has(key) || !touched.has(address)) continue
+      /*
+       * Read, not asserted. `address` came from `Object.keys(all)`, so the
+       * value is there -- but an assertion that happens to be true is still an
+       * assertion, and `noUncheckedIndexedAccess` is on so that this file has
+       * to say what it does with a miss.
+       */
+      const message = all[address]
+      if (message === undefined) continue
       shown ??= {}
-      shown[address] = all[address] as string
+      shown[address] = message
     }
     return shown ?? NO_ERRORS
   }, [preview, validated, api.document.root, data, touched, context])
@@ -488,6 +501,22 @@ export function Canvas({
 
       const [x, y] = toLocal(snap.origin, clientX, clientY)
       const resolved = resolveDrop(snap.candidates, x, y, draggedKey)
+
+      /*
+       * And the drag's snapshot goes with the drag.
+       *
+       * It holds a measured rectangle for every drawn element in the form --
+       * one per row of every repeater -- and nothing released it, so the last
+       * drag of a session stayed in memory for the rest of it, describing a
+       * document that has since moved on. Released here rather than in an
+       * effect on `dragState`, because setting state from an effect is a
+       * cascade React's own rule refuses; this runs from the release handler.
+       *
+       * A release the tree claims first never reaches this line, so at most one
+       * snapshot survives a gesture -- and the next `takeSnapshot` replaces it.
+       */
+      setSnapshot(undefined)
+
       return resolved ? { parentKey: resolved.parentKey, index: resolved.index } : undefined
     },
     [measureNow, preview],

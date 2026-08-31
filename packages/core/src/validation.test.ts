@@ -1745,3 +1745,58 @@ describe('a repeater with more rows than will be checked', () => {
     })
   })
 })
+
+/**
+ * A repeater that fails its own rule and is also over the cap.
+ *
+ * The rules on the repeater itself are checked first and write to the same
+ * address, so `TOO_MANY_ROWS` overwrote them -- losing the message a person can
+ * act on for one about the size of a body they did not choose.
+ */
+describe('a repeater failing its own rule and the row cap at once', () => {
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [{ key: 'maxLength', value: 3 }] },
+        children: [
+          {
+            key: 'street',
+            dataKey: 'line1',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [] },
+          },
+        ],
+      },
+    ],
+  }
+
+  it('keeps the rule failure rather than replacing it with the cap', () => {
+    const rows = { addresses: Array.from({ length: MAX_ROWS + 1 }, () => ({ line1: 'x' })) }
+
+    expect(validateForm(root, rows)).toEqual({ addressList: DEFAULT_MESSAGES.maxLength })
+  })
+
+  it('still reports the cap when the repeater own rules pass', () => {
+    // The control, and the reason the cap is there at all.
+    const root2: ComponentNode = {
+      ...root,
+      children: [
+        {
+          ...(root.children?.[0] as ComponentNode),
+          schema: { type: 'array', validations: [] },
+        },
+      ],
+    }
+    const rows = { addresses: Array.from({ length: MAX_ROWS + 1 }, () => ({ line1: 'x' })) }
+
+    expect(validateForm(root2, rows)).toEqual({ addressList: TOO_MANY_ROWS })
+  })
+})

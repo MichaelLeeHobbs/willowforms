@@ -36,8 +36,20 @@ function tree(): ComponentNode {
 const rows = (): ReturnType<typeof flatten> => flatten(tree())
 const isContainer = (type: string): boolean => type === 'Screen' || type === 'Stack'
 
-describe('flatten', () => {
-  it('lists the tree in document order, parents before children', () => {
+/**
+ * The fixture this file navigates, stated once.
+ *
+ * `flatten` is core's, and its contract -- document order, `parentKey`, `index`,
+ * `depth` -- is now pinned in `packages/core/src/tree.test.ts`, where the
+ * function lives. Three tests here asserted it under a `describe('flatten')` in
+ * a file named for `keyboard.ts`, so core's traversal was described by a suite
+ * in another package and this file claimed coverage it was not providing.
+ *
+ * What is left is the one thing this file needs from it: the order the keyboard
+ * moves through, which every test below reads.
+ */
+describe('the flattened tree these tests move through', () => {
+  it('is the document order the arrows follow', () => {
     expect(rows().map((r) => r.node.key)).toEqual([
       'root',
       'heading',
@@ -46,15 +58,6 @@ describe('flatten', () => {
       'second',
       'footer',
     ])
-  })
-
-  it('records the parent, index, and depth of each node', () => {
-    const second = rows().find((r) => r.node.key === 'second')
-    expect(second).toMatchObject({ parentKey: 'stack', index: 1, depth: 2 })
-  })
-
-  it('gives the root no parent', () => {
-    expect(rows()[0]).toMatchObject({ parentKey: undefined, depth: 0 })
   })
 })
 

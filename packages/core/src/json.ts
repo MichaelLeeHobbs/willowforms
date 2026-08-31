@@ -59,10 +59,20 @@ export function optionValue(options: readonly unknown[], submitted: string): Jso
     if (declared !== undefined && jsonToString(declared) === submitted) return declared
   }
 
-  for (let i = 0; i < options.length; i++) {
-    if (declaredOf(options[i]) === undefined && String(i) === submitted) return submitted
-  }
-
+  /*
+   * And a position otherwise, which is what `submitted` already is.
+   *
+   * There was a second loop here that walked the options looking for an index
+   * matching the submitted string and returned `submitted` when it found one --
+   * the same value the line below returns, so deleting it cannot change an
+   * answer. It read as the second half of the two-pass rule and was not: the
+   * first pass is what resolves `['Yes', { label: 'No', value: '0' }]`, by
+   * preferring the declared `'0'` over the position `0`.
+   *
+   * A submitted string that matches no declared value is the string a control
+   * put in the DOM, and for an option with no declared value that string is its
+   * index. Handing it back unchanged is right for both.
+   */
   return submitted
 }
 
@@ -99,8 +109,23 @@ export function optionEntry(
    */
   const declared = record ? record['value'] : option
   const value = declared === undefined || declared === null ? String(index) : jsonToString(declared)
-  // The value is the fallback label, so an option always draws as something.
-  const label = typeof record?.['label'] === 'string' ? record['label'] : value
+  /*
+   * `jsonToString`, not a string check.
+   *
+   * A numeric label -- `{ label: 2024, value: 'y2024' }`, which is what an
+   * author writing years in the JSON options editor produces -- was discarded
+   * and the control drew the value instead. This file already has the function
+   * that renders a number, a boolean or a string as text, and it is the one
+   * every other read here uses.
+   *
+   * The value is still the fallback, so an option always draws as something:
+   * `null`, an object or a list has no label a person wrote.
+   */
+  const written = record?.['label']
+  const label =
+    written === undefined || written === null || typeof written === 'object'
+      ? value
+      : jsonToString(written)
 
   return { value, label }
 }

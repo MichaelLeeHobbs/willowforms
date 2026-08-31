@@ -11,6 +11,13 @@
  *
  * One function, used everywhere a language is named, so the two spellings cannot
  * drift apart again.
+ *
+ * With one deliberate exception, named here because a claim of "one place" that
+ * has two is worse than a claim of two: `validateDocument` spells the rule out
+ * inline, because its input is untrusted and `languageTag` takes a `Language`.
+ * That copy has already drifted once -- it read `typeof dialect === 'string'`,
+ * which is true of `''`, and computed `en-` for a document this function reads
+ * as `en`. If the rule here changes, that is the other place to change.
  */
 
 import type { Language } from './types.js'

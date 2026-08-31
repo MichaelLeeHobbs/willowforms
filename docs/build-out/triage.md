@@ -468,3 +468,398 @@ added and removed, the re-addressing that follows, and the row coordinate surviv
 component's fallback. The identity half, `rowFromEventTarget` and `keyFromEventTarget`, is now tested
 directly in `geometry.test.ts`, which needs no layout engine. What is left needs an add-row control to
 exist, and that is a feature rather than a test.
+
+## Three findings in `rows.ts` left as they are — area 2
+
+**LOW, and each is a real observation with a fix worse than the gap.**
+
+`encodeRow` interpolates a frame's key with no grammar check (`rows.ts:66`), so a data key holding `.`,
+`[` or `]` produces an address `decodeAddress` refuses and `applyChange` drops silently. The key grammar
+excludes those characters, `validateDocument` reports one that does not, and the panel refuses one on the
+way in -- so reaching this needs a document that was never gated. What a check here could do is nothing
+useful: the function returns a string and has no channel to report on, so it would either throw from the
+render path or return an address that is wrong in a different way. The place to hold this is the gate,
+which already does.
+
+`mark` excludes a repeater's own data key from `formKeys` while `keyScopesFor` includes it in `form`
+(`rows.ts:264` against `:192`), so a row-scoped ref naming a top-level repeater's data key is not
+reported even though the panel lists that name under `form`. The direction is conservative -- a false
+negative in a reporting function -- and aligning the two means deciding whether a repeater's list is an
+answer at form scope, which is a design question rather than a defect.
+
+The three condition-scanning blocks at `:272-307`, `:316-339` and `:355-380` are near-identical, and two
+of them share a guard, so `props` and `guards` are built twice per node inside a repeater. Merging them
+is a rewrite of the function that reports row-scope problems, on a document-sized walk that runs at boot
+rather than per keystroke. It is worth doing when that function is next opened for a reason, and not
+worth doing as a refactor with no test that can tell the two versions apart.
+
+## Two findings in core's evaluation left as they are — area 3
+
+**NOTE, and one of them is a suggestion worth refusing.**
+
+`and` and `or` evaluate every branch before inspecting any result, so neither short-circuits
+(`condition.ts:280`). That is load-bearing rather than an oversight: an unreadable branch anywhere makes
+the whole condition unreadable, and short-circuiting would skip it -- `or(true, <broken>)` would answer
+`true` and _show_ a component whose rule nobody can read, which is the permissive direction this module
+is organised against. The cost is walking branches whose answer cannot change the result, on a structure
+an author nests by hand in a 288px panel. The reasoning is now a comment at the site.
+
+The same six-line "props, if props is a non-array object" guard is written out three times in `context.ts`
+and twice in `rows.ts`. Extracting it means a shared narrowing helper crossing five call sites in two
+modules, each of which reads slightly differently -- one wants the record, one wants to skip, one wants to
+continue a loop -- and no test can tell the extracted version from the copies. Worth doing when one of
+those functions is next opened for a reason.
+
+## `RadioGroup` and `RadioItem` in the MUI kit — area 4
+
+**LOW, both left as they are with the reason written down.**
+
+`RadioGroup` declares `container: true`, which is true -- it holds `RadioItem` children -- and the kit
+contract's three accessibility rules filter with `def.dataBound && !def.container`, so they never see it.
+The wiring is correct today and there is a rule of its own asserting the group carries
+`role="radiogroup"`, which is the part a container can get wrong. Widening the filter means deciding what
+"marks a required control required" means for a component whose control is its children, and the honest
+answer is a rule written for a group rather than a filter loosened until it catches one.
+
+`RadioItem`'s `defaultProps` set `value: ''`, and core reads `''` as no answer -- so a required
+`RadioGroup` whose items were never given values stays failing after a user picks one. That is real, and
+the fix is not a different default: any default is a value two items would then share, which is a
+worse failure (two options that submit the same answer) arriving silently instead of loudly. What this
+wants is the palette refusing to leave a `RadioItem` without a value, in the panel where somebody can see
+it, and that is a feature rather than a default.
+
+## The HTML kit's stylesheet and two markup notes — area 5
+
+**LOW and NOTE, seven findings, each a real gap in a kit that is deliberately the simple one.**
+
+`@formsmith/kit-html` exists to prove a kit is a package rather than a rewrite: semantic elements and a
+stylesheet, no dependencies, about 2,000 lines. These seven all ask it to grow a piece of design work:
+
+- `.fsh-field__hint` has no rule in the stylesheet, so the file-upload line renders at the user agent's
+  defaults inside a `gap: 4px` column. Real, and a one-line rule -- but it is the only class in the kit
+  with no rule, so the question is whether that message should be a hint at all or the field's own
+  message element, which is a markup decision rather than a missing declaration.
+- `SwitchNode` and `RadioGroupNode` never add `is-invalid`, and neither has an `.fsh-input` for the
+  stylesheet's `.fsh-field.is-invalid .fsh-input` rule to colour. Making the error state visible on those
+  two means giving them the field markup the others have.
+- `role="group"` on the repeater's wrapper and on `ButtonGroup` carries no accessible name in either kit.
+  A name has to come from somewhere -- a prop, or the component's label -- and both kits would need the
+  same one, which is a contract change.
+- The `prefers-reduced-motion` block covers the progress sweep and not the switch's two transitions, and
+  `docs/accessibility.md` says the stylesheet has a block "for its own transitions". Adding the two
+  declarations is easy; auditing the claim so it stays true is the part worth doing.
+- The switch has no `forced-colors` fallback, and its whole state signal is a background colour with the
+  real checkbox at `opacity: 0`. In Windows high contrast that is a control with no visible state. This
+  is the most serious of the seven and it needs a design answer -- an outline, a glyph, or a different
+  markup -- rather than a token.
+- A determinate circular progress draws a partial-width ellipse, because `.fsh-progress--circular` only
+  rounds the box while the fill is still sized on the inline axis. A real arc is a conic gradient or an
+  SVG ring, which is new markup.
+- `.fsh-field__message:empty { display: none }` collapses the message line, so the form shifts when an
+  error appears -- and `kit-mui` deliberately does the opposite, reserving the line. Two kits with
+  opposite answers to one question is worth settling in the contract, not in one stylesheet.
+
+The eleven dark tokens duplicated in two blocks are already checked against each other by
+`test/contrast.test.ts`, which asserts the two dark blocks declare the same tokens -- so the duplication
+cannot drift silently, which was the concern.
+
+## Six designer-shell findings left as they are — area 6
+
+**NOTE and LOW.** Each is true, and each asks for a decision rather than a change:
+
+- The designer renders an `<h1>` (`Designer.tsx:434`). A component embedded in a host's page cannot know
+  its own heading level, and guessing `h2` is as wrong as guessing `h1` for the host that embeds it in a
+  section. The answer is a prop -- `headingLevel`, defaulted -- which is public API and belongs in the
+  spec's embedding contract rather than in a sweep.
+- `useDesigner` is exported and is absent from `12-api.md`'s embedding contract, which names `Designer`
+  as the package's surface. That export also publishes `replaceDocument`, which applies a document with
+  no gate. Both are real; deciding whether the hook is public API is a design call, and the honest fixes
+  point opposite ways (document it, or stop exporting it).
+- `replaceDocument` applies an arbitrary document with no `validateDocument` gate. The designer warns
+  about the document it is mounted with and this path says nothing -- but a gate here has to decide what
+  to do when a host insists, and "refuse" and "warn" are different products.
+- `findNode` walks the tree twice per render for the same key, and the derived value could feed the memo.
+  A real allocation, on a walk of a document-sized tree, in a hook that already memoises everything else.
+  Worth doing with a profile rather than by inspection.
+- `const document = history.present` shadows the global `document` for the body of `useDesigner`. Nothing
+  in that scope touches the DOM today, and renaming it touches every line in a 700-line hook.
+- The `useCallback` around `Tabs`' key handler saves nothing, because each button gets a fresh inline
+  arrow anyway. Removing the memo is right; the inline arrow is what would have to go first, and that is
+  a render-shape change to a component three panels depend on.
+
+## Nine drag, geometry and canvas findings left as they are — area 7
+
+**NOTE and LOW.** All nine are accurate readings of code that is doing the right thing for a reason the
+finding does not reach, or that needs a browser to settle:
+
+- `dnd.ts:332`'s `anchor === -1` fallback is unreachable today, because `forbidden` always contains the
+  dragged key and the row was rejected before that line. It is the branch that runs if either of those
+  ever stops being true, and deleting a fallback because the current call graph cannot reach it is how a
+  refactor turns into a crash.
+- A drop on the tree's root row always prepends, because the index is a literal `0`. That is a design
+  answer -- the root row is the whole form, and "into the form" has no position -- and changing it to
+  read the pointer offset is a behaviour change with no finding saying which way it should go.
+- `measureIn` mixes `getBoundingClientRect`, which is post-transform, with `scrollTop`, which is CSS
+  pixels. A host that CSS-scales the designer therefore measures wrong. Real, and settling it means a
+  scaled-designer e2e fixture, because jsdom has no transforms and no scroll.
+- `Candidate.index` is the document index, so two candidates for one node in different rows share it.
+  True, and the row coordinate is what tells them apart; changing the index's meaning would change what
+  every drop resolves against.
+- The `ResizeObserver` in `SelectionLayer` watches the surface and the form root, so a component that
+  grows without changing the root's box does not re-measure the frame. Fixing it means observing every
+  drawn node, which is a per-node observer on a document-sized tree -- a trade worth measuring in a
+  browser rather than assuming.
+- `Tree.tsx`'s `visit` records the previous node's key as a parent even when that node drew no row.
+  Unreachable, because every node draws a row; it is a difference from `measureTree`, which returns early,
+  and the two are worth reconciling when one of them next changes.
+- Escape abandons a drag only while the button is still down, so a drag whose pointer was lost cannot be
+  abandoned from the keyboard. The window-blur path covers the case that actually happens; a keydown
+  handler that fires on `moved` alone would also fire long after the gesture is over.
+- `SelectionLayer`'s `document` prop shadows the global, and `useDesigner`'s local does the same. Nothing
+  in either scope touches the DOM; renaming a prop that three call sites pass by name is churn until
+  something does.
+- Two adjacent comments in `Canvas.tsx` disagree about a bounds check that does not exist. Both describe
+  real history -- one records that adding the check broke a drop -- and untangling which sentence
+  survives needs the person who wrote them, not a sweep.
+
+## Two number-field fixes that jsdom cannot exercise — area 8
+
+**LOW, both fixed, neither testable in this suite.** The property panel's number editor stored whatever
+`Number()` returned, so `1e999` entered the document as `Infinity` -- which `JSON.stringify` writes as
+`null`, so the export and the payload disagreed with what the author typed. And the Rules tab's number
+field updated `committed` without `draft` on a normalising commit, so the box could show text the
+document does not hold.
+
+Both are fixed. Neither can be driven from a unit test: jsdom's `type="number"` input refuses `1e999`
+outright (the value becomes `''`), and `userEvent` normalises `5.50` to `5.5` before the component ever
+sees it -- so a test written through the DOM passes whether or not the guard is there, which is worse
+than no test. Reaching them needs a real browser, where the value sanitisation is the specification's
+rather than jsdom's, and that belongs with the Playwright coverage of the inspector panels, which does
+not exist yet.
+
+A vacuous test for each was written, seen to pass against the unfixed code, and deleted rather than kept.
+
+## Seven inspector findings left as they are — area 8
+
+**LOW and NOTE.**
+
+- The icon picker stores `''` for "(none)" instead of clearing the property. Real, and the fix is one
+  line -- but "(none)" is also a legitimate stored value for a kit whose icon prop has no default, and
+  telling those apart is a decision about what an empty icon means rather than a bug in the writer.
+- `indexKit(kit)` and `keyScopesFor(document, key)` both run in the Properties panel's body, so every
+  keystroke in any property rebuilds a map over the kit and walks the whole document. Worth memoising,
+  and worth measuring first: both are cheap on the documents this repository has, and a `useMemo` whose
+  dependency is the document root re-runs on every edit anyway.
+- A `PropSchema.section` outside the three-value union is dropped from every tab rather than falling back
+  to `main`, so a third-party kit's unknown section makes a property invisible. Same shape as the palette
+  group fixed in area 6; the fix here is a decision about whether an unknown section is `main` or an
+  error, and the panel has no way to report the latter.
+- The text, colour, code and multiline editors render `''` for a stored value that is not a string, so
+  the first keystroke overwrites a value the box never showed. True of four editors, and the answer is
+  the one `KeyField` uses -- show what is there, refuse to commit what cannot be read -- which is a
+  rewrite of four editors rather than a guard.
+- `asCondition` validates the operator and not the operand shape, so a condition missing the keys its
+  operator implies draws a row with nothing editable. The engine reads such a condition as unreadable and
+  hides the component, which is the right answer; making the panel repair it means writing to a document
+  because somebody looked at it.
+- Adding a bounds rule writes `value: 0` immediately -- a real constraint nobody chose. Leaving the value
+  absent means every consumer has to treat a rule with no parameter as inert, which is a change to the
+  rule model rather than to the panel.
+- `RuleRow` is keyed by rule key and index but not by component, and `Rules` is not remounted per
+  selection. The same shape the spec records as a real bug for the JSON editor; it needs the same fix,
+  which is a `key` on the panel rather than on the row.
+
+## Eight panel findings left as they are — area 9
+
+**LOW and NOTE.**
+
+- Every id in `StyleTab` and the JSON dialog is a hard-coded literal, so two `<Designer>` instances on
+  one page produce duplicate ids and a `htmlFor` that points at the wrong box. Real, and the fix is
+  `useId` in five files -- worth doing as one deliberate pass over every panel rather than in the two
+  that a review happened to name, because a half-converted panel is worse than a consistent one.
+- A key rename is not one undo step: the binding commits under one label and each translation under its
+  own, and the store coalesces by label. Making it one step means a label that spans several writers,
+  which is a change to how coalescing works rather than to this panel.
+- `<li key={tag}>` duplicates when two languages share a tag, dropping a row -- the same hazard
+  `FormSettings` guards by index. That panel guards it because two languages sharing a tag is a state it
+  can produce; this one lists what the document holds, and the fix is the same one line when somebody is
+  next in the file.
+- `role="alert"` added to an already-mounted `<p>` in the same commit that fills it, and the JSON
+  dialog's note being created only when non-empty, are both the live-region timing problem
+  `docs/accessibility.md` describes: a region created and populated together is announced unreliably. The
+  answer is one always-mounted region per panel, which is a pattern to apply everywhere at once.
+- `role="alert"` on the error `<ul>` replaces its list semantics, so a screen reader reads the text
+  without "list of 4 items". Wrapping the list in a `<div role="alert">` is the fix and it changes the
+  markup the dialog's tests assert against; worth doing with those tests open.
+- The dialog's note renders inside the tab children, so a message about the schema stays on screen after
+  switching to the Document tab. Moving it above the tabs is right and it moves an element the tests
+  find by role from inside the panel to outside it.
+
+## The tab strip moves focus before the parent has honoured the request — area 6
+
+**LOW, attempted, reverted, and left open with what was tried.** The finding is right: `onSelect` is a
+request, the parent owns the selection, and the strip moves focus on the assumption that the request was
+granted. A parent that ignores or remaps it leaves focus on a tab rendered `aria-selected="false"` with
+`tabIndex={-1}`, which the next arrow key steps out of the strip entirely.
+
+The obvious repair is to record what was asked for and move focus in an effect when `active` really
+becomes it. That was written, and it passed in jsdom -- and then `e2e/keyboard.spec.ts` failed in
+Chromium: the tab was selected, `aria-selected` moved, and focus never left the tab it started on. The
+effect's own logging never reached the browser console, so what did not happen is not yet understood, and
+guessing at a second version is how a keyboard regression ships.
+
+So the synchronous focus stays, with a comment at the site saying why, and this is the note for whoever
+picks it up: the jsdom test for the refusal case passes against the broken version, so the check that
+matters is the Playwright one, and the first question is why an effect in `Tabs` appears not to run in
+that build at all.
+
+## The `ResizeObserver` counters do not count — area 10
+
+**LOW, half fixed, and the rest written down because it is not understood yet.** `test/setup.ts` stubs
+`ResizeObserver` and counts what it is asked to do, with a comment saying the counting exists so an
+observer leak cannot be invisible -- "an effect that rebuilt them per render would look identical to one
+that does not". `observerCount` is exported and read by no file in the repository, which the review
+noticed.
+
+Half of it is fixed: the stub was installed only `if (!('ResizeObserver' in globalThis))`, and this
+environment provides one, so the counting stub was never installed at all and the counters read zero
+forever -- the always-reads-zero silent pass the file's own docblock warns about, arriving through the
+other door. It is installed unconditionally now.
+
+The other half is open. With the stub installed, a test that mounts the designer, selects a component and
+unmounts still reads `{made: 0, observing: 0, disconnects: 0}` -- while `SelectionLayer` constructs a
+`ResizeObserver` in a layout effect that runs whenever the canvas surface exists, and the surface does
+exist. Something between those two is not what it looks like, and a test written before that is
+understood would be asserting a zero for the wrong reason. The test was written, seen to fail, and
+deleted rather than weakened into one that passes.
+
+## The rest of area 10, in groups
+
+**Thirty-eight LOW and NOTE findings about the apps, the build and the configuration.** Grouped because
+the reasons repeat:
+
+**The demo server is a demo.** Its `CLAUDE.md` entry says so. Every route re-reads and re-parses the whole
+store with no cache and no ceiling; `bodyOf` collapses "too large" and "malformed" into one `undefined`,
+so an oversize body is a 400 whose message already names both possibilities rather than a 413; the temp
+file for the write-and-rename is a fixed path that two processes would collide on; and `body as
+FormDocument` is a cast immediately followed by the gate that makes it true. All four are real and all
+four are properties of a fixture that exists so the playground has somewhere to save to. Making it a
+server worth hardening is a different project from remediating this review.
+
+**Configuration that describes something nobody runs.** `allowImportingTsExtensions` with no relative
+imports to allow; `preview` without `strictPort` where `server` has it; `exclude` replacing vitest's
+defaults rather than extending them; `coverage` with reporters and no thresholds, and an `include` that
+skips `apps/`; `paths` in `tsconfig.eslint.json` not mapping the two stylesheet subpaths; `sideEffects`
+naming `**/*.css`; `files` declared at the bottom of one manifest and after `exports` in the others;
+`auto-install-peers` restating pnpm's default; `coverage/` absent from eslint's ignores. Each is a line of
+configuration that is true, unused, or redundant, and each would be a one-line change on the day somebody
+is in the file for another reason.
+
+**Publishing.** `version: "0.0.0"` on all five packages with `publishConfig.access: "public"`, and an
+`exports` map with no `require` condition and no `./package.json` entry. Both matter at the first publish
+and neither is decidable before it: the version comes from whatever release process is chosen, and adding
+a CommonJS condition means deciding whether this project ships CJS at all.
+
+**Things a browser or a bigger fixture would settle.** `App.tsx` persists on every keystroke with a full
+`JSON.stringify` and a synchronous `localStorage.setItem`, which wants a debounce and a document large
+enough to measure it against. `contrast.ts` reads the last declaration for a token, splits a value on the
+first colon, and accepts only hex -- all three constrain what colour syntax the stylesheets may use, which
+is a deliberate trade the file should state rather than a defect. `parseHex` refusing `oklch()` is the
+same trade.
+
+**Already answered elsewhere.** The reporter's `onFinished` naming (`REPORTER_MARK` catches a reporter
+that stops being called), `copy-assets.mjs`'s cwd anchoring (fixed in item 23), and the digit bound on
+the count pattern (widened in item 15) are all closed.
+
+**Fixed here:** `retries: 1` on CI, which turned a positional failure that only shows up sometimes into a
+green run; `cancel-in-progress` cancelling `main` builds, which leaves the merged commit with no verdict;
+no `timeout-minutes`; the two apps' `tsconfig.json` files being referenced by nothing, so the demo
+server's deliberate DOM-free `lib` was never in force; `pnpm clean` walking `node_modules` for
+`.tsbuildinfo`; the demo server not declaring the Node floor its own scripts require; `cspell.json`, forty
+lines of configuration no script runs, deleted; the competitor's name in a published source comment and in
+a public type's docblock; the listing route reading an array as a document and rendering
+`[object Object]` as an id; the claim that CI runs the gates "in that order"; and the playground build,
+which nothing ran -- so the anchored-alias failure its own docblock describes would have reached a release
+rather than a run.
+
+## Nine test-suite observations left as they are — areas 11, 12 and 15
+
+**LOW and NOTE, and several are notes about a test rather than about a gap:**
+
+- `rows.test.ts`'s `data` fixtures are describe-scope constants shared by every test in their block
+  rather than factories. They survive because `applyChange`'s immutability is separately asserted, which
+  is the property that makes sharing safe -- and converting three blocks to factories is churn until a
+  test mutates one.
+- `keys.test.ts`'s "leaves the path characters free on purpose" reads as the opposite of what it asserts
+  until you know "free" means "reserved for the row-path grammar". Renaming it means renaming the
+  vocabulary the key grammar's own comment uses.
+- `context.test.ts`'s denial-of-service test asserts an upper bound rather than the cap, so it also
+  passes if the walk collects nothing -- and the control beside it is what makes the pair meaningful,
+  which is the shape this repository uses everywhere.
+- `visibility.test.ts` blesses a fail-open as correct and says so; the pairing that makes it safe -- a
+  host being able to detect the missing evaluator -- lives in `context.test.ts`, which is the right place
+  for it and not obvious from either file.
+- `css.test.ts` pins `safeStyleValue` refusing every fetching function and says nothing about
+  `safeDeclarations` deliberately allowing `url()` through the Style tab. That asymmetry is a decision,
+  and it is recorded in `docs/decisions.md` rather than in a test.
+- `docs.test.ts` derives three counts by slicing text and matching source, so a `describe.each` or a
+  stray pipe-prefixed line would miscount. Both slices are now bounded, and counting the run rather than
+  the source is what `count-reporter.ts` exists for; a third mechanism for the same job is not obviously
+  better than the two.
+- `contrast.ts` compares thresholds against a ratio rounded to two places, so 4.4951 clears 4.5. Real,
+  and changing it means re-measuring every pair the table quotes -- worth doing with the figures open.
+- `kit-css-injection.test.tsx` finds the style attribute by position after `data-fs-key`, which depends
+  on the kit spreading `nodeProps` before `style`. A parser would be the answer, and the test is about
+  what text reached the page rather than what a parser makes of it.
+- `test/setup.ts` patches `Element.prototype.scrollIntoView` globally and never restores it. Every test
+  file in the worker sees the stub whether it opted in or not -- which is what a setup file is for, and
+  the alternative is every file installing its own.
+
+## The rest of areas 13, 14 and 16, in groups
+
+**Forty-odd LOW and NOTE findings about the designer, renderer and Playwright suites.** The ones fixed in
+this item are in the commit message; these are the rest, grouped by why they stay:
+
+**Branches that are unreachable rather than untested.** `dnd.ts`'s `anchor === -1` fallback, `keyboard.ts`'s
+`position === -1` arm, the coalescing branch's `future: []` with a non-empty future, and the empty-container
+drop reached by dragging out a container's only child. Each is a guard that runs if a caller ever changes,
+and a test for an unreachable branch is a test that pins the call graph rather than the behaviour. Three of
+them are already documented at the site.
+
+**Fixtures the product does not produce.** `renderHook(() => useDesigner(doc()))` builds a fresh document
+per render, which `Designer.tsx` never does; the repeater fixtures use `type: 'Screen'` with an array
+schema, which no kit declares; `renderers.test.tsx` makes a `Box` the root; three panel fixtures declare no
+root component. All four are fixtures that are _more_ permissive than the product, so a test passing
+against them is not weaker -- and correcting them means touching every test in four files to prove nothing
+new.
+
+**Tests that are true for a reason other than the one they name.** The design-mode click test passes
+because `user-event` implements focus-on-mousedown; `node()` is `.first()`, so a `data-fs-row` assertion
+through it is partly guaranteed by the locator; `openTab` matches a tab name across both tablists with
+Playwright's substring matching. Each is a real fragility and each fix is a rewrite of a helper that a
+dozen tests share -- worth doing as one pass over the harness, not scattered.
+
+**Duplication.** Two describes in `renderer.test.tsx` carry byte-identical fixtures and three duplicated
+tests; `Icon.test.tsx`'s size describe renders a known icon under a heading about unknown ones. Both are
+tidying with no behavioural question in them.
+
+**Nesting and parsing.** `designer.css.test.ts`'s reader cannot parse CSS nesting, which the stylesheet
+does not use and Prettier would reformat if it did; `kit-mui/renderers.test.tsx` matches emitted class
+names by substring. Both are the same shape as the guards this run has already rewritten twice, and both
+are worth the same treatment when the stylesheet or the kit next needs it.
+
+## Documentation findings that describe this run's own record — area 18
+
+**NOTE.** Four findings are about `triage.md` and the first pass's report as documents:
+
+- Several `file:line` anchors in this file have drifted past the fixes made in the same run. True, and
+  fixing them means pinning a line number to a file that is still being edited: the anchors name a
+  function and a file, which is what a reader searches for, and the line is the part that goes stale.
+  New entries in this run name the function rather than the line where the two can differ.
+- The count of entries here does not match the 21 the first pass's queue and report claim. That count was
+  of _findings triaged_, and this file groups several findings under one heading -- which is the right
+  shape for a reader and the wrong one for a count. The second pass's report states both numbers and
+  where each comes from.
+- `docs/prior-art`'s anonymity is nominal, because `README.md` names the products two tables earlier.
+  Correct, and the answer taken in item 32 is the other direction: the measured figures moved out of the
+  README, so the naming and the measurements are no longer in the same document.

@@ -165,13 +165,22 @@ export function indexKit(kit: Kit): ReadonlyMap<string, ComponentDef> {
  */
 export function groupKit(kit: Kit): Array<{ group: PaletteGroup; components: ComponentDef[] }> {
   const out: Array<{ group: PaletteGroup; components: ComponentDef[] }> = []
-  const seen = new Set<string>()
+
+  /*
+   * The palette draws what the renderer resolves, by construction.
+   *
+   * "First declaration wins" used to be written twice -- `!byType.has(...)`
+   * above and a `seen` Set here -- with a comment in each pointing at the
+   * other. That is two places to change if the rule ever does, and the failure
+   * if only one changes is the palette drawing one definition while the
+   * renderer resolves another, which is the bug the comment above this pair
+   * says already happened once.
+   */
+  const resolved = indexKit(kit)
 
   for (const component of kit.components) {
     if (component.root === true) continue
-    // One entry per type, the first, which is the one `indexKit` resolves to.
-    if (seen.has(component.type)) continue
-    seen.add(component.type)
+    if (resolved.get(component.type) !== component) continue
     let bucket = out.find((b) => b.group === component.group)
     if (!bucket) {
       bucket = { group: component.group, components: [] }

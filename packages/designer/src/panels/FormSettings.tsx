@@ -218,7 +218,31 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
              */
             aria-invalid={error ? true : undefined}
             {...(error ? { 'aria-describedby': 'fs-language-error' } : {})}
-            onChange={(e) => setCode(e.target.value)}
+            /*
+             * Editing the code clears the refusal it earned.
+             *
+             * The error was cleared only by the next successful `add()`, so
+             * correcting `en US` to `en-US` left "not a language code" sitting
+             * under a field that no longer holds one -- and the box is
+             * `aria-invalid` and described by that message, so a screen reader
+             * went on reading a refusal of text that had been fixed.
+             */
+            onChange={(e) => {
+              setCode(e.target.value)
+              setError('')
+            }}
+            /*
+             * Enter adds the language, the way Enter commits every other field
+             * in this panel. This block is not a `<form>` -- it sits inside the
+             * designer's own markup, and a nested form in a host's page is a
+             * submit nobody asked for -- so the key is handled here instead of
+             * by the browser.
+             */
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              add()
+            }}
           />
         </div>
         <div className="fs-prop-row">

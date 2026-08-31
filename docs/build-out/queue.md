@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 26, the spec and guide MEDIUMs. Stage 4 is done; item 27 is next.
+- **Last completed:** item 32, the spec, guide and working-note LOW/NOTEs. Stage 5 is done; item 33 closes the run.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/26-spec-guides`
+- **Last pushed item branch:** `build-out/b/32-docs-low`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -46,7 +46,7 @@ pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && p
 
 Plus, for every behavioural fix, **a test that fails against the code as it stands and passes after**.
 Run it against the unfixed code first and say so in the transcript. Read
-`.claude/skills/write-tests/SKILL.md` before writing one; twelve traps in it came from this repository,
+`.claude/skills/write-tests/SKILL.md` before writing one; thirteen traps in it came from this repository,
 and this review found four more guards that could not fail.
 
 Plus, for every item, **its own pushed branch**. See the git section of `docs/build-out/RUN.md`.
@@ -287,15 +287,15 @@ slice either fixed or in `triage.md` with a one-line reason.
 312 findings. Triage is expected to carry a large share of these, and a triage line with a reason counts as
 handling one. It is the only honest way to close out three hundred findings.
 
-- [ ] **27. core and both kits.** Areas 1 to 5, 67 findings.
-- [ ] **28. the designer.** Areas 6 to 9, 69 findings.
-- [ ] **29. the apps, the build, the lint config and CI.** Area 10, 54 findings. Includes `forms.json.tmp`
+- [x] **27. core and both kits.** Areas 1 to 5, 67 findings.
+- [x] **28. the designer.** Areas 6 to 9, 69 findings.
+- [x] **29. the apps, the build, the lint config and CI.** Area 10, 54 findings. Includes `forms.json.tmp`
       missing from `.gitignore`, `cspell.json` being 40 lines of configuration no script runs, the Node
       engines drift between the root, the five packages and `CLAUDE.md`, and the CI job having no
       `timeout-minutes`.
-- [ ] **30. core and cross-cutting test suites.** Areas 11, 12 and 15, 23 findings.
-- [ ] **31. designer, renderer and Playwright suites.** Areas 13, 14 and 16, 58 findings.
-- [ ] **32. the spec, the guides and the working notes.** Areas 17 and 18, 41 findings. Includes the
+- [x] **30. core and cross-cutting test suites.** Areas 11, 12 and 15, 23 findings.
+- [x] **31. designer, renderer and Playwright suites.** Areas 13, 14 and 16, 58 findings.
+- [x] **32. the spec, the guides and the working notes.** Areas 17 and 18, 41 findings. Includes the
       `SKILL.md` e2e count saying 65 against 68 actual, and the policy call already made:
       `apps/playground/src/sample.ts:51-52` loses the competitor's name and keeps the engineering point.
 

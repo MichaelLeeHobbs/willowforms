@@ -22,6 +22,14 @@ in the project as the only undocumented one.
 A kit package brings its own two halves and depends on the first two. Most consumers never install the
 designer, which is the point of the split.
 
+`@formsmith/designer` also exports `useDesigner`, `DesignerApi`, `RenameResult` and `MAX_HISTORY`.
+`Designer` is the supported surface and the rest of this section is about it; the hook is what `Designer`
+is built on, and it is exported so a host that wants its own chrome around the same document model can
+have one. Two things follow from that and are worth saying rather than discovering: the hook's
+`replaceDocument` applies a document with no gate, so a host calling it owns the `validateDocument` call
+that `Designer` makes on its behalf, and the hook's shape is not covered by the stability this table
+implies for `Designer`.
+
 ## Embedding the designer
 
 **Status: built.**
@@ -307,7 +315,8 @@ nothing is published.
 
 ## Undo
 
-**Status: built.** `MAX_HISTORY` is 100 and is exported. The store keeps the last hundred documents, and
+**Status: built.** `MAX_HISTORY` is 100 and is exported. The store keeps the last hundred documents to go
+back through, plus the one on screen, and
 consecutive edits to one property coalesce into a single entry, so a typed label costs one slot rather
 than thirteen. See [06-inspector.md](06-inspector.md#editing-granularity).
 

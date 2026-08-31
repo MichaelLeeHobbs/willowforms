@@ -141,6 +141,55 @@ describe('the drop zone handshake', () => {
     expect(tree).not.toHaveBeenCalled()
   })
 
+  it('treats exactly the threshold as a drag', async () => {
+    /*
+     * The boundary. The threshold was checked at 2px and at 42px, so `<` could
+     * become `<=` -- or the constant could move by one -- with nothing red, and
+     * the difference is whether a 4px twitch selects a component or starts
+     * moving it.
+     */
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 14, 10)
+      await Promise.resolve()
+    })
+
+    expect(result.current.state, 'four pixels is a drag').toBeDefined()
+
+    await act(async () => {
+      pointer('pointerup', 14, 10)
+      await Promise.resolve()
+    })
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats one pixel short of it as a click', async () => {
+    // The other side of the same line.
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 13, 10)
+      pointer('pointerup', 13, 10)
+      await Promise.resolve()
+    })
+
+    expect(result.current.state).toBeUndefined()
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
   it('commits nothing when no zone claims the release', async () => {
     const onCommit = vi.fn()
     const { result } = renderHook(() => useDrag(onCommit))
@@ -710,23 +759,45 @@ describe('a zone that throws on release', () => {
     expect(commits).toEqual([{ parentKey: 'root', index: 0 }])
   })
 
-  it('ends the gesture when the commit itself throws', async () => {
-    // The other half. The document is the host's to change, and this cannot know
-    // what that costs -- but it must not leave the pointer holding a label.
-    const { result } = renderHook(() =>
-      useDrag(() => {
-        throw new Error('the host refused')
-      }),
-    )
+  it('ends the gesture when the commit itself throws, and reports the throw', async () => {
+    /*
+     * The other half. The document is the host's to change, and this cannot
+     * know what that costs -- but it must not leave the pointer holding a
+     * label, and it must not eat the error either.
+     *
+     * This handler is a bare `window` listener, so React's error boundaries
+     * never see what throws in it: the `catch` used to carry a comment saying
+     * they did, which made swallowing look safe while a host's `onCommit`
+     * disappeared completely. It is re-thrown on a later task now, which
+     * reaches `window.onerror` and whatever the host has there -- and which is
+     * why this test runs on fake timers and asserts the throw rather than
+     * leaving it to surface as an unhandled error in whichever test came next.
+     */
+    vi.useFakeTimers()
+    try {
+      const boom = new Error('the host refused')
+      const { result, unmount } = renderHook(() =>
+        useDrag(() => {
+          throw boom
+        }),
+      )
 
-    act(() => {
-      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
-    })
+      act(() => {
+        result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+      })
 
-    await drag(() =>
-      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
-    )
+      await drag(() =>
+        result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
+      )
 
-    expect(result.current.state).toBeUndefined()
+      expect(result.current.state).toBeUndefined()
+      expect(() => vi.runAllTimers()).toThrow(boom)
+
+      // Taken down inside its own test: the listeners live on `window` until it
+      // unmounts, and a release from the next test would re-enter this handler.
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

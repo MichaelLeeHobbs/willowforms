@@ -543,6 +543,43 @@ describe('form settings', () => {
     })
   })
 
+  it('takes Enter as Add, the way every other field here commits', async () => {
+    /*
+     * The block is not a `<form>` -- a nested form inside a host's page is a
+     * submit nobody asked for -- so nothing handled Enter and pressing it in
+     * the Code field did nothing at all, in a panel where Enter commits every
+     * other field.
+     */
+    const { user, openTab, latest } = setup()
+    await openTab('Settings')
+
+    await user.type(screen.getByLabelText('Name'), 'Portuguese')
+    await user.type(screen.getByLabelText('Code'), 'pt{Enter}')
+
+    expect(latest().languages).toHaveLength(2)
+    expect(latest().languages[1]).toMatchObject({ code: 'pt', name: 'Portuguese' })
+  })
+
+  it('clears the refusal as soon as the code is corrected', async () => {
+    /*
+     * The error was cleared only by the next successful `add()`, so correcting
+     * `en US` to `en-US` left the refusal on screen under a field that no
+     * longer holds what was refused -- and the box is `aria-invalid` and
+     * described by that message, so a screen reader went on reading it.
+     */
+    const { user, openTab } = setup()
+    await openTab('Settings')
+
+    await user.type(screen.getByLabelText('Code'), 'en US')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+    expect(screen.getByRole('alert')).toBeTruthy()
+
+    await user.type(screen.getByLabelText('Code'), '{Backspace}')
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByLabelText('Code').hasAttribute('aria-invalid')).toBe(false)
+  })
+
   it('refuses a duplicate that differs only in case', async () => {
     const { user, openTab, latest } = setup([
       { code: 'pt', dialect: 'BR', name: 'PT', bidi: 'ltr' },
@@ -597,6 +634,17 @@ describe('the translation key field', () => {
 
     expect(latest().translations['en']?.['emailLabel']).toBe('Email')
     expect(latest().translations['fr']?.['emailLabel']).toBe('Courriel')
+
+    /*
+     * And the old key is gone from both bundles.
+     *
+     * The comment at the call site says the rename "carries the translations
+     * with it" and it only copied them, so every rename left the old key's text
+     * in every bundle: unreachable from the panel, exported with the document,
+     * and two entries for one string with nothing saying which the form reads.
+     */
+    expect(latest().translations['en']).not.toHaveProperty(before)
+    expect(latest().translations['fr']).not.toHaveProperty(before)
   })
 
   it('shows what is being typed rather than re-deriving it', async () => {

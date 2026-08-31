@@ -1,6 +1,22 @@
 {
   "files": [],
+  /*
+   * The two apps as well.
+   *
+   * `tsc --build` referenced only the five packages, so each app's own
+   * `tsconfig.json` was used by nothing -- including the demo server's
+   * deliberate `lib: ["ES2022"]`, which mirrors invariant 1 for the server and
+   * was therefore never in force. The only config that typechecked them was
+   * `tsconfig.eslint.json`, which applies the base `lib` and hands the server
+   * `DOM`.
+   */
   "references": [
+    {
+      "path": "./apps/demo-server"
+    },
+    {
+      "path": "./apps/playground"
+    },
     {
       "path": "./packages/core"
     },

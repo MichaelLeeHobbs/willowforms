@@ -20,6 +20,27 @@ describe('historyOps.commit', () => {
     expect(next.present.name).toBe('b')
   })
 
+  it('leaves the history it was handed alone', () => {
+    /*
+     * Invariant 4's caller-visible half. Every test in this file threads the
+     * returned history forward, so a `commit` that pushed onto `history.past`
+     * in place would satisfy all of them -- and undo holds references to prior
+     * documents, so a mutation here is the redo stack of a session changing
+     * under a component that already rendered from it.
+     */
+    const start = seed()
+    const past = start.past
+    const future = start.future
+
+    const next = historyOps.commit(start, doc('b'))
+
+    expect(next).not.toBe(start)
+    expect(start.past).toBe(past)
+    expect(start.past).toHaveLength(0)
+    expect(start.future).toBe(future)
+    expect(start.present.name).toBe('a')
+  })
+
   it('is a no-op when the document is referentially unchanged', () => {
     const start = seed()
     expect(historyOps.commit(start, start.present)).toBe(start)

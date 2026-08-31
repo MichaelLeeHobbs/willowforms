@@ -158,6 +158,10 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
  * A step draws as a plain column. Everything that makes it a step is the
  * condition on it, which core evaluates, so there is nothing here for a kit to
  * decide beyond how a group of fields stacks up.
+ *
+ * (That paragraph is `StepNode`'s, further down. It sat directly above
+ * `RepeaterNode`, so a reader taking a comment as documentation of the function
+ * beneath it was told the wrong thing about the more complicated of the two.)
  */
 /*
  * A repeater draws the rows it was handed and nothing else. The renderer has
@@ -188,8 +192,8 @@ function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps):
       >
         {children}
       </Stack>
-      <FormHelperText id={messageId} error={Boolean(error)} {...(error ? { role: 'alert' } : {})}>
-        {error ?? ''}
+      <FormHelperText id={messageId} error={Boolean(error)} {...alertWhenError(error)}>
+        {message(error, '')}
       </FormHelperText>
     </Stack>
   )
@@ -204,7 +208,26 @@ function StepNode({ props, nodeProps, children }: NodeRendererProps): ReactNode 
 }
 
 function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
-  const level = str(props['level'], 'h5') as Variant
+  /*
+   * Narrowed, like every other enumerated prop in this file.
+   *
+   * The cast was the only thing between a document's string and MUI's
+   * `variantMapping[variant] || 'span'`, so `level: 'body2'` rendered a `<p>`
+   * and `level: 'x'` a `<span>` with a made-up class -- a heading that has
+   * silently stopped being a heading, which no automated check would see
+   * because the element is still there.
+   */
+  const LEVELS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const
+  /*
+   * `h2` when the document names no rank, which is what the HTML kit answers.
+   *
+   * This fell back to `h5`, so a hand-written document with no `level` rendered
+   * at a different rank depending on which kit drew it -- and a heading's rank
+   * is the document outline a screen reader navigates by. The palette still
+   * starts a *new* heading at `h5`, which is this kit's own call about size.
+   */
+  const asked = str(props['level'], 'h2')
+  const level: Variant = (LEVELS as readonly string[]).includes(asked) ? (asked as Variant) : 'h2'
   return (
     <Typography {...nodeProps} variant={level}>
       {str(props['text'])}
@@ -523,7 +546,16 @@ function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
       component="img"
       src={safeHref(props['src']) ?? ''}
       alt={str(props['alt'])}
-      sx={{ objectFit: fit, width: width > 0 ? width : '100%', display: 'block' }}
+      /*
+       * `px(width)`, not the bare number.
+       *
+       * `sx.width` runs MUI's `sizingTransform`, which reads a number at or
+       * below 1 as a fraction: `width: 1` rendered as `100%` and `0.5` as
+       * `50%`, against a palette hint that says only "Zero means full width".
+       * That is the same reinterpretation `px()` exists for everywhere else in
+       * this file.
+       */
+      sx={{ objectFit: fit, width: width > 0 ? px(width) : '100%', display: 'block' }}
     />
   )
 }
@@ -787,7 +819,16 @@ function FileUploadNode({
        */
       helperText={message(
         error ?? (dropped > 0 ? tooLarge(dropped) : undefined),
-        filesHeld ? 'Holding ' + filesHeld : str(props['helperText']),
+        /*
+         * The authored helper text, not a hard-coded English sentence.
+         *
+         * This kit's own `Select` comment calls a hard-coded English string a
+         * defect worth fixing, and then this line put "Holding contrat.pdf"
+         * under a file input on a form localised to French, with no prop able
+         * to change it. The file names alone say what is held, and the helper
+         * text stays what the author wrote.
+         */
+        filesHeld || str(props['helperText']),
       )}
       slotProps={{
         formHelperText: alertWhenError(error),

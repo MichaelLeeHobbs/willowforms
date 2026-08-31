@@ -4,7 +4,7 @@ A deep review of the whole repository produced 428 findings on 2026-08-30. This 
 them. The queue that drove it is `docs/build-out/queue.md`, frozen before the first commit; the contract
 it followed is `docs/build-out/RUN.md`.
 
-**407 fixed, 21 triaged, 428 accounted for.** 32 commits on `build-out/review-2026-08-30`, 120 files,
+**407 fixed, 21 triaged, 428 accounted for.** 33 commits on `build-out/review-2026-08-30`, 120 files,
 about 15,900 lines added. The suite went from 911 unit tests to 1,500 and from 65 browser tests to 68.
 
 The fixed figure is the per-item tallies in the queue (402) plus the five findings handled in stage 1 --
@@ -100,7 +100,9 @@ form lands below the visible box while sitting squarely inside the form.
 ## What is left
 
 `docs/build-out/found.md` is the hand-over. Eight entries, found while working and deliberately not
-fixed, because each is a design decision rather than a repair. The two that matter most:
+fixed, because each is a design decision rather than a repair -- one of them, the end-to-end harness
+reading persisted state without waiting for the commit, has since been fixed in the second pass and is
+marked as such in that file rather than deleted from it. The two that matter most:
 
 - **A repeater's rows cannot be reached in the designer at all.** No kit renders an add-row control,
   edit mode swallows keystrokes, and preview starts with empty data. `Repeater` is described as built,
@@ -109,5 +111,5 @@ fixed, because each is a design decision rather than a repair. The two that matt
   answer name with the key, and nothing follows it. Three defensible fixes, and choosing between them
   decides what a key is.
 
-`docs/decisions.md` gained five entries during the run, each recording a choice that changes behaviour
+`docs/decisions.md` gained eleven entries during the run, each recording a choice that changes behaviour
 rather than a repair.

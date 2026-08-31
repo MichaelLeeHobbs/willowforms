@@ -204,6 +204,37 @@ describe('toJsonSchema', () => {
     }
   })
 
+  it('takes no title from a label it merely inherits', () => {
+    /*
+     * `props` arriving with a prototype that carries `label` -- a document
+     * parsed by something that reused an object, or an application that has
+     * polluted `Object.prototype.label` -- gave every untitled field the same
+     * inherited title. `valueOf` and `readPath` both read own properties for
+     * this reason and say so; this function, whose whole job is hardening
+     * against a malformed `props`, did not.
+     */
+    const inherited = Object.create({
+      label: { kind: 'static', value: 'Inherited' },
+    }) as ComponentNode['props']
+
+    const node = { ...field('email', 'string'), props: inherited }
+
+    expect(toJsonSchema(doc([node])).properties['email']).not.toHaveProperty('title')
+  })
+
+  it('still takes the title from a label the props really hold', () => {
+    // The control: reading own properties must not stop reading them.
+    const own = Object.create({ label: { kind: 'static', value: 'Inherited' } }) as Record<
+      string,
+      unknown
+    >
+    own['label'] = { kind: 'static', value: 'Own' }
+
+    const node = { ...field('email', 'string'), props: own as ComponentNode['props'] }
+
+    expect(toJsonSchema(doc([node])).properties['email']?.title).toBe('Own')
+  })
+
   it('leaves the title off when the label is a binding rather than static text', () => {
     const node = field('email', 'string')
     node.props['label'] = { kind: 'i18n', key: 'email_label' }
@@ -377,6 +408,20 @@ describe('dataKey in the export', () => {
     const schema = toJsonSchema(doc([a, b]))
 
     expect(Object.keys(schema.properties)).toEqual(['email'])
+  })
+
+  it('names the shared key once in required, not twice', () => {
+    /*
+     * The guard the test above cannot reach: neither of its fields carries a
+     * rule, so `!required.includes(name)` is never the thing preventing a
+     * duplicate. Two required components sharing one data key exported
+     * `required: ['email', 'email']` -- valid JSON Schema, and a payload
+     * validator reporting the same missing field twice.
+     */
+    const a = { ...field('personalEmail', 'string', [{ key: 'required' }]), dataKey: 'email' }
+    const b = { ...field('workEmail', 'string', [{ key: 'required' }]), dataKey: 'email' }
+
+    expect(toJsonSchema(doc([a, b])).required).toEqual(['email'])
   })
 })
 
@@ -730,5 +775,55 @@ describe('the exported schema and a document that is data', () => {
     }
 
     expect(() => toJsonSchema(withField(node))).not.toThrow()
+  })
+})
+
+/**
+ * A document whose root is itself a repeater.
+ *
+ * `objectFor` describes a node's children rather than the node, which is right
+ * for a screen and wrong for a repeater: the root's rows were flattened to the
+ * top level and the array disappeared, so the export named one row's fields as
+ * the document's own. A server validating a real payload against that schema
+ * rejects every submission. The root is always a container and a repeater is a
+ * container, so an imported document can be shaped this way.
+ */
+describe('a repeater at the root', () => {
+  const rooted = (): FormDocument => {
+    const root: ComponentNode = {
+      key: 'orderList',
+      dataKey: 'orders',
+      type: 'Repeater',
+      props: {},
+      schema: { type: 'array', validations: [] },
+      children: [
+        field('sku', 'string', [{ key: 'required' }]),
+        field('quantity', 'number', [{ key: 'min', value: 1 }]),
+      ],
+    }
+    return { ...createDocument('Orders', 'orders'), root }
+  }
+
+  it('exports an array of rows, not the row', () => {
+    const schema = toJsonSchema(rooted())
+    const orders = schema.properties['orders']
+
+    expect(Object.keys(schema.properties)).toEqual(['orders'])
+    expect(orders?.type).toBe('array')
+    expect(Object.keys(orders?.items?.properties ?? {})).toEqual(['sku', 'quantity'])
+  })
+
+  it("keeps the rows' required inside items, never on the document", () => {
+    const schema = toJsonSchema(rooted())
+
+    expect(schema.properties['orders']?.items?.required).toEqual(['sku'])
+    // A row's required field is not a required key of the submitted object.
+    expect(schema.required).toBeUndefined()
+  })
+
+  it('names the array by the data key, not the component key', () => {
+    // The same rule the nested case follows: an answer is submitted under the
+    // name the author chose.
+    expect(Object.keys(toJsonSchema(rooted()).properties)).not.toContain('orderList')
   })
 })

@@ -400,7 +400,7 @@ const CONTRACT_RULES = 25
  * nowhere, so the spec presented the first table as the whole obligation set
  * while the suite ran nearly twice that.
  */
-const CONTRACT_RULES_PER_KIT = 15
+const CONTRACT_RULES_PER_KIT = 17
 
 /**
  * The describes that are about this repository rather than about a kit.
@@ -474,7 +474,17 @@ describe('the kit contract table', () => {
 
     // Everything but the describes that are about these two kits rather than
     // about kits, so a courtesy is not read as an obligation.
-    let outside = suite.slice(0, suite.indexOf('describe.each(KITS)'))
+    /*
+     * The whole file with the per-kit block cut out, not just what precedes it.
+     *
+     * This sliced to the start of that block, so a per-kit rule written *after*
+     * it was counted by nothing -- and one was, the day this guard was added.
+     * A guard that reads "everything before a marker" has the same weakness as
+     * one that reads "everything after" it.
+     */
+    const blockAt = suite.indexOf('describe.each(KITS)')
+    const blockEnds = suite.indexOf('\ndescribe(', blockAt)
+    let outside = suite.slice(0, blockAt) + (blockEnds === -1 ? '' : suite.slice(blockEnds))
     for (const name of NOT_OBLIGATIONS) {
       const at = outside.indexOf("describe('" + name)
       if (at === -1) continue
@@ -709,6 +719,25 @@ describe('the decision log', () => {
 })
 
 describe('the accessibility document', () => {
+  it('lists exactly the axe rules the suite disables', () => {
+    /*
+     * `NEEDS_LAYOUT` in `a11y.test.tsx` names the rules turned off because
+     * jsdom has no layout engine, and `docs/accessibility.md` lists the same
+     * three for a reader deciding how much the audit is worth. Nothing compared
+     * them, so disabling a fourth rule would have gone unmentioned in the one
+     * document that says what is checked.
+     */
+    const suite = read('test/a11y.test.tsx')
+    const declared = [
+      ...(/const NEEDS_LAYOUT = \[([^\]]*)\]/.exec(suite)?.[1] ?? '').matchAll(/'([\w-]+)'/g),
+    ].map((match) => match[1] ?? '')
+
+    expect(declared.length, 'the disabled-rule list was not found').toBeGreaterThan(0)
+
+    const document = read('docs/accessibility.md')
+    expect(declared.filter((rule) => !document.includes(rule))).toEqual([])
+  })
+
   const doc = read('docs/accessibility.md')
 
   it('quotes the number of states axe actually audits', () => {

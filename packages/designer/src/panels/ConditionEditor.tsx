@@ -121,7 +121,20 @@ function morph(current: Condition, op: Condition['op']): Condition {
     const carried = 'conditions' in current ? asList(current.conditions) : [current]
     return { op: op as (typeof GROUPS)[number], conditions: carried }
   }
-  return { op: 'not', condition: 'condition' in current ? current.condition : current }
+  if (op === 'not') {
+    return { op: 'not', condition: 'condition' in current ? current.condition : current }
+  }
+
+  /*
+   * An operator this editor does not know is refused, not turned into a `not`.
+   *
+   * The four families above are the whole vocabulary, and the tail used to
+   * accept anything else and rewrite it as a negation -- so a document holding
+   * an operator from a newer version, or a typo, was silently *changed* by
+   * opening the panel that was supposed to show it. Returning the condition as
+   * it stands leaves the document alone; the row above draws what it can.
+   */
+  return current
 }
 
 /**
@@ -583,7 +596,16 @@ export interface ConditionEditorProps {
   /** The enclosing row's data keys, when this condition sits inside a row. */
   rowDataKeys?: string[] | undefined
   onChange: (next: Condition) => void
-  /** Nesting level, for indentation only. */
+  /**
+   * How deep this editor is nested, kept for the guard rather than for looks.
+   *
+   * The comment here said "for indentation only", and nothing indented by it:
+   * the attribute it rendered, `data-fs-depth`, appears in no stylesheet in the
+   * repository. What indents a nested group is the padding on
+   * `.fs-condition__group`. Kept because the value is what a bound would be
+   * measured against the day this editor stops drawing deeper than the engine
+   * will read -- see the note in `triage.md`.
+   */
   depth?: number
 }
 
@@ -600,7 +622,7 @@ export function ConditionEditor({
   const hasValue = 'value' in value
 
   return (
-    <div className="fs-condition" data-fs-depth={depth}>
+    <div className="fs-condition">
       <div className="fs-condition__head">
         {hasLeft && (
           <OperandField

@@ -55,7 +55,7 @@ opens with. A reader scanning this table for what is safe to depend on is asking
 question, and an index that answers Partial over a file reading Built answers a third question nobody
 asked.
 
-`03`, `05`, `06`, `07`, `08`, `11` and `12` read Partial because each has a named gap in it, and each of those
+`01`, `03`, `05`, `06`, `07`, `08`, `11` and `12` read Partial because each has a named gap in it, and each of those
 files says which one in its own preamble. `09` is Planned because actions are a design with no code.
 
 ## Vocabulary
@@ -107,8 +107,14 @@ we look at what they do and choose differently.
 
 `test/docs.test.ts` checks that this index lists every file in the directory, that every file opens with
 a status, that every link between these files resolves and that every `#anchor` in one names a real
-heading, and that the rule table in `02-kit-contract.md` has exactly as many rows as the contract suite
-has tests.
+heading, and that both rule tables in `02-kit-contract.md` have exactly as many rows as the contract
+suite has rules -- the per-kit block and the rules driven per kit from outside it.
+
+It checks more than that now, and the list is worth having in one place: the events table in
+`03-components.md` against what the two kits declare, both token tables in `11-theming.md` against the
+two stylesheets in both directions, the axe rules `a11y.test.tsx` disables against the ones
+`accessibility.md` names, the end-to-end total against the spec files rather than against the other
+documents, the decision log's shape, and the component catalogue against the kits.
 
 It cannot check that a section marked **Built** actually is. That is the claim worth being strict about
 when writing here, and it is the one that has been wrong most often.

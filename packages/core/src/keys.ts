@@ -25,6 +25,21 @@
 export const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 /**
+ * How long a key may be.
+ *
+ * The grammar bounds the characters and not the length, so a megabyte-long
+ * `dataKey` in an imported document passed every gate and then appeared in
+ * `data-fs-key`, in a CSS selector, in `FormData`, and as a property name in
+ * the exported JSON Schema. Nothing breaks -- the regex is linear and has no
+ * nested quantifier -- but nothing a person types is anywhere near this, and a
+ * grammar is the place a bound belongs.
+ *
+ * 128, which is longer than any name in this repository's own fixtures by an
+ * order of magnitude and shorter than anything that reads as an attack.
+ */
+export const MAX_KEY_LENGTH = 128
+
+/**
  * Names that pass the grammar and still must not be used.
  *
  * `__proto__` is the one that bites hardest. Assigning it does not add a
@@ -85,6 +100,10 @@ export function keyProblem(key: unknown): string | undefined {
 
   const trimmed = key.trim()
   if (!trimmed) return 'A key cannot be empty.'
+
+  if (trimmed.length > MAX_KEY_LENGTH) {
+    return 'A key can be at most ' + String(MAX_KEY_LENGTH) + ' characters.'
+  }
 
   if (RESERVED_KEYS.includes(trimmed)) {
     return (

@@ -141,6 +141,32 @@ export function Tree({
     [onSelect],
   )
 
+  /**
+   * A focus move scheduled for after the tree has redrawn, cancellable.
+   *
+   * Three places move focus a frame late, because the row they want does not
+   * exist until the document they just changed has rendered. None of them kept
+   * the handle, so a frame scheduled just before the pane was switched away
+   * still ran -- pulling focus back into a tree the user had left, from a
+   * component that had unmounted. One handle, replaced each time, cancelled on
+   * the way out.
+   */
+  const scheduled = useRef(0)
+  const focusRowSoon = useCallback(
+    (key: string) => {
+      cancelAnimationFrame(scheduled.current)
+      scheduled.current = requestAnimationFrame(() => focusRow(key))
+    },
+    [focusRow],
+  )
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(scheduled.current)
+    },
+    [],
+  )
+
   /*
    * Arrows move focus; the same arrows with Alt move the component.
    *
@@ -176,7 +202,7 @@ export function Tree({
           onMove(node.key, target.parentKey, target.index)
           announce(describeMove(node.key, direction))
           // The row is re-rendered in its new place; put focus back on it.
-          requestAnimationFrame(() => focusRow(node.key))
+          focusRowSoon(node.key)
           return
         }
 
@@ -212,7 +238,7 @@ export function Tree({
           return
         }
         announce(node.key + ' duplicated as ' + copy + '.')
-        requestAnimationFrame(() => focusRow(copy))
+        focusRowSoon(copy)
         return
       }
 
@@ -236,7 +262,9 @@ export function Tree({
          * body after all. `flatten` is depth-first, so the subtree is the
          * contiguous run of deeper rows that follows.
          */
-        const rows = flatten(root)
+        // The same `rows` the handler opened with, not a second identical
+        // `flatten`: an inner one that shadows the outer reads as though it
+        // were measuring something the outer could not see.
         const position = rows.findIndex((r) => r.node.key === node.key)
         const depth = rows[position]?.depth ?? 0
         const beyond = rows.findIndex((r, i) => i > position && r.depth <= depth)
@@ -244,10 +272,10 @@ export function Tree({
 
         onRemove(node.key)
         announce(node.key + ' removed.')
-        if (after) requestAnimationFrame(() => focusRow(after.node.key))
+        if (after) focusRowSoon(after.node.key)
       }
     },
-    [announce, focusRow, kit, onDuplicate, onMove, onRemove, onSelect, root],
+    [announce, focusRow, focusRowSoon, kit, onDuplicate, onMove, onRemove, onSelect, root],
   )
 
   /*
@@ -285,13 +313,20 @@ export function Tree({
    */
   const resolveRelease = useCallback(
     (clientX: number, clientY: number, draggedKey: string | undefined) => {
-      const snap = measureNow(0)
+      /*
+       * `-1`, a snapshot no drag can be holding, for the reason the canvas
+       * gives at its own call site: this one is measured for this release and
+       * thrown away, and `0` claims to be drag zero's.
+       */
+      const snap = measureNow(-1)
       if (!snap) return undefined
 
       const x = clientX - snap.origin.x
-      // The widest row, for the reason the indicator's copy above gives.
+      // The widest row, for the reason the indicator's copy above gives --
+      // including the `width === 0` half, which this copy was missing: a tree
+      // with no rows has no drop to claim, and `x <= 0` would have claimed one.
       const width = Math.max(0, ...snap.rows.map((row) => row.rect.width))
-      if (x < 0 || x > width) return undefined
+      if (width === 0 || x < 0 || x > width) return undefined
 
       const resolved = resolveTreeDrop(snap.rows, clientY - snap.origin.y, draggedKey)
       return resolved ? { parentKey: resolved.parentKey, index: resolved.index } : undefined

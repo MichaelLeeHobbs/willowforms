@@ -279,7 +279,16 @@ function NumberField({
       setDraft(text)
       return
     }
+    /*
+     * The box shows what was stored, not what was typed.
+     *
+     * `commit` normalised the value and updated `committed` without touching
+     * `draft`, so typing `007` left the box reading `007` over a document
+     * holding `7` -- and the re-sync above only fires when the *document*
+     * changes, which it did not.
+     */
     setCommitted(String(next))
+    setDraft(String(next))
     onCommit(next)
   }
 

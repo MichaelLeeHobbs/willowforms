@@ -63,9 +63,24 @@ export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNo
    * an outside-supplied name straight onto a literal.
    */
   const built = Object.create(null) as Record<string, PropValue>
-  for (const [name, value] of Object.entries(def.defaultProps)) {
-    built[name] = prop(value)
+
+  /*
+   * And read as data, not trusted as a shape.
+   *
+   * The prototype-pollution half of "a kit is third-party code by design" was
+   * defended above and this half was not: `defaultProps` is required by the
+   * type, so `Object.entries(undefined)` throws for a kit compiled loosely or
+   * built at runtime from JSON -- and it throws inside the designer's drop
+   * handler, which reads as the builder crashing rather than as a bad kit.
+   * A component with no defaults is a component with no defaults.
+   */
+  const defaults: unknown = def.defaultProps
+  if (defaults && typeof defaults === 'object' && !Array.isArray(defaults)) {
+    for (const [name, value] of Object.entries(defaults as Record<string, JsonValue>)) {
+      built[name] = prop(value)
+    }
   }
+
   const props: Record<string, PropValue> = { ...built }
 
   const node: ComponentNode = {
@@ -77,8 +92,23 @@ export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNo
   if (def.container) node.children = []
   if (def.dataBound) node.schema = { type: def.dataType ?? 'string', validations: [] }
 
-  // After the key, because a rule that names the node needs one to name.
-  if (def.defaultRenderWhen) node.renderWhen = def.defaultRenderWhen(node.key)
+  /*
+   * After the key, because a rule that names the node needs one to name.
+   *
+   * And in a `try`, for the same reason as the loop above: this is a function a
+   * kit supplies, so "it will not throw" is not a property this can rely on.
+   * A kit whose default condition throws gets a component with no condition,
+   * which is the shape every other component has, rather than a palette entry
+   * that takes the designer down when it is dragged.
+   */
+  if (def.defaultRenderWhen) {
+    try {
+      node.renderWhen = def.defaultRenderWhen(node.key)
+    } catch {
+      // Reported by nothing here: core has no logger and the caller sees a
+      // component that rendered. A condition that cannot be built is not one.
+    }
+  }
 
   return node
 }

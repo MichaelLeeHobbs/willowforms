@@ -11,15 +11,16 @@
  * is lost if nobody checks it stays that way.
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { autoValidateKeys } from '@formsmith/core'
 import type { ComponentNode, FormDocument, Kit, ValidationRule } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
+import { Tabs } from './Tabs.js'
 
 function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
   return <div {...nodeProps}>{children}</div>
@@ -200,6 +201,39 @@ describe('inspector tabs', () => {
     expect(focused()).toBe('Properties')
     await user.keyboard('{End}')
     expect(focused()).toBe('Rules')
+  })
+
+  it('leaves focus alone when the strip has nowhere to go', () => {
+    /*
+     * `preventDefault` used to run before the one-tab check, so on a strip with
+     * a single tab the four navigation keys were swallowed and did nothing at
+     * all -- Home and End included, which anywhere else on the page scroll. A
+     * component that takes a key and declines to act on it has to give it back.
+     *
+     * The JSON dialog's strip has two tabs and the inspector has three, so the
+     * one-tab case is checked through `Tabs` itself.
+     */
+    const onSelect = vi.fn()
+    render(
+      <Tabs
+        label="One thing"
+        tabs={[{ id: 'only', label: 'Only' }]}
+        active="only"
+        onSelect={onSelect}
+      >
+        <p>panel</p>
+      </Tabs>,
+    )
+
+    const only = screen.getByRole('tab', { name: 'Only' })
+    only.focus()
+
+    const event = createEvent.keyDown(only, { key: 'End' })
+    fireEvent(only, event)
+
+    expect(event.defaultPrevented, 'the key was swallowed with nowhere to go').toBe(false)
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(only)
   })
 })
 

@@ -350,18 +350,28 @@ describe('the undo and redo shortcuts', () => {
     return harness
   }
 
-  const keys = (): string[] => {
-    const children = screen.queryAllByText('Email')
-    return children.map((element) => element.textContent ?? '')
-  }
+  /**
+   * The components the canvas is drawing, by key.
+   *
+   * This was named `keys` and returned `textContent`, from a `queryAllByText`
+   * over the whole document rather than the shell -- so it answered about a
+   * label, from anywhere on the page, under a name that promised the tree. The
+   * canvas marks every node it drew with `data-fs-key`, which is the thing the
+   * assertion is actually about.
+   */
+  const drawn = (harness: Harness): string[] =>
+    [...harness.shell.querySelectorAll('.fs-canvas__frame [data-fs-key]')]
+      .map((element) => element.getAttribute('data-fs-key') ?? '')
+      .filter((key) => key !== 'root')
 
   it('takes an edit back on Ctrl+Z and puts it back on Ctrl+Y', async () => {
-    const { shell, latest } = await withAnEdit()
+    const harness = await withAnEdit()
+    const { shell, latest } = harness
 
     fireEvent.keyDown(shell, { key: 'z', ctrlKey: true })
     expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
     // And the canvas says so too, not only the document the host was handed.
-    expect(keys()).toHaveLength(1)
+    expect(drawn(harness)).toEqual(['email'])
 
     fireEvent.keyDown(shell, { key: 'y', ctrlKey: true })
     expect(latest().root.children).toEqual([])

@@ -15,7 +15,13 @@
 import { describe, expect, it } from 'vitest'
 import type { ComponentNode } from '@formsmith/core'
 
-import { keyFromEventTarget, measureTree, nodeElement, rowFromEventTarget } from './geometry.js'
+import {
+  keyFromEventTarget,
+  measureTree,
+  nodeElement,
+  rowFromEventTarget,
+  toLocal,
+} from './geometry.js'
 
 /** A canvas holding one repeater whose subtree is drawn twice. */
 function surfaceWithRows(): HTMLElement {
@@ -182,5 +188,33 @@ describe('reading a click', () => {
 
     expect(keyFromEventTarget(clicked(stray, 'input'))).toBe('street')
     expect(rowFromEventTarget(clicked(stray, 'input'))).toBeUndefined()
+  })
+})
+
+/**
+ * Client coordinates into surface coordinates.
+ *
+ * Pure arithmetic over two numbers, no test in any environment, and every drop
+ * position in the designer passes through it: the canvas and the tree both
+ * subtract the surface's origin before asking `resolveDrop` anything, so a sign
+ * error here moves every drop by the surface's offset and nothing else would
+ * say where it came from.
+ */
+describe('toLocal', () => {
+  it('subtracts the origin from the pointer', () => {
+    expect(toLocal({ x: 10, y: 20 }, 40, 50)).toEqual([30, 30])
+  })
+
+  it('answers zero at the origin, and negatives above and left of it', () => {
+    // A release above or left of the surface is outside it, and the callers
+    // decide that by the sign -- so it has to be a sign rather than a clamp.
+    expect(toLocal({ x: 10, y: 20 }, 10, 20)).toEqual([0, 0])
+    expect(toLocal({ x: 10, y: 20 }, 4, 8)).toEqual([-6, -12])
+  })
+
+  it('carries a scrolled origin through unchanged', () => {
+    // The origin already accounts for the surface's scroll, which is why this
+    // is a subtraction and not a `getBoundingClientRect` of its own.
+    expect(toLocal({ x: -120, y: -45 }, 0, 0)).toEqual([120, 45])
   })
 })

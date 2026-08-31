@@ -227,13 +227,24 @@ export function useDrag(
       }
 
       if (dragged && press && landed) {
-        // And a commit that throws must not strand it either. The document is
-        // the host's to change and this cannot know what that costs.
+        /*
+         * And a commit that throws must not strand the gesture either. The
+         * document is the host's to change and this cannot know what that
+         * costs.
+         *
+         * Re-thrown on a later task rather than swallowed. This handler is a
+         * bare `window` listener, so React's error boundaries never see what
+         * throws here -- the comment that used to sit in this `catch` said they
+         * did, and swallowing it therefore hid a host's error completely.
+         * Throwing on a timeout reaches `window.onerror` and whatever telemetry
+         * the host has there, while `cancel()` below still runs on this task.
+         */
         try {
           commit.current(press.source, landed)
-        } catch {
-          // Reported by React's own error handling; swallowing it here would
-          // hide it and re-throwing would take the cancel below with it.
+        } catch (error) {
+          setTimeout(() => {
+            throw error
+          })
         }
       }
       /*

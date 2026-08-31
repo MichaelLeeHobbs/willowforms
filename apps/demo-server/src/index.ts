@@ -321,8 +321,19 @@ app.get('/api/forms', async (c) => {
    * appearing as one missing row.
    */
   const rows = Object.values(store)
-    .filter((doc): doc is FormDocument => Boolean(doc) && typeof doc === 'object')
-    .map((doc) => ({ id: String(doc.id ?? ''), name: String(doc.name ?? '') }))
+    /*
+     * Not an array, and named by text.
+     *
+     * `typeof [] === 'object'`, so a hand-edited `{"x": []}` became a row -- and
+     * `String(doc.id)` on an object renders `[object Object]`, which is a row
+     * the playground then asks for and cannot find. Both are the same mistake
+     * one level apart: reading a shape as a document because it is truthy.
+     */
+    .filter(
+      (doc): doc is FormDocument => Boolean(doc) && typeof doc === 'object' && !Array.isArray(doc),
+    )
+    .filter((doc) => typeof doc.id === 'string' && doc.id !== '')
+    .map((doc) => ({ id: doc.id, name: typeof doc.name === 'string' ? doc.name : '' }))
 
   return c.json(rows)
 })

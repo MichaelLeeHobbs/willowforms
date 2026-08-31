@@ -472,6 +472,20 @@ describe('writing an answer at an address', () => {
     }
   })
 
+  it('changes nothing when the row is not an object', () => {
+    /*
+     * The third branch of the same guard, and the one the list above cannot
+     * reach: a missing row and a list that is not a list were both covered, and
+     * a list whose *entry* is a string or a number was not. A row is read as a
+     * record to write into, and writing into `'text'` produces an object with
+     * one key and nothing of the row left.
+     */
+    for (const row of ['text', 7, null, ['a']]) {
+      const ragged = { addresses: [row] }
+      expect(applyChange(ragged, 'addresses[0].postcode', 'x'), JSON.stringify(row)).toBe(ragged)
+    }
+  })
+
   it('reads an address back', () => {
     expect(decodeAddress('postcode')).toEqual({ path: NO_ROWS, name: 'postcode' })
     expect(decodeAddress('addresses[1].postcode')?.name).toBe('postcode')
@@ -966,5 +980,67 @@ describe('validateForm and a body with too many rows', () => {
     // And says so, rather than quietly validating a prefix: a row nobody
     // checked is the permissive failure this project is organised against.
     expect(Object.values(errors).join(' ')).toContain('rows')
+  })
+})
+
+/**
+ * Which node the scopes are computed for, and how deep the walk goes.
+ *
+ * `keyScopesFor` runs during render -- the Properties panel and the Style tab
+ * both call it in their component bodies -- so both of these are about what
+ * happens on screen rather than about a walk in the abstract.
+ */
+describe('keyScopesFor on a document nobody gated', () => {
+  const twice = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'firstList',
+        dataKey: 'first',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          { key: 'shared', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+        ],
+      },
+      {
+        key: 'secondList',
+        dataKey: 'second',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          { key: 'shared', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+          { key: 'extra', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+        ],
+      },
+    ],
+  })
+
+  it('answers for the first node with that key, like every other lookup', () => {
+    /*
+     * Duplicate keys are a state `validateDocument` reports and cannot prevent,
+     * and `findNode`, `findParent` and `pathTo` all take the first match and
+     * say why. This took the last -- an unconditional assignment inside a walk
+     * that keeps going -- so the panel offered one node's row keys while every
+     * other lookup in the session resolved to another.
+     */
+    expect(keyScopesFor(twice(), 'shared').row).toEqual(['shared'])
+  })
+
+  it('answers rather than overflowing on a tree nested past the bound', () => {
+    /*
+     * The bound `rowScopeProblems` already carries. A `RangeError` thrown from
+     * a React render unmounts the whole designer in React 19, not one panel.
+     */
+    let deep: ComponentNode = { key: 'leaf', type: 'Field', props: {} }
+    for (let i = 0; i < 5000; i += 1) {
+      deep = { key: 'stack' + String(i), type: 'Stack', props: {}, children: [deep] }
+    }
+
+    expect(() => keyScopesFor(deep, 'leaf')).not.toThrow()
   })
 })

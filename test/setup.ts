@@ -37,7 +37,21 @@ if (typeof document !== 'undefined') {
    * and the counters cost two integers. `observerCount()` below is what a test
    * asks.
    */
-  if (!('ResizeObserver' in globalThis)) {
+  /*
+   * Installed always, not only when jsdom has none.
+   *
+   * The guard used to be `if (!('ResizeObserver' in globalThis))`, and the
+   * environment now provides one -- so the stub was never installed, the
+   * counters read zero forever, and the leak this file says it can see became
+   * invisible. That is the same always-reads-zero silent pass the paragraph
+   * above describes, arriving through the other door.
+   *
+   * Overwriting a real implementation is right for this suite: jsdom has no
+   * layout, so a real `ResizeObserver` here observes elements that never
+   * change size and reports nothing. What a test can ask is how many were made
+   * and how many were let go.
+   */
+  {
     globalThis.ResizeObserver = class implements ResizeObserver {
       constructor() {
         counts.made += 1

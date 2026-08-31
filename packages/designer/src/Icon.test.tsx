@@ -17,8 +17,20 @@ import { Icon, ICON_NAMES } from './Icon.js'
 
 describe('Icon', () => {
   it('declares a vocabulary worth having', () => {
+    /*
+     * A floor, and nothing more, because there is nothing more for a test to
+     * say here. `new Set(ICON_NAMES).size === ICON_NAMES.length` used to sit
+     * beside this and cannot fail: the list is `Object.keys(GLYPHS)`, and
+     * object keys are unique by construction.
+     *
+     * That every name in `IconName` has a glyph is guaranteed by
+     * `Record<IconName, ReactNode>` on `GLYPHS` -- a missing one is a compile
+     * error, which is a better check than any assertion here. What a test can
+     * add is that each glyph draws, which the sweeps below do, and that a name
+     * a kit really declares reaches one, which `test/kit-contract.test.tsx`
+     * does because the designer cannot import a kit.
+     */
     expect(ICON_NAMES.length).toBeGreaterThan(15)
-    expect(new Set(ICON_NAMES).size).toBe(ICON_NAMES.length)
   })
 
   it.each(ICON_NAMES)('%s draws something', (name) => {
@@ -39,6 +51,16 @@ describe('Icon', () => {
   it('takes its colour from the text around it', () => {
     const { container } = render(<Icon name="text" />)
     expect(container.querySelector('svg')?.getAttribute('stroke')).toBe('currentColor')
+  })
+
+  it('defaults to the palette size', () => {
+    // The documented default, which nothing asserted: every size test passed an
+    // explicit one, so the number in the signature was free to change.
+    const { container } = render(<Icon name="text" />)
+    const svg = container.querySelector('svg')
+
+    expect(svg?.getAttribute('width')).toBe('16')
+    expect(svg?.getAttribute('height')).toBe('16')
   })
 
   it('honours a requested size', () => {

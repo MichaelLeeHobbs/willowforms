@@ -65,12 +65,19 @@ export function Tabs<Id extends string>({
     (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
       const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
       if (!keys.includes(event.key)) return
-      event.preventDefault()
 
-      // With one tab there is nowhere to go, and calling `onSelect` with the
-      // tab that is already active re-renders the panel for a keypress that
-      // did nothing.
+      /*
+       * Before `preventDefault`, not after.
+       *
+       * With one tab there is nowhere to go -- and swallowing the key anyway
+       * meant Home and End did nothing at all on a one-tab strip, rather than
+       * scrolling the panel the way they would anywhere else on the page. A
+       * component that takes a key and declines to act on it has to give it
+       * back.
+       */
       if (tabs.length < 2) return
+
+      event.preventDefault()
 
       const last = tabs.length - 1
       const next =
@@ -96,6 +103,13 @@ export function Tabs<Id extends string>({
        * navigation that looks like it worked because the panel changed. The
        * buttons are the strip's element children, in the order they are
        * rendered, so `next` indexes them directly.
+       *
+       * Moved here rather than after the parent has honoured the request. The
+       * review is right that `onSelect` is a request and this assumes it was
+       * granted -- and the version that waited for `active` to change was
+       * measured in a browser and did not move focus at all, while passing in
+       * jsdom. A keyboard regression is worse than the hole; the finding stays
+       * open in `triage.md` with what was tried.
        */
       const buttons = strip.current?.children
       const element = buttons?.[next]

@@ -158,7 +158,18 @@ export function evaluatorKeys(root: ComponentNode): string[] {
       props.some(needs) ||
       rules.some((rule) => needs(rule?.when) || rule?.key === 'custom')
 
-    if (expression && typeof node.key === 'string') keys.add(node.key)
+    /*
+     * A node with no usable key still needs an evaluator.
+     *
+     * The key was used to *name* the node in the answer and, when it was not a
+     * string, the fact that the node needs a sandbox was discarded with it --
+     * so a document with `"key": 42` and a computed `renderWhen` answered "no
+     * expressions here", the host waved it through with no evaluator, and every
+     * such node read as hidden. What this function is asked is whether a
+     * sandbox is needed, and the answer does not depend on the key being
+     * readable.
+     */
+    if (expression) keys.add(typeof node.key === 'string' ? node.key : '(a node with no key)')
 
     for (const child of Array.isArray(node.children) ? node.children : [])
       walkNode(child, depth + 1)

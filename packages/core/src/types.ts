@@ -89,7 +89,16 @@ export interface ActionRef {
 
 export interface CodeAction {
   name: string
-  /** JavaScript source. Executed in a sandbox; see docs/ARCHITECTURE.md. */
+  /**
+   * JavaScript source, stored and never run.
+   *
+   * Actions are a design with no code: nothing in this repository executes
+   * this string, and `09-actions.md` is Planned. It said "Executed in a
+   * sandbox", which invites a host to conclude core owns that boundary and to
+   * wire `new Function(action.body)` themselves -- which is the crossing
+   * invariant 6 exists to prevent. When it is built, the host will inject the
+   * evaluator and own the sandbox, the way `evaluate` already works.
+   */
   body: string
   params: Record<string, JsonValue>
 }
@@ -128,9 +137,13 @@ export interface FieldSchema {
 }
 
 /**
- * Validation rules carry their parameters in the type. FormEngine's equivalent
- * is an untyped `{key, message?}`, which cannot express `minLength` without a
- * side channel.
+ * Validation rules carry their parameters in the type.
+ *
+ * A discriminated union rather than an untyped `{ key, message? }`: the latter
+ * cannot say that `minLength` has a number and `required` has nothing, so the
+ * parameter travels in a side channel and every reader guesses. The comparison
+ * that motivated this is in `docs/prior-art`, which is where competitive
+ * material belongs; this is a public type in an MIT package.
  */
 export type ValidationRule =
   | { key: 'required'; message?: string; when?: PropValue }
@@ -198,7 +211,19 @@ export interface FormDocument {
   settings: FormSettings
 }
 
-/** Runtime form data, keyed by component key. */
+/**
+ * Runtime form data, keyed by **data key**.
+ *
+ * `dataKeyOf(node)`, which is `node.dataKey ?? node.key` -- so a field the
+ * author renamed is read and submitted under the name they chose, and two
+ * fields deliberately sharing a data key are one answer. Errors are the other
+ * way round and stay keyed by component key, for the reason `dataKey`'s own
+ * comment gives; this line said "component key" and a host reading only it
+ * writes `data[node.key]` and silently misses every renamed field.
+ *
+ * Inside a repeater the keys are the row's, not the form's: a row is a
+ * `FormData` of its own, nested under the repeater's data key.
+ */
 export type FormData = Record<string, JsonValue>
 
 /**

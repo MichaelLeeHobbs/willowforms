@@ -94,7 +94,8 @@ nothing produces an `object` yet.
 | `string` / `number` / `boolean`                            | the matching type                       |
 | `date`                                                     | `string` with `format: date`            |
 | `file`                                                     | `string` with `contentEncoding: base64` |
-| `minLength` / `maxLength`                                  | the matching keyword                    |
+| `minLength` / `maxLength` on text                          | `minLength` / `maxLength`               |
+| `minLength` / `maxLength` on a list                        | `minItems` / `maxItems`                 |
 | `min` / `max`                                              | `minimum` / `maximum`                   |
 | `pattern`                                                  | `pattern`                               |
 | `email` / `url` / `uuid`                                   | `format: email` / `uri` / `uuid`        |
@@ -105,7 +106,7 @@ nothing produces an `object` yet.
 
 `unexportableRules()` names each dropped rule and the field it was on, and the dialog lists them rather
 than leaving the loss unmentioned. It used to describe all of them as custom rules, so a guarded
-`required` was reported as something it was not:
+`required` was reported as something it was not. There are four causes, not two:
 
 - **`custom` rules.** Arbitrary JavaScript has no declarative equivalent.
 - **Guarded rules.** A rule with a `when` guard applies only sometimes, and JSON Schema's `required` is

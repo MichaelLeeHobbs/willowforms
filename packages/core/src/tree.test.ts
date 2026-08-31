@@ -12,6 +12,7 @@ import {
   duplicateNode,
   findNode,
   findParent,
+  flatten,
   generateKey,
   insertNode,
   moveNode,
@@ -19,6 +20,7 @@ import {
   removeNode,
   updateNode,
   validateDocument,
+  walk,
 } from './tree.js'
 import type { StructuralError } from './tree.js'
 
@@ -89,7 +91,7 @@ describe('generateKey', () => {
   })
 })
 
-describe('mutations are immutable', () => {
+describe('mutations: what they return, and what they leave alone', () => {
   it('insertNode leaves the original tree untouched', () => {
     const before = fixture()
     const after = insertNode(before, 'stack', leaf('d'))
@@ -105,6 +107,38 @@ describe('mutations are immutable', () => {
   it('clamps an out-of-range index instead of producing holes', () => {
     const after = insertNode(fixture(), 'stack', leaf('d'), 99)
     expect(findNode(after, 'stack')?.children?.map((c) => c.key)).toEqual(['a', 'b', 'd'])
+  })
+
+  it('clamps a negative index to the front', () => {
+    /*
+     * The other half of the same clamp, and it has to be an index the array is
+     * long enough to feel: `splice` clamps a start below `-length` to zero by
+     * itself, so `-3` on two children lands at the front either way. `-1` on
+     * three children lands *before the last one* without `Math.max`, which is
+     * the difference the clamp exists for.
+     */
+    const wide = container('root', [container('stack', [leaf('a'), leaf('b'), leaf('c')])])
+
+    const after = insertNode(wide, 'stack', leaf('d'), -1)
+    expect(findNode(after, 'stack')?.children?.map((c) => c.key)).toEqual(['d', 'a', 'b', 'c'])
+  })
+
+  it('appends for an index that is not a position at all', () => {
+    /*
+     * `Math.max(0, Math.min(NaN, len))` is `NaN`, and `splice(NaN, ...)`
+     * coerces to 0 -- so a caller handing over a computed-but-broken index
+     * silently *prepended*, while the two `Math` calls read as though every
+     * non-number was covered. An index nobody can place is the end of the
+     * list, which is what an absent index already means.
+     */
+    for (const index of [NaN, Infinity, -Infinity]) {
+      expect(
+        findNode(insertNode(fixture(), 'stack', leaf('d'), index), 'stack')?.children?.map(
+          (c) => c.key,
+        ),
+        String(index),
+      ).toEqual(['a', 'b', 'd'])
+    }
   })
 
   it('removes a nested node', () => {
@@ -1612,8 +1646,13 @@ describe('the tree and keys that repeat or are quoted', () => {
     }
 
     const copy = duplicateNode(stepped, 'step1')
-    // `baseOf` strips the trailing digits, so the copy of `step1` is `step`.
-    expect(copy?.key).toBe('step')
+    /*
+     * `step2`, not `step`. The name is taken from the source's own number
+     * upwards, so a copy is never named below the thing it was copied from --
+     * duplicating `step1` used to produce `step` whenever `step` happened to be
+     * free, which reads as the original coming back rather than as a copy.
+     */
+    expect(copy?.key).toBe('step2')
 
     const when = copy?.renderWhen
     const right =
@@ -1938,5 +1977,129 @@ describe('a field whose schema has no validations', () => {
     expect(() => validateForm(doc.root, {})).not.toThrow()
     expect(() => toJsonSchema(doc)).not.toThrow()
     expect(() => duplicateNode(doc.root, 'email')).not.toThrow()
+  })
+})
+
+/**
+ * What a copy is called when the source already carries a number.
+ *
+ * `baseOf` strips the trailing digits and `freeKey` returned the bare base
+ * whenever nothing had taken it -- so in a document where `website` was renamed
+ * away and `website2` remains, duplicating `website2` produced `website`. A
+ * copy named below its source contradicts the rule `duplicateNode`'s own
+ * docstring states, and reads as the original having been restored.
+ */
+describe('naming a copy of a copy', () => {
+  const withKeys = (...keys: string[]): ComponentNode =>
+    container(
+      'root',
+      keys.map((key) => leaf(key)),
+    )
+
+  it('never names a copy below its source', () => {
+    expect(duplicateNode(withKeys('website2'), 'website2')?.key).toBe('website3')
+    expect(duplicateNode(withKeys('step1'), 'step1')?.key).toBe('step2')
+  })
+
+  it('skips the numbers already taken', () => {
+    expect(duplicateNode(withKeys('website2', 'website3'), 'website2')?.key).toBe('website4')
+  })
+
+  it('still numbers a copy of an unnumbered key from two', () => {
+    // The ordinary case, unchanged: `website` copies to `website2`.
+    expect(duplicateNode(withKeys('website'), 'website')?.key).toBe('website2')
+    expect(duplicateNode(withKeys('website', 'website2'), 'website')?.key).toBe('website3')
+  })
+})
+
+/**
+ * A node whose key is unusable is still a node worth reading.
+ *
+ * `visitShape` and `visitEvents` sat inside the final `else` of the key chain,
+ * so a component with an empty or non-string key had its props, conditions,
+ * css and rules go unchecked. Fixing the key then produced a second round of
+ * errors about a document the first report had already called broken -- and a
+ * host gating on `validateDocument` sees one problem at a time.
+ */
+describe('validateDocument and a node with no usable key', () => {
+  const broken = (key: unknown): FormDocument => ({
+    ...createDocument('Broken', 'broken'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key, type: 'Field', props: { label: { kind: 'conditon' } } } as never],
+    },
+  })
+
+  it.each([
+    ['an empty key', ''],
+    ['a key that is not text', 42],
+  ])('reports the misspelled binding as well as %s', (_what, key) => {
+    const codes = validateDocument(broken(key)).map((problem) => problem.code)
+
+    // Both, in one pass. The key problem was the only one reported.
+    expect(codes.length).toBeGreaterThan(1)
+    expect(codes.some((code) => code === 'malformed')).toBe(true)
+  })
+
+  it('still reports nothing for a node that is fine', () => {
+    // The control: reading the shape of every node must not invent problems.
+    const fine: FormDocument = {
+      ...createDocument('Fine', 'fine'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'email', type: 'Field', props: { label: prop('Email') } }],
+      },
+    }
+
+    expect(validateDocument(fine)).toEqual([])
+  })
+})
+
+/**
+ * `flatten` and `walk`, in the package that owns them.
+ *
+ * Both are exported from `tree.ts` and neither was imported by this file:
+ * `flatten`'s `parentKey`/`index`/`depth` contract was pinned only in
+ * `packages/designer/src/keyboard.test.ts`, so core's own traversal was
+ * described by a test in another package that could be deleted with core's
+ * suite staying green -- and `walk` is what `styleSheetFor`,
+ * `unexportableRules` and `collectKeys` all traverse with.
+ */
+describe('flatten', () => {
+  it('reports every node with its parent, index and depth, in document order', () => {
+    expect(flatten(fixture())).toEqual([
+      { node: expect.objectContaining({ key: 'root' }), parentKey: undefined, index: 0, depth: 0 },
+      { node: expect.objectContaining({ key: 'stack' }), parentKey: 'root', index: 0, depth: 1 },
+      { node: expect.objectContaining({ key: 'a' }), parentKey: 'stack', index: 0, depth: 2 },
+      { node: expect.objectContaining({ key: 'b' }), parentKey: 'stack', index: 1, depth: 2 },
+      { node: expect.objectContaining({ key: 'c' }), parentKey: 'root', index: 1, depth: 1 },
+    ])
+  })
+
+  it('gives the nodes themselves, not copies of them', () => {
+    // Callers compare identity: the tree panel keys rows on the node, and a
+    // fresh object per call would make every row new on every render.
+    const tree = fixture()
+    expect(flatten(tree)[0]?.node).toBe(tree)
+  })
+})
+
+describe('walk', () => {
+  it('visits parents before children, with the parent it came from', () => {
+    const seen: string[] = []
+    walk(fixture(), (node, parent) => seen.push(node.key + '<' + (parent?.key ?? '-')))
+
+    expect(seen).toEqual(['root<-', 'stack<root', 'a<stack', 'b<stack', 'c<root'])
+  })
+
+  it('visits a leaf it is handed directly', () => {
+    const seen: string[] = []
+    walk(leaf('only'), (node) => seen.push(node.key))
+
+    expect(seen).toEqual(['only'])
   })
 })

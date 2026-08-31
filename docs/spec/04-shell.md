@@ -165,9 +165,9 @@ rules are:
 
 ### Known conflict
 
-`Delete` on a focused tree row is handled by the row and by a window-level shortcut. The row stops
-propagation, because without it one keypress removed the component twice and needed two undos. Any new
-window-level shortcut has to consider the same collision.
+`Delete` and `Backspace` on a focused tree row are handled by the row and by a window-level shortcut --
+both keys, in both places. The row stops propagation, because without it one keypress removed the
+component twice and needed two undos. Any new window-level shortcut has to consider the same collision.
 
 ## The live region
 

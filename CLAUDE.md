@@ -59,7 +59,7 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 1897 tests
+pnpm test          # vitest, 1967 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
@@ -67,22 +67,29 @@ pnpm build         # tsc --build, then copies designer.css
 pnpm e2e           # playwright, 78 tests in a real browser
 ```
 
-CI runs exactly these, in that order, then `node scripts/check-dist.mjs`, which reads the packages off
+CI runs every one of these, then `node scripts/check-dist.mjs`, which reads the packages off
 the directory and asserts each emitted `dist/index.js` and `dist/index.d.ts`, and that every stylesheet
 `copy-assets.mjs` names arrived. The end-to-end suite runs last, after the build, against the playground on port 5180
-with `--strictPort`, so a busy port fails loudly rather than serving from somewhere else. Anything
+with `--strictPort`, so a busy port fails loudly rather than serving from somewhere else. CI's order is
+format, lint, typecheck, test, build, end-to-end -- the cheapest gates first, so a formatting slip does
+not wait behind a browser download -- and the list above is alphabetical-by-habit rather than an order;
+saying "in that order" here was wrong about a workflow anybody can read. Anything
 positional belongs there: jsdom has no layout engine, so drop geometry, selection frames, and focus
 order cannot be checked anywhere else. `pnpm typecheck` is two passes on purpose: the per-package configs exclude tests so
 they stay out of `dist`, which left every test file unchecked until `tsconfig.eslint.json` picked them
 up. It found a type error in the first test file it ever saw.
 
 `aliases.ts` at the root maps `@formsmith/*` to `src` for vitest and the playground, so in-repo edits
-need no rebuild. Published packages resolve through `dist`. Entries are anchored regexes on purpose: a
+need no rebuild. Published packages resolve through `dist`. The five bare package entries are anchored
+regexes on purpose -- the two stylesheet subpaths are plain strings, because an exact specifier needs no
+anchoring -- and the reason is that a
 plain string alias also rewrites `@formsmith/designer/styles.css` and breaks the build.
 
 ## Conventions
 
-- Node 22+, pnpm 10, React 19, TypeScript strict with `exactOptionalPropertyTypes` and
+- Node 22.6+ to develop -- the demo server runs on `--experimental-strip-types`, which is where that
+  arrived -- and Node 20+ to consume a published package, which is what the five manifests declare.
+  pnpm 10, React 19, TypeScript strict with `exactOptionalPropertyTypes` and
   `noUncheckedIndexedAccess`. Both are on deliberately; do not relax them to make a type fit.
 - Tests live beside the source as `*.test.ts`, or `*.test.tsx` for component tests. Node is the default
   vitest environment, deliberately, so core keeps proving it runs without a DOM; a component test opts

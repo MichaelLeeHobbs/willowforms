@@ -121,23 +121,25 @@ met a suite naming rules that did not exist on paper. Both counts are checked ag
 Same suite, same kits, same consequence for a kit that fails one. They sit outside the per-kit block
 because each drives its own fixture rather than sweeping every component.
 
-| Rule                                                          | Why                                                                              |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| A failing control is marked invalid                           | A control that looks wrong and does not say so is announced as fine              |
-| A required control is marked required                         | WCAG 3.3.2, and the first anybody heard of it was a rejected submit              |
-| An unrequired control is left unmarked                        | Marking everything required would satisfy the rule above                         |
-| A `Text` variant adds no classes of its own                   | A document's string interpolated into a class name is a document styling the app |
-| Two declared variants still render differently                | Narrowing to nothing would satisfy the rule above                                |
-| An unrecognised `Alert` severity still carries a role         | A typo in a severity drew the banner and announced nothing                       |
-| An `Alert` that really is an error still announces itself     | A kit that announced nothing would satisfy the rule above                        |
-| An `Image` src carries no arbitrary scheme                    | `javascript:` in a document is a document that runs code                         |
-| An image with an ordinary address still renders               | Refusing every address would satisfy the rule above                              |
-| A text prop cleared to empty falls back to the default        | An empty string is a value; a cleared prop is an absence                         |
-| A component whose options a document got wrong still renders  | An option list is a document's list, and a document is data                      |
-| A control holding a value that is not a string still shows it | `String(value)` answered `''` for a number, so a stored answer rendered as blank |
-| A select still shows an option it can read                    | Dropping every entry would satisfy the rule above                                |
-| A select holding a number shows the option the data names     | `str` answers `''` for a number, so a stored answer rendered as nothing          |
-| A select shows nothing when the data names no option          | Showing the first option would satisfy the rule above                            |
+| Rule                                                                         | Why                                                                              |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| A failing control is marked invalid                                          | A control that looks wrong and does not say so is announced as fine              |
+| A required control is marked required                                        | WCAG 3.3.2, and the first anybody heard of it was a rejected submit              |
+| An unrequired control is left unmarked                                       | Marking everything required would satisfy the rule above                         |
+| A `Text` variant adds no classes of its own                                  | A document's string interpolated into a class name is a document styling the app |
+| Two declared variants still render differently                               | Narrowing to nothing would satisfy the rule above                                |
+| An unrecognised `Alert` severity still carries a role                        | A typo in a severity drew the banner and announced nothing                       |
+| An `Alert` that really is an error still announces itself                    | A kit that announced nothing would satisfy the rule above                        |
+| An `Image` src carries no arbitrary scheme                                   | `javascript:` in a document is a document that runs code                         |
+| An image with an ordinary address still renders                              | Refusing every address would satisfy the rule above                              |
+| A text prop cleared to empty falls back to the default                       | An empty string is a value; a cleared prop is an absence                         |
+| A component whose options a document got wrong still renders                 | An option list is a document's list, and a document is data                      |
+| Every icon the kit declares draws a glyph                                    | A palette entry with a blank square reads as a broken build                      |
+| A heading whose document names no rank renders at the same rank in both kits | The rank is the outline a screen reader navigates by, not a size                 |
+| A control holding a value that is not a string still shows it                | `String(value)` answered `''` for a number, so a stored answer rendered as blank |
+| A select still shows an option it can read                                   | Dropping every entry would satisfy the rule above                                |
+| A select holding a number shows the option the data names                    | `str` answers `''` for a number, so a stored answer rendered as nothing          |
+| A select shows nothing when the data names no option                         | Showing the first option would satisfy the rule above                            |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two

@@ -298,6 +298,18 @@ function evaluate(
       // only chains of `not` -- and `and` and `or` are the two an author's
       // nesting actually goes through, because they are the ones the panel
       // draws a group for.
+      /*
+       * Every branch, and no short-circuit. That is load-bearing rather than
+       * an oversight.
+       *
+       * An unreadable branch anywhere makes the whole condition unreadable,
+       * which is the line below -- and short-circuiting would skip it:
+       * `or(true, <broken>)` would answer `true` and *show* a component whose
+       * rule nobody can read, which is the permissive direction this whole
+       * module is organised against. The cost is walking branches whose answer
+       * cannot change the result, on a structure an author nests by hand in a
+       * 288px panel.
+       */
       const answers = condition.conditions.map((inner) =>
         evaluate(inner, data, context, row, depth + 1),
       )

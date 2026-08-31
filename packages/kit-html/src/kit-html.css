@@ -427,6 +427,13 @@ fieldset.fsh-field {
   gap: 2px;
   padding: 12px 14px;
   border: 1px solid var(--fsh-border);
+  /*
+   * The stripe every severity overrides, kept as the one an unrecognised
+   * severity would get. `AlertNode` narrows through `oneOf`, so today it always
+   * emits one of the four modifier classes and this value is never seen -- and
+   * it is one prop change away from being seen again, which is a stripe with a
+   * colour rather than none.
+   */
   border-inline-start: 4px solid var(--fsh-muted);
   border-radius: var(--fsh-radius);
   color: var(--fsh-text);

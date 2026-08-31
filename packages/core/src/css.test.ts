@@ -353,6 +353,22 @@ describe('declarations round-trip, so two editors can share one string', () => {
     ])
   })
 
+  it('is not confused by an escaped separator outside a string either', () => {
+    /*
+     * The other escape branch. A backslash escapes the next character wherever
+     * it appears in CSS, and only the in-quote branch had a test -- so the
+     * out-of-quote one could be deleted while an escaped `;` or `:` split a
+     * declaration CSS reads as one.
+     */
+    expect(parseDeclarations('content: a\\; b; padding: 8px')).toEqual([
+      ['content', 'a\\; b'],
+      ['padding', '8px'],
+    ])
+
+    // And the same for the name/value split, which walks with the same reader.
+    expect(parseDeclarations('grid-template: a\\: b')).toEqual([['grid-template', 'a\\: b']])
+  })
+
   it('ignores a fragment that is not a declaration', () => {
     expect(parseDeclarations('padding: 8px; nonsense; : 4px; color:')).toEqual([['padding', '8px']])
   })
@@ -572,5 +588,55 @@ describe('setDeclaration and the order of a block', () => {
     expect(setDeclaration('color: red; padding: 8px; margin: 0', 'padding', '').split(SEP)).toEqual(
       ['color: red', 'margin: 0'],
     )
+  })
+})
+
+/**
+ * A stylesheet built from a document nobody gated.
+ *
+ * `styleSheetFor` walks the tree with `walk`, which was neither total nor
+ * bounded: a `children` that is an object threw "is not iterable", and a tree
+ * nested past the stack threw `RangeError`. The renderer hardened its own layer
+ * for exactly this -- "one node missing `props` used to take the whole form
+ * with it" -- and this path, which also runs during render, was left.
+ */
+describe('styleSheetFor on a malformed tree', () => {
+  it.each([
+    ['an object', { nope: true }],
+    ['a string', 'children'],
+    ['a number', 7],
+  ])('answers rather than throwing for children that are %s', (_what, children) => {
+    const broken = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      css: { any: 'color: red' },
+      children,
+    } as never
+
+    expect(() => styleSheetFor(broken)).not.toThrow()
+    // And it still emits what it could read, which is the root's own rule.
+    expect(styleSheetFor(broken)).toContain('color: red')
+  })
+
+  it('answers rather than overflowing on a tree nested past any bound', () => {
+    let deep: ComponentNode = { key: 'leaf', type: 'Field', props: {}, css: { any: 'color: red' } }
+    for (let i = 0; i < 5000; i += 1) {
+      deep = { key: 'stack' + String(i), type: 'Stack', props: {}, children: [deep] }
+    }
+
+    expect(() => styleSheetFor(deep)).not.toThrow()
+  })
+
+  it('still emits a rule for a node a person would author', () => {
+    // The control: a walk that gave up on everything would pass all four above.
+    const fine: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'card', type: 'Box', props: {}, css: { any: 'padding: 8px' } }],
+    }
+
+    expect(styleSheetFor(fine)).toContain('padding: 8px')
   })
 })
