@@ -18,7 +18,7 @@ a status line in a file that calls itself repo facts only is a status line nobod
 - **Started:** 2026-08-31
 - **Last completed:** nothing yet. Item 0 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main`
-- **Last pushed item branch:** `build-out/b/00-prep`
+- **Last pushed item branch:** none yet (prep PR branch is `build-out/b/00-prep`)
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
