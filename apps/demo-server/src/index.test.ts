@@ -14,7 +14,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import type { ComponentNode, FormDocument } from '@formsmith/core'
 
 /*
@@ -63,7 +63,7 @@ const FORM: FormDocument = {
 
 await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
 
-const { app } = await import('./index.js')
+const { app, stopper } = await import('./index.js')
 
 afterAll(async () => {
   await rm(directory, { recursive: true, force: true })
@@ -359,5 +359,77 @@ describe('a form with two steps', () => {
     })
 
     expect(await response.json()).toEqual({ ok: true, received: { name: 'Ada', city: 'Ely' } })
+  })
+})
+
+/*
+ * A form id that every object answers to.
+ *
+ * The store is a plain object parsed from JSON, so `store['toString']` is a
+ * function and `store['__proto__']` is a prototype, and both are truthy. Every
+ * route guarded that with `held()`, which checks own keys -- except the submit
+ * route, which indexed the store directly and then walked whatever came back as
+ * if it were a form. The route that takes a body was the one without the guard.
+ */
+describe('a form id borrowed from Object.prototype', () => {
+  for (const id of ['__proto__', 'toString', 'constructor', 'hasOwnProperty']) {
+    it('is not a form: ' + id, async () => {
+      const response = await app.request('/api/forms/' + id + '/submit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{"name":"Ada"}',
+      })
+
+      expect(response.status).toBe(404)
+      expect(await response.json()).toEqual({ error: 'Not found' })
+    })
+  }
+
+  it('is not a form even when a real one is stored beside it', async () => {
+    // The control. `deep` is in the store and answers, so a blanket 404 from a
+    // broken route would not be what the cases above are measuring.
+    expect((await submit('{"answers":"x","name":"Ada"}')).status).toBe(200)
+  })
+})
+
+/*
+ * Shutting down.
+ *
+ * `stopper` is exported for this: the handler used to live inside the
+ * entry-point guard, where a test can never reach it, and that is why nobody
+ * noticed there was no handler at all.
+ */
+describe('a signal arriving mid-write', () => {
+  it('exits once the server reports its connections closed', () => {
+    let closed: (() => void) | undefined
+    const exit = vi.fn()
+
+    stopper({ close: (done) => (closed = done) }, exit)('SIGTERM')
+
+    // Not yet: an in-flight PUT is between `writeFile` and `rename`, and exiting
+    // here is the corruption this handler exists to avoid.
+    expect(exit).not.toHaveBeenCalled()
+
+    closed?.()
+    expect(exit).toHaveBeenCalledTimes(1)
+  })
+
+  it('exits anyway when a connection never closes', () => {
+    vi.useFakeTimers()
+    try {
+      const exit = vi.fn()
+
+      // A `close` that never calls back: a held-open keep-alive socket, or a
+      // request stuck on a disk that is not answering.
+      stopper({ close: () => {} }, exit)('SIGINT')
+
+      vi.advanceTimersByTime(4_999)
+      expect(exit).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(1)
+      expect(exit).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

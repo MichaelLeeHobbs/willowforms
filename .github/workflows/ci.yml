@@ -18,15 +18,25 @@ concurrency:
 permissions:
   contents: read
 
+# Every action is pinned to a commit, with the version it was in the comment.
+#
+# A tag is a mutable pointer: whoever owns the action can move `v4` onto any
+# commit at any time, and every workflow in the world picks it up on the next
+# run without a diff anywhere. A commit hash cannot be moved. The cost is that
+# bumps are manual, so the comment names the version each hash was, and the
+# hashes here are the tip of v4 as of 2026-08-31. Majors have moved on since
+# (checkout and setup-node are at v7, upload-artifact at v7, action-setup at
+# v6); those bumps need a CI run to verify and are not something to make blind.
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -59,7 +69,7 @@ jobs:
 
       - name: Keep the trace from a failed run
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report
           path: |

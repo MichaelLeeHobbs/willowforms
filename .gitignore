@@ -23,5 +23,8 @@ coverage/
 .vscode/
 
 # Written by apps/demo-server at runtime. Running the demo must not dirty the tree,
-# and it must not fail format:check.
+# and it must not fail format:check. The `.tmp` sibling is the half of the
+# write-and-rename that only exists between two syscalls, and a kill in that gap
+# leaves it behind -- so it needs ignoring too, or a crash dirties the tree.
 apps/demo-server/forms.json
+apps/demo-server/forms.json.tmp

@@ -389,3 +389,45 @@ hook-level tests for five `DesignerApi` writers that are covered through the pan
 Each is a real gap and none of them is a defect: they are tests to write when something touches those
 paths, which is when a test written for them will be checked against a change rather than against the
 code it was copied from.
+
+## eslint does lint the config files — area 10
+
+**Refuted.** The finding says `eslint .` never sees `vitest.config.ts`, `playwright.config.ts` or
+`apps/playground/vite.config.ts`, so a mistake in any of them is unlinted. The `aliases.ts` half of the
+same claim was refuted in item 5; this is the rest of it, measured the same way. Appending
+`const unusedOnPurpose = 1` to each of the three and running `pnpm lint`:
+
+```
+vitest.config.ts                 caught by pnpm lint
+playwright.config.ts             caught by pnpm lint
+apps/playground/vite.config.ts   caught by pnpm lint
+```
+
+All three are linted. `pnpm typecheck`'s second pass covers them too, through `tsconfig.eslint.json`.
+
+## The end-to-end suite still runs against source, not `dist` — `playwright.config.ts:42`, area 10
+
+**MEDIUM, partly fixed, and the rest is honest to leave.** The finding is right that `pnpm e2e` starts
+the Vite dev server, so nothing in the pipeline ever put a built package in front of a browser.
+
+The half worth fixing is fixed: `scripts/check-dist.mjs` now imports every package's `dist/index.js` in
+Node, so a broken `exports` map, a directory import Node refuses, or a dependency that only resolves
+under a bundler fails CI. That is the class of defect this actually catches, and it caught one during
+this run -- `@formsmith/kit-mui` did not load at all under MUI 6.
+
+The other half does not follow. Building the playground and serving it with `vite preview` would not
+exercise `dist` either, because `aliases.ts` maps `@formsmith/*` to `src` for the playground too, on
+purpose, so an in-repo edit needs no rebuild. A genuine build-output end-to-end run means a second
+playground with the aliases off, installing the packed tarballs -- a package-consumer smoke test, which
+is a piece of infrastructure and not a corner of a MEDIUM sweep. Worth doing as its own step.
+
+## `auto-install-peers` stays on — `.npmrc`, area 10
+
+**Fixed in part.** `strict-peer-dependencies=false` is now `true`: it was hiding peer conflicts, and the
+tree satisfies strict mode today, so `pnpm install --frozen-lockfile --strict-peer-dependencies` passes
+unchanged. That is the half of the setting that silences a real error.
+
+`auto-install-peers=true` stays. It is pnpm's default since v8, and turning it off is recorded in the
+lockfile, so flipping it fails `--frozen-lockfile` with `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` until the
+lockfile is regenerated. Regenerating the lockfile to change a default, in the middle of a remediation
+run, would move dependency resolutions no finding asked to move.

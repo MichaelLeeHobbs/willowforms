@@ -409,7 +409,14 @@ const contextFor = (): FormContext => ({ user: { role: 'guest' } })
  * rather than a missing answer in the database later.
  */
 app.post('/api/forms/:id/submit', async (c) => {
-  const doc = (await readStore())[c.req.param('id')]
+  /*
+   * `held`, not a bare index. The helper exists because a store read from disk
+   * is a plain object, so `store['__proto__']` and `store['toString']` answer
+   * with something inherited -- and this route then treated that as a document
+   * and walked it. Every other route uses it; the submit route, which is the one
+   * that takes a body, did not.
+   */
+  const doc = held(await readStore(), c.req.param('id'))
   if (!doc) return c.json({ error: 'Not found' }, 404)
 
   const context = contextFor()
@@ -507,6 +514,39 @@ app.post('/api/forms/:id/submit', async (c) => {
 export { app }
 
 /*
+ * How long a shutdown waits for the requests already in flight.
+ *
+ * Long enough for a `PUT` to finish its write and rename, short enough that
+ * `docker stop` (10 seconds by default) still gets a clean exit rather than a
+ * `SIGKILL` -- which is the case this whole thing exists to avoid.
+ */
+const SHUTDOWN_GRACE = 5000
+
+/**
+ * The signal handler, as a value, so a test can drive it.
+ *
+ * The block below runs only when this file is the process entry point, which a
+ * test never is, so anything defined inside it is unreachable from a test. The
+ * bug being fixed here lived exactly there: `serve()`'s return was discarded,
+ * so there was no `close()` and no handler, and `docker stop` or a Ctrl+C during
+ * a `PUT` killed the process between `writeFile` and `rename`. That leaves the
+ * half-written temporary file `readStore` refuses to serve. The write-and-rename
+ * dance makes that recoverable; handling the signal makes it rare.
+ *
+ * `exit` is a parameter for the same reason: a test cannot call `process.exit`.
+ */
+export const stopper =
+  (server: { close: (done: () => void) => void }, exit: () => void) =>
+  (signal: string): void => {
+    console.log('Formsmith demo server stopping on ' + signal)
+    server.close(exit)
+
+    // Unrefed, so a connection that will not close cannot itself hang the exit,
+    // and so this timer never holds the process open on its own.
+    setTimeout(exit, SHUTDOWN_GRACE).unref()
+  }
+
+/*
  * Only when this file is the thing that was run.
  *
  * Importing it used to bind a port as a side effect, which is why nothing ever
@@ -522,6 +562,11 @@ if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
    * store of somebody's form documents was reachable from the network the laptop
    * happened to be on — a coffee shop, a conference, a client's office.
    */
-  serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' })
+  const server = serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' })
   console.log('Formsmith demo server on http://localhost:' + String(PORT))
+
+  const stop = stopper(server, () => process.exit(0))
+
+  process.on('SIGTERM', () => stop('SIGTERM'))
+  process.on('SIGINT', () => stop('SIGINT'))
 }
