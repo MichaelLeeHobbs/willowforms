@@ -106,6 +106,11 @@ the obvious thing to do is key everything the same way. An error belongs to a co
 two components sharing a data key still need to be able to say different things. So `FormData` is keyed
 by data key and `FormErrors` by component key, and they are deliberately not parallel.
 
+Inside a repeater an error key is a row address rather than a bare component key:
+`addresses[1].street`, the prefix built from data keys and the leaf still the component's.
+[12-api.md](12-api.md) and [08-validation.md](08-validation.md) both spell that out; a host looking up
+`errors[node.key]` finds nothing for any field in a row.
+
 `data-fs-key` stays the component key too. It is how the canvas finds a node from a DOM element, which is
 identity, not data. See [02-kit-contract.md](02-kit-contract.md#the-one-obligation).
 
@@ -129,9 +134,11 @@ the tree's entries into one stylesheet, and the renderer emits that alongside th
 simulation, which had to come first: authoring a tablet rule is meaningless without a way to see the
 tablet.
 
-The text is **declarations only**. `safeDeclarations` refuses anything holding `{`, `}`, `<` or `@`,
-because a component's styling that can leave its own block can style the whole page, and a document is
-data. Refused text is reported in the Style tab rather than silently dropped.
+The text is **declarations only**. `safeDeclarations` refuses anything holding `{`, `}`, `<`, `@`, or a
+CSS comment delimiter (`/*` or `*/`), because a component's styling that can leave its own block can style
+the whole page, and a document is data. The comment delimiters are on that list for a reason of their own:
+these blocks are concatenated into one sheet, so an unbalanced `/*` comments out every rule that follows
+it, including other components'. Refused text is reported in the Style tab rather than silently dropped.
 
 A single style _value_ is judged more strictly than a declaration list, by `safeStyleValue` in core.
 That one also refuses `;`, `!`, a comment, a backslash and anything that fetches, because a value on a

@@ -180,16 +180,19 @@ rather than being two components, because they are one idea with two shapes.
 Every component declares which of the six `EventName`s it can raise. Authoring them is
 [09-actions.md](09-actions.md), which is not built.
 
-The right-hand column is what the two kits declare today, not a rule. Since nothing fires an event yet,
-these lists have never had to be right: `onFocus` is missing from every input but `TextField`, and
-lifecycle events are declared only by `Screen`. Settle them when something reads them.
+The right-hand column is what the two kits declare today, not a rule -- both declare the same lists, and
+`test/docs.test.ts` checks this table against them. Since nothing fires an event yet, the lists have never
+had to be complete: `onFocus` reaches only the two free-text inputs, `onBlur` only those two and the
+components that commit a value on leaving, and lifecycle events only `Screen`. Settle them when something
+reads them.
 
-| Event                   | Raised by                                    |
-| ----------------------- | -------------------------------------------- |
-| `onChange`              | data-bound components                        |
-| `onClick`               | `Button`, `Link`                             |
-| `onFocus` / `onBlur`    | `TextField`; `onBlur` alone on `NumberField` |
-| `onMount` / `onUnmount` | `Screen`                                     |
+| Event                   | Raised by                                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `onChange`              | `TextField`, `NumberField`, `TextArea`, `Checkbox`, `Switch`, `Select`, `RadioGroup`, `DatePicker`, `FileUpload` |
+| `onClick`               | `Button`, `Link`                                                                                                 |
+| `onBlur`                | `TextField`, `TextArea`, `NumberField`, `DatePicker`                                                             |
+| `onFocus`               | `TextField`, `TextArea`                                                                                          |
+| `onMount` / `onUnmount` | `Screen`                                                                                                         |
 
 ## What is deliberately absent
 
@@ -209,7 +212,8 @@ lifecycle events are declared only by `Screen`. Settle them when something reads
 
 1. Add the `ComponentDef` to both kits' metadata.
 2. Add a renderer to both kits, spreading `nodeProps`.
-3. Run `test/kit-contract.test.tsx`. It checks twenty obligations against every kit, one per row of the
+3. Run `test/kit-contract.test.tsx`. It checks the obligations in `02-kit-contract.md`'s table against
+   every kit, one per row of the
    table in [02-kit-contract.md](02-kit-contract.md), and `docs.test.ts` fails when the two counts
    disagree. Most hold for the kit as a whole; the `nodeProps` rule runs once per component.
 4. Add a row above and mark it Built.

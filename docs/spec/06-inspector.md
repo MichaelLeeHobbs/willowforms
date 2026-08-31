@@ -156,9 +156,11 @@ a test enforcing that for the designer's own stylesheet; a Style tab that let an
 `input { padding: 0 }` would hand every user the ability to make the same mistake the invariant exists to
 prevent, one form at a time.
 
-The text is **declarations only**, applied scoped to the element carrying `data-fs-key`. `{`, `}`, `<`
-and `@` are refused: they are how a component's styling would end its own block and reach the page, leave
-CSS through `</style>`, or open an `@import`. Refused rather than escaped, because escaping invites an
+The text is **declarations only**, applied scoped to the element carrying `data-fs-key`. `{`, `}`, `<`,
+`@` and the CSS comment delimiters `/*` and `*/` are refused: the first four are how a component's styling
+would end its own block and reach the page, leave CSS through `</style>`, or open an `@import`, and a
+comment delimiter is how it would swallow the rules after it -- these blocks share one sheet, so an
+unbalanced `/*` takes other components' styling with it. Refused rather than escaped, because escaping invites an
 argument about which escape is sufficient, and refused rather than cleaned, because silently rewriting
 what an author typed is how a rule ends up meaning something nobody asked for. The panel says the text
 was refused; the renderer leaves it out.

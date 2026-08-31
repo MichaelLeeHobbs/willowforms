@@ -37,6 +37,7 @@ fighting specificity.
 | `--fs-bg-panel`               | Panel and toolbar surfaces                          |
 | `--fs-bg-well`                | Inset surfaces: inputs, rule cards, the JSON editor |
 | `--fs-border`                 | Every divider and control outline                   |
+| `--fs-control-border`         | The outline of an editable control, which is darker |
 | `--fs-text`                   | Body text                                           |
 | `--fs-text-muted`             | Hints, secondary labels, type names                 |
 | `--fs-primary`                | Selection frames, focus rings, primary buttons      |
@@ -53,7 +54,13 @@ fighting specificity.
 On `.fsh-screen`:
 
 `--fsh-text`, `--fsh-muted`, `--fsh-surface`, `--fsh-field`, `--fsh-border`, `--fsh-accent`,
-`--fsh-accent-text`, `--fsh-danger`, `--fsh-radius`, `--fsh-font`.
+`--fsh-accent-text`, `--fsh-danger`, `--fsh-success`, `--fsh-warning`, `--fsh-shadow`, `--fsh-radius`,
+`--fsh-font`.
+
+Both lists are checked against the stylesheets by `test/docs.test.ts`. A token a host cannot find here is
+a token they cannot override, which is the whole mechanism this section describes -- and three of the kit's
+were missing, so an alert's success and warning accents and every shadow stayed on the default palette
+however thoroughly a host restyled the rest.
 
 ## Light and dark
 

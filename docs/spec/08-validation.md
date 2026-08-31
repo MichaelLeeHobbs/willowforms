@@ -61,12 +61,15 @@ type ValidationRule =
 | `min` / `max`             | `number`           | numbers    | the number is outside the range             |
 | `pattern`                 | regular expression | text       | the expression does not match               |
 | `email`                   | —                  | text       | it is not an email address                  |
-| `url`                     | —                  | text       | `URL.canParse` rejects it                   |
+| `url`                     | —                  | text       | it is not an http, https, mailto or tel URL |
 | `uuid`                    | —                  | text       | it is not a UUID                            |
 | `custom`                  | expression         | anything   | the expression returns falsy                |
 
-**Empty** means `undefined`, `null`, a string that is blank once trimmed, or an empty array. A `0` is a
-value, not an absence.
+**Empty** means `undefined`, `null`, a string that is blank once trimmed, an empty array, or an object
+with no keys. A `0` is a value, not an absence.
+
+The empty object is there because a payload shape that uses `{}` as a placeholder would otherwise satisfy
+a required consent: `{"consent": {}}` was a truthy value with nothing in it, and `required` passed.
 
 `required` is the one rule that is stricter, and only for booleans: **an unchecked box is a non-answer**.
 "I accept the terms" is the canonical required checkbox and it has to be checked, which is exactly what
@@ -94,7 +97,18 @@ correct. Neither the type checker nor the suite had an opinion, because nothing 
 - **Non-primitive values read as empty text.** `String({})` gives `"[object Object]"`, which would land
   in an input the user then has to clear and could accidentally satisfy a `pattern`.
 
-The principle: a missing sandbox must not throw and must not silently fail a user's form.
+Three of these degrade towards failing rather than passing, and they are the ones an author will meet:
+
+- A **value longer than 4096 characters never matches a `pattern`.** Matching is linear in the input for a
+  well-behaved expression and is not for a hostile one, so the input is bounded before the engine is
+  asked. A long answer therefore fails its format rule rather than hanging the page.
+- A **pattern with a nested unbounded quantifier matches nothing at all.** `(a+)+` and `(\w+)+@example\.com`
+  are the shape whose backtracking is exponential, so they are refused rather than run -- which means every
+  value fails that rule, including the ones the author was testing with. The rule editor says so; a host
+  calling `applyRule` directly sees only the failure.
+- A **rule key the engine does not recognise fails with `UNREADABLE_RULE`.** This is the one place a rule
+  reports rather than passes on an empty value, and deliberately: an unknown key is a document from a
+  newer version or a hand edit, and a rule nobody can read is not a rule anybody should be told passed.
 
 ## Messages
 
@@ -162,7 +176,20 @@ becoming optional, on the server.
 `validateForm` returns the first failing message per component, not every failure. Showing one problem at
 a time per field is what a form does; the full list is available by calling `applyRule` directly.
 
-`FormErrors` is keyed by component key, and stays that way now `dataKey` exists. Data keys may repeat,
+**A repeater with more rows than `MAX_ROWS` (5000) is refused whole.** The row count comes out of the
+submitted body rather than from the client -- asking the browser how many rows there are would let a
+client submit one and have the rest go unchecked -- so the body decides how much work happens, and rows
+nest multiplicatively. Over the cap, `validateForm` records `TOO_MANY_ROWS` against the repeater and
+validates none of its rows, so the response carries one generic message where a server operator might
+expect per-field ones. Both constants are exported, so a body-size limit can be sized against the same
+number the engine uses.
+
+`FormErrors` is keyed by component key outside a repeater, and by a row address inside one --
+`addresses[1].street`, where the prefix is built from the repeater's _data_ key and the leaf is the
+component key. A host that looks errors up by `node.key` alone finds none for any field inside a
+repeater, and ships a form that displays nothing on a rejected submit.
+
+It stays keyed by component key rather than by data key, and stays that way now `dataKey` exists. Data keys may repeat,
 so keying errors by one would let two components collide over a single message. See
 [01-document-model.md](01-document-model.md#datakey).
 

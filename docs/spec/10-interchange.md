@@ -89,17 +89,17 @@ export would then reject every one of them. [ARCHITECTURE.md](../ARCHITECTURE.md
 `FieldSchema['type']` also permits `array` and `object`. `Repeater` produces an `array` in both kits;
 nothing produces an `object` yet.
 
-| Model                           | Schema                                  |
-| ------------------------------- | --------------------------------------- |
-| `string` / `number` / `boolean` | the matching type                       |
-| `date`                          | `string` with `format: date`            |
-| `file`                          | `string` with `contentEncoding: base64` |
-| `minLength` / `maxLength`       | the matching keyword                    |
-| `min` / `max`                   | `minimum` / `maximum`                   |
-| `pattern`                       | `pattern`                               |
-| `email` / `url` / `uuid`        | `format: email` / `uri` / `uuid`        |
-| `required`, unguarded           | the parent object's `required` array    |
-| A static `label`, or `text`     | `title`                                 |
+| Model                                                      | Schema                                  |
+| ---------------------------------------------------------- | --------------------------------------- |
+| `string` / `number` / `boolean`                            | the matching type                       |
+| `date`                                                     | `string` with `format: date`            |
+| `file`                                                     | `string` with `contentEncoding: base64` |
+| `minLength` / `maxLength`                                  | the matching keyword                    |
+| `min` / `max`                                              | `minimum` / `maximum`                   |
+| `pattern`                                                  | `pattern`                               |
+| `email` / `url` / `uuid`                                   | `format: email` / `uri` / `uuid`        |
+| `required`, unguarded, on a component that is always shown | the parent object's `required` array    |
+| A static `label`, or `text`                                | `title`                                 |
 
 ### What it cannot carry
 
@@ -111,6 +111,12 @@ than leaving the loss unmentioned. It used to describe all of them as custom rul
 - **Guarded rules.** A rule with a `when` guard applies only sometimes, and JSON Schema's `required` is
   unconditional. Exporting a guarded `required` as an unconditional one would reject payloads the form
   itself accepts.
+- **Every rule on a component carrying a `renderWhen`.** The same argument one level up: a component
+  that is sometimes on screen collects an answer sometimes, so its `required` is conditional however
+  unguarded the rule is. This one is easy to miss because it is invisible in the rule -- and every `Step`
+  carries a `renderWhen`, so a wizard's required fields are dropped from the exported `required` array
+  wholesale. `unexportableRules()` names them, and the dialog lists them; a host that exports a schema
+  without reading that list gets one that accepts every submission.
 
 **Known gap:** a required boolean exports as "the key must be present", which is not the same as "it must
 be `true`". A `const: true` would express it, and does not yet.

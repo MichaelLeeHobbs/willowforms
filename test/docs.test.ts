@@ -389,6 +389,28 @@ describe('the specification index', () => {
 /** How many obligations the kit contract states. See the assertion that uses it. */
 const CONTRACT_RULES = 25
 
+/**
+ * And how many are driven per kit from outside the per-kit block.
+ *
+ * The guard below counted only the `describe.each(KITS)` block, on purpose --
+ * the file also holds checks that are not obligations on a kit at all. But
+ * fifteen cases outside that block *are*: they run against every registered
+ * kit -- directly through `KITS`, or through a table built from `KITS` and a
+ * list of component types -- and fail a kit by name. They were written down
+ * nowhere, so the spec presented the first table as the whole obligation set
+ * while the suite ran nearly twice that.
+ */
+const CONTRACT_RULES_PER_KIT = 15
+
+/**
+ * The describes that are about this repository rather than about a kit.
+ *
+ * `the two kits in this repository agree` is a courtesy these two keep, not a
+ * contract; `a default copied between kits` is the same. Neither belongs in a
+ * document a third-party kit author reads as their obligations.
+ */
+const NOT_OBLIGATIONS = ['the two kits in this repository agree', 'a default copied between kits']
+
 describe('the kit contract table', () => {
   it('has one row for every rule the contract suite runs', () => {
     /*
@@ -438,6 +460,47 @@ describe('the kit contract table', () => {
     const cases = [...rules.matchAll(/^\s+it(?:\.each)?\(/gm)].length
 
     expect(rows, 'the rule table and the contract suite disagree').toBe(cases)
+    expect(rows, 'a contract rule was added or removed; say so here as well').toBe(CONTRACT_RULES)
+  })
+
+  it('has a second row for every rule driven per kit outside that block', () => {
+    /*
+     * The other half, and the half nothing checked. `it.each(KITS)` outside the
+     * per-kit block is a rule that runs against every registered kit and fails
+     * it by name -- the same consequence as a row in the first table, and until
+     * now none of them was written down.
+     */
+    const suite = read('test/kit-contract.test.tsx')
+
+    // Everything but the describes that are about these two kits rather than
+    // about kits, so a courtesy is not read as an obligation.
+    let outside = suite.slice(0, suite.indexOf('describe.each(KITS)'))
+    for (const name of NOT_OBLIGATIONS) {
+      const at = outside.indexOf("describe('" + name)
+      if (at === -1) continue
+      const next = outside.indexOf('\ndescribe(', at)
+      outside = outside.slice(0, at) + (next === -1 ? '' : outside.slice(next))
+    }
+
+    // `KITS` directly, or a table built from it: `LIST_CASES` and `VALUE_CASES`
+    // are `KITS.flatMap(...)`, so each of their rows is a kit failing by name.
+    const cases = [...outside.matchAll(/it\.each\((?:KITS|[A-Z_]+_CASES)\)\(/g)].length
+    expect(cases, 'no per-kit rules were found outside the block').toBeGreaterThan(0)
+    expect(
+      cases,
+      'a rule driven per kit was added or removed; say so in 02-kit-contract.md as well',
+    ).toBe(CONTRACT_RULES_PER_KIT)
+
+    const spec = read('docs/spec/02-kit-contract.md')
+    const heading = spec.indexOf('### And the rules driven per kit from outside that block')
+    expect(heading, 'the second obligation table is gone from the spec').toBeGreaterThan(-1)
+
+    const fromRules = spec.slice(spec.indexOf('| Rule', heading))
+    const afterTable = fromRules.search(/\n[ \t]*\n/)
+    const table = afterTable === -1 ? fromRules : fromRules.slice(0, afterTable)
+    const rows = [...table.matchAll(/^\|(?! *-)[^|\n]+\|/gm)].length - 1
+
+    expect(rows, 'the second table and the suite disagree').toBe(cases)
 
     /*
      * And both against a number stated here, because the comparison above is
@@ -450,7 +513,122 @@ describe('the kit contract table', () => {
      * is meant to be a deliberate act in three places: the spec, the suite, and
      * here.
      */
-    expect(rows, 'a contract rule was added or removed; say so here as well').toBe(CONTRACT_RULES)
+  })
+})
+
+/**
+ * The events table in `03-components.md`, against what the kits declare.
+ *
+ * Its own preamble says the right-hand column is what the kits declare today,
+ * and both of its concrete claims were wrong: `onFocus` was said to be missing
+ * from every input but `TextField` while `TextArea` declares it, and
+ * `DatePicker`'s `onBlur` was not listed at all. Whoever eventually builds the
+ * Actions tab reads this table as the inventory of what needs settling.
+ */
+describe('the events table', () => {
+  /** Every component type in a kit definitions file, with the events it declares. */
+  const declared = (path: string): Map<string, string[]> => {
+    const source = read(path)
+    const found = new Map<string, string[]>()
+
+    for (const match of source.matchAll(/type: '(\w+)'/g)) {
+      const after = source.slice(match.index + match[0].length, match.index + 2500)
+      const events = /events: \[([^\]]*)\]/.exec(after)
+      if (!events) continue
+      found.set(
+        match[1] ?? '',
+        [...(events[1] ?? '').matchAll(/'(\w+)'/g)].map((event) => event[1] ?? ''),
+      )
+    }
+
+    return found
+  }
+
+  const mui = declared('packages/kit-mui/src/definitions.ts')
+  const html = declared('packages/kit-html/src/definitions.ts')
+
+  it('found the declarations to check against', () => {
+    // The control for everything below: a reader that matched nothing would
+    // make every comparison a comparison of two empty maps.
+    expect(mui.size).toBeGreaterThan(15)
+    expect([...mui.keys()].sort()).toEqual([...html.keys()].sort())
+  })
+
+  it('the two kits declare the same events for the same component', () => {
+    const differing = [...mui.entries()]
+      .filter(([type, events]) => (html.get(type) ?? []).join() !== events.join())
+      .map(([type]) => type)
+
+    expect(differing).toEqual([])
+  })
+
+  it.each(['onChange', 'onClick', 'onBlur', 'onFocus'])(
+    'lists every component that raises %s',
+    (event) => {
+      const raising = [...mui.entries()]
+        .filter(([, events]) => events.includes(event))
+        .map(([type]) => type)
+        .sort()
+
+      const spec = read('docs/spec/03-components.md')
+      const row = new RegExp('^\\| `' + event + '`[^|]*\\|([^|]*)\\|', 'm').exec(spec)
+      expect(row, event + ' has no row in the events table').not.toBeNull()
+
+      const listed = [...(row?.[1] ?? '').matchAll(/`(\w+)`/g)]
+        .map((match) => match[1] ?? '')
+        .sort()
+      expect(listed, 'the events table and the kits disagree about ' + event).toEqual(raising)
+    },
+  )
+})
+
+/**
+ * The theming document, against the tokens the stylesheets define.
+ *
+ * `11-theming.md` says a host restyles by overriding tokens rather than
+ * fighting specificity, and it is the only place the names are written down --
+ * so a token missing from it is a token nobody can override. Four were:
+ * `--fs-control-border`, and the kit's `--fsh-success`, `--fsh-warning` and
+ * `--fsh-shadow`.
+ */
+describe('the theming document', () => {
+  /** Every custom property a stylesheet declares. */
+  const tokensIn = (path: string): string[] => {
+    const css = read(path).replace(/\/\*[\s\S]*?\*\//g, '')
+    return [
+      ...new Set([...css.matchAll(/(--fsh?-[a-z0-9-]+)\s*:/g)].map((match) => match[1] ?? '')),
+    ]
+  }
+
+  const spec = read('docs/spec/11-theming.md')
+
+  it.each([
+    ['the designer', 'packages/designer/src/designer.css'],
+    ['the HTML kit', 'packages/kit-html/src/kit-html.css'],
+  ])('documents every token %s defines', (_what, path) => {
+    const tokens = tokensIn(path)
+
+    // The control: a reader that found nothing would document nothing and pass.
+    expect(tokens.length, 'no tokens were found in ' + path).toBeGreaterThan(8)
+
+    expect(tokens.filter((token) => !spec.includes(token)).sort()).toEqual([])
+  })
+
+  it('documents no token that has since been removed', () => {
+    /*
+     * The other direction, and the one a reader meets: a name in this table
+     * that no stylesheet defines is an override that silently does nothing.
+     */
+    const defined = new Set([
+      ...tokensIn('packages/designer/src/designer.css'),
+      ...tokensIn('packages/kit-html/src/kit-html.css'),
+    ])
+
+    const mentioned = [
+      ...new Set([...spec.matchAll(/`(--fsh?-[a-z0-9-]+)`/g)].map((m) => m[1] ?? '')),
+    ]
+    expect(mentioned.length).toBeGreaterThan(8)
+    expect(mentioned.filter((token) => !defined.has(token)).sort()).toEqual([])
   })
 })
 
