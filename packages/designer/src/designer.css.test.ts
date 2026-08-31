@@ -18,18 +18,83 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(fileURLToPath(new URL('./designer.css', import.meta.url)), 'utf8')
 const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
 
-/** Selector text of every rule in the file, comments and at-rule preludes removed. */
-function selectors(source: string): string[] {
-  const out: string[] = []
-  for (const match of source.matchAll(/([^{}]+)\{/g)) {
-    const head = match[1]?.trim()
-    if (!head || head.startsWith('@')) continue
-    for (const part of head.split(',')) {
-      const selector = part.trim()
-      if (selector) out.push(selector)
+/**
+ * Every rule in the file as prelude and body, at any nesting depth.
+ *
+ * A brace walk rather than a regex, because both readers built on the regex had
+ * a hole that a regex over `([^{}]+)\{` cannot avoid. It cannot tell a rule
+ * beside an at-rule from a rule inside one, and it cannot tell where a block
+ * ends -- which is how `declarationsFor` came to skip every block inside
+ * `@media` and how an allowlisted selector could be re-declared there with
+ * anything at all in it.
+ *
+ * Only leaf blocks are returned. An at-rule's own block holds rules rather than
+ * declarations, so returning it would report `.fs-x` as a property name.
+ */
+interface Block {
+  prelude: string
+  body: string
+}
+
+function blocks(source: string): Block[] {
+  const found: Block[] = []
+  const stack: { prelude: string; open: number; nested: boolean }[] = []
+  let from = 0
+
+  for (let i = 0; i < source.length; i += 1) {
+    if (source[i] === '{') {
+      const parent = stack[stack.length - 1]
+      if (parent) parent.nested = true
+      stack.push({ prelude: source.slice(from, i).trim(), open: i, nested: false })
+      from = i + 1
+    } else if (source[i] === '}') {
+      const frame = stack.pop()
+      if (frame && !frame.nested) {
+        found.push({ prelude: frame.prelude, body: source.slice(frame.open + 1, i) })
+      }
+      from = i + 1
     }
   }
-  return out
+
+  return found
+}
+
+/**
+ * A prelude's selectors, split on the commas that separate them.
+ *
+ * At paren depth zero, which the old split was not. `:is(.fs-shell, .fs-canvas)
+ * input` is one selector containing one comma inside a functional pseudo, and
+ * splitting on every comma turned it into `:is(.fs-shell` and `.fs-canvas)
+ * input` -- two fragments, neither of which any check in this file can
+ * classify, so the rule that broke MUI's notched outline passed in that
+ * spelling.
+ */
+function commaSeparated(prelude: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+
+  for (const character of prelude) {
+    if (character === '(') depth += 1
+    else if (character === ')') depth -= 1
+
+    if (character === ',' && depth === 0) {
+      if (current.trim()) parts.push(current.trim())
+      current = ''
+    } else {
+      current += character
+    }
+  }
+
+  if (current.trim()) parts.push(current.trim())
+  return parts
+}
+
+/** Selector text of every rule in the file, comments and at-rule preludes removed. */
+function selectors(source: string): string[] {
+  return blocks(source)
+    .filter((block) => !block.prelude.startsWith('@'))
+    .flatMap((block) => commaSeparated(block.prelude))
 }
 
 /**
@@ -42,36 +107,29 @@ function selectors(source: string): string[] {
  * two blocks are merged now; the reader is fixed so the next pair cannot hide.
  */
 function declarationsFor(selector: string, source: string = withoutComments): string[] {
-  const names: string[] = []
-
-  let from = 0
-  for (;;) {
-    const start = source.indexOf(selector, from)
-    if (start === -1) break
-    from = start + selector.length
-
-    /*
-     * The selector has to be the whole of the rule's prelude, not part of it:
-     * `.fs-drop` appears inside `.fs-drop--bar`, and a substring match would
-     * read the wrong block's declarations and call them the first's.
-     */
-    const open = source.indexOf('{', from)
-    if (open === -1) break
-    if (source.slice(from, open).trim() !== '') continue
-    const before = source.slice(0, start)
-    const boundary = before.slice(before.lastIndexOf('}') + 1).trim()
-    if (boundary !== '' && !boundary.endsWith(',')) continue
-
-    const close = source.indexOf('}', open)
-    if (close === -1) break
-
-    for (const line of source.slice(open + 1, close).split(';')) {
-      const name = line.split(':')[0]?.trim()
-      if (name) names.push(name)
-    }
-  }
-
-  return names
+  /*
+   * Every block whose prelude names this selector, wherever it sits.
+   *
+   * The previous reader walked the text looking for the selector and then
+   * checked what came before it: empty, or a comma. Inside `@media` that text
+   * is the at-rule's own prelude, so the block was skipped -- and the exception
+   * pinning below could not see a second block on an allowlisted selector in a
+   * media query. `designer.css` has such a block today, for the dark theme, so
+   * this was not a hypothetical shape.
+   *
+   * Matching on the split prelude also keeps the reason the old boundary check
+   * existed: `.fs-drop` must not read `.fs-drop--bar`'s declarations, and it
+   * does not, because the comparison is against a whole selector rather than a
+   * substring of one.
+   */
+  return blocks(source)
+    .filter((block) => commaSeparated(block.prelude).includes(selector))
+    .flatMap((block) =>
+      block.body
+        .split(';')
+        .map((line) => line.split(':')[0]?.trim() ?? '')
+        .filter((name) => name !== ''),
+    )
 }
 
 /**
@@ -256,6 +314,33 @@ describe('designer.css isolation', () => {
     expect(selectors('@media (min-width: 1px) { .fs-x .y { color: red } }')).toEqual(['.fs-x .y'])
   })
 
+  it('pins an exception re-declared inside an at-rule as well as beside one', () => {
+    /*
+     * `declarationsFor` used to look for the selector in the text and then check
+     * what came before it -- empty, or a comma. Inside `@media` what comes
+     * before is the at-rule's own prelude, so every block in a media query was
+     * skipped, and an allowlisted selector could be re-declared there setting
+     * anything at all. The stylesheet has such blocks today, for the dark theme.
+     *
+     * A synthetic sheet, because the point is what the reader can see rather
+     * than what this file currently contains.
+     */
+    const sheet =
+      '.fs-canvas__surface [data-fs-key] { scrollbar-width: thin }' +
+      '@media (prefers-color-scheme: dark) {' +
+      '  .fs-canvas__surface [data-fs-key] { background: #000 }' +
+      '}'
+
+    expect(declarationsFor('.fs-canvas__surface [data-fs-key]', sheet)).toEqual([
+      'scrollbar-width',
+      'background',
+    ])
+
+    // And the reason the old boundary check existed, which must survive: a
+    // selector is matched whole, so `.fs-drop` does not read `.fs-drop--bar`.
+    expect(declarationsFor('.fs-drop', '.fs-drop--bar { color: red }')).toEqual([])
+  })
+
   it('only reaches into the form through the sanctioned exceptions', () => {
     /*
      * One assertion for every scope that contains the form, rather than one per
@@ -309,6 +394,23 @@ describe('designer.css isolation', () => {
       ['.fs-canvas__frame :is(.fs-drop, input)', 'alternatives it cannot choose between'],
     ])('flags %s — %s', (selector) => {
       expect(reachesIntoTheForm(selector)).toBe(true)
+    })
+
+    it('flags a scope written as a list inside :is(), comma and all', () => {
+      /*
+       * One selector holding one comma, and the prelude reader used to split on
+       * every comma it saw -- so this arrived as `:is(.fs-shell` and
+       * `.fs-canvas) input`, two fragments neither check can classify, and the
+       * rule that broke MUI's notched outline passed in this spelling. The split
+       * is at paren depth zero now.
+       *
+       * Driven through `selectors()` rather than through `reachesIntoTheForm`
+       * directly, because splitting is the half that was wrong.
+       */
+      const found = selectors(':is(.fs-shell, .fs-canvas) input { padding: 5px 8px }')
+
+      expect(found).toEqual([':is(.fs-shell, .fs-canvas) input'])
+      expect(found.filter(reachesIntoTheForm)).toEqual(found)
     })
 
     it.each([
