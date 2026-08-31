@@ -37,6 +37,22 @@ export interface Candidate {
   container: boolean
   /** Root is 0; deeper nodes count up. Used to pick the innermost hit. */
   depth: number
+  /**
+   * Which drawn row this element is, when it is inside a repeater.
+   *
+   * `measureTree` emits one candidate per drawn element and a repeater draws its
+   * subtree once per row, so without this every consumer conflated elements from
+   * different rows: `resolveDrop` scanned a children list interleaving all of
+   * them and computed an insertion index against whichever rectangle happened to
+   * come first. One missing field, and the review counted four symptoms.
+   *
+   * Geometry, not identity, like `rowFromEventTarget` above. The node a drop
+   * names is the authored one, which is the only thing a document has; this says
+   * which of its drawn copies the pointer is over.
+   *
+   * Undefined outside every repeater, which is most of a form.
+   */
+  row: string | undefined
   rect: Rect
 }
 
@@ -184,6 +200,9 @@ export function measureTree(
         index,
         container: isContainer(node.type),
         depth,
+        // The element knows which row it is; it carries `data-fs-row`. This was
+        // read nowhere and thrown away here.
+        row: element.dataset['fsRow'],
         rect: measureIn(surface, element),
       })
     }

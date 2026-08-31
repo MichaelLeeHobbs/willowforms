@@ -173,8 +173,25 @@ export function Canvas({
   const [validated, setValidated] = useState(false)
   /** Fields the user has changed. A field validates while typing only after it is touched. */
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
-  const [hoverKey, setHoverKey] = useState<string | undefined>(undefined)
-  const [selectedRow, setSelectedRow] = useState<string | undefined>(undefined)
+  const [hover, setHover] = useState<{ key: string | undefined; row: string | undefined }>({
+    key: undefined,
+    row: undefined,
+  })
+  /**
+   * Which drawn copy was clicked, and which node that answer belongs to.
+   *
+   * The key travels with the row on purpose. This was a bare row string written
+   * only by the canvas click handler, so selecting a different component from
+   * the tree left the previous row behind and the frame stayed on it. Pairing
+   * them makes a selection by any other route invalidate the row without the
+   * tree having to know this state exists.
+   */
+  const [clicked, setClicked] = useState<{ key: string | undefined; row: string | undefined }>({
+    key: undefined,
+    row: undefined,
+  })
+  const hoverKey = hover.key
+  const selectedRow = clicked.key === api.selectedKey ? clicked.row : undefined
 
   const frameWidth = FRAME_WIDTH[viewport]
 
@@ -394,10 +411,11 @@ export function Canvas({
       if (isOwnChrome(event.target)) return
       event.stopPropagation()
       if (consumeClick()) return
-      select(keyFromEventTarget(event.target))
+      const key = keyFromEventTarget(event.target)
+      select(key)
       // Which drawn copy was pointed at. Geometry only: the node selected is
       // the authored one, and there is only ever one of those.
-      setSelectedRow(rowFromEventTarget(event.target))
+      setClicked({ key, row: rowFromEventTarget(event.target) })
     },
     [consumeClick, select],
   )
@@ -508,7 +526,7 @@ export function Canvas({
           onClick={() => {
             setPreview((p) => !p)
             setValidated(false)
-            setHoverKey(undefined)
+            setHover({ key: undefined, row: undefined })
           }}
           aria-pressed={preview}
         >
@@ -563,9 +581,17 @@ export function Canvas({
               onPointerMove: () => {
                 if (dragState && snapshot?.dragId !== dragState.id) takeSnapshot(dragState.id)
               },
+              /*
+               * The row as well as the key. The hover frame measured with no
+               * row, so `nodeElement` fell back to the first match and outlined
+               * row 0 whichever row the pointer was over.
+               */
               onPointerOver: (event: ReactPointerEvent) =>
-                setHoverKey(keyFromEventTarget(event.target)),
-              onPointerLeave: () => setHoverKey(undefined),
+                setHover({
+                  key: keyFromEventTarget(event.target),
+                  row: rowFromEventTarget(event.target),
+                }),
+              onPointerLeave: () => setHover({ key: undefined, row: undefined }),
             }
           : {})}
       >
@@ -605,6 +631,7 @@ export function Canvas({
             {...(selectedRow ? { selectedRow } : {})}
             selectedType={api.selectedNode?.type}
             hoverKey={dragState ? undefined : hoverKey}
+            {...(dragState || hover.row === undefined ? {} : { hoverRow: hover.row })}
             {...(selectionActions ? { actions: selectionActions } : {})}
           />
         )}

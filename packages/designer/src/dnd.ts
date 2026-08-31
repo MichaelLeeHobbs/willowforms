@@ -99,6 +99,54 @@ function closure(
 }
 
 /** The innermost container under the point that the drag is allowed to enter. */
+/**
+ * One repeater row's worth of children, chosen by where the pointer is.
+ *
+ * A repeater draws its subtree once per row, so `measureTree` emits one
+ * candidate per drawn element and the children of a repeater arrive here as
+ * every row's children interleaved -- each with the same key and the same
+ * `index`, differing only in `row` and in the rectangle. Scanning that list for
+ * a midpoint compares the pointer against whichever row sorted first, so a drop
+ * into row 1 was placed by row 0's geometry.
+ *
+ * Grouped by row and then picked by containment, falling back to the nearest
+ * group by vertical distance so a pointer in the gap between two rows still gets
+ * an answer. Outside a repeater every child shares one row value, the map has a
+ * single entry, and this returns its argument.
+ */
+function inOneRow(children: Candidate[], x: number, y: number): Candidate[] {
+  const rows = new Map<string, Candidate[]>()
+  for (const child of children) {
+    const key = child.row ?? ''
+    const held = rows.get(key)
+    if (held) held.push(child)
+    else rows.set(key, [child])
+  }
+  if (rows.size <= 1) return children
+
+  const groups = [...rows.values()]
+  const containing = groups.find((group) => group.some((child) => contains(child.rect, x, y)))
+  if (containing) return containing
+
+  let best = groups[0] as Candidate[]
+  let bestDistance = Infinity
+  for (const group of groups) {
+    for (const child of group) {
+      const distance =
+        y < child.rect.top
+          ? child.rect.top - y
+          : y > child.rect.top + child.rect.height
+            ? y - (child.rect.top + child.rect.height)
+            : 0
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = group
+      }
+    }
+  }
+  return best
+}
+
 function parentAt(
   candidates: Candidate[],
   x: number,
@@ -135,9 +183,11 @@ export function resolveDrop(
   if (!parent) return undefined
 
   // A dragged node is leaving its slot, so it must not act as its own landmark.
-  const children = candidates
-    .filter((c) => c.parentKey === parent.key && c.key !== draggedKey)
-    .sort((a, b) => a.index - b.index)
+  const children = inOneRow(
+    candidates.filter((c) => c.parentKey === parent.key && c.key !== draggedKey),
+    x,
+    y,
+  ).sort((a, b) => a.index - b.index)
 
   /*
    * The axis is read from every child, including the one being dragged.
@@ -149,9 +199,11 @@ export function resolveDrop(
    * a two-field row past its neighbour landed it back where it started, every
    * time, in the smallest row anybody builds.
    */
-  const siblings = candidates
-    .filter((c) => c.parentKey === parent.key)
-    .sort((a, b) => a.index - b.index)
+  const siblings = inOneRow(
+    candidates.filter((c) => c.parentKey === parent.key),
+    x,
+    y,
+  ).sort((a, b) => a.index - b.index)
 
   if (children.length === 0) {
     return {
@@ -231,10 +283,43 @@ function indexInParent(filtered: Candidate[], slot: number): number {
 }
 
 /** The insertion bar: a thin rect on the boundary between two children. */
+/**
+ * The span the bar takes across the axis it is not on.
+ *
+ * The parent's own rectangle, normally, and the comment below says why: the bar
+ * marks a position in the parent rather than in a child.
+ *
+ * Except inside a repeater, where the parent's rectangle covers every drawn row
+ * at once. A bar for a drop into row 1 was therefore drawn from the top of row 0
+ * to the bottom of the last row -- the right index with an indicator a hundred
+ * pixels from the pointer, which is the visible half of this defect and the half
+ * an author would report.
+ *
+ * The children name a row their parent does not exactly when they are a
+ * repeater's row contents, so that comparison is the test.
+ */
+function spanOf(parent: Candidate, children: Candidate[]): Rect {
+  const first = children[0]
+  if (!first || first.row === parent.row) return parent.rect
+
+  let top = Infinity
+  let bottom = -Infinity
+  let left = Infinity
+  let right = -Infinity
+  for (const child of children) {
+    top = Math.min(top, child.rect.top)
+    bottom = Math.max(bottom, child.rect.top + child.rect.height)
+    left = Math.min(left, child.rect.left)
+    right = Math.max(right, child.rect.left + child.rect.width)
+  }
+  return { top, left, width: right - left, height: bottom - top }
+}
+
 function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Axis): Rect {
   const last = children[children.length - 1]
   const at = children[slot]
   const previous = children[slot - 1]
+  const span = spanOf(parent, children)
 
   if (axis === 'row') {
     /*
@@ -244,8 +329,8 @@ function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Ax
      * and does not. If a child ever does overflow, the bar should still be the
      * parent's height: it marks a position in the parent, not in the child.
      */
-    const top = parent.rect.top
-    const height = parent.rect.height
+    const top = span.top
+    const height = span.height
     // Midway between the neighbours, so the bar sits in the gap rather than on
     // top of a component's edge.
     const left = at
@@ -256,8 +341,8 @@ function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Ax
     return { top, left: left - BAR / 2, width: BAR, height }
   }
 
-  const left = parent.rect.left
-  const width = parent.rect.width
+  const left = span.left
+  const width = span.width
   const top = at
     ? previous
       ? (previous.rect.top + previous.rect.height + at.rect.top) / 2

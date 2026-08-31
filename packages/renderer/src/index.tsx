@@ -281,6 +281,16 @@ const RowCtx = createContext<RowContext | undefined>(undefined)
 interface NodeBoundaryProps {
   node: ComponentNode
   scope: string
+  /**
+   * The row the failed node was drawn in, when it was drawn in one.
+   *
+   * The fallback carried `data-fs-key`, `data-fs-type` and `data-fs-scope` so a
+   * broken component stays selectable, and omitted this one -- so inside a
+   * repeater the designer could find *a* copy of the node and not the one that
+   * broke. It is the fourth symptom of one missing field, and the other three
+   * are in the drag pipeline.
+   */
+  row: string | undefined
   onError: ((error: Error, key: string) => void) | undefined
   children: ReactNode
 }
@@ -310,6 +320,7 @@ class NodeBoundary extends Component<NodeBoundaryProps, { failed: boolean }> {
         data-fs-key={this.props.node.key}
         data-fs-type={this.props.node.type}
         data-fs-scope={this.props.scope}
+        {...(this.props.row === undefined ? {} : { 'data-fs-row': this.props.row })}
         /*
          * And a mark saying it is the fallback, which the three attributes above
          * cannot say.
@@ -534,9 +545,17 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
  */
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const { scope, onError } = useRenderContext()
+  // The same coordinate the body puts on `nodeProps`, so a fallback is findable
+  // in the row that broke rather than in whichever row drew first.
+  const row = useContext(RowCtx)
 
   return (
-    <NodeBoundary node={node} scope={scope} onError={onError}>
+    <NodeBoundary
+      node={node}
+      scope={scope}
+      row={row ? encodeRow(row.path) : undefined}
+      onError={onError}
+    >
       <RenderNodeBody node={node} />
     </NodeBoundary>
   )

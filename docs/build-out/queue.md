@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 10, the designer's keyboard model. Item 11 is next.
+- **Last completed:** item 11, row identity through the drag pipeline. Item 12 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/10-keyboard-model`
+- **Last pushed item branch:** `build-out/b/11-row-identity`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -176,7 +176,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus an e2e test that clicks a field on the canvas and then presses Delete,
       with no `.focus()` anywhere in it, seen red first, and a Tab-order spec that walks the shell.
 
-- [ ] **11. Carry row identity through the drag pipeline.** Three HIGHs plus theme 3, areas 7 and 16.
+- [x] **11. Carry row identity through the drag pipeline.** Three HIGHs plus theme 3, areas 7 and 16.
       `geometry.ts:30-41,177-189` — `Candidate` carries no row even though `measureTree` emits one candidate
       per drawn element, so every consumer conflates elements from different repeater rows.
       `dnd.ts:138-186` — `resolveDrop` scans a list interleaving children from every drawn row and computes

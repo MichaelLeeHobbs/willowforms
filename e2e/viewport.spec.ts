@@ -90,3 +90,29 @@ test('a move still lands where the bar showed at mobile width', async ({ designe
   expect(after).toHaveLength(before.length)
   expect(after[after.length - 1]).toBe('heading')
 })
+
+test('a move at mobile width lands at the pointer rather than at the end', async ({ designer }) => {
+  /*
+   * The test above is satisfied by a `resolveDrop` that ignores the pointer
+   * entirely: it drags the first component onto the last one's bottom edge, so
+   * "append whatever is dragged" produces exactly the asserted result. It is the
+   * only drop-targeting check at mobile width, and what it checks is that a drop
+   * happened.
+   *
+   * This one aims at a midpoint. `submit` is last, and dropping it above `email`
+   * has to put it immediately before `email` -- an append leaves it where it
+   * already was, and the assertion is on the neighbour rather than on the index,
+   * so it survives the fixture growing a component.
+   */
+  await designer.page.getByRole('button', { name: 'Mobile' }).click()
+
+  const before = await designer.rootChildren()
+  expect(before[before.length - 1]).toBe('submit')
+
+  await dragOnto(designer.page, designer.node('submit'), designer.node('email'), 'top')
+
+  const after = await designer.rootChildren()
+  expect(after).toHaveLength(before.length)
+  expect(after[after.indexOf('submit') + 1]).toBe('email')
+  expect(after[after.length - 1]).not.toBe('submit')
+})
