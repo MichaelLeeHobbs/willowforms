@@ -103,6 +103,8 @@ obligation missed.
 | Every palette entry declares an icon                             | Half a palette with icons reads as a bug rather than a choice                |
 | A RadioItem child can be selected in its group                   | A child that looks like an option and answers nothing is worse than no child |
 | The palette index has no colliding types                         | The type is how a node finds its renderer                                    |
+| A length-valued prop is CSS pixels                               | A number that means two things is a document that renders two ways           |
+| Two different lengths render differently                         | A kit hard-coding the tested value would satisfy the rule above              |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two
@@ -110,24 +112,56 @@ accessibility rules caught `@formsmith/kit-mui` failing both: no renderer in it 
 its checkbox built the message element only once there was an error. Those two obligations had been
 written down here, as things a kit must do, for as long as this file has existed. Nothing ran them.
 
+### What a length means
+
+**A length-valued prop is a number of CSS pixels.** `gap`, `padding`, `radius`, `maxWidth` and `width`
+all mean the same thing in every kit: `gap: 16` is sixteen pixels, wherever the document is rendered.
+
+This had never been decided, and the contract's one obligation is that a document authored against one
+kit renders against the other. `@formsmith/kit-html` read `gap` as pixels; `@formsmith/kit-mui` passed it
+to MUI's `gap` prop, which is a multiple of `theme.spacing` and defaults to 8 -- so an authored `gap: 2`
+was 16px in one kit and 2px in the other. `kit-mui`'s own `Grid` used pixels, so that kit disagreed with
+itself as well. Neither kit was wrong, because nothing had said.
+
+A kit built on a design system with its own spacing scale converts at its edge, the way `kit-mui` does
+now. That is the kit's job precisely because the scale is the kit's, and the document belongs to nobody.
+
+**What changed:** `@formsmith/kit-mui` reflows. A document that authored `gap: 2` against it rendered
+16px and now renders 2px. Its _defaults_ are unchanged -- the default was `gap: 2` through MUI's scale,
+which was 16px, and it is 16 pixels now -- so a form that never set a gap looks identical. Only an
+authored value moves, and it moves onto the meaning `kit-html`, `Grid`, `padding`, `radius`, `maxWidth`
+and `width` already had.
+
 ## Accessibility is the kit's job
 
 The renderer knows nothing about the markup a kit produces, so it cannot supply labels or error wiring.
 A kit must:
 
-- give every field a real `<label for>` pointing at its control
-- set `aria-invalid` on a control whose `error` is set
-- point `aria-describedby` at a message element **that always exists**, so an error appearing later is
-  picked up rather than referring to a node that was not there when the description was read
-- put `role="alert"` on that message when it holds an error
-- leave a visible focus indicator on everything interactive
+| Obligation                                                                | Attribute          | Enforced |
+| ------------------------------------------------------------------------- | ------------------ | -------- |
+| Give every field a real `<label for>` pointing at its control             | —                  | no       |
+| Set `aria-invalid` on a control whose `error` is set                      | `aria-invalid`     | yes      |
+| Mark a control the document requires, so it says so before a submit fails | `aria-required`    | yes      |
+| Point the description at a message element **that always exists**         | `aria-describedby` | yes      |
+| Put `role="alert"` on that message when it holds an error                 | `role="alert"`     | yes      |
+| Leave a visible focus indicator on everything interactive                 | —                  | no       |
 
-`@formsmith/kit-html` is the reference implementation of all five and is deliberately dependency-free, so
+The description has to point at an element that is always in the DOM, so an error appearing later is
+picked up rather than referring to a node that was not there when the description was read.
+
+`@formsmith/kit-html` is the reference implementation of all six and is deliberately dependency-free, so
 it can be read and copied without also reading a component library.
 
-The third and fourth bullets are executed by the contract test. The other three are not: no test checks
-that a label points at its control, that `aria-invalid` is set, or that a focus indicator survives. They
-are obligations a kit author is trusted with, and saying so is better than implying a test is watching.
+**The Enforced column is checked.** `test/docs.test.ts` reads this table and asserts that every attribute
+marked `yes` is asserted in `test/kit-contract.test.tsx`, and that every one marked `no` is not -- so the
+column cannot drift in either direction. It said four bullets and enforcement of two, and both halves
+were wrong: `aria-invalid` is checked against every kit and this said it was not, and `aria-required` is
+checked and was not listed at all. Understating what is enforced is the dangerous direction, because a
+kit author budgets against this table and meets a red build.
+
+The two rows with no attribute are genuinely not checked. A label pointing at its control and a focus
+indicator surviving both need a browser, and they are named in
+[../accessibility.md](../accessibility.md) as what a Playwright pass would cover.
 
 ## Writing your own kit
 

@@ -77,13 +77,29 @@ test('the frame follows the component when the canvas scrolls', async ({ designe
   expect(Math.abs(frame.y - node.y)).toBeLessThanOrEqual(1)
 })
 
-test('selecting a field does not focus it or type into it', async ({ designer }) => {
+test('selecting a field does not type into it, and the keystrokes reach the shell', async ({
+  designer,
+}) => {
   const input = designer.node('email').locator('input')
-  await designer.node('email').click()
+  await designer.node('email').locator('input').click()
   await designer.page.keyboard.type('typed')
 
   // While editing, a click is a selection gesture and nothing else.
   await expect(input).toHaveValue('')
+
+  /*
+   * And the second half, which the name promised and nothing checked.
+   *
+   * An empty input proves the field did not take the text. It does not prove
+   * where the text went, and "nowhere at all" passed this test just as well as
+   * "the shell" -- which is exactly what was happening: the canvas cancels
+   * mousedown's default so the field cannot focus, and the shell's own focus
+   * handler then exempted `input` from being focused on its behalf. Delete,
+   * Ctrl+Z and Escape did nothing after clicking a field.
+   */
+  await expect(
+    designer.page.evaluate(() => document.activeElement?.classList.contains('fs-shell') === true),
+  ).resolves.toBe(true)
 })
 
 test('clicking a select does not open its dropdown', async ({ designer }) => {

@@ -15,7 +15,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { FormDocument } from '@formsmith/core'
+import type { ComponentNode, FormDocument } from '@formsmith/core'
 
 /*
  * Before the import, and by dynamic import for that reason: `index.ts` reads
@@ -134,5 +134,230 @@ describe('a body nested deeper than anything will walk', () => {
     const response = await submit('{"answers":"x"}')
 
     expect(response.status).toBe(422)
+  })
+})
+
+/**
+ * Two writes that overlap.
+ *
+ * The comment on the store says every route "read the file, changed one entry
+ * and wrote it back -- across an `await`, with no lock -- so two `PUT`s that
+ * overlapped lost one of them entirely, with both answering `{ok: true}`". Only
+ * the write was chained. Every route still called `readStore()` on its own,
+ * outside the chain, so both requests read the same version, each added its own
+ * entry, and the second write replaced the first.
+ *
+ * Serializing a write serializes nothing about the read that decided what to
+ * write. Theme 2 of the review, in the reference implementation a reader copies.
+ */
+describe('two documents stored at once', () => {
+  const formNamed = (id: string): FormDocument => ({ ...FORM, id, name: id })
+
+  const put = async (id: string): Promise<Response> =>
+    await app.request('/api/forms/' + id, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(formNamed(id)),
+    })
+
+  it('keeps both', async () => {
+    const [first, second] = await Promise.all([put('one'), put('two')])
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+
+    const listed = (await (await app.request('/api/forms')).json()) as { id: string }[]
+    const held = new Set(listed.map((row) => row.id))
+    expect(
+      ['one', 'two'].filter((id) => !held.has(id)),
+      'one write replaced the other',
+    ).toEqual([])
+  })
+
+  it('keeps all of a larger burst', async () => {
+    /*
+     * Ten at once rather than two. The two-request case can pass by luck when
+     * the reads happen to be ordered; ten is not luck.
+     */
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+    await Promise.all(ids.map(put))
+
+    /*
+     * Containment, not equality: the store is one file shared by every test in
+     * this describe, so an exact list would be asserting the order the other
+     * tests ran in. What this row is about is that none of the ten was lost.
+     */
+    const listed = (await (await app.request('/api/forms')).json()) as { id: string }[]
+    const held = new Set(listed.map((row) => row.id))
+    expect(
+      ids.filter((id) => !held.has(id)),
+      'writes were lost',
+    ).toEqual([])
+  })
+
+  it('still refuses to delete an id nobody holds', async () => {
+    // The control for moving that decision inside the chain: it must still be
+    // made, and still answer 404.
+    const response = await app.request('/api/forms/nothing-here', { method: 'DELETE' })
+    expect(response.status).toBe(404)
+  })
+})
+
+/**
+ * A body larger than the cap.
+ *
+ * `MAX_BODY` was compared against `text.length` after `await c.req.text()` had
+ * already buffered the whole stream, so it was a report on something in memory
+ * rather than a limit on what arrives. A declared `content-length` is refused
+ * before a byte is read; a client that omits it or lies is read a chunk at a
+ * time and abandoned the moment the total passes the cap.
+ */
+describe('a body larger than the limit', () => {
+  const oversized = (): string => '{"answers":"' + 'x'.repeat(1_100_000) + '","name":"Ada"}'
+
+  it('is refused on the declared length, before it is read', async () => {
+    const body = oversized()
+    const response = await app.request('/api/forms/deep/submit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': String(body.length) },
+      body,
+    })
+
+    expect(response.status).toBe(400)
+  })
+
+  it('stops reading the stream rather than buffering it and then declining', async () => {
+    /*
+     * The mechanism, because the outcome cannot tell the two apart: a body that
+     * is buffered whole and then measured also answers 400. That is the finding.
+     * `MAX_BODY` compared `text.length` *after* `await c.req.text()`, so a
+     * gigabyte arrived, was held in memory, and was then declined -- a report on
+     * a body rather than a limit on one.
+     *
+     * So the body is a stream that counts what is pulled out of it. A server
+     * that buffers first drains all of it; one that stops at the cap pulls a
+     * little over `MAX_BODY` and cancels.
+     */
+    const chunk = new TextEncoder().encode('x'.repeat(64 * 1024))
+    const total = 64 // 4 MB, four times the cap
+    let pulled = 0
+
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= total) {
+          controller.close()
+          return
+        }
+        pulled += 1
+        controller.enqueue(chunk)
+      },
+    })
+
+    const response = await app.request(
+      new Request('http://localhost/api/forms/deep/submit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        // Required by undici for a streaming request body.
+        duplex: 'half',
+      } as RequestInit & { duplex: 'half' }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(pulled, 'the whole body was read before it was declined').toBeLessThan(total)
+  })
+
+  it('still takes a body of an ordinary size', async () => {
+    // The control. A limit that refused everything would pass both rows above.
+    const response = await submit('{"answers":"x","name":"Ada"}')
+    expect(response.status).toBe(200)
+  })
+})
+
+/**
+ * A two-step form, submitted.
+ *
+ * The route validates across every step, deliberately, because the steps come
+ * out of the document rather than out of the request. Then it projected the
+ * payload under `scopes[0]` alone -- so every answer given on step two onwards
+ * was dropped from the echo. A form that checked a required field and then
+ * submitted without it.
+ *
+ * `validateAcross` exists because one environment is not enough; the projection
+ * had the same problem and no answer of its own until `submittedAcross`.
+ */
+describe('a form with two steps', () => {
+  const step = (name: string, children: ComponentNode[]): ComponentNode => ({
+    key: 'step' + name.charAt(0).toUpperCase() + name.slice(1),
+    type: 'Box',
+    props: {},
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: name },
+      },
+    },
+    children,
+  })
+
+  const wizard: FormDocument = {
+    ...FORM,
+    id: 'wizard',
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        step('who', [
+          {
+            key: 'name',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [] },
+          },
+        ]),
+        step('where', [
+          {
+            key: 'city',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [] },
+          },
+        ]),
+      ],
+    },
+  }
+
+  it('echoes the answers from every step, not only the first', async () => {
+    await app.request('/api/forms/wizard', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(wizard),
+    })
+
+    const response = await app.request('/api/forms/wizard/submit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Ada', city: 'Ely' }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, received: { name: 'Ada', city: 'Ely' } })
+  })
+
+  it('still leaves out an answer to a question the form is not asking', async () => {
+    /*
+     * The control, and the whole point of projecting at all. A key no component
+     * collects is not in the payload, however many scopes are merged.
+     */
+    const response = await app.request('/api/forms/wizard/submit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Ada', city: 'Ely', leftover: 'x' }),
+    })
+
+    expect(await response.json()).toEqual({ ok: true, received: { name: 'Ada', city: 'Ely' } })
   })
 })

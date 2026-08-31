@@ -11,7 +11,7 @@
  * components nest.
  */
 
-import { dataKeyOf, walk } from './tree.js'
+import { dataKeyOf, validationsOf, walk } from './tree.js'
 import { isRowScope } from './validation.js'
 import type {
   ComponentNode,
@@ -74,7 +74,7 @@ const DRAFT = 'https://json-schema.org/draft/2020-12/schema'
 export function unexportableRules(document: FormDocument): { key: string; rule: string }[] {
   const lossy: { key: string; rule: string }[] = []
   walk(document.root, (node) => {
-    for (const rule of node.schema?.validations ?? []) {
+    for (const rule of validationsOf(node)) {
       // Arbitrary JavaScript has no declarative equivalent at all.
       if (rule.key === 'custom') {
         lossy.push({ key: node.key, rule: rule.key })
@@ -110,7 +110,7 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
    */
   const FORMAT_RULES = new Set(['email', 'url', 'uuid'])
   walk(document.root, (node) => {
-    const formats = (node.schema?.validations ?? []).filter((rule) => FORMAT_RULES.has(rule.key))
+    const formats = validationsOf(node).filter((rule) => FORMAT_RULES.has(rule.key))
     for (const rule of formats.slice(0, -1)) {
       lossy.push({ key: node.key, rule: rule.key })
     }
@@ -267,7 +267,7 @@ function objectFor(root: ComponentNode): {
      */
     const conditional = node.renderWhen !== undefined
 
-    for (const rule of field.validations) {
+    for (const rule of validationsOf(node)) {
       property = applyRule(property, rule)
       /*
        * Only an unguarded `required` becomes a schema requirement. A guarded one

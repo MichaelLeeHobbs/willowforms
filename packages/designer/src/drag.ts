@@ -263,6 +263,22 @@ export function useDrag(
      */
     const lowerSwallow = (): void => {
       swallowClick.current = false
+      /*
+       * And the abandonment, for the same reason and one the other flag already
+       * had written down: a new press is a new interaction whatever happened to
+       * the last one.
+       *
+       * `abandoned` was lowered only by `pointerup`, and the window-blur path
+       * that raises it is precisely the path where no `pointerup` arrives -- the
+       * button came up somewhere the page never saw. So it stayed raised, and
+       * the next release anywhere computed `swallowClick = dragged || abandoned`
+       * and ate a click nobody connected to a drag abandoned minutes earlier.
+       *
+       * The Escape path still works, and that is what makes lowering it here
+       * safe: Escape abandons while the button is still down, so its `pointerup`
+       * arrives before any new `pointerdown` or `click` can run this.
+       */
+      abandoned.current = false
     }
 
     window.addEventListener('pointermove', onMove)

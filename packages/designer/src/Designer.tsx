@@ -16,7 +16,7 @@ import type { RendererKit } from '@formsmith/renderer'
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
 import { Icon } from './Icon.js'
-import { Canvas } from './panels/Canvas.js'
+import { Canvas, canvasSwallowsFocus } from './panels/Canvas.js'
 import type { Viewport } from './panels/Canvas.js'
 import { DocumentDialog } from './panels/DocumentDialog.js'
 import { Inspector } from './panels/Inspector.js'
@@ -218,10 +218,22 @@ export function Designer({
       tabIndex={-1}
       onPointerDown={(event) => {
         const target = event.target
-        // Anything that takes focus itself keeps it: a click in a text field
-        // must not be stolen by the container it happens to be inside.
+        /*
+         * Anything that takes focus itself keeps it: a click in a text field
+         * must not be stolen by the container it happens to be inside.
+         *
+         * Except on the canvas while editing, where nothing takes focus at all.
+         * The canvas cancels mousedown's default in the capture phase so a click
+         * selects rather than types, and this exemption then fired on the very
+         * elements that had just been prevented from focusing -- so the shell
+         * stayed unfocused, its key handler never ran, and Delete, Ctrl+Z and
+         * Escape did nothing after clicking a field. Two guards, opposite
+         * assumptions about the same click; `canvasSwallowsFocus` is the one
+         * they share.
+         */
         if (
           target instanceof Element &&
+          !canvasSwallowsFocus(target) &&
           target.closest(
             'input, textarea, select, button, a[href], [tabindex]:not([tabindex="-1"])',
           )

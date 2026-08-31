@@ -4,6 +4,95 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### `rowScopeProblems` stays internal; the spec names `validateDocument` instead
+
+- **Decided:** the document, not the export. `docs/spec/12-api.md` told hosts to call `rowScopeProblems`
+  at boot; it is not exported from `@formsmith/core` and now the page says `validateDocument`, which is
+  what actually reports those problems, under the `row-scope` code.
+- **Why:** `validateDocument` already calls it. A host has one boot-time gate to call, and exporting a
+  second entry point for a subset of what the first one returns is two ways to ask one question -- with
+  the usual consequence that one of them drifts.
+- **Rejected: exporting it.** It would be a public function whose whole output is a strict subset of
+  `validateDocument`'s, and a host that called only it would miss every other structural problem. The
+  cheap thing to add is the wrong shape to add.
+- **What it costs:** nothing today, because nothing could have called it. If a host ever wants row-scope
+  problems without the rest, that is a filter on `validateDocument`'s result by `code`, which is already
+  how the errors are typed.
+- **Reversal:** one line in `index.ts`.
+- **When:** 2026-08-31.
+
+### A length-valued prop is CSS pixels, and kit-mui converts at its edge
+
+- **Decided:** every length a document can author -- `gap`, `padding`, `radius`, `maxWidth`, `width` --
+  is a number of CSS pixels in every kit. `@formsmith/kit-mui` converts to its own spacing scale at its
+  edge. Written into `docs/spec/02-kit-contract.md` and run as two contract rules against every kit.
+- **Why:** the contract's one obligation is that a document authored against one kit renders against the
+  other, and it never said what a number means. `kit-html` read `gap` as pixels; `kit-mui` passed it to
+  MUI's `gap`, which is a multiple of `theme.spacing` and defaults to 8 -- so an authored `gap: 2` was
+  16px in one kit and 2px in the other. Neither kit was wrong. That is what made it a spec defect rather
+  than a bug, and why the fix belongs in the document first.
+- **Why pixels:** it is the only unit both kits can express without a theme, and it is what the other four
+  lengths already meant in both. `kit-mui`'s own `Grid` was already using pixels for the same prop, so
+  that kit disagreed with itself -- the choice was not between two coherent positions.
+- **Rejected: making `gap` kit-relative and documenting it.** It gives up the claim the contract exists to
+  make. A document that lays out differently in each kit is a document that does not travel, and the
+  designer would have to stop pretending one number means one thing.
+- **Rejected: a spacing unit in core.** A scale is a design-system decision, and core has no design
+  system by construction. Converting at the kit's edge puts the knowledge where the scale lives.
+- **What it costs:** `kit-mui` reflows. A document that authored `gap: 2` against it rendered 16px and now
+  renders 2px. Its _defaults_ do not move: the default was `gap: 2` through MUI's scale, which was 16px,
+  and it is `16` pixels now, so a form that never set a gap looks identical. Only an authored value
+  changes, onto the meaning every other length already had. Unpublished at `0.0.0`, so the real cost is
+  the playground's own sample and nothing else.
+- **Reversal:** one constant and five call sites in `kit-mui`, plus the spec section and two contract
+  rules. The rules are what would make a silent reversal fail.
+- **When:** 2026-08-31.
+
+### A throwing evaluator fails a custom rule and applies a guarded one
+
+- **Decided:** both bare evaluator calls in `validation.ts` are wrapped. A throw in a `custom` rule's
+  expression fails the rule; a throw in a rule's `when` guard leaves the rule applying. `validations`
+  becomes optional on `FieldSchema`, read everywhere through one `validationsOf` helper.
+- **Why the two answers differ:** they are not the same question. `visibility.ts` already wraps the same
+  call and says a throw reads as hidden, matching what a missing evaluator gets. Here the missing-evaluator
+  answers are deliberate and different from each other -- a `custom` rule passes, a computed guard is
+  skipped -- because a host that supplied no evaluator has made a configuration choice that `evaluatorKeys`
+  reports at boot. A throw is one broken expression in a document, which is a different thing.
+- **Why a throwing `custom` fails:** the same sentence `matchesPattern` makes twenty lines away about a
+  pattern it refuses to run. A rule that cannot be run has not been satisfied.
+- **Why a throwing guard applies:** the `default` case in `guardPasses` already rules on it -- a guard this
+  code cannot read has not said no. The other direction is a required answer quietly becoming optional on
+  the server, over a typo in an expression.
+- **Rejected: making both answer permissively, to match the no-evaluator path.** That reads the
+  configuration choice and the broken expression as one thing, and both of its answers are the silent
+  permissive failure.
+- **What it costs:** a host whose evaluator throws now sees rules fail rather than a 500. That is a
+  behaviour change for anyone relying on the crash, which is nobody.
+- **Reversal:** two `catch` bodies.
+- **When:** 2026-08-31.
+
+### `FieldSchema.validations` is optional, because the gate always said so
+
+- **Decided:** the field is `validations?: ValidationRule[]`, and every reader goes through
+  `validationsOf(node)`, which answers `[]` for absent _and_ for anything that is not an array.
+- **Why:** `validateDocument` accepts a schema with no `validations` -- its own check returns early on
+  `undefined`, deliberately, because a field with no rules is an ordinary field. The type said the array
+  was always there, so three readers were written as though it were: `duplicateNode` spread it, and
+  `validateField` and `toJsonSchema` iterated it. A document the gate calls valid threw a `TypeError` out
+  of the duplicate action, out of `validateForm` and out of the schema export.
+- **Why the type rather than three fixes:** ten other readers already guarded with `Array.isArray`, which
+  is what made the class look handled. Ten call sites each deciding for themselves is the shape that
+  produces three that decide differently. The type is what turns "remember to guard" into something the
+  compiler asks about, and the helper is what makes the answer one answer.
+- **Rejected: requiring `validations` in `validateDocument` instead.** It makes the gate refuse
+  hand-written documents that are perfectly renderable, to spare three call sites a guard.
+- **Rejected: `?? []`.** Absent is not the only thing it can be. A document is data, so `validations` can
+  arrive as a string, and `?? []` hands that straight to a `for...of`.
+- **What it costs:** nothing at the boundary -- a document with `validations: []` and one without both work
+  as before. `duplicateNode` preserves whichever shape it was given rather than normalising.
+- **Reversal:** one `?` and thirteen call sites.
+- **When:** 2026-08-31.
+
 ### The boundary's fallback says it is the fallback
 
 - **Decided:** `NodeBoundary`'s fallback emits `data-fs-failed=""` alongside the three attributes it

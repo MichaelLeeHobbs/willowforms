@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 7, the symmetry audit. Stage 2 is done; item 8 is next.
+- **Last completed:** item 18, the test suites' HIGHs. Stage 3 is done; item 19 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/07-symmetry-audit`
+- **Last pushed item branch:** `build-out/b/18-test-highs`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -150,7 +150,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
 
 ## Stage 3 — the remaining HIGHs
 
-- [ ] **8. core HIGHs.** Areas 2 and 3. `tree.ts:282` — `duplicateNode` spreads `node.schema.validations`
+- [x] **8. core HIGHs.** Areas 2 and 3. `tree.ts:282` — `duplicateNode` spreads `node.schema.validations`
       unguarded while `validateDocument` allows it to be absent, so the gate passes a document the duplicate
       action then crashes on. `validation.ts:134-140,228` — the ReDoS guard treats a bounded quantifier
       wrapping an unbounded one as safe, so `(a+){10}b` compiles and runs. `validation.ts:322,416` — the host
@@ -158,7 +158,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       expression escapes `validateForm`; `visibility.ts` wraps the same call and explains why.
       _Check:_ standing gate, plus a test per finding, each seen red first.
 
-- [ ] **9. renderer HIGHs.** Area 4. `renderer/src/index.tsx:459` — `NodeBoundary` wraps only the kit's
+- [x] **9. renderer HIGHs.** Area 4. `renderer/src/index.tsx:459` — `NodeBoundary` wraps only the kit's
       `<Component>`, not `RenderNode`'s own body, so the blast-radius guarantee in its doc comment does not
       hold and the document root has no boundary at all. `:169` — the host evaluator is called with no
       `try`/`catch`, unlike every other render-time evaluator call site in the project.
@@ -166,7 +166,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       asserts the fallback rather than a blank tree, seen red first. Coordinate with item 3: the boundary
       must stay able to fail the contract suite.
 
-- [ ] **10. The designer's keyboard model in the state it is actually in.** HIGH plus two e2e HIGHs,
+- [x] **10. The designer's keyboard model in the state it is actually in.** HIGH plus two e2e HIGHs,
       areas 6 and 16. `Designer.tsx:219-232` exempts `input, textarea, select, button` from the focus-steal
       guard on the theory that anything taking focus keeps it, while `Canvas.tsx:321-325` deliberately
       `preventDefault`s exactly that. Clicking a field selects the component, leaves the shell unfocused,
@@ -176,7 +176,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus an e2e test that clicks a field on the canvas and then presses Delete,
       with no `.focus()` anywhere in it, seen red first, and a Tab-order spec that walks the shell.
 
-- [ ] **11. Carry row identity through the drag pipeline.** Three HIGHs plus theme 3, areas 7 and 16.
+- [x] **11. Carry row identity through the drag pipeline.** Three HIGHs plus theme 3, areas 7 and 16.
       `geometry.ts:30-41,177-189` — `Candidate` carries no row even though `measureTree` emits one candidate
       per drawn element, so every consumer conflates elements from different repeater rows.
       `dnd.ts:138-186` — `resolveDrop` scans a list interleaving children from every drawn row and computes
@@ -187,14 +187,14 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a fixture where `key !== dataKey` and a repeater draws two rows (trap 11)
       asserting the insertion index in row 1 differs from row 0, seen red first.
 
-- [ ] **12. The drag lifecycle.** Two HIGHs, area 7. `drag.ts:239-243,216` — the `abandoned` flag raised by
+- [x] **12. The drag lifecycle.** Two HIGHs, area 7. `drag.ts:239-243,216` — the `abandoned` flag raised by
       the window-blur path has no matching `pointerup`, so it survives to the next unrelated gesture and eats
       one click. `Tree.tsx:117-123` — `onRowPointerDown` arms a drag for any pointer button, so a right-press
       plus four pixels reparents the component; both other `begin` call sites guard `event.button` and both
       carry a comment describing this exact bug.
       _Check:_ standing gate, plus a test per finding, each seen red first.
 
-- [ ] **13. The inspector panels' HIGHs.** Areas 8 and 9, plus theme 4. `Properties.tsx:661` — the `select`
+- [x] **13. The inspector panels' HIGHs.** Areas 8 and 9, plus theme 4. `Properties.tsx:661` — the `select`
       editor hands `optionValue` unwrapped values, so its declared-value pass never matches and it returns
       the raw string, the exact bug the comment above it claims to have fixed. `Properties.tsx:344` —
       choosing "Always" after authoring a condition destroys it with no undo path, because both writes carry
@@ -207,7 +207,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a test per finding, each seen red first. The undo one must assert the
       condition is reachable by undo **and** redo.
 
-- [ ] **14. demo-server HIGHs.** Area 10. `:207-216` — the lost update the comment at :92-98 claims to have
+- [x] **14. demo-server HIGHs.** Area 10. `:207-216` — the lost update the comment at :92-98 claims to have
       fixed is live: the read-modify-write straddles an `await` and only the write half is serialized.
       `:159-167` — `MAX_BODY` is not a body limit; `await c.req.text()` buffers the whole stream before
       `text.length` is compared. `:344` — for a multi-step document the echoed payload drops every step but
@@ -216,7 +216,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a concurrent-write test that loses no update, a body-limit test that
       rejects before buffering, and a two-step submit whose echo carries both steps, each seen red first.
 
-- [ ] **15. Decide what unit a length prop carries, in the kit contract.** The fourth theme of the executive
+- [x] **15. Decide what unit a length prop carries, in the kit contract.** The fourth theme of the executive
       summary, areas 4 and 5. `gap` is CSS pixels in `kit-html` and MUI spacing multiples in `kit-mui`, and
       pixels again on `kit-mui`'s own `Grid`, so every gap is eight times larger across kits. The contract
       says a document authored against one kit renders against the other and never says what unit a length
@@ -225,7 +225,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a contract test asserting the unit for every length-valued prop in both
       kits, and the spec section that states it.
 
-- [ ] **16. Make the four published READMEs work.** HIGHs and MEDIUMs, area 18.
+- [x] **16. Make the four published READMEs work.** HIGHs and MEDIUMs, area 18.
       `packages/renderer/README.md:22` ships `{ ...data, [key]: value }`, the anti-pattern the source warns
       against by name, which inside a repeater creates a literal property called `addresses[1].line1` and
       drops every row answer. The designer and renderer READMEs import `@formsmith/kit-mui` from an install
@@ -234,7 +234,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a test that extracts every fenced `ts`/`tsx` block from every published
       README, typechecks it against the built packages, and fails on an import the install line omits.
 
-- [ ] **17. The specification's HIGHs.** Area 17, plus one export and one line of `CLAUDE.md`.
+- [x] **17. The specification's HIGHs.** Area 17, plus one export and one line of `CLAUDE.md`.
       `docs/spec/12-api.md:239` names `rowScopeProblems` as a boot-time check and it is not exported from
       `@formsmith/core`. Export it, or correct the document, and say which and why.
       `02-kit-contract.md:118,129` understates what is enforced in both directions: it says no test checks
@@ -246,7 +246,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus `docs.test.ts` extended so that a spec claim about what a test enforces is
       itself checked, at least for the `aria-invalid` and `required` obligations.
 
-- [ ] **18. The test suites' remaining HIGHs.** Areas 11, 12, 14 and 16.
+- [x] **18. The test suites' remaining HIGHs.** Areas 11, 12, 14 and 16.
       `tree.test.ts:401` (nothing asserts `removeNode` leaves its input unchanged, so invariant 4 is
       undefended for the one operation that deletes), `tree.test.ts:57` (`generateKey` covers only
       `TextField`, so the sanitising branch that exists because of a named incident is untested),

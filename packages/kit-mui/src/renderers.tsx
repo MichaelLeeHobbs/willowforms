@@ -89,6 +89,23 @@ const num = (v: unknown, fallback: number): number =>
 const px = (value: number): string => String(value) + 'px'
 
 /**
+ * The gap a layout component takes when the document does not say.
+ *
+ * CSS pixels, like every other length in both kits, and this one was not.
+ * MUI's `gap` prop is a multiple of `theme.spacing`, which defaults to 8, so an
+ * authored `gap: 2` was 16px here and 2px in `@formsmith/kit-html` -- eight
+ * times apart for the same document, which is the one thing the kit contract
+ * exists to prevent. MUI's own `Grid` in this file already used pixels, so the
+ * kit disagreed with itself as well.
+ *
+ * 16 rather than 2, so the *default* renders exactly as it did: `gap: 2` through
+ * MUI's spacing scale was 16px, and 16px is what `kit-html` has always used.
+ * What changes is the meaning of an authored number, which is stated in
+ * `docs/spec/02-kit-contract.md`.
+ */
+const GAP = 16
+
+/**
  * What a control has to say about itself beyond its value.
  *
  * `aria-required` rather than the platform `required`, deliberately: the
@@ -123,7 +140,7 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // and collides with the next field when siblings are flush against each other.
   return (
     <Box {...nodeProps} sx={{ maxWidth: num(props['maxWidth'], 640), mx: 'auto', p: 2 }}>
-      <Stack gap={num(props['gap'], 2)}>{children}</Stack>
+      <Stack gap={px(num(props['gap'], GAP))}>{children}</Stack>
     </Box>
   )
 }
@@ -131,7 +148,7 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
 function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   const direction = props['direction'] === 'row' ? 'row' : 'column'
   return (
-    <Stack {...nodeProps} direction={direction} gap={num(props['gap'], 2)}>
+    <Stack {...nodeProps} direction={direction} gap={px(num(props['gap'], GAP))}>
       {children}
     </Stack>
   )
@@ -151,7 +168,7 @@ function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps):
   const id = useId()
   const messageId = id + '-message'
   return (
-    <Stack {...nodeProps} direction="column" gap={num(props['gap'], 2)}>
+    <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
       {/*
        * A repeater is data-bound: its value is the list, so a rule about the
        * list is its own error, not any row's. "Add at least one address" has
@@ -166,7 +183,7 @@ function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps):
       <Stack
         role="group"
         direction="column"
-        gap={num(props['gap'], 2)}
+        gap={px(num(props['gap'], GAP))}
         aria-describedby={messageId}
       >
         {children}
@@ -180,7 +197,7 @@ function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps):
 
 function StepNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   return (
-    <Stack {...nodeProps} direction="column" gap={num(props['gap'], 2)}>
+    <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
       {children}
     </Stack>
   )

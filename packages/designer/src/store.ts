@@ -141,7 +141,7 @@ export interface DesignerApi {
    * override rather than storing a redundant copy of the key. Data keys are
    * allowed to collide, so nothing is refused here.
    */
-  setDataKey: (key: string, dataKey: string) => void
+  setDataKey: (key: string, dataKey: string) => RenameResult
   /**
    * Set or clear a component's visibility condition.
    *
@@ -368,7 +368,17 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             }
             return { ...node, schema }
           }),
-        'schema:' + key,
+        /*
+         * The rule keys too, for the reason above. Every write on the Rules tab
+         * shared one label, so adding a rule folded into the preceding run of
+         * typing and one undo took away both -- the rule and the message being
+         * typed into the rule before it.
+         *
+         * Typing a rule's value leaves the set of rules alone and still
+         * coalesces. Adding or removing one changes it, which is what starts a
+         * new entry.
+         */
+        'schema:' + key + ':' + (schema?.validations ?? []).map((rule) => rule.key).join(','),
       )
     },
     [apply],
@@ -553,7 +563,21 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             }
             return { ...node, renderWhen: value }
           }),
-        'renderWhen:' + key,
+        /*
+         * The kind is part of the label, and that is the whole fix.
+         *
+         * Consecutive edits sharing a label replace the entry on top rather than
+         * stacking on it, which is right for typing an expression and wrong for
+         * changing what kind of rule this is. Every write here shared one label,
+         * so choosing "Always" after authoring a condition replaced the version
+         * that held the condition -- destroying it in `past` and in `present` at
+         * once, so it was reachable by neither undo nor redo. The panel offered
+         * no other way back.
+         *
+         * A label has to name what makes an edit a continuation. Same kind is a
+         * continuation; a different kind is a new decision.
+         */
+        'renderWhen:' + key + ':' + (value?.kind ?? 'none'),
       )
     },
     [apply],
@@ -583,8 +607,26 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   )
 
   const setDataKey = useCallback(
-    (key: string, dataKey: string) => {
+    (key: string, dataKey: string): RenameResult => {
       const trimmed = dataKey.trim()
+      /*
+       * The same rule a rename is judged by, which this never applied.
+       *
+       * A `dataKey` is the name an answer takes in the payload, in exported
+       * JSON Schema and in every `ref` a condition writes -- the same jobs a
+       * `key` does, judged by the same grammar in `validateDocument`. The panel
+       * refused `first-name` as a key and accepted it here, so the panel could
+       * write a document its own gate reports as malformed.
+       *
+       * `renameKey` is the twin and already had the shape: report the reason so
+       * the field can show it, rather than storing it or silently doing nothing.
+       * Clearing the override is exempt, because an empty value means "use the
+       * key" rather than a name to check.
+       */
+      if (trimmed && trimmed !== key) {
+        const problem = keyProblem(trimmed)
+        if (problem) return { ok: false, reason: problem }
+      }
       apply(
         (doc) =>
           writeNode(doc, key, (node) => {
@@ -598,6 +640,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
           }),
         'dataKey:' + key,
       )
+      return { ok: true }
     },
     [apply],
   )

@@ -26,7 +26,7 @@ import {
   contextValues,
   evaluatorKeys,
   missingContext,
-  submittedData,
+  submittedAcross,
   validateAcross,
   validateDocument,
 } from '@formsmith/core'
@@ -112,17 +112,48 @@ async function readStore(): Promise<Store> {
  * a process killed mid-write left an empty or half-written store, which is the
  * failure `readStore` above now refuses to serve rather than silently rebuild.
  */
-let writing: Promise<void> = Promise.resolve()
+let working: Promise<unknown> = Promise.resolve()
 
-async function writeStore(store: Store): Promise<void> {
-  const next = writing.then(async () => {
-    const temporary = new URL('../forms.json.tmp', import.meta.url)
-    await writeFile(temporary, JSON.stringify(store, null, 2), 'utf8')
-    await rename(temporary, STORE)
+/** Write the store whole, assuming the caller has already serialized itself. */
+async function writeStoreNow(store: Store): Promise<void> {
+  /*
+   * Beside the store, not beside this module. `rename` is only atomic within one
+   * filesystem, and the store's location is configurable, so a temporary file
+   * pinned to the source directory would be a cross-device rename the day
+   * anybody moved it.
+   */
+  const temporary = new URL(STORE.href + '.tmp')
+  await writeFile(temporary, JSON.stringify(store, null, 2), 'utf8')
+  await rename(temporary, STORE)
+}
+
+/**
+ * Read, change and write the store with nothing interleaving.
+ *
+ * The comment above described this and the code did half of it. Only the *write*
+ * was chained: every route still called `readStore()` on its own, outside the
+ * chain, so two overlapping `PUT`s both read the same version, each added its
+ * own entry to it, and the second write replaced the first -- with both
+ * answering `{ok: true}`. That is the exact failure the comment says was fixed,
+ * still live, because serializing the write serializes nothing about the read
+ * that decided what to write.
+ *
+ * The change runs inside the chain and returns what the route should answer, so
+ * a decision that depends on the store -- a 404 for an id nobody holds -- is
+ * made against the same version that is about to be written.
+ */
+async function withStore<T>(
+  change: (store: Store) => { next?: Store; result: T } | Promise<{ next?: Store; result: T }>,
+): Promise<T> {
+  const run = working.then(async () => {
+    const store = await readStore()
+    const { next, result } = await change(store)
+    if (next) await writeStoreNow(next)
+    return result
   })
   // Chained whether it settles or throws, so one failure does not stall the rest.
-  writing = next.catch(() => undefined)
-  return next
+  working = run.catch(() => undefined)
+  return run
 }
 
 /**
@@ -167,9 +198,11 @@ const MAX_BODY = 1_000_000
  * layer earlier — and a route that writes what it receives to disk had no cap
  * on what it would write.
  */
-async function bodyOf(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
-  const text = await c.req.text()
-  if (text.length > MAX_BODY) return undefined
+async function bodyOf(c: {
+  req: { text: () => Promise<string>; header: (name: string) => string | undefined; raw: Request }
+}): Promise<unknown> {
+  const text = await textOf(c)
+  if (text === undefined) return undefined
   let parsed: unknown
   try {
     parsed = JSON.parse(text) as unknown
@@ -195,6 +228,61 @@ async function bodyOf(c: { req: { text: () => Promise<string> } }): Promise<unkn
    */
   if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return undefined
   return parsed
+}
+
+/**
+ * The body as text, or nothing if it is larger than `MAX_BODY`.
+ *
+ * `await c.req.text()` buffers the whole stream and only then compares
+ * `text.length`, so `MAX_BODY` was a check on something already in memory: a
+ * gigabyte arrived, was held, and was then declined. That is not a body limit,
+ * it is a report on one.
+ *
+ * `content-length` first, which refuses the honest case before a byte is read.
+ * A client that omits it or lies is read a chunk at a time and abandoned the
+ * moment the total passes the cap, so nothing beyond it is ever held.
+ *
+ * Bytes, not characters. `text.length` counts UTF-16 units, which is neither
+ * what a client sent nor what the header declares, and the two disagree by up to
+ * four times on non-Latin text.
+ */
+async function textOf(c: {
+  req: { text: () => Promise<string>; header: (name: string) => string | undefined; raw: Request }
+}): Promise<string | undefined> {
+  const declared = c.req.header('content-length')
+  if (declared !== undefined && Number(declared) > MAX_BODY) return undefined
+
+  const stream = c.req.raw.body
+  // No stream at all is an empty body, which `JSON.parse` will refuse below.
+  if (!stream) return await c.req.text()
+
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+      size += value.byteLength
+      if (size > MAX_BODY) {
+        // Nothing beyond the cap is kept, and the sender is told to stop.
+        await reader.cancel()
+        return undefined
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const joined = new Uint8Array(size)
+  let at = 0
+  for (const chunk of chunks) {
+    joined.set(chunk, at)
+    at += chunk.byteLength
+  }
+  return new TextDecoder().decode(joined)
 }
 
 /**
@@ -261,34 +349,41 @@ app.put('/api/forms/:id', async (c) => {
     return c.json({ error: 'The document id must match the one in the URL' }, 422)
   }
 
-  const store = await readStore()
-  /*
-   * A null-prototype record, so an attacker-chosen key is a key. `store['__proto__'] = doc`
-   * answered `{ok: true}` and stored nothing at all. Core's own `submittedData`
-   * documents this exact hazard and builds on a null prototype; the reference
-   * server was doing the thing core warns against.
-   */
-  const next: Store = Object.assign(Object.create(null) as Store, store)
-  next[c.req.param('id')] = doc
-  await writeStore(next)
+  await withStore((store) => {
+    /*
+     * A null-prototype record, so an attacker-chosen key is a key. `store['__proto__'] = doc`
+     * answered `{ok: true}` and stored nothing at all. Core's own `submittedData`
+     * documents this exact hazard and builds on a null prototype; the reference
+     * server was doing the thing core warns against.
+     */
+    const next: Store = Object.assign(Object.create(null) as Store, store)
+    next[c.req.param('id')] = doc
+    return { next, result: undefined }
+  })
   return c.json({ ok: true })
 })
 
 app.delete('/api/forms/:id', async (c) => {
-  const store = await readStore()
   const id = c.req.param('id')
 
-  /*
-   * 404 for an id the store does not hold, rather than `{ok: true}` and a
-   * rewritten file. A client deleting the wrong id -- a typo, a stale list, a
-   * double submit against a document somebody else removed -- was told it had
-   * worked, and the only way to find out otherwise was to look.
-   */
-  if (!held(store, id)) return c.json({ error: 'Not found' }, 404)
+  const found = await withStore((store) => {
+    /*
+     * 404 for an id the store does not hold, rather than `{ok: true}` and a
+     * rewritten file. A client deleting the wrong id -- a typo, a stale list, a
+     * double submit against a document somebody else removed -- was told it had
+     * worked, and the only way to find out otherwise was to look.
+     *
+     * Decided inside the chain, against the version about to be written, so it
+     * cannot be answered from a store some other request has already replaced.
+     */
+    if (!held(store, id)) return { result: false }
 
-  const next: Store = Object.assign(Object.create(null) as Store, store)
-  delete next[id]
-  await writeStore(next)
+    const next: Store = Object.assign(Object.create(null) as Store, store)
+    delete next[id]
+    return { next, result: true }
+  })
+
+  if (!found) return c.json({ error: 'Not found' }, 404)
   return c.json({ ok: true })
 })
 
@@ -398,7 +493,7 @@ app.post('/api/forms/:id/submit', async (c) => {
    * projection a host applies, and this route, which is the implementation a
    * reader copies, echoed the raw body instead.
    */
-  const submitted = submittedData(doc.root, data, scopes[0])
+  const submitted = submittedAcross(doc.root, data, scopes)
   return c.json({ ok: true, received: submitted })
 })
 

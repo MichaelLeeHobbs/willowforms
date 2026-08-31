@@ -7,20 +7,29 @@ It walks a document and resolves property bindings; it knows nothing about which
 the result.
 
 ```bash
-npm install @formsmith/renderer @formsmith/core
+npm install @formsmith/renderer @formsmith/core @formsmith/kit-mui
 ```
 
 ```tsx
 import { FormRenderer } from '@formsmith/renderer'
 import { muiRendererKit } from '@formsmith/kit-mui'
+import { applyChange } from '@formsmith/core'
+import type { FormData, FormDocument, FormErrors } from '@formsmith/core'
 
-;<FormRenderer
-  document={document}
-  kit={muiRendererKit}
-  data={data}
-  errors={errors}
-  onChange={(key, value) => setData((d) => ({ ...d, [key]: value }))}
-/>
+declare const form: FormDocument
+declare const data: FormData
+declare const errors: FormErrors
+declare const setData: (update: (current: FormData) => FormData) => void
+
+export const view = (
+  <FormRenderer
+    document={form}
+    kit={muiRendererKit}
+    data={data}
+    errors={errors}
+    onChange={(address, value) => setData((current) => applyChange(current, address, value))}
+  />
+)
 ```
 
 ## Writing a kit
@@ -28,7 +37,9 @@ import { muiRendererKit } from '@formsmith/kit-mui'
 A renderer receives resolved props and must spread `nodeProps` onto its outermost DOM element:
 
 ```tsx
-function TextFieldNode({ nodeProps, props, value, error, onChange }: NodeRendererProps) {
+import type { NodeRendererProps } from '@formsmith/renderer'
+
+export function TextFieldNode({ nodeProps, value, onChange }: NodeRendererProps) {
   return (
     <input {...nodeProps} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} />
   )

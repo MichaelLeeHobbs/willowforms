@@ -64,6 +64,8 @@ export interface SelectionLayerProps {
    * selection made from the tree, which names a node and no row.
    */
   selectedRow?: string
+  /** Which drawn copy the pointer is over, when it is over one inside a repeater. */
+  hoverRow?: string
   /** Component type of the selection, shown on the frame's label. */
   selectedType: string | undefined
   hoverKey: string | undefined
@@ -85,6 +87,7 @@ export function SelectionLayer({
   document,
   selectedKey,
   selectedRow,
+  hoverRow,
   selectedType,
   hoverKey,
   actions,
@@ -103,15 +106,26 @@ export function SelectionLayer({
    * thirty components cost thirty observer cycles and thirty extra renders on
    * top of the thirty it was actually asked for.
    */
-  const what = useRef({ selectedKey, selectedRow, hoverKey })
+  const what = useRef({ selectedKey, selectedRow, hoverKey, hoverRow })
 
   const remeasure = useCallback(() => {
     const surface = surfaceRef.current
     if (!surface) return
-    const { selectedKey: key, selectedRow: row, hoverKey: hovered } = what.current
+    const {
+      selectedKey: key,
+      selectedRow: row,
+      hoverKey: hovered,
+      hoverRow: hoveredRow,
+    } = what.current
     const nextSelected = measure(surface, key, row)
-    // One frame is enough when the pointer is over the selection already.
-    const nextHover = measure(surface, hovered === key ? undefined : hovered)
+    /*
+     * One frame is enough when the pointer is over the selection already, and
+     * "already" now means the same drawn copy rather than the same node: inside
+     * a repeater, hovering row 1 of the component selected in row 0 is two
+     * different rectangles and needs both frames.
+     */
+    const sameCopy = hovered === key && hoveredRow === row
+    const nextHover = measure(surface, sameCopy ? undefined : hovered, hoveredRow)
 
     setSelected((current) => keepIfSame(current, nextSelected))
     setHover((current) => keepIfSame(current, nextHover))
@@ -124,9 +138,9 @@ export function SelectionLayer({
    * would have read the previous one and drawn no frame at all.
    */
   useLayoutEffect(() => {
-    what.current = { selectedKey, selectedRow, hoverKey }
+    what.current = { selectedKey, selectedRow, hoverKey, hoverRow }
     remeasure()
-  }, [remeasure, document, selectedKey, selectedRow, hoverKey])
+  }, [remeasure, document, selectedKey, selectedRow, hoverKey, hoverRow])
 
   useLayoutEffect(() => {
     const surface = surfaceRef.current

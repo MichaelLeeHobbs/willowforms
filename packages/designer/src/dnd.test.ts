@@ -21,6 +21,7 @@ function column(): Candidate[] {
       index: 0,
       container: true,
       depth: 0,
+      row: undefined,
       rect: { top: 0, left: 0, width: 400, height: 300 },
     },
     {
@@ -29,6 +30,7 @@ function column(): Candidate[] {
       index: 0,
       container: false,
       depth: 1,
+      row: undefined,
       rect: { top: 10, left: 10, width: 380, height: 40 },
     },
     {
@@ -37,6 +39,7 @@ function column(): Candidate[] {
       index: 1,
       container: false,
       depth: 1,
+      row: undefined,
       rect: { top: 60, left: 10, width: 380, height: 40 },
     },
     {
@@ -45,6 +48,7 @@ function column(): Candidate[] {
       index: 2,
       container: false,
       depth: 1,
+      row: undefined,
       rect: { top: 110, left: 10, width: 380, height: 40 },
     },
   ]
@@ -59,6 +63,7 @@ function nested(): Candidate[] {
       index: 0,
       container: true,
       depth: 0,
+      row: undefined,
       rect: { top: 0, left: 0, width: 400, height: 300 },
     },
     {
@@ -67,6 +72,7 @@ function nested(): Candidate[] {
       index: 0,
       container: true,
       depth: 1,
+      row: undefined,
       rect: { top: 10, left: 10, width: 380, height: 60 },
     },
     {
@@ -75,6 +81,7 @@ function nested(): Candidate[] {
       index: 0,
       container: false,
       depth: 2,
+      row: undefined,
       rect: { top: 20, left: 20, width: 160, height: 40 },
     },
     {
@@ -83,6 +90,7 @@ function nested(): Candidate[] {
       index: 1,
       container: false,
       depth: 2,
+      row: undefined,
       rect: { top: 20, left: 200, width: 160, height: 40 },
     },
     {
@@ -91,6 +99,7 @@ function nested(): Candidate[] {
       index: 1,
       container: false,
       depth: 1,
+      row: undefined,
       rect: { top: 90, left: 10, width: 380, height: 40 },
     },
   ]
@@ -205,6 +214,7 @@ describe('resolveDrop', () => {
         index: 0,
         container: true,
         depth: 0,
+        row: undefined,
         rect: { top: 0, left: 0, width: 400, height: 300 },
       },
     ]
@@ -231,6 +241,7 @@ describe('resolveDrop', () => {
         index: 0,
         container: true,
         depth: 0,
+        row: undefined,
         rect: { top: 0, left: 0, width: 400, height: 300 },
       },
       {
@@ -239,6 +250,7 @@ describe('resolveDrop', () => {
         index: 0,
         container: false,
         depth: 1,
+        row: undefined,
         rect: { top: 10, left: 10, width: 380, height: 40 },
       },
       {
@@ -247,6 +259,7 @@ describe('resolveDrop', () => {
         index: 3,
         container: false,
         depth: 1,
+        row: undefined,
         rect: { top: 60, left: 10, width: 380, height: 40 },
       },
       {
@@ -255,6 +268,7 @@ describe('resolveDrop', () => {
         index: 4,
         container: false,
         depth: 1,
+        row: undefined,
         rect: { top: 110, left: 10, width: 380, height: 40 },
       },
     ]
@@ -339,6 +353,7 @@ describe('resolveDrop', () => {
           index: 0,
           container: true,
           depth: 3,
+          row: undefined,
           rect: { top: 25, left: 25, width: 100, height: 30 },
         },
       ]
@@ -493,5 +508,121 @@ describe('resolveTreeDrop index against moveNode', () => {
   it('places a new component by position among the existing siblings', () => {
     const target = resolveTreeDrop(siblingRows(), 58)
     expect(target).toMatchObject({ index: 2 })
+  })
+})
+
+/**
+ * A repeater drawing two rows, and the drop that has to tell them apart.
+ *
+ * `measureTree` emits one candidate per drawn *element*, and a repeater draws
+ * its subtree once per row -- so the children of a repeater arrive at
+ * `resolveDrop` as every row's children interleaved, each carrying the same key
+ * and the same `index` and differing only in the rectangle. Scanning that list
+ * for a midpoint compared the pointer against whichever row sorted first, so a
+ * drop aimed at row 1 was placed by row 0's geometry.
+ *
+ * Trap 11 applies and is the reason for the names below. The repeater is keyed
+ * `addressList` and holds `addresses`; its field is keyed `street` and holds
+ * `line1`. A fixture whose two names are the same string cannot see a defect
+ * about which of them is used, and every repeater fixture in this repository set
+ * `key === dataKey` until that was fixed once already.
+ */
+describe('a drop into the second row of a repeater', () => {
+  /*
+   * Two rows, stacked, each holding two fields side by side. The rows are
+   * `addresses[0]` at the top and `addresses[1]` below it -- the strings the
+   * renderer writes into `data-fs-row`, not invented ones.
+   */
+  const twoRows = (): Candidate[] => [
+    {
+      key: 'root',
+      parentKey: undefined,
+      index: 0,
+      container: true,
+      depth: 0,
+      row: undefined,
+      rect: { top: 0, left: 0, width: 400, height: 300 },
+    },
+    {
+      key: 'addressList',
+      parentKey: 'root',
+      index: 0,
+      container: true,
+      depth: 1,
+      row: undefined,
+      rect: { top: 0, left: 0, width: 400, height: 200 },
+    },
+    // Row 0
+    {
+      key: 'street',
+      parentKey: 'addressList',
+      index: 0,
+      container: false,
+      depth: 2,
+      row: 'addresses[0]',
+      rect: { top: 10, left: 10, width: 180, height: 40 },
+    },
+    {
+      key: 'town',
+      parentKey: 'addressList',
+      index: 1,
+      container: false,
+      depth: 2,
+      row: 'addresses[0]',
+      rect: { top: 10, left: 210, width: 180, height: 40 },
+    },
+    // Row 1, the same two authored nodes drawn again, lower down.
+    {
+      key: 'street',
+      parentKey: 'addressList',
+      index: 0,
+      container: false,
+      depth: 2,
+      row: 'addresses[1]',
+      rect: { top: 110, left: 10, width: 180, height: 40 },
+    },
+    {
+      key: 'town',
+      parentKey: 'addressList',
+      index: 1,
+      container: false,
+      depth: 2,
+      row: 'addresses[1]',
+      rect: { top: 110, left: 210, width: 180, height: 40 },
+    },
+  ]
+
+  it('places by the row the pointer is in, not by the first row measured', () => {
+    /*
+     * The same X in both, so only the row differs. Left of `street`'s midpoint
+     * in row 0 gives index 0; right of `town`'s midpoint in row 1 gives index 2.
+     * Interleaved, the two rows' rectangles produce neither.
+     */
+    const inRowZero = resolveDrop(twoRows(), 20, 30)
+    const inRowOne = resolveDrop(twoRows(), 380, 130)
+
+    expect(inRowZero?.parentKey).toBe('addressList')
+    expect(inRowOne?.parentKey).toBe('addressList')
+    expect(inRowZero?.index).toBe(0)
+    expect(inRowOne?.index).toBe(2)
+    expect(inRowOne?.index).not.toBe(inRowZero?.index)
+  })
+
+  it('draws the bar in the row the pointer is in', () => {
+    /*
+     * The index alone would pass if the bar were still measured from row 0, and
+     * an indicator a hundred pixels from the pointer is the visible half of this
+     * defect.
+     */
+    const inRowOne = resolveDrop(twoRows(), 20, 130)
+    expect(inRowOne?.indicator.top).toBeGreaterThanOrEqual(100)
+  })
+
+  it('still resolves a form with no repeater in it', () => {
+    // The control. Grouping by row must be a no-op where every child shares one
+    // row, which is most of a form.
+    const flat = twoRows().filter((c) => c.row !== 'addresses[1]')
+    expect(resolveDrop(flat, 20, 30)?.index).toBe(0)
+    expect(resolveDrop(flat, 380, 30)?.index).toBe(2)
   })
 })

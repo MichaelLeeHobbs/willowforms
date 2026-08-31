@@ -163,6 +163,73 @@ describe('documented test counts', () => {
   })
 })
 
+/**
+ * What the kit contract claims the suite enforces, against the suite.
+ *
+ * `02-kit-contract.md` listed five accessibility obligations and said which of
+ * them a test executed. Both halves were wrong: it said no test checks
+ * `aria-invalid` and one does, against every kit, and it omitted `aria-required`
+ * entirely, which is also checked. Understating enforcement is the dangerous
+ * direction -- a kit author budgets against the document and meets a red build.
+ *
+ * The claim is a column now, and this is what reads it. Both directions, because
+ * a check that only confirms the `yes` rows would let the document go on
+ * claiming something is unchecked while a test quietly enforces it, which is the
+ * half that was wrong.
+ */
+describe('the accessibility obligations table', () => {
+  const rows = (): { obligation: string; attribute: string; enforced: string }[] => {
+    const spec = read('docs/spec/02-kit-contract.md')
+    const from = spec.indexOf('| Obligation')
+    const rest = spec.slice(from)
+    const end = rest.search(/\n[ \t]*\n/)
+    const table = end === -1 ? rest : rest.slice(0, end)
+
+    return [...table.matchAll(/^\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|$/gm)]
+      .map((match) => ({
+        obligation: (match[1] ?? '').trim(),
+        attribute: (match[2] ?? '').trim().replace(/`/g, ''),
+        enforced: (match[3] ?? '').trim(),
+      }))
+      .filter((row) => row.enforced === 'yes' || row.enforced === 'no')
+  }
+
+  it('was read, and says something', () => {
+    // The control. A table this could not parse would make every row below pass
+    // over nothing, which is the shape the rule-count guard above already had.
+    const found = rows()
+    expect(found.length, 'the obligations table could not be read').toBeGreaterThan(4)
+    expect(found.filter((row) => row.enforced === 'yes').length).toBeGreaterThan(2)
+    expect(found.filter((row) => row.enforced === 'no').length).toBeGreaterThan(0)
+  })
+
+  it('claims enforcement only where the contract suite enforces it', () => {
+    const suite = read('test/kit-contract.test.tsx')
+    const wrong: string[] = []
+
+    for (const row of rows()) {
+      // A row with no attribute is an obligation no attribute expresses -- a
+      // label pointing at its control, a focus indicator surviving -- and both
+      // are marked `no` for the honest reason that they need a browser.
+      if (row.attribute === '' || row.attribute === '—') {
+        if (row.enforced === 'yes')
+          wrong.push(row.obligation + ' claims enforcement and names no attribute')
+        continue
+      }
+
+      const asserted = suite.includes(row.attribute)
+      if (row.enforced === 'yes' && !asserted) {
+        wrong.push(row.attribute + ' is marked enforced and the contract suite never mentions it')
+      }
+      if (row.enforced === 'no' && asserted) {
+        wrong.push(row.attribute + ' is marked unenforced and the contract suite asserts it')
+      }
+    }
+
+    expect(wrong, 'docs/spec/02-kit-contract.md disagrees with the contract suite').toEqual([])
+  })
+})
+
 describe('the README package table', () => {
   const readme = read('README.md')
 
@@ -268,7 +335,7 @@ describe('the specification index', () => {
 })
 
 /** How many obligations the kit contract states. See the assertion that uses it. */
-const CONTRACT_RULES = 19
+const CONTRACT_RULES = 21
 
 describe('the kit contract table', () => {
   it('has one row for every rule the contract suite runs', () => {
@@ -278,7 +345,16 @@ describe('the kit contract table', () => {
      * kit had to satisfy.
      */
     const spec = read('docs/spec/02-kit-contract.md')
-    const table = spec.slice(spec.indexOf('| Rule'))
+    /*
+     * The rule table, and only it. This sliced to the end of the file and
+     * counted every row of every table after it -- so adding the accessibility
+     * obligations table below made the count 28 against 21, for a reason that
+     * had nothing to do with the rules. A guard that reads "everything after a
+     * marker" is a guard that changes meaning when somebody writes prose.
+     */
+    const fromRules = spec.slice(spec.indexOf('| Rule'))
+    const afterTable = fromRules.search(/\n[ \t]*\n/)
+    const table = afterTable === -1 ? fromRules : fromRules.slice(0, afterTable)
     /*
      * Any first character, not a capital letter. A row beginning with a
      * backtick -- `nodeProps`, which is how half the obligations in this table

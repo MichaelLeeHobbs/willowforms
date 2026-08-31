@@ -675,21 +675,56 @@ describe('a document whose translations are not a bundle', () => {
     expect(screen.getByLabelText('greeting')).toBeTruthy()
   })
 
+  /*
+   * A kit that draws the label, which the one above does not.
+   *
+   * The test below asserted `textContent` did *not* contain `not-a-bundle`, and
+   * could not fail for two independent reasons: a negative assertion passes when
+   * an element renders nothing at all, and the `Field` renderer in this file
+   * draws an `<input aria-label>` and an error span, never the label prop. So
+   * the string it looked for could not have been there whatever `resolveProp`
+   * did.
+   *
+   * The claim is positive now: the label falls back to the translation key.
+   */
+  function Labelled({ nodeProps, props }: NodeRendererProps): ReactNode {
+    return (
+      <div {...nodeProps}>
+        <span data-testid="label">{typeof props['label'] === 'string' ? props['label'] : ''}</span>
+      </div>
+    )
+  }
+
+  const labelKit: RendererKit = { id: 'labelled', renderers: { Screen: Screen_, Field: Labelled } }
+
   it('falls back to the key when the bundle for the language is not one', () => {
-    // `resolveProp` returns the key when there is no translation for it, and a
-    // bundle that is not an object holds no translation for anything.
-    render(
+    const { container } = render(
       <FormRenderer
         document={brokenDocument({ en: 'not-a-bundle' })}
-        kit={kit}
+        kit={labelKit}
         data={{}}
         onChange={() => undefined}
       />,
     )
 
-    expect(screen.getByLabelText('greeting').closest('[data-fs-key]')?.textContent).not.toContain(
-      'not-a-bundle',
+    // `hello` is the i18n key the document asks for. An unresolvable bundle
+    // resolves to the key, which is the readable answer and the documented one.
+    expect(container.querySelector('[data-testid="label"]')?.textContent).toBe('hello')
+  })
+
+  it('uses the translation when the bundle is one', () => {
+    // The control. A renderer that always drew the key would pass the row above
+    // and never translate anything.
+    const { container } = render(
+      <FormRenderer
+        document={brokenDocument({ 'en-US': { hello: 'Hello there' } })}
+        kit={labelKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
     )
+
+    expect(container.querySelector('[data-testid="label"]')?.textContent).toBe('Hello there')
   })
 })
 
@@ -1143,5 +1178,195 @@ describe('the renderer over an untrusted document', () => {
     expect(container.querySelector('[data-fs-key="mystery"]')?.textContent).toContain(
       'This field is required.',
     )
+  })
+})
+
+/**
+ * What the boundary actually covers.
+ *
+ * Its doc comment calls itself "one node's blast radius" and says React 19
+ * unmounts the whole tree when nothing catches a throw. It wrapped `<Component>`
+ * and nothing else, so everything `RenderNode` does before that line -- the kit
+ * lookup, `isVisible`, `resolveProps`, the row mapping -- was outside it. And
+ * the root is rendered as `<RenderNode node={document.root} />` with nothing
+ * above it, so the document root had no boundary at all: a throw there took the
+ * host's page down, which is the one outcome the class exists to prevent.
+ *
+ * A kit is third-party code, which is the premise the comment argues from, so
+ * these throw from the kit lookup rather than from a renderer.
+ */
+describe('a throw from RenderNode before it reaches the kit component', () => {
+  /** A kit whose renderer lookup throws for one type, the way arbitrary code can. */
+  const kitThrowingOn = (type: string): RendererKit => ({
+    id: 'hostile',
+    renderers: new Proxy(
+      { Screen: Screen_, Field },
+      {
+        get: (target, name) => {
+          if (name === type) throw new Error('the kit blew up looking up ' + type)
+          return target[name as keyof typeof target]
+        },
+      },
+    ) as RendererKit['renderers'],
+  })
+
+  const field = (key: string): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  it('draws the fallback for the node that threw', () => {
+    const onError = vi.fn()
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([field('broken')])}
+        kit={kitThrowingOn('Field')}
+        data={{}}
+        onError={onError}
+        onChange={() => undefined}
+      />,
+    )
+
+    const element = container.querySelector('[data-fs-key="broken"]')
+    expect(element, 'the node vanished instead of falling back').not.toBeNull()
+    expect(element?.hasAttribute('data-fs-failed')).toBe(true)
+    expect(onError).toHaveBeenCalled()
+  })
+
+  it('keeps the rest of the form, which is what per-node means', () => {
+    /*
+     * The whole argument for a boundary per node rather than one around the
+     * form: a form-level boundary saves the host's page and throws away every
+     * answer already typed into the fields that were fine.
+     */
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([field('broken'), { key: 'ok', type: 'Screen', props: {} }])}
+        kit={kitThrowingOn('Field')}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="ok"]')?.hasAttribute('data-fs-failed')).toBe(
+      false,
+    )
+  })
+
+  it('draws a fallback when the document root itself throws, rather than a blank tree', () => {
+    /*
+     * The root had nothing above it. React 19 unmounts the whole tree on an
+     * uncaught throw, so this was a blank page in whatever host embedded the
+     * form -- the exact outcome the class was written to stop, at the one node
+     * it did not cover.
+     */
+    const onError = vi.fn()
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([])}
+        kit={kitThrowingOn('Screen')}
+        data={{}}
+        onError={onError}
+        onChange={() => undefined}
+      />,
+    )
+
+    const element = container.querySelector('[data-fs-key="root"]')
+    expect(element, 'the whole tree was unmounted').not.toBeNull()
+    expect(element?.hasAttribute('data-fs-failed')).toBe(true)
+    expect(onError).toHaveBeenCalled()
+  })
+
+  it('still renders an ordinary document, with no fallback anywhere', () => {
+    // The control. A boundary that always fell back would pass every assertion
+    // above.
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([field('email')])}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelectorAll('[data-fs-failed]')).toHaveLength(0)
+    expect(container.querySelector('[data-fs-key="email"]')).not.toBeNull()
+  })
+})
+
+/**
+ * A host evaluator that throws while resolving a prop.
+ *
+ * Every other render-time evaluator call site in this project wraps this.
+ * `visibility.ts` wraps it and says why; `validation.ts`'s two sites were
+ * wrapped in item 8. This one was bare, so an expression that throws took the
+ * form down through a path the boundary did not cover either.
+ *
+ * It answers `null`, which is what the line's own comment already promised for
+ * a host that supplied no evaluator at all: "No sandbox means no evaluation.
+ * Render the field rather than crash the form." A single bad prop expression is
+ * not a reason to replace a working component with an error box.
+ */
+describe('an evaluator that throws while resolving a prop', () => {
+  const boom = (): never => {
+    throw new Error('the host evaluator blew up')
+  }
+
+  const computed: ComponentNode = {
+    key: 'greeting',
+    type: 'Field',
+    props: { label: { kind: 'computed', expression: 'boom()' } },
+    schema: { type: 'string', validations: [] },
+  }
+
+  it('does not take the form down', () => {
+    expect(() =>
+      render(
+        <FormRenderer
+          document={documentOf([computed])}
+          kit={kit}
+          data={{}}
+          evaluate={boom}
+          onChange={() => undefined}
+        />,
+      ),
+    ).not.toThrow()
+  })
+
+  it('renders the component rather than the boundary fallback', () => {
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([computed])}
+        kit={kit}
+        data={{}}
+        evaluate={boom}
+        onChange={() => undefined}
+      />,
+    )
+
+    const element = container.querySelector('[data-fs-key="greeting"]')
+    expect(element).not.toBeNull()
+    expect(element?.hasAttribute('data-fs-failed')).toBe(false)
+  })
+
+  it('still evaluates an expression that works', () => {
+    // The control, so "renders the component" is not satisfied by an evaluator
+    // that is never called.
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([computed])}
+        kit={kit}
+        data={{}}
+        evaluate={() => 'Hello'}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="greeting"]')).not.toBeNull()
+    expect(
+      resolveProp({ kind: 'computed', expression: 'x' }, {}, {}, { evaluate: () => 'Hello' }),
+    ).toBe('Hello')
   })
 })

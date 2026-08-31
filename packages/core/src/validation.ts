@@ -15,7 +15,7 @@ import { evaluateCondition } from './condition.js'
 import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
-import { dataKeyOf, flatten } from './tree.js'
+import { dataKeyOf, flatten, validationsOf } from './tree.js'
 import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -94,6 +94,24 @@ export const MAX_ROWS = 5000
 /** What a repeater reports when the submitted body asks for more rows than that. */
 export const TOO_MANY_ROWS = 'This list has too many rows to check.'
 
+/**
+ * What a repeater reports when its answer is not a list at all.
+ *
+ * `rowsOf` reads anything that is not an array as no rows, which is right for
+ * the *projection* -- `submittedData` submits only what was asked and given --
+ * and was quietly wrong here. No rows means the rules inside the repeater do not
+ * run, so a body sending `"addresses": "nope"` turned every required field
+ * inside that repeater optional, on the server, with nothing to see. A test
+ * asserted that as correct behaviour.
+ *
+ * Absent stays absent: `undefined` and `null` are a repeater nobody has filled
+ * in, and there is nothing to check inside one. A string, a number or an object
+ * is an answer of the wrong shape, and refusing it is the same call
+ * `matchesPattern` and `TOO_MANY_ROWS` already make -- what cannot be checked
+ * has not been satisfied.
+ */
+export const NOT_A_LIST = 'This list was not sent as a list.'
+
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 
 /*
@@ -137,6 +155,39 @@ function unboundedAt(source: string, at: number): boolean {
   if (ch !== '{') return false
   const close = source.indexOf('}', at)
   return close !== -1 && /^\{\d+,\s*\}$/.test(source.slice(at, close + 1))
+}
+
+/**
+ * Whether a quantifier at this position permits two or more repetitions.
+ *
+ * A different question from `unboundedAt`, and the difference is the finding.
+ * The bound on the outside is not what makes `(a+){10}` safe: what an engine
+ * backtracks over is the ways to split the input *between* the repetitions, and
+ * ten non-empty groups over thirty characters is ten million of them. The
+ * exponent is the repeat count, which the author chooses.
+ *
+ * Two is the threshold because one repetition has nothing to split against, and
+ * neither does none-or-one. `(a+){1}` and `(a+)?` are left alone.
+ *
+ * `{n}` repeats n times; `{n,}` is unbounded; `{n,m}` repeats up to m.
+ */
+function repeatsAt(source: string, at: number): boolean {
+  const ch = source[at]
+  if (ch === '*' || ch === '+') return true
+  if (ch !== '{') return false
+
+  const close = source.indexOf('}', at)
+  if (close === -1) return false
+  const body = source.slice(at + 1, close)
+
+  // `{n,}` — unbounded, so certainly two or more.
+  if (/^\d+,\s*$/.test(body)) return true
+  // `{n,m}` — the ceiling decides.
+  const range = /^(\d+),\s*(\d+)$/.exec(body)
+  if (range) return Number(range[2]) >= 2
+  // `{n}` — exactly n.
+  if (/^\d+$/.test(body)) return Number(body) >= 2
+  return false
 }
 
 /**
@@ -188,6 +239,17 @@ function nestedUnbounded(source: string): boolean {
 
       // `)` may be followed by a quantifier, optionally made lazy with `?`.
       const quantified = unboundedAt(source, i + 1)
+
+      /*
+       * Two or more repetitions of a group holding an unbounded quantifier, not
+       * only unboundedly many. This asked `unboundedAt` on both sides, so
+       * `(a+){10}b` compiled and ran -- and the comment above defending that
+       * said a bounded quantifier "is not the shape that goes exponential,
+       * because there is a fixed amount for the engine to try", which is true of
+       * `a{10}` and false of `(a+){10}`. The code was written to the sentence
+       * rather than to the distinction inside it.
+       */
+      if (repeatsAt(source, i + 1) && group.unbounded) return true
       if (quantified && group.unbounded) return true
 
       // A quantified group is itself an unbounded repetition as far as any
@@ -318,9 +380,26 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       return Boolean(when.value)
     case 'computed':
       // Without a sandbox we cannot know, so skip the rule rather than guess.
-      return options.evaluate
-        ? Boolean(options.evaluate(when.expression, data, options.context))
-        : false
+      if (!options.evaluate) return false
+      /*
+       * A throw is not the same as no sandbox, and gets the opposite answer.
+       *
+       * No evaluator is a host configuration: nothing computed can be evaluated,
+       * failing every guarded rule for it would be wrong, and `evaluatorKeys`
+       * already reports it at boot. A throw is one broken expression, authored
+       * in a document, and it is exactly the case the `default` below already
+       * rules on -- a guard this code cannot read has not said no, so the rule
+       * applies. The other direction is a required answer quietly becoming
+       * optional on the server, over a typo in an expression.
+       *
+       * `visibility.ts` wraps the same call and says why; this call site and the
+       * `custom` rule below were the two that did not.
+       */
+      try {
+        return Boolean(options.evaluate(when.expression, data, options.context))
+      } catch {
+        return true
+      }
     /*
      * A translation key is not a condition, so this reads as "no guard was
      * expressed" and the rule applies -- the same answer `isVisible` gives the
@@ -413,7 +492,21 @@ export function applyRule(
       return UUID.test(asString(value)) ? undefined : fail()
     case 'custom':
       if (!options.evaluate) return undefined
-      return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
+      /*
+       * A throw fails the rule, which is the answer `matchesPattern` gives a
+       * pattern it refuses to run, in this file, for the same reason: a rule
+       * that cannot be run has not been satisfied.
+       *
+       * Not the same as the line above it. No evaluator is a host that declined
+       * to supply one, and failing every custom rule for that would make the
+       * library unusable without a sandbox; a throw is one expression that is
+       * broken, and letting the value through is the silent permissive failure.
+       */
+      try {
+        return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
+      } catch {
+        return fail()
+      }
 
     /*
      * Unreachable: the `KNOWN_RULES` check above has already answered for a key
@@ -444,7 +537,7 @@ export function applyRule(
  * In core rather than in each kit, so the two cannot answer differently.
  */
 export function isRequired(node: ComponentNode): boolean {
-  const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+  const rules = validationsOf(node)
   return rules.some((rule) => rule?.key === 'required' && !rule.when)
 }
 
@@ -457,7 +550,7 @@ export function validateField(
   if (!node.schema) return undefined
   // A field inside a row holds its answer in that row, not at the top level.
   const held = valueOf(options.row?.values ?? data, dataKeyOf(node))
-  for (const rule of node.schema.validations) {
+  for (const rule of validationsOf(node)) {
     const error = applyRule(rule, held, data, options)
     if (error) return error
   }
@@ -505,7 +598,19 @@ export function validateForm(
      * rest go unchecked.
      */
     if (isRowScope(node)) {
-      const all = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+      const stored = valueOf(rowData(data, scope), dataKeyOf(node))
+
+      /*
+       * An answer of the wrong shape is reported rather than read as no rows.
+       * See `NOT_A_LIST`: reading it as empty turned every required field inside
+       * the repeater optional.
+       */
+      if (stored !== undefined && stored !== null && !Array.isArray(stored)) {
+        errors[addressOf(path, node.key)] = NOT_A_LIST
+        return
+      }
+
+      const all = rowsOf(stored)
 
       /*
        * The row count comes out of the data, which is right: asking the browser
@@ -669,6 +774,45 @@ export function submittedData(
   const kept: FormData = Object.create(null) as FormData
   collect(root, options, kept)
   return { ...kept }
+}
+
+/**
+ * The projection a multi-step form submits, taken across every step.
+ *
+ * `validateAcross` exists because a wizard's steps are hidden from each other
+ * and hidden means not validated -- so at submit every step has to be checked,
+ * and checking under one environment misses the rest. The projection has exactly
+ * the same problem and did not have the same answer: the demo server validated
+ * across all scopes and then projected under `scopes[0]`, so every answer given
+ * on step two onwards was dropped from the payload. A form that validated a
+ * required field and then submitted without it.
+ *
+ * Merged the way `validateAcross` merges, and for the same reason: steps
+ * partition the tree, so a key belongs to at most one of them and there is
+ * nothing to resolve. Where scopes overlap the first answer wins, which is the
+ * order everywhere else in this file.
+ *
+ * No scopes is not the same as one empty scope. A document with no steps yields
+ * no scopes, and the honest projection across nothing is nothing -- a caller
+ * that means the whole form calls `submittedData`, which is what
+ * `validateAcross` says about the same case one function below.
+ */
+export function submittedAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormData {
+  // No prototype, for the reason `submittedData` has none and `validateAcross`
+  // has none: a key from a document is a key an attacker may have chosen.
+  const merged: FormData = Object.create(null) as FormData
+
+  for (const scope of scopes) {
+    for (const [key, value] of Object.entries(submittedData(root, data, scope))) {
+      merged[key] ??= value
+    }
+  }
+
+  return { ...merged }
 }
 
 /**

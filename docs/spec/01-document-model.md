@@ -49,8 +49,9 @@ look fixed. One helper decides now, and nothing compares these strings by hand.
 
 **Status: planned.** Decided; not yet written.
 
-`version` is the literal `'1'` and nothing reads it. There is no migration path, so any change to the
-shape of a stored document would silently break every document a host has already saved.
+`version` is the literal `'1'`, and `validateDocument` refuses a document that says anything else. What
+is missing is not a reader -- it is a migration path, so any change to the shape of a stored document
+would refuse every document a host has already saved rather than upgrading it.
 
 **Core owns migrations.** `loadDocument(unknown)` takes arbitrary JSON and returns either a document at
 the current version or the list of reasons it cannot be one. Every host would otherwise reimplement the

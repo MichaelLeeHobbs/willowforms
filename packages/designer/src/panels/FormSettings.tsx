@@ -151,12 +151,20 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                   <input
                     type="checkbox"
                     checked={language.bidi === 'rtl'}
+                    /*
+                     * By position, like the Remove button beside it.
+                     *
+                     * Nothing stops a hand-edited document holding one tag
+                     * twice, and matching by tag then wrote both rows: ticking
+                     * "Right to left" on one flipped the other. The removal on
+                     * this same row was fixed and pinned by a test; the checkbox
+                     * next to it kept matching by tag, which is one side of a
+                     * symmetry fixed and the other left alone.
+                     */
                     onChange={(e) =>
                       api.setLanguages(
-                        doc.languages.map((l) =>
-                          languageTag(l) === tag
-                            ? { ...l, bidi: e.target.checked ? 'rtl' : 'ltr' }
-                            : l,
+                        doc.languages.map((l, i) =>
+                          i === at ? { ...l, bidi: e.target.checked ? 'rtl' : 'ltr' } : l,
                         ),
                       )
                     }

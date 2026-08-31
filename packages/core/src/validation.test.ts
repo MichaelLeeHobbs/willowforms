@@ -47,20 +47,85 @@ describe('required', () => {
 })
 
 describe('every non-required rule passes on an empty value', () => {
-  // This is the bug the prior-art study found in the demo it examined: a field declaring only
-  // a `url` rule reported "Required" when left blank. Requiredness is one rule's
-  // job, and only one.
+  /*
+   * This is the bug the prior-art study found in the demo it examined: a field
+   * declaring only a `url` rule reported "Required" when left blank.
+   * Requiredness is one rule's job, and only one.
+   *
+   * Invariant 5, and it was enforced for six of the nine rules and for one shape
+   * of empty. `maxLength`, `max` and `custom` were not listed, and only `''` was
+   * tried -- while `required`'s own test says empty means `undefined`, `null`,
+   * `''`, whitespace and `[]`. An invariant checked on two thirds of its
+   * subjects is a rule with three exceptions nobody wrote down.
+   *
+   * What each half earns is worth being exact about. Removing the empty guard
+   * for `maxLength`, `max` or `custom` fails none of these rows, because those
+   * three pass an empty value anyway -- 0 is within any maximum, and `custom`
+   * with no evaluator passes. Their rows state the contract rather than
+   * exercising the mechanism, and that is still worth having: invariant 5 is a
+   * claim about behaviour, and a later rewrite of `maxLength` that decided an
+   * empty answer is too short would be caught here.
+   *
+   * The empty *shapes* do exercise it. Measured: with `isEmpty` no longer
+   * counting whitespace or an empty list, twelve of these rows go red.
+   */
   const rules: ValidationRule[] = [
     { key: 'email' },
     { key: 'url' },
     { key: 'uuid' },
     { key: 'minLength', value: 5 },
+    { key: 'maxLength', value: 5 },
     { key: 'min', value: 10 },
+    { key: 'max', value: 10 },
     { key: 'pattern', value: '^x+$' },
+    { key: 'custom', expression: 'false' },
   ]
 
-  it.each(rules)('$key passes on empty string', (rule) => {
-    expect(check(rule, '')).toBeUndefined()
+  it('covers every rule the union has except required', () => {
+    /*
+     * Read from the message table rather than listed here, so a rule added
+     * later is not silently outside the invariant. `DEFAULT_MESSAGES` is typed
+     * as a total record over the union, which is what makes it the right source.
+     */
+    const covered = new Set(rules.map((rule) => rule.key))
+    const missing = Object.keys(DEFAULT_MESSAGES).filter(
+      (key) => key !== 'required' && !covered.has(key as ValidationRule['key']),
+    )
+
+    expect(missing, 'these rules are outside invariant 5 and nothing says why').toEqual([])
+  })
+
+  const EMPTY: [string, unknown][] = [
+    ['undefined', undefined],
+    ['null', null],
+    ['an empty string', ''],
+    ['whitespace', '   '],
+    ['an empty list', []],
+  ]
+
+  it.each(
+    rules.flatMap((rule) => EMPTY.map((empty) => [rule.key, empty[0], rule, empty[1]] as const)),
+  )('%s passes on %s', (_key, _shape, rule, value) => {
+    expect(check(rule, value)).toBeUndefined()
+  })
+
+  it('still fails each of them on a value that is not empty', () => {
+    /*
+     * The control, and it is the whole difference between "the rule passes on
+     * empty" and "the rule never fails". Without it a rule that returned
+     * undefined unconditionally would satisfy every row above.
+     */
+    expect(check({ key: 'email' }, 'nope')).toBeDefined()
+    expect(check({ key: 'url' }, 'nope')).toBeDefined()
+    expect(check({ key: 'uuid' }, 'nope')).toBeDefined()
+    expect(check({ key: 'minLength', value: 5 }, 'ab')).toBeDefined()
+    expect(check({ key: 'maxLength', value: 5 }, 'abcdef')).toBeDefined()
+    expect(check({ key: 'min', value: 10 }, 9)).toBeDefined()
+    expect(check({ key: 'max', value: 10 }, 11)).toBeDefined()
+    expect(check({ key: 'pattern', value: '^x+$' }, 'y')).toBeDefined()
+    expect(
+      applyRule({ key: 'custom', expression: 'false' }, 'x', NO_DATA, { evaluate: () => false }),
+    ).toBeDefined()
   })
 })
 
@@ -647,48 +712,82 @@ describe('validateAcross, and the submit it exists to stop', () => {
     expect(validateAcross(wizard, { ...answered, city: 'Ely' }, scopes)).toEqual({})
   })
 
-  it('keeps the first message when two steps report the same field', () => {
+  it('keeps the first message when two scopes report the same field', () => {
     /*
-     * A field can be visible in more than one step -- a summary step that shows
-     * what an earlier one collected -- and the merge takes the first message
-     * rather than the last. Which one is arbitrary; that it is decided is not,
-     * because a caller showing "Too short" where the earlier step said
-     * "Required" is a form arguing with itself.
+     * A field can be reported under more than one scope, and the merge takes the
+     * first message rather than the last. Which one is arbitrary; that it is
+     * decided is not, because a caller showing "Too short" where the earlier
+     * step said "Required" is a form arguing with itself.
+     *
+     * The fixture this replaces could not collide. It used two components keyed
+     * `nickname` and `nickname2`, and `validateForm` keys an error by the
+     * *node's* key -- so the two never shared an entry and the merge had nothing
+     * to resolve. Two nodes can never collide, because keys are unique in a
+     * document.
+     *
+     * One node reported twice is the case that exists: a field outside every
+     * step is visible under every scope. Two guarded rules on it, each applying
+     * in a different step, make the two visits produce different messages -- so
+     * "the first wins" is observable rather than asserted about identical
+     * strings.
      */
     const shared: ComponentNode = {
       key: 'root',
       type: 'Screen',
       props: {},
       children: [
-        step('who', [
-          {
-            key: 'nickname',
-            type: 'TextField',
-            props: {},
-            schema: {
-              type: 'string',
-              validations: [{ key: 'required', message: 'The first step says so.' }],
-            },
+        {
+          key: 'nickname',
+          type: 'TextField',
+          props: {},
+          schema: {
+            type: 'string',
+            validations: [
+              {
+                key: 'required',
+                message: 'The first step says so.',
+                when: {
+                  kind: 'condition',
+                  condition: {
+                    op: 'eq',
+                    left: { kind: 'context', path: 'step' },
+                    right: { kind: 'literal', value: 'who' },
+                  },
+                },
+              },
+              {
+                key: 'required',
+                message: 'The second step says so.',
+                when: {
+                  kind: 'condition',
+                  condition: {
+                    op: 'eq',
+                    left: { kind: 'context', path: 'step' },
+                    right: { kind: 'literal', value: 'where' },
+                  },
+                },
+              },
+            ],
           },
-        ]),
-        step('where', [
-          {
-            key: 'nickname2',
-            dataKey: 'nickname',
-            type: 'TextField',
-            props: {},
-            schema: {
-              type: 'string',
-              validations: [{ key: 'required', message: 'The second step says so.' }],
-            },
-          },
-        ]),
+        },
+        step('who', []),
+        step('where', []),
       ],
     }
 
+    // Each scope on its own reports its own message, which is what makes the
+    // merge a choice rather than a formality.
+    expect(validateForm(shared, {}, onStep('who'))['nickname']).toBe('The first step says so.')
+    expect(validateForm(shared, {}, onStep('where'))['nickname']).toBe('The second step says so.')
+
     const merged = validateAcross(shared, {}, ['who', 'where'].map(onStep))
+    expect(Object.keys(merged)).toEqual(['nickname'])
     expect(merged['nickname']).toBe('The first step says so.')
-    expect(merged['nickname2']).toBe('The second step says so.')
+
+    // And the order is the scope order, not the rule order: reversing the
+    // scopes reverses the answer.
+    const backwards = validateAcross(shared, {}, ['where', 'who'].map(onStep))
+    expect(backwards['nickname']).toBe('The second step says so.')
   })
 
   it('merges nothing into an empty scope list, rather than validating everything', () => {
@@ -1205,5 +1304,140 @@ describe('bounds and schemes', () => {
 
   it('still refuses something that is not a URL at all', () => {
     expect(check({ key: 'url' }, 'not a url')).toBe(DEFAULT_MESSAGES.url)
+  })
+})
+
+/**
+ * A bounded quantifier wrapping an unbounded one.
+ *
+ * The ReDoS guard asks whether an *unbounded* quantifier is applied to a group
+ * holding another one, so `(a+)+` is refused and `(a+){10}` is not. The bound on
+ * the outside is not what makes it safe: splitting thirty characters into ten
+ * non-empty groups is ten million ways, and the exponent is the repeat count,
+ * which the author chooses.
+ *
+ * The guard's own comment says a bounded quantifier "is not the shape that goes
+ * exponential, because there is a fixed amount for the engine to try". That is
+ * true of `a{10}` and false of `(a+){10}`, and the code was written to the
+ * sentence rather than to the distinction inside it.
+ */
+describe('a pattern whose outer quantifier is bounded and whose inner is not', () => {
+  /*
+   * Each row supplies a value the pattern *matches*, which is what separates
+   * "refused" from "ran and did not match". Both answer with the same message,
+   * so a helper that fed every pattern a non-matching string would report every
+   * one of them as refused -- including the controls -- and the table would have
+   * proved nothing. That was the first version of this block.
+   */
+  const refused = (pattern: string, matching: string): boolean =>
+    check({ key: 'pattern', value: pattern }, matching) === DEFAULT_MESSAGES.pattern
+
+  it.each([
+    ['(a+){10}b', 'aaaaaaaaaab', 'the shape the review named'],
+    ['(a*){8}b', 'b', 'with a star inside'],
+    ['(a+){2,5}b', 'aab', 'and with a range outside'],
+    ['((a+)*){3}b', 'ab', 'and nested two deep'],
+  ])('refuses %s — %s', (pattern, matching) => {
+    expect(refused(pattern, matching)).toBe(true)
+  })
+
+  it.each([
+    ['(a+){1}b', 'ab', 'one repetition cannot backtrack between groups'],
+    ['(a+)?b', 'b', 'and neither can none-or-one'],
+    ['(\\d{3}-){4}x', '123-456-789-012-x', 'a fixed-length inner group is common'],
+    ['(\\d{1,3}\\.){3}\\d{1,3}', '10.0.0.1', 'and an IP address must keep working'],
+  ])('still runs %s — %s', (pattern, matching) => {
+    // The controls. A guard that refused every quantified group would pass every
+    // assertion above and break patterns people actually write.
+    expect(refused(pattern, matching)).toBe(false)
+  })
+})
+
+/**
+ * The host evaluator throwing, on the two call sites that did not catch it.
+ *
+ * `visibility.ts` wraps the same call in `try`/`catch` and explains why: a throw
+ * out of `isVisible` is an unhandled 500 on submit and a blank form in the
+ * browser. `guardPasses` and the `custom` rule call it bare, so an expression
+ * that throws escapes `validateForm` entirely -- and the expression is authored
+ * in a document while the evaluator belongs to the host, so neither side owns
+ * the failure.
+ *
+ * The two answers differ on purpose, and each matches a decision already written
+ * down one case away.
+ */
+describe('an evaluator that throws', () => {
+  const boom: Evaluator = () => {
+    throw new Error('the host evaluator blew up')
+  }
+
+  const guardedRule = (): ComponentNode => ({
+    key: 'spouse',
+    type: 'TextField',
+    props: {},
+    schema: {
+      type: 'string',
+      validations: [{ key: 'required', when: { kind: 'computed', expression: 'boom()' } }],
+    },
+  })
+
+  const customRule = (): ComponentNode => ({
+    key: 'code',
+    type: 'TextField',
+    props: {},
+    schema: {
+      type: 'string',
+      validations: [{ key: 'custom', expression: 'boom()' }],
+    },
+  })
+
+  const root = (child: ComponentNode): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [child],
+  })
+
+  it('does not escape validateForm from a rule guard', () => {
+    expect(() => validateForm(root(guardedRule()), {}, { evaluate: boom })).not.toThrow()
+  })
+
+  it('leaves the guarded rule applying, because a guard nobody can read has not said no', () => {
+    /*
+     * The same answer the `default` case in `guardPasses` gives an unreadable
+     * guard, and for the same reason. The other direction is a required answer
+     * quietly becoming optional on the server, which is the permissive failure
+     * this project is organised against.
+     */
+    expect(validateForm(root(guardedRule()), {}, { evaluate: boom })).toEqual({
+      spouse: DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('does not escape validateForm from a custom rule', () => {
+    expect(() => validateForm(root(customRule()), { code: 'x' }, { evaluate: boom })).not.toThrow()
+  })
+
+  it('fails the custom rule, because a rule that cannot be run has not been satisfied', () => {
+    /*
+     * The same answer `matchesPattern` gives a pattern it refuses to run, in the
+     * same file. Not the same as a host that supplied no evaluator at all: that
+     * is a configuration the boot-time `evaluatorKeys` check already covers, and
+     * failing every custom rule for it would be wrong.
+     */
+    expect(validateForm(root(customRule()), { code: 'x' }, { evaluate: boom })).toEqual({
+      code: DEFAULT_MESSAGES.custom,
+    })
+  })
+
+  it('still runs a custom rule whose evaluator works', () => {
+    // The control, in both directions.
+    const yes: Evaluator = () => true
+    const no: Evaluator = () => false
+
+    expect(validateForm(root(customRule()), { code: 'x' }, { evaluate: yes })).toEqual({})
+    expect(validateForm(root(customRule()), { code: 'x' }, { evaluate: no })).toEqual({
+      code: DEFAULT_MESSAGES.custom,
+    })
   })
 })

@@ -137,9 +137,34 @@ describe('styleSheetFor', () => {
     expect(sheet).toBe('[data-fs-key="card"]{padding: 8px}')
   })
 
-  it('leaves out a declaration it refused rather than emitting a broken rule', () => {
-    const sheet = styleSheetFor(root([node('card', { any: 'color: red } body { display: none' })]))
-    expect(sheet).toBe('')
+  it.each(['any', 'mobile', 'tablet', 'desktop'] as const)(
+    'leaves out a declaration it refused on the %s layer rather than emitting a broken rule',
+    (layer) => {
+      /*
+       * Every layer, not only `any`. The refusal was tested on one of four, and
+       * the other three go through a different branch of `styleSheetFor` -- the
+       * one that wraps the block in a media query, where an escaped brace does
+       * not merely add a rule, it closes the `@media` and everything after it is
+       * top-level.
+       */
+      const sheet = styleSheetFor(
+        root([node('card', { [layer]: 'color: red } body { display: none' })]),
+      )
+
+      expect(sheet).not.toContain('display: none')
+      expect(sheet).not.toContain('body')
+    },
+  )
+
+  it('still emits a legitimate declaration on every layer', () => {
+    // The control. A `styleSheetFor` that emitted nothing at all would pass
+    // every row above.
+    for (const layer of ['any', 'mobile', 'tablet', 'desktop'] as const) {
+      expect(
+        styleSheetFor(root([node('card', { [layer]: 'color: red' })])),
+        layer + ' emitted nothing',
+      ).toContain('color: red')
+    }
   })
 
   it('escapes a key that would otherwise break out of the selector', () => {
