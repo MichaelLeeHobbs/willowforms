@@ -690,21 +690,25 @@ JSONForms had to bolt on is, here, one optional field on one member.
   moment an action vocabulary ships against the looser reading.
 - **When:** 2026-08-28, on `feat/context`.
 
-## A condition follows a copy only when it reads the context
+### A condition follows a copy only when it reads the context
 
-`repointBinding` rewrote every literal equal to the old key. `duplicateNode`'s own comment said it did
-not, and gave the reason: a condition testing an answer whose value happens to spell the copied key is
-about the answer, not the node. The function had been doing the opposite since it was written, and the
-designer's rename inherited it, so renaming a component quietly rewrote conditions about answers.
+- **Decided:** `repointBinding` rewrites a literal equal to the old key only inside a comparison that
+  has a `context` operand in it. Everywhere else the literal is left alone, and the recursion covers
+  the boolean operators and the `in`/`notIn` options list.
+- **Why:** It rewrote every literal equal to the old key, while `duplicateNode`'s own comment said it
+  did not and gave the reason: a condition testing an answer whose value happens to spell the copied key
+  is about the answer, not the node. The function had been doing the opposite since it was written and
+  the designer's rename inherited it, so renaming a component quietly rewrote conditions about answers.
+  A literal names a node when it is compared against the host context, which is the shape a `Step` ships
+  with (`context.step == 'welcome'`); it names a value when it is compared against a `ref`.
+- **Rejected:** Rewriting nothing, which breaks the case the function exists for -- a duplicated `Step`
+  shown by the original's name, so both render at once and the copy can never be reached. Also
+  rejected: asking the kit whether a component is a `Step`, which core must not know.
+- **Reversal:** Cheap. One predicate in one function, and the tests name both directions.
+- **When:** 2026-08-31, on `build-out/review-b`. Found by writing the test the review said was missing,
+  which is the second half of the rule failing against the code that claimed to implement it.
 
-A literal names a node when it is compared against the host context, which is the shape a `Step` ships
-with (`context.step == 'welcome'`). It names a value when it is compared against a `ref`. So the rewrite
-now happens only inside a comparison with a `context` operand in it.
-
-Found by writing the test the review said was missing, which is the second half of the rule failing
-against the code that claimed to implement it.
-
-## A row-scoped ref to a form-level answer is reported at boot
+### A row-scoped ref to a form-level answer is reported at boot
 
 `rowScopeProblems` reported two mismatches: a form-scoped ref to a key that only exists in a row, and a
 row-scoped ref on a node outside every repeater. The third is a row-scoped ref _inside_ a repeater
@@ -712,41 +716,57 @@ naming a key no node in that row writes while a node outside every repeater does
 dragging a conditional field into a repeater. It reads nothing, the condition is false, the component is
 hidden, and its rules never run.
 
-Conservative in the same way as the other two: reported only when the key demonstrably lives at the
-other scope. A row's data can carry keys no component authors, so a ref naming a key nothing in the
-document writes is left alone rather than guessed at.
+- **Decided:** `rowScopeProblems` reports a third mismatch: a row-scoped ref inside a repeater naming a
+  key no node in that row writes while a node outside every repeater does.
+- **Why:** It reads nothing, so the condition is false, the component is hidden, and its rules never
+  run -- and that is what you get by dragging a conditional field into a repeater, which is an ordinary
+  gesture rather than a hand edit.
+- **Rejected:** Falling back to the form scope, which is the silent-permissive outcome `rows.test.ts`
+  already asserted and stopped at. Also rejected: reporting any row-scoped ref whose key is not written
+  in that row -- a row's data can carry keys no component authors, so it is reported only when the key
+  demonstrably lives at the other scope.
+- **Reversal:** Cheap. One more case in one reporting function; nothing downstream reads it.
+- **When:** 2026-08-31, on `build-out/review-b`.
 
-This closes the loop under `rows.test.ts`'s "does not fall back to the form when the row has no such
-field", which asserted the silent-permissive outcome and stopped there.
+### The documented suite size is enforced by a reporter, not a test
 
-## The documented suite size is enforced by a reporter, not a test
+- **Decided:** `test/count-reporter.ts` counts the tests that reported a result and fails the process
+  when a document quotes a different figure. It skips itself on a filtered run and says which of the two
+  it did.
+- **Why:** Three documents quote how many tests there are and `docs.test.ts` compared them with each
+  other, which is three files agreeing on a number that can be wrong in all three. No test can count the
+  run it belongs to: the total is not known until every file has finished, and that is where a reporter
+  stands.
+- **Rejected:** A test that counts test files or `it(` occurrences, which counts the source rather than
+  the run and cannot see a `describe.each`. Also rejected: silently skipping on a filtered run, because
+  a skip that says nothing is indistinguishable from a pass.
+- **Reversal:** Cheap. One reporter in `vitest.config.ts`; deleting it leaves the documents unchecked
+  rather than wrong.
+- **When:** 2026-08-31, on `build-out/review-b`.
 
-Three documents quote how many tests there are and `docs.test.ts` compared them with each other, which
-is three files agreeing on a number that can be wrong in all three. No test can count the run it belongs
-to: the total is not known until every file has finished, and that is where a reporter stands.
+### A control border is not a divider
 
-`test/count-reporter.ts` runs at the end, counts the tests that reported a result and fails the process
-when a document disagrees. It skips itself on a filtered run -- comparing a figure about the whole
-repository against `vitest run packages/core` would make the fast loop unusable -- and says which of the
-two it did, so a silent skip cannot be mistaken for a pass.
+- **Decided:** `--fs-control-border` is a token of its own, used by inputs, selects, textareas and
+  buttons, clearing 3:1 on all three surfaces in both themes. `--fs-border` stays what it was.
+- **Why:** Measuring the designer's own controls for the first time found them at 1.39:1 light and
+  1.41:1 dark against the surfaces they sit on, where WCAG 1.4.11 asks 3:1 -- and a field's background is
+  1.08:1 from the panel behind it, so the border is the only thing that says a control is there. A panel
+  divider is decoration and 1.4.11 asks nothing of it.
+- **Rejected:** Darkening `--fs-border` itself, which clears the ratio and turns the chrome into a grid
+  of hard lines: every divider in the shell would carry a contrast meant for a control outline.
+- **Reversal:** Cheap. One token, overridable by a host like every other.
+- **When:** 2026-08-31, on `build-out/review-b`.
 
-## A control border is not a divider
+### Refused CSS stays in the box and out of the document
 
-Measuring the designer's own controls for the first time found them at 1.39:1 light and 1.41:1 dark
-against the surfaces they sit on, where WCAG 1.4.11 asks 3:1. A field's background is 1.08:1 from the
-panel behind it, so the border is the only thing that says a control is there.
-
-`--fs-border` stays what it was, because a panel divider is decoration and 1.4.11 asks nothing of it.
-`--fs-control-border` is the new token, used by inputs, selects, textareas and buttons, clearing 3:1 on
-all three surfaces in both themes. Splitting the token rather than darkening the existing one keeps the
-chrome from turning into a grid of hard lines.
-
-## Refused CSS stays in the box and out of the document
-
-The Style tab's raw editor told the author a value with a brace in it would not be applied, and then
-committed it anyway. So the document carried declarations the renderer drops -- the "worst of both" the
-row's own comment warns about -- and a host reading `node.css` for itself got the unsanitised string.
-
-It now keeps the text in the textarea, flagged, and writes nothing. That is the bargain `KeyField`
-already makes with a name that is already taken: refuse, say why, and let the mistake be corrected in
-place rather than retyped.
+- **Decided:** The Style tab's raw editor keeps refused text in the textarea, flagged, and writes
+  nothing to the document.
+- **Why:** It told the author a value with a brace in it would not be applied and then committed it
+  anyway, so the document carried declarations the renderer drops -- the "worst of both" the row's own
+  comment warns about -- and a host reading `node.css` for itself got the unsanitised string.
+- **Rejected:** Clearing the box on refusal, which makes the author retype what they wrote to correct
+  one character. Also rejected: sanitising on the way in, because silently rewriting what an author
+  typed is how a rule ends up meaning something nobody asked for.
+- **Reversal:** Cheap, and it is the bargain `KeyField` already makes with a name that is taken: refuse,
+  say why, correct in place.
+- **When:** 2026-08-31, on `build-out/review-b`.

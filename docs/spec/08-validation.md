@@ -24,6 +24,11 @@ express "optional, but must be a URL if given".
 `validation.test.ts` holds this under `every non-required rule passes on an empty value`, which runs the
 whole catalogue rather than one case.
 
+One rule key is not in that catalogue: a key the engine does not recognise reports `UNREADABLE_RULE`
+whatever the value. That is deliberate rather than an exception mislaid -- an unknown key is a document
+from a newer version or a hand edit, and a rule nobody can read is not a rule anybody should be told
+passed. Invariant 5 is about the rules this version has.
+
 ### Validation and rendering agree about what is visible
 
 **Status: built.**

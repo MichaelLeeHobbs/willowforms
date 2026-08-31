@@ -632,6 +632,82 @@ describe('the theming document', () => {
   })
 })
 
+/**
+ * The decision log, against the shape it says it has.
+ *
+ * "The field that earns this file is **Reversal**: it says which entries
+ * deserve a second look" -- so an entry with no Reversal line is invisible to
+ * the one use the file claims. Five entries written during this run carried
+ * none of the five fields and used `##` where every other entry uses `###`,
+ * which also took them out of the heading level the rest of the file reads by.
+ */
+describe('the decision log', () => {
+  /*
+   * `**Decided` rather than `**Decided:**`. Two entries carry the field with
+   * the sentence folded into the label -- `**Decided: validateDocument now
+   * reads the whole document**` -- which is the same field written a different
+   * way, and a guard that insisted on the punctuation would be about the
+   * punctuation.
+   */
+  const FIELDS = ['Decided', 'Reversal', 'When']
+
+  /*
+   * Not `Why` and not `Rejected`, and the omission is deliberate.
+   *
+   * Two entries fold the reasoning into a preamble above the list, and two
+   * decisions genuinely had no alternative worth naming -- writing one in to
+   * satisfy a guard would be inventing rationale, which is worse than the gap.
+   * The three above are the ones the file's own stated use depends on: what was
+   * decided, what it would cost to undo, and when.
+   */
+
+  /** Each entry as its heading and the body up to the next one. */
+  const entries = (): { title: string; body: string }[] => {
+    const text = read('docs/decisions.md')
+    const found: { title: string; body: string }[] = []
+    const headings = [...text.matchAll(/^### (.+)$/gm)]
+
+    for (const [index, heading] of headings.entries()) {
+      const from = (heading.index ?? 0) + heading[0].length
+      const to = headings[index + 1]?.index ?? text.length
+      found.push({ title: heading[1] ?? '', body: text.slice(from, to) })
+    }
+
+    return found
+  }
+
+  it('is read as entries at all', () => {
+    // The control: a file that parsed to nothing would satisfy every
+    // assertion below by having no entry to fail.
+    expect(entries().length).toBeGreaterThan(20)
+  })
+
+  it('gives every entry the fields the file is read by', () => {
+    const missing = entries()
+      .flatMap((entry) =>
+        FIELDS.filter((field) => !new RegExp('\\*\\*' + field + '\\b').test(entry.body)).map(
+          (field) => entry.title + ' has no ' + field,
+        ),
+      )
+      .sort()
+
+    expect(missing).toEqual([])
+  })
+
+  it('writes every entry at the same heading level', () => {
+    /*
+     * `##` inside the log is a section, and there are none -- the file is a
+     * flat list under one `#`. An entry written at `##` reads as a section
+     * holding the entries after it, and drops out of any reader that walks
+     * `###`, which is what the check above does.
+     */
+    const text = read('docs/decisions.md')
+    const sections = [...text.matchAll(/^## (?!#)(.+)$/gm)].map((match) => match[1] ?? '')
+
+    expect(sections).toEqual([])
+  })
+})
+
 describe('the accessibility document', () => {
   const doc = read('docs/accessibility.md')
 

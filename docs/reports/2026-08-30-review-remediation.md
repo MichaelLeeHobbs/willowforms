@@ -4,8 +4,13 @@ A deep review of the whole repository produced 428 findings on 2026-08-30. This 
 them. The queue that drove it is `docs/build-out/queue.md`, frozen before the first commit; the contract
 it followed is `docs/build-out/RUN.md`.
 
-**402 fixed, 21 triaged, 428 accounted for.** 32 commits on `build-out/review-2026-08-30`, 120 files,
+**407 fixed, 21 triaged, 428 accounted for.** 32 commits on `build-out/review-2026-08-30`, 120 files,
 about 15,900 lines added. The suite went from 911 unit tests to 1,500 and from 65 browser tests to 68.
+
+The fixed figure is the per-item tallies in the queue (402) plus the five findings handled in stage 1 --
+the three CRITICALs and two HIGHs -- which are fixed and appear in no per-item tally. It read 402 for
+long enough to be worth saying: 402 and 21 do not make 428, and a headline that does not add up is the
+first thing a reader checks.
 
 ## What the run was actually for
 

@@ -191,14 +191,23 @@ swap the two and the test still passes, the test is not about them.
 
 ## Trap 12 — the guard that checks the wrong ancestor
 
-`designer.css.test.ts` enforces invariant 3 by testing whether a selector reaches past
+`designer.css.test.ts` used to enforce invariant 3 by testing whether a selector reached past
 `.fs-shell` or `.fs-canvas__surface`. The form is rendered inside `.fs-canvas__frame`, one level
 below the surface. So `.fs-canvas__frame input { padding: 5px 8px }` — the exact rule that broke
-MUI's notched outline and caused the invariant to be written — contains neither base string, and
-all four assertions stay green.
+MUI's notched outline and caused the invariant to be written — contained neither base string, and
+all four assertions stayed green.
 
 The guard was correct when the DOM had one fewer wrapper. Nothing failed when the wrapper was
 added, because a guard that names its scopes as strings cannot notice that the scopes moved.
+
+**It is the other way round now**, which is the shape to copy rather than the hole to re-fix: the
+file holds an allowlist of the scopes under the canvas that are _not_ the form, and flags any
+selector whose rightmost compound carries no `fs-` class under any `.fs-shell` or `.fs-canvas`
+scope. `.fs-canvas__frame input` is one of a dozen cases asserting the guard flags it, including
+the scope wrapped in `:where()` and written as a list inside `:is()`. Both readers walk braces
+rather than matching a regex, because the two that matched regexes each had a hole: one could not
+tell a rule inside `@media` from one beside it, and the other split a prelude on a comma that was
+inside a functional pseudo.
 
 **Rule:** a guard written against a DOM shape has to be re-derived when the shape changes, and
 the cheapest way to force that is to make it fail loudly on an unknown ancestor rather than pass
