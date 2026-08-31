@@ -1,6 +1,6 @@
 # Findings triaged, not fixed
 
-A review finding that a run decided not to act on. Recording it here
+A review finding that a run decided not to act on. Recording it here.
 counts as handling it for the purposes of the queue. Leaving it out does not.
 
 The review skill names the recurring false-positive shapes, and they are the reasons that belong here:
