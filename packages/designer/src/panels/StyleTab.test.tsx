@@ -183,6 +183,39 @@ describe('the Style tab', () => {
 
     expect(screen.getByRole('alert').textContent).toMatch(/Declarations only/)
     expect(raw).toHaveProperty('ariaInvalid', 'true')
+    /*
+     * And the document does not have it. The warning and the flag were the whole
+     * assertion, so a refusal that said its piece and then committed the text
+     * anyway -- a rule that escapes the component, which is what the message is
+     * about -- passed this test.
+     */
+    expect(harness.latest()?.css?.any ?? '').not.toContain('body')
+    expect(harness.latest()?.css?.any ?? '').not.toContain('}')
+  })
+
+  it('keeps the refused text in the box so it can be repaired', async () => {
+    // Refusing is not the same as deleting what somebody typed: the text stays,
+    // flagged, so the stray brace can be taken out rather than retyped.
+    const harness = setup(field())
+    await harness.openStyle()
+
+    const raw = screen.getByLabelText('CSS')
+    await harness.user.type(raw, 'color: red }} body {{ display: none')
+    await harness.user.tab()
+
+    expect(raw).toHaveProperty('value', 'color: red }} body { display: none')
+  })
+
+  it('accepts the same declarations once the brace is gone', async () => {
+    // The control. Without it, "refuses" could mean "refuses everything".
+    const harness = setup(field())
+    await harness.openStyle()
+
+    await harness.user.type(screen.getByLabelText('CSS'), 'color: red')
+    await harness.user.tab()
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(harness.latest()?.css?.any).toContain('color: red')
   })
 
   it('shows the kit properties that are styling, and Properties does not', async () => {
@@ -207,6 +240,33 @@ describe('property sections', () => {
     expect(disclosure).toBeTruthy()
     expect(disclosure?.open).toBe(false)
     expect(screen.getByLabelText('Label')).toBeTruthy()
+
+    /*
+     * *Which* properties, which this never asked. A closed `<details>` still
+     * renders its children and `getByLabelText` does not filter on visibility,
+     * so inverting the routing -- the label folded away and the advanced
+     * property given the top of the panel -- kept every assertion above green.
+     */
+    const advanced = screen.getByLabelText('Disabled')
+    expect(advanced.closest('details'), 'an advanced property outside the fold').toBe(disclosure)
+    expect(
+      screen.getByLabelText('Label').closest('details'),
+      'the main property was folded away',
+    ).toBeNull()
+  })
+
+  it('opens on demand, and what was inside is still the same set', async () => {
+    const harness = setup(field())
+    const row = document.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await harness.user.click(row)
+
+    const disclosure = screen.getByText('Advanced').closest('details')
+    if (!disclosure) throw new Error('no disclosure')
+    await harness.user.click(screen.getByText('Advanced'))
+
+    expect(disclosure.open).toBe(true)
+    expect(screen.getByLabelText('Disabled').closest('details')).toBe(disclosure)
   })
 })
 

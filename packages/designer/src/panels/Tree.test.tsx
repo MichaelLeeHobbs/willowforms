@@ -376,26 +376,87 @@ describe('landmarks and names', () => {
     expect(screen.getByRole('complementary', { name: 'Component properties' })).toBeTruthy()
   })
 
-  it('names every button in the shell', () => {
-    const { view } = setup()
-    const unnamed = Array.from(view.container.querySelectorAll('button')).filter((button) => {
-      const name = button.getAttribute('aria-label') ?? button.textContent ?? ''
-      return name.trim() === ''
-    })
+  /*
+   * Both sweeps below used to run against one state: the Tree tab, with nothing
+   * selected. That is the toolbar and five rows, and it is not where controls
+   * come from -- the Style tab has seven inputs, the condition editor has a
+   * select and a Remove button per row, and the Rules tab builds its controls
+   * from whatever rule was added. None of them was ever swept.
+   *
+   * So each state is driven, then swept. The drivers are ordinary interactions
+   * rather than fixtures, because a panel that renders nothing would otherwise
+   * pass every sweep in this file.
+   */
+  const STATES: [string, (harness: Harness) => Promise<void>][] = [
+    ['at rest', (): Promise<void> => Promise.resolve()],
+    [
+      'with a component selected',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+      },
+    ],
+    [
+      'on the Style tab',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+        await user.click(screen.getByRole('tab', { name: 'Style' }))
+      },
+    ],
+    [
+      'on the Rules tab, with a rule on the field',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+        await user.click(screen.getByRole('tab', { name: 'Rules' }))
+      },
+    ],
+    [
+      'with a condition being edited',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+        await user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+      },
+    ],
+    [
+      'on the Settings tab',
+      async ({ user }) => {
+        await user.click(screen.getByRole('tab', { name: 'Settings' }))
+      },
+    ],
+    [
+      'with the palette open',
+      async ({ user }) => {
+        await user.click(screen.getByRole('tab', { name: 'Components' }))
+      },
+    ],
+  ]
+
+  it.each(STATES)('names every button in the shell, %s', async (_label, drive) => {
+    const harness = setup()
+    await drive(harness)
+
+    const unnamed = Array.from(harness.view.container.querySelectorAll('button')).filter(
+      (button) => {
+        const name = button.getAttribute('aria-label') ?? button.textContent ?? ''
+        return name.trim() === ''
+      },
+    )
 
     // The study in docs/prior-art counted 30 unnamed buttons in the product
     // this project studied. Zero is the bar.
     expect(unnamed.map((b) => b.outerHTML)).toEqual([])
   })
 
-  it('labels every form control in the shell', () => {
-    const { view } = setup()
-    const controls = Array.from(view.container.querySelectorAll('input, select, textarea'))
+  it.each(STATES)('labels every form control in the shell, %s', async (_label, drive) => {
+    const harness = setup()
+    await drive(harness)
+
+    const controls = Array.from(harness.view.container.querySelectorAll('input, select, textarea'))
+    expect(controls.length, 'a state with no controls sweeps nothing').toBeGreaterThan(0)
 
     const unlabelled = controls.filter((control) => {
       if (control.getAttribute('aria-label')) return false
       const id = control.getAttribute('id')
-      if (id && view.container.querySelector(`label[for="${id}"]`)) return false
+      if (id && harness.view.container.querySelector(`label[for="${id}"]`)) return false
       return !control.closest('label')
     })
 

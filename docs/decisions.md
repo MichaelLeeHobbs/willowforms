@@ -457,3 +457,35 @@ document writes is left alone rather than guessed at.
 
 This closes the loop under `rows.test.ts`'s "does not fall back to the form when the row has no such
 field", which asserted the silent-permissive outcome and stopped there.
+
+## The documented suite size is enforced by a reporter, not a test
+
+Three documents quote how many tests there are and `docs.test.ts` compared them with each other, which
+is three files agreeing on a number that can be wrong in all three. No test can count the run it belongs
+to: the total is not known until every file has finished, and that is where a reporter stands.
+
+`test/count-reporter.ts` runs at the end, counts the tests that reported a result and fails the process
+when a document disagrees. It skips itself on a filtered run -- comparing a figure about the whole
+repository against `vitest run packages/core` would make the fast loop unusable -- and says which of the
+two it did, so a silent skip cannot be mistaken for a pass.
+
+## A control border is not a divider
+
+Measuring the designer's own controls for the first time found them at 1.39:1 light and 1.41:1 dark
+against the surfaces they sit on, where WCAG 1.4.11 asks 3:1. A field's background is 1.08:1 from the
+panel behind it, so the border is the only thing that says a control is there.
+
+`--fs-border` stays what it was, because a panel divider is decoration and 1.4.11 asks nothing of it.
+`--fs-control-border` is the new token, used by inputs, selects, textareas and buttons, clearing 3:1 on
+all three surfaces in both themes. Splitting the token rather than darkening the existing one keeps the
+chrome from turning into a grid of hard lines.
+
+## Refused CSS stays in the box and out of the document
+
+The Style tab's raw editor told the author a value with a brace in it would not be applied, and then
+committed it anyway. So the document carried declarations the renderer drops -- the "worst of both" the
+row's own comment warns about -- and a host reading `node.css` for itself got the unsanitised string.
+
+It now keeps the text in the textarea, flagged, and writes nothing. That is the bargain `KeyField`
+already makes with a name that is already taken: refuse, say why, and let the mistake be corrected in
+place rather than retyped.

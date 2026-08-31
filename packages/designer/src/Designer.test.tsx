@@ -89,7 +89,10 @@ interface Harness {
   latest: () => FormDocument
 }
 
-function setup(languages: Language[] = [ENGLISH, FRENCH], onSave?: () => void): Harness {
+function setup(
+  languages: Language[] = [ENGLISH, FRENCH],
+  onSave?: (document: FormDocument) => void,
+): Harness {
   const user = userEvent.setup()
   let current = documentOf(languages)
   const view = render(
@@ -204,12 +207,101 @@ describe('the Save button', () => {
   })
 
   it('hands the host the current document', async () => {
-    const onSave = vi.fn()
-    const { user } = setup([ENGLISH, FRENCH], onSave)
+    const onSave = vi.fn<(document: FormDocument) => void>()
+    const { user, shell } = setup([ENGLISH, FRENCH], onSave)
+
+    /*
+     * With an edit in between, because the call count was the whole assertion:
+     * a Save that handed over the document the designer booted with -- the
+     * failure this button has exactly one way to get wrong -- passed it.
+     */
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = shell.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await user.click(row)
+    fireEvent.keyDown(shell, { key: 'Delete' })
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onSave).toHaveBeenCalledTimes(1)
+    const saved = onSave.mock.calls[0]?.[0]
+    expect(
+      saved?.root.children?.map((child) => child.key),
+      'Save handed over a stale document',
+    ).toEqual([])
+  })
+})
+
+/**
+ * The undo shortcuts, which no test in any suite had ever pressed.
+ *
+ * The buttons are covered and the keys are not, and they are not the same code
+ * path: the handler reads `ctrlKey || metaKey`, lowercases the key, and routes
+ * shift to redo. Every one of those is a place to be wrong, and being wrong
+ * there costs an author the edit they just made.
+ */
+describe('the undo and redo shortcuts', () => {
+  /** Delete the one component, so the document has a visible before and after. */
+  async function withAnEdit(): Promise<Harness> {
+    const harness = setup()
+    await harness.user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = harness.shell.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await harness.user.click(row)
+    fireEvent.keyDown(harness.shell, { key: 'Delete' })
+
+    expect(harness.latest().root.children).toEqual([])
+    return harness
+  }
+
+  const keys = (): string[] => {
+    const children = screen.queryAllByText('Email')
+    return children.map((element) => element.textContent ?? '')
+  }
+
+  it('takes an edit back on Ctrl+Z and puts it back on Ctrl+Y', async () => {
+    const { shell, latest } = await withAnEdit()
+
+    fireEvent.keyDown(shell, { key: 'z', ctrlKey: true })
+    expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
+    // And the canvas says so too, not only the document the host was handed.
+    expect(keys()).toHaveLength(1)
+
+    fireEvent.keyDown(shell, { key: 'y', ctrlKey: true })
+    expect(latest().root.children).toEqual([])
+  })
+
+  it('redoes on Ctrl+Shift+Z as well', async () => {
+    const { shell, latest } = await withAnEdit()
+
+    fireEvent.keyDown(shell, { key: 'z', ctrlKey: true })
+    expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
+
+    fireEvent.keyDown(shell, { key: 'Z', ctrlKey: true, shiftKey: true })
+    expect(latest().root.children).toEqual([])
+  })
+
+  it('answers to the meta key, for the half of the world on a Mac', async () => {
+    const { shell, latest } = await withAnEdit()
+
+    fireEvent.keyDown(shell, { key: 'z', metaKey: true })
+    expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
+  })
+
+  it('leaves the shortcut alone while a text field has focus', async () => {
+    /*
+     * The guard that makes the rest safe. Ctrl+Z in a property box is the
+     * browser's own undo for the text being typed, and stealing it would undo
+     * the last structural edit instead of the last few characters.
+     */
+    const { user, latest } = await withAnEdit()
+
+    await user.click(screen.getByRole('tab', { name: 'Settings' }))
+    const name = screen.getByLabelText('Form name')
+    await user.click(name)
+    fireEvent.keyDown(name, { key: 'z', ctrlKey: true })
+
+    expect(latest().root.children, 'the designer took the field own undo').toEqual([])
   })
 })
 

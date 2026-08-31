@@ -155,6 +155,48 @@ describe('resolveDrop', () => {
     expect(resolveDrop(column(), 900, 900)).toBeUndefined()
   })
 
+  /*
+   * Where the bar is drawn, which no test had ever looked at.
+   *
+   * `resolveDrop`'s indicator was asserted for an empty container and nowhere
+   * else, so the arithmetic that puts the bar in the gap between two components
+   * was unchecked in every suite: replacing the midpoint with `rect.top` -- the
+   * bar sitting on a component's edge rather than between two of them, which is
+   * what tells somebody where the drop will land -- kept everything green.
+   *
+   * BAR is 2, so a bar is centred on the boundary it names: top = boundary - 1.
+   */
+  describe('the bar it draws', () => {
+    it('sits in the gap between the two children it will land between', () => {
+      // a ends at 50, b starts at 60, so the gap's middle is 55.
+      const target = resolveDrop(column(), 200, 55)
+      expect(target?.index).toBe(1)
+      expect(target?.indicator).toEqual({ top: 54, left: 0, width: 400, height: 2 })
+    })
+
+    it('sits on the leading edge when the drop is above everything', () => {
+      const target = resolveDrop(column(), 200, 20)
+      expect(target?.index).toBe(0)
+      // a's own top, not the parent's: the bar marks the child it lands before.
+      expect(target?.indicator.top).toBe(9)
+    })
+
+    it('sits past the last child when the drop is below everything', () => {
+      const target = resolveDrop(column(), 200, 280)
+      expect(target?.index).toBe(3)
+      // c runs 110 to 150.
+      expect(target?.indicator.top).toBe(149)
+    })
+
+    it('turns on its side inside a row', () => {
+      const target = resolveDrop(nested(), 150, 40)
+      expect(target?.orientation).toBe('row')
+      // left ends at 180, right starts at 200, so the gap's middle is 190.
+      expect(target?.indicator).toMatchObject({ left: 189, width: 2 })
+      expect(target?.indicator.height).toBeGreaterThan(40)
+    })
+  })
+
   it('marks an empty container and outlines the whole box', () => {
     const empty: Candidate[] = [
       {
@@ -169,6 +211,80 @@ describe('resolveDrop', () => {
     const target = resolveDrop(empty, 200, 150)
     expect(target).toMatchObject({ parentKey: 'root', index: 0, empty: true })
     expect(target?.indicator.width).toBeGreaterThan(300)
+  })
+
+  /**
+   * A parent whose drawn children are not its only children.
+   *
+   * Three components on screen at document indices 0, 3 and 4: the two in
+   * between are hidden by a condition, so they are in the document and not in
+   * the measurement. This is the only shape in which a slot in the drawn list
+   * and an index in the document are different numbers, and it is the shape
+   * `indexInParent` exists for -- every fixture here had contiguous indices, so
+   * `before.index + 1` never ran and "one position too far" was untestable.
+   */
+  function withHidden(): Candidate[] {
+    return [
+      {
+        key: 'root',
+        parentKey: undefined,
+        index: 0,
+        container: true,
+        depth: 0,
+        rect: { top: 0, left: 0, width: 400, height: 300 },
+      },
+      {
+        key: 'a',
+        parentKey: 'root',
+        index: 0,
+        container: false,
+        depth: 1,
+        rect: { top: 10, left: 10, width: 380, height: 40 },
+      },
+      {
+        key: 'd',
+        parentKey: 'root',
+        index: 3,
+        container: false,
+        depth: 1,
+        rect: { top: 60, left: 10, width: 380, height: 40 },
+      },
+      {
+        key: 'e',
+        parentKey: 'root',
+        index: 4,
+        container: false,
+        depth: 1,
+        rect: { top: 110, left: 10, width: 380, height: 40 },
+      },
+    ]
+  }
+
+  it('places a node from elsewhere after the child it was dropped past, not after that many', () => {
+    /*
+     * Dropped in the gap below `d`, whose document index is 3, so the answer is
+     * 4 -- the slot in the drawn list is 2, and inserting there would put the
+     * component before two hidden siblings the author cannot see. Same
+     * arithmetic, and only this fixture can tell the two apart.
+     */
+    const target = resolveDrop(withHidden(), 200, 105, 'fromAnotherParent')
+    expect(target?.parentKey).toBe('root')
+    expect(target?.index).toBe(4)
+  })
+
+  it('places it first when it is dropped above every drawn child', () => {
+    const target = resolveDrop(withHidden(), 200, 15, 'fromAnotherParent')
+    expect(target?.index).toBe(0)
+  })
+
+  it('reads a slot as a slot when the dragged node is a sibling', () => {
+    /*
+     * The other branch, and the reason it is a branch: `moveNode` removes the
+     * node before it inserts, so for a sibling the index is measured in the list
+     * that already excludes it.
+     */
+    const target = resolveDrop(withHidden(), 200, 105, 'a')
+    expect(target?.index).toBe(1)
   })
 
   describe('dragging an existing node', () => {

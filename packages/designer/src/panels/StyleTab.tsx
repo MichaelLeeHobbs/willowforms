@@ -241,6 +241,18 @@ function RawCss({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
+            /*
+             * Refused text stays in the box and out of the document.
+             *
+             * It used to be committed anyway, with the message beside it saying
+             * it would not be applied -- so the document carried declarations
+             * the renderer drops, which is the "worst of both" this row's own
+             * comment warns about, and a host reading `node.css` for itself
+             * would have got the unsanitised string. The draft is kept so the
+             * stray brace can be taken out rather than retyped, which is the
+             * same bargain `KeyField` makes with a name that is already used.
+             */
+            if (refused) return
             setCommitted(draft)
             onCommit(draft)
           }}

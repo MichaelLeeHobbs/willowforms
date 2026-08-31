@@ -356,15 +356,28 @@ describe('revealing what a condition hides', () => {
 })
 
 describe('a repeater', () => {
+  /*
+   * `addressList` holding `addresses`, with `street` holding `line1`.
+   *
+   * Both names differ from their answer, deliberately. This fixture set `key`
+   * and `dataKey` to the same string, so the row-addressing design and its
+   * opposite produced byte-identical output and a patched build of the wrong one
+   * stayed green -- Trap 11 in the write-tests skill, which names this file as
+   * one of the three that had to change and left this describe behind.
+   *
+   * Read it as: the component is `street`, the answer is `line1`, the row
+   * coordinate is built from answers and the DOM key from components.
+   */
   const repeating = (): FormDocument =>
     documentOf([
       field('email'),
       {
-        key: 'addresses',
+        key: 'addressList',
+        dataKey: 'addresses',
         type: 'Screen',
         props: {},
         schema: { type: 'array', validations: [] },
-        children: [field('line1')],
+        children: [field('street', 'line1')],
       },
     ])
 
@@ -375,7 +388,7 @@ describe('a repeater', () => {
       <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
     )
 
-    const inputs = screen.getAllByLabelText('line1')
+    const inputs = screen.getAllByLabelText('street')
     expect(inputs).toHaveLength(2)
     expect(inputs[0]).toHaveProperty('value', 'one')
     expect(inputs[1]).toHaveProperty('value', 'two')
@@ -393,7 +406,7 @@ describe('a repeater', () => {
         onChange={() => undefined}
       />,
     )
-    expect(screen.queryByLabelText('line1')).toBeNull()
+    expect(screen.queryByLabelText('street')).toBeNull()
   })
 
   it('marks which row an element is in', () => {
@@ -401,10 +414,17 @@ describe('a repeater', () => {
       <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
     )
 
-    const rows = [...container.querySelectorAll('[data-fs-key="line1"]')].map((el) =>
+    /*
+     * Keyed by the component and coordinated by the answer, which is the whole
+     * distinction: `data-fs-key` says `street`, `data-fs-row` says `addresses`.
+     * With one name for both, either half could have been wrong.
+     */
+    const rows = [...container.querySelectorAll('[data-fs-key="street"]')].map((el) =>
       el.getAttribute('data-fs-row'),
     )
     expect(rows).toEqual(['addresses[0]', 'addresses[1]'])
+    expect(container.querySelectorAll('[data-fs-key="line1"]')).toHaveLength(0)
+    expect(container.querySelector('[data-fs-key="addressList"]')).toBeTruthy()
     // Absent outside a repeater, so every existing selector is unchanged.
     expect(container.querySelector('[data-fs-key="email"]')?.hasAttribute('data-fs-row')).toBe(
       false,
@@ -421,7 +441,7 @@ describe('a repeater', () => {
     const onChange = vi.fn()
     render(<FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={onChange} />)
 
-    fireEvent.change(screen.getAllByLabelText('line1')[1] as HTMLElement, {
+    fireEvent.change(screen.getAllByLabelText('street')[1] as HTMLElement, {
       target: { value: 'edited' },
     })
 
@@ -434,12 +454,15 @@ describe('a repeater', () => {
         document={repeating()}
         kit={kit}
         data={twoRows}
-        errors={{ 'addresses[1].line1': 'Wrong.' }}
+        // Row coordinate from the answer, leaf from the component: two fields
+        // may share a data key and still fail for different reasons, so an
+        // error is addressed by node key inside the row it is in.
+        errors={{ 'addresses[1].street': 'Wrong.' }}
         onChange={() => undefined}
       />,
     )
 
-    const messages = [...container.querySelectorAll('[data-testid="line1-error"]')].map(
+    const messages = [...container.querySelectorAll('[data-testid="street-error"]')].map(
       (el) => el.textContent,
     )
     expect(messages).toEqual(['', 'Wrong.'])
@@ -505,6 +528,119 @@ describe('a repeater on an authoring surface', () => {
  * `document.translations[tag]` on a document that skipped the gate throws
  * during render — which in React 19 unmounts the whole tree, not one node.
  */
+/**
+ * The translation path, in the renderer's own suite.
+ *
+ * There were tests for a `translations` field that is not a bundle and for a key
+ * that collides with `Object.prototype`, and none at all for the ordinary case:
+ * a label bound to a key, resolved through the document, in the language the
+ * host asked for. That path is the reason the panel writes bundles at all, and
+ * the failure it has -- writing under a bare code and reading under a tag -- puts
+ * the raw key on screen where the label should be.
+ */
+describe('an i18n binding', () => {
+  const translated = (): FormDocument => ({
+    ...documentOf([
+      {
+        key: 'greeting',
+        type: 'Field',
+        props: { label: { kind: 'i18n', key: 'greeting_label' } },
+        schema: { type: 'string', validations: [] },
+      },
+    ]),
+    languages: [
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'fr', name: 'French', bidi: 'ltr' },
+    ],
+    defaultLanguage: 'en-US',
+    translations: {
+      'en-US': { greeting_label: 'Your name' },
+      fr: { greeting_label: 'Votre nom' },
+    },
+  })
+
+  const labelOf = (container: HTMLElement): string | null =>
+    container.querySelector('[data-testid="greeting-label"]')?.textContent ?? null
+
+  const labellingKit: RendererKit = {
+    id: 'labelling',
+    renderers: {
+      Screen: Screen_,
+      Field: ({ nodeProps, props }: NodeRendererProps): ReactNode => (
+        <div {...nodeProps}>
+          <span data-testid={nodeProps['data-fs-key'] + '-label'}>
+            {typeof props['label'] === 'string' ? props['label'] : ''}
+          </span>
+        </div>
+      ),
+    },
+  }
+
+  it('resolves the label through the default language bundle', () => {
+    const { container } = render(
+      <FormRenderer
+        document={translated()}
+        kit={labellingKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(labelOf(container)).toBe('Your name')
+  })
+
+  it('follows the language the host asked for', () => {
+    const { container } = render(
+      <FormRenderer
+        document={translated()}
+        kit={labellingKit}
+        data={{}}
+        language="fr"
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(labelOf(container)).toBe('Votre nom')
+  })
+
+  it('reads the bundle by tag, not by bare code', () => {
+    /*
+     * `en-US` is what `createDocument` ships and what the panel writes. A
+     * renderer looking the bundle up under `en` finds nothing and falls back to
+     * the key, so the canvas shows `greeting_label` -- which is the failure the
+     * fallback exists to make visible rather than silent.
+     */
+    const document_ = translated()
+    const { container } = render(
+      <FormRenderer
+        document={document_}
+        kit={labellingKit}
+        data={{}}
+        language="en"
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(labelOf(container)).toBe('greeting_label')
+  })
+
+  it('falls back to the key when the language has no such translation', () => {
+    const bare = translated()
+    const { container } = render(
+      <FormRenderer
+        document={{ ...bare, translations: { 'en-US': {} } }}
+        kit={labellingKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    // Showing the key is deliberate: an empty label looks like a design choice,
+    // a raw key looks like the missing translation it is.
+    expect(labelOf(container)).toBe('greeting_label')
+  })
+})
+
 describe('a document whose translations are not a bundle', () => {
   const brokenDocument = (translations: unknown): FormDocument =>
     ({

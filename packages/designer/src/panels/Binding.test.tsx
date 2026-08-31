@@ -202,9 +202,17 @@ describe('binding editors', () => {
     expect(propOf(latest(), 'label')).toBeUndefined()
   })
 
-  it('writes a translation per language', async () => {
+  it('writes a translation per language, under the tag rather than the code', async () => {
+    /*
+     * `en-US`, not `en`. Every fixture in this describe was dialect-free, so a
+     * bundle keyed by BCP 47 tag and one keyed by bare code were the same
+     * string and the mistake this whole area exists to prevent -- writing to a
+     * bundle the renderer never reads, which shows the raw key on the canvas --
+     * could not be told apart. `createDocument` ships `en-US`, so the fixture
+     * that cannot see it is also the unrealistic one.
+     */
     const { user, select, latest } = setup([
-      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
     ])
     await select()
@@ -213,8 +221,27 @@ describe('binding editors', () => {
     await user.type(screen.getByLabelText('English'), 'Email')
     await user.type(screen.getByLabelText('French'), 'Courriel')
 
-    expect(latest().translations['en']).toEqual({ email_label: 'Email' })
+    expect(latest().translations['en-US']).toEqual({ email_label: 'Email' })
+    expect(
+      latest().translations['en'],
+      'written under the code, which nothing reads',
+    ).toBeUndefined()
     expect(latest().translations['fr']).toEqual({ email_label: 'Courriel' })
+  })
+
+  it('shows the translation the document already holds for a dialect tag', async () => {
+    // The reading half of the same distinction: a bundle under `en-US` has to
+    // reach the box for English, or an author retypes a translation that exists.
+    const { user, select, latest } = setup([
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+    ])
+    await select()
+
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+    await user.type(screen.getByLabelText('English'), 'Email')
+
+    expect(latest().translations['en-US']).toEqual({ email_label: 'Email' })
+    expect(screen.getByLabelText('English')).toHaveProperty('value', 'Email')
   })
 
   it('drops a translation rather than storing an empty string', async () => {
@@ -227,6 +254,53 @@ describe('binding editors', () => {
 
     // An absent key renders as the key itself, which shows the gap.
     expect(latest().translations['en']).toEqual({})
+  })
+
+  it('turns a language right to left, and the boxes follow', async () => {
+    /*
+     * The toggle rebuilds the whole language list -- it maps every language,
+     * comparing tags -- and no test had ever clicked it. Comparing the wrong
+     * pair of names there sets `bidi` on the wrong language, or on none.
+     */
+    const { user, select, openTab, latest } = setup([
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'ar', name: 'Arabic', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    const pane = document.querySelector<HTMLElement>('.fs-panel--left')
+    if (!pane) throw new Error('no left pane')
+    const arabic = within(pane).getByText('Arabic').closest('li')
+    if (!arabic) throw new Error('no row for Arabic')
+    await user.click(within(arabic).getByLabelText('Right to left'))
+
+    expect(latest().languages).toEqual([
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'ar', name: 'Arabic', bidi: 'rtl' },
+    ])
+
+    // And the translation box for it is now right to left, which is the only
+    // thing the flag is for.
+    await openTab('Tree')
+    await select()
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+    expect(screen.getByLabelText('Arabic').getAttribute('dir')).toBe('rtl')
+  })
+
+  it('turns it back again', async () => {
+    const { user, openTab, latest } = setup([
+      { code: 'ar', name: 'Arabic', bidi: 'rtl' },
+      { code: 'en', name: 'English', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    const pane = document.querySelector<HTMLElement>('.fs-panel--left')
+    if (!pane) throw new Error('no left pane')
+    const arabic = within(pane).getByText('Arabic').closest('li')
+    if (!arabic) throw new Error('no row for Arabic')
+    await user.click(within(arabic).getByLabelText('Right to left'))
+
+    expect(latest().languages[0]).toEqual({ code: 'ar', name: 'Arabic', bidi: 'ltr' })
   })
 
   it('marks a right-to-left language on its input', async () => {

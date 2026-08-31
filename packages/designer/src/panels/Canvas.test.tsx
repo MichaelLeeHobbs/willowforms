@@ -339,7 +339,21 @@ describe('drag and drop wiring', () => {
       { target: from, coords: { clientX: 90, clientY: 200 } },
     ])
 
-    expect(view.container.querySelector('.fs-drag-label')?.textContent).toBe('first')
+    const label = view.container.querySelector<HTMLElement>('.fs-drag-label')
+    expect(label?.textContent).toBe('first')
+    /*
+     * And where it is, which the test named "follows the pointer" never asked.
+     * The position is an inline style, which jsdom can read perfectly well, so a
+     * label pinned to the corner for the whole gesture passed a test about it
+     * moving.
+     */
+    expect(label?.style.left).toBe('90px')
+    expect(label?.style.top).toBe('200px')
+
+    await user.pointer([{ target: from, coords: { clientX: 140, clientY: 260 } }])
+    const moved = view.container.querySelector<HTMLElement>('.fs-drag-label')
+    expect(moved?.style.left).toBe('140px')
+    expect(moved?.style.top).toBe('260px')
 
     await user.pointer([{ target: from, keys: '[/MouseLeft]' }])
     expect(view.container.querySelector('.fs-drag-label')).toBeNull()

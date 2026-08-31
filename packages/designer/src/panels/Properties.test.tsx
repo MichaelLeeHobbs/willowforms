@@ -166,6 +166,140 @@ const dataField = (): ComponentNode => ({
   schema: { type: 'string', validations: [] },
 })
 
+/**
+ * The Key field, which this file never touched.
+ *
+ * The write-tests skill names it as the reference draft-and-commit shape --
+ * type freely, commit on blur or Enter, refuse with a reason and keep the text
+ * so it can be corrected -- and the panel that owns it had no test for it here
+ * at all. A rename also re-points every condition naming the old key, so a
+ * refusal that quietly half-applied is the worst outcome available.
+ */
+describe('the key field', () => {
+  const keyBox = (): HTMLElement => screen.getByRole('textbox', { name: /^Key/ })
+
+  it('renames the component on Enter', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email{Enter}')
+
+    expect(node('email')).toBeDefined()
+    expect(node('emailField')).toBeUndefined()
+  })
+
+  it('renames on blur as well, since leaving the field is a commit', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email')
+    await user.tab()
+
+    expect(node('email')).toBeDefined()
+  })
+
+  it('holds the draft while it is being typed, and changes nothing yet', async () => {
+    /*
+     * The reason this is a draft rather than a live write: every intermediate
+     * spelling of a key is a rename of its own, and `em` is a key like any
+     * other. Committing per keystroke would rewrite the document, and every
+     * condition naming it, eleven times.
+     */
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'em')
+
+    expect(keyBox()).toHaveProperty('value', 'em')
+    expect(node('emailField'), 'the rename happened mid-word').toBeDefined()
+    expect(node('em')).toBeUndefined()
+  })
+
+  it('refuses a key another component already has, and says which', async () => {
+    const { user, select, node } = setup(dataField(), [{ key: 'taken', type: 'Field', props: {} }])
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'taken{Enter}')
+
+    expect(screen.getByRole('alert').textContent).toMatch(/already used/)
+    expect(keyBox().getAttribute('aria-invalid')).toBe('true')
+    /*
+     * The field goes back to the key the component actually has. It reverts and
+     * says why, which is the whole point of the docblock on `KeyField`: the
+     * version before it reverted silently, so a refused rename looked like a
+     * field that would not accept typing.
+     */
+    expect(keyBox()).toHaveProperty('value', 'emailField')
+    expect(node('emailField')).toBeDefined()
+    expect(node('taken')).toBeDefined()
+  })
+
+  it('refuses a key the grammar does not allow', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), '2 fields{Enter}')
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(node('emailField')).toBeDefined()
+  })
+
+  it('puts the real key back on Escape', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'somethingElse{Escape}')
+
+    expect(keyBox()).toHaveProperty('value', 'emailField')
+    expect(node('emailField')).toBeDefined()
+  })
+
+  it("re-points the component's own condition, which names its own key", async () => {
+    /*
+     * A `Step` is a Step because its `renderWhen` compares `context.step`
+     * against its own key, so a rename that moved the key and left the
+     * condition made the step unsatisfiable, permanently, with nothing
+     * reporting why. Same hole `duplicateNode` had from the other side.
+     *
+     * Only its own condition. What a *sibling* names is a data key, and a
+     * rename does not follow those -- see `found.md`.
+     */
+    const step: ComponentNode = {
+      key: 'who',
+      type: 'Field',
+      props: {},
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: 'who' },
+        },
+      },
+    }
+    const { user, select, node } = setup(step)
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'whoElse{Enter}')
+
+    expect(node('whoElse')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: 'whoElse' },
+      },
+    })
+  })
+})
+
 describe('the data key field', () => {
   it('shows the component key when nothing overrides it, and stores nothing', async () => {
     const { select, latest } = setup(dataField())
@@ -293,12 +427,47 @@ describe('the colour editor', () => {
     expect(latest()?.props['tint']).toEqual({ kind: 'static', value: 'var(--brand)' })
   })
 
-  it('shows black in the swatch for a value it cannot represent', async () => {
+  it('shows a hex value in the swatch', async () => {
+    // The wiring, asserted first, because everything below is about what the
+    // swatch does *not* do and none of it means anything if it shows nothing.
     const { user } = await open()
+    await user.type(screen.getByLabelText('Tint'), '#336699')
+
+    expect(screen.getByLabelText('Pick a colour')).toHaveProperty('value', '#336699')
+  })
+
+  it('leaves a value it cannot represent exactly where it was', async () => {
+    /*
+     * The swatch falls back to black for anything that is not `#rrggbb`, and the
+     * assertion here used to be that it shows `#000000` -- which jsdom produces
+     * on its own for an unparseable value, so deleting the fallback left it
+     * green. What can fail, and is the actual contract, is the other half: the
+     * text and the document still say `transparent`, because a swatch that owned
+     * the value would have rewritten it to the nearest hex on first paint.
+     */
+    const { user, latest } = await open()
+    const text = screen.getByLabelText('Tint')
+    await user.type(text, 'transparent')
+
+    expect(text).toHaveProperty('value', 'transparent')
+    expect(latest()?.props['tint']).toEqual({ kind: 'static', value: 'transparent' })
+    expect(screen.getByLabelText('Pick a colour')).toHaveProperty('value', '#000000')
+  })
+
+  it('writes the hex through when somebody uses the swatch', async () => {
+    const { user, latest } = await open()
     await user.type(screen.getByLabelText('Tint'), 'transparent')
 
-    const swatch = screen.getByLabelText('Pick a colour')
-    expect(swatch).toHaveProperty('value', '#000000')
+    fireEvent.change(screen.getByLabelText('Pick a colour'), { target: { value: '#ff0000' } })
+
+    // Picking is a deliberate act, so it replaces whatever was there.
+    expect(latest()?.props['tint']).toEqual({ kind: 'static', value: '#ff0000' })
+    /*
+     * By role, because the row's label picks up a visually hidden "(modified)"
+     * once the property has been touched, which is the marker the panel draws to
+     * say a value is no longer the default.
+     */
+    expect(screen.getByRole('textbox', { name: /^Tint/ })).toHaveProperty('value', '#ff0000')
   })
 
   it('names the swatch, since the row label belongs to the text field', async () => {

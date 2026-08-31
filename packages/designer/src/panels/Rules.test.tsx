@@ -15,7 +15,8 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import type { FormDocument, Kit, ValidationRule } from '@formsmith/core'
+import { autoValidateKeys } from '@formsmith/core'
+import type { ComponentNode, FormDocument, Kit, ValidationRule } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
@@ -115,6 +116,11 @@ function setup(validations: ValidationRule[] = []): Harness {
   return { user, view, latest: () => current, selectRow, openRules }
 }
 
+/** The schema on one field, read back out of the document. */
+function schemaOf(doc: FormDocument, key: string): ComponentNode['schema'] {
+  return doc.root.children?.find((c) => c.key === key)?.schema
+}
+
 /** The rules on the selected field, read back out of the document. */
 function rulesOf(doc: FormDocument, key: string): ValidationRule[] {
   return doc.root.children?.find((c) => c.key === key)?.schema?.validations ?? []
@@ -200,6 +206,40 @@ describe('rules editor', () => {
     await openRules()
 
     expect(screen.getByText(/holds no form data/)).toBeTruthy()
+  })
+
+  it('writes "Validate while typing" onto the field it belongs to', async () => {
+    /*
+     * The one control on this tab with no test anywhere, and it decides which
+     * errors somebody sees before they press anything: `autoValidateKeys` reads
+     * it, the renderer asks that set which fields validate on every keystroke.
+     * It was written by this tab and read by nothing at all for the whole of
+     * the tab's life, which is the reason to pin both ends of it.
+     */
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    const box = screen.getByLabelText('Validate while typing')
+    expect(box).toHaveProperty('checked', false)
+
+    await user.click(box)
+
+    expect(schemaOf(latest(), 'email')?.autoValidate).toBe(true)
+    expect(autoValidateKeys(latest().root)).toEqual(new Set(['email']))
+  })
+
+  it('turns it off again, rather than only ever on', async () => {
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    const box = screen.getByLabelText('Validate while typing')
+    await user.click(box)
+    await user.click(box)
+
+    expect(schemaOf(latest(), 'email')?.autoValidate).toBe(false)
+    expect(autoValidateKeys(latest().root)).toEqual(new Set())
   })
 
   it('adds a rule to the document', async () => {

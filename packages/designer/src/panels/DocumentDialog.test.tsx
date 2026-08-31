@@ -239,6 +239,50 @@ describe('the JSON dialog', () => {
     expect(JSON.parse(editor().value)).toMatchObject({ name: 'Contact request' })
   })
 
+  it('exposes its views as a real tablist', async () => {
+    /*
+     * This was a hand-rolled strip -- a roving `tabIndex` with no arrow keys, no
+     * `aria-controls` and no tabpanel -- so the JSON Schema view could not be
+     * reached from the keyboard at all, and nothing in this file ever asked. It
+     * uses the shared `Tabs` now, and this is the check that says so: the same
+     * pattern `Rules.test.tsx` pins for the inspector, applied to the other
+     * tablist in the product.
+     */
+    const { open } = setup()
+    await open()
+
+    const tablist = screen.getByRole('tablist', { name: 'JSON view' })
+    const tabs = within(tablist).getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Document', 'JSON Schema'])
+
+    const selected = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true')
+    expect(selected?.textContent).toBe('Document')
+
+    const panel = document.querySelector('dialog [role="tabpanel"]')
+    expect(panel?.getAttribute('aria-labelledby')).toBe(selected?.id)
+    expect(selected?.getAttribute('aria-controls')).toBe(panel?.id)
+  })
+
+  it('puts one tab in the tab order and moves between them with the arrows', async () => {
+    /*
+     * A roving tabindex is only half a tab pattern: without arrow keys the tabs
+     * that are not selected are unreachable by any means at all, which is the
+     * exact state this dialog shipped in.
+     */
+    const { user, open } = setup()
+    await open()
+
+    const tablist = screen.getByRole('tablist', { name: 'JSON view' })
+    const tabs = within(tablist).getAllByRole('tab')
+    expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['0', '-1'])
+
+    tabs[0]?.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(document.activeElement?.textContent).toBe('JSON Schema')
+    await user.keyboard('{ArrowLeft}')
+    expect(document.activeElement?.textContent).toBe('Document')
+  })
+
   it('shows a JSON Schema projection of the form', async () => {
     const { user, open } = setup()
 
