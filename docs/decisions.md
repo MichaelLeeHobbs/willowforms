@@ -4,6 +4,56 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The second review is committed; the first one is not
+
+- **Decided:** `docs/reviews/2026-08-30-second-pass.md` is tracked. The first pass stays gitignored in
+  `tmp/`, because moving it now would rewrite the provenance of triage lines that already cite that path.
+- **Why:** the first run's own contract said "if you cannot find the work list, stop" — an instruction
+  that exists only because the work list lived in one working copy. A worktree, a fresh clone, or a
+  machine change lost it. A remediation run whose input is not in the repository cannot be resumed, cannot
+  be reviewed, and cannot be checked against later.
+- **Rejected: keeping it in `tmp/` again.** It repeats the failure the review named in its own findings
+  on `RUN.md`.
+- **Rejected: a summary in the repo and the full review outside.** The queue items point at line numbers
+  and file paths; a summary is not a work list.
+- **What it costs:** this is a public MIT repository, so a 1283-line audit of its own code is now public,
+  including four CRITICALs and the fact that all four were introduced by the previous remediation run.
+  That is the actual cost and it is not small. Michael was asked and chose to publish.
+- **Reversal:** `git rm` plus a history rewrite if the exposure ever matters, which is the expensive kind.
+- **When:** 2026-08-31.
+
+### Each queue item ends on its own pushed branch; each stage ends in a pull request
+
+- **Decided:** one accumulating run branch, `build-out/review-b`. After an item's check passes, a
+  never-moving pointer branch `build-out/b/NN-slug` is pushed at that commit, so item NN reads as
+  `git diff build-out/b/<NN-1>-slug..build-out/b/NN-slug`. Each of the seven stages opens a PR onto the
+  previous stage's head.
+- **Why:** 34 items is 34 reviewable chunks, and the last run landed as one 32-commit squash that nobody
+  could read a slice of. Pointer branches give per-chunk diffs for free. Stages give the automated
+  reviewer something the size of a real PR rather than 34 round-trips, which matters because `RUN.md`
+  forbids waiting on a review.
+- **Rejected: a branch per item cut from `main`.** Items depend on each other — a product fix and the
+  test that proves it are usually two different items — and the standing gate is repo-wide, so most such
+  branches could not go green on their own.
+- **Rejected: one PR per item.** 34 automated-review round-trips against a contract that says never wait
+  on one. The reviews would land after the code they describe had already been rewritten twice.
+- **Reversal:** free. The pointer branches are deletable and the run branch is the whole history either
+  way.
+- **When:** 2026-08-31.
+
+### The playground sample keeps its point and loses the competitor's name
+
+- **Decided:** `apps/playground/src/sample.ts:51-52` keeps the comment explaining why the field is
+  optional and drops the named product and the asserted defect in its demo.
+- **Why:** the file ships in the public bundle, and `CLAUDE.md` confines competitive material to
+  `docs/prior-art`. The engineering point — a blank value passes for a url-only field, which is
+  invariant 5 — is the part a reader of the sample needs; the comparison is not.
+- **Rejected: leaving it.** The claim is measured and `docs/prior-art` names the same subject, so it is
+  defensible. It is still a public assertion of a defect in someone else's product sitting in a demo
+  fixture, which is not where that belongs.
+- **Reversal:** two lines.
+- **When:** 2026-08-31. Michael's call, not the run's.
+
 ### `data-fs-row` is the canvas coordinate; the tree's rows are `data-fs-tree-row`
 
 - **Decided:** the renderer keeps `data-fs-row`, holding a repeater coordinate like `addresses[1]`. The

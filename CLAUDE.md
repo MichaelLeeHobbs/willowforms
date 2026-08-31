@@ -6,6 +6,10 @@ renderer, because every competitor paywalls exactly that piece.
 > Working agreement and personal defaults live in the global `~/.claude/CLAUDE.md`. This file is repo
 > facts only.
 
+> **Mid build-out, second pass** (started 2026-08-31). The frozen queue, the run status and the `/goal`
+> line are in `docs/build-out/queue.md`; the run contract is `docs/build-out/RUN.md`; decisions are in
+> `docs/decisions.md`. If no goal is active, tell me to paste the line at the top of the queue file.
+
 ## Read first
 
 - `docs/spec/README.md` — the specification, one file per contract, each section carrying a status.

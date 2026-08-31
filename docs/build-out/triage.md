@@ -1,6 +1,6 @@
 # Findings triaged, not fixed
 
-A finding from `tmp/formsmith-review-2026-08-30.md` that the run decided not to act on. Recording it here
+A review finding that a run decided not to act on. Recording it here.
 counts as handling it for the purposes of the queue. Leaving it out does not.
 
 The review skill names the recurring false-positive shapes, and they are the reasons that belong here:
@@ -9,6 +9,19 @@ a bug, a premature-abstraction warning with no defect behind it, and a guard tha
 
 Security and correctness findings do **not** get triaged for tidiness. If one is wrong, say what makes it
 wrong; if it is merely inconvenient, fix it.
+
+Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`; first-pass entries cite
+`tmp/formsmith-review-2026-08-30.md`, which is gitignored and exists in one working copy only.
+
+---
+
+## Second pass (from 2026-08-31)
+
+_Nothing yet._
+
+---
+
+## First pass (2026-08-30)
 
 Add an entry as: `area / file:line` — the finding in one clause, then the reason in one line.
 
