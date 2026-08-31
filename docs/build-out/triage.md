@@ -17,6 +17,38 @@ Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`; first-pass en
 
 ## Second pass (from 2026-08-31)
 
+## The HTML kit writes layout props as inline styles — `kit-html/renderers.tsx`, area 5, item 20
+
+**MEDIUM.** Every layout and display prop lands in a `style` attribute, which a strict
+`Content-Security-Policy` without `'unsafe-inline'` blocks outright, so a form served under one loses
+its layout entirely.
+
+Not fixed, because the fix is a rewrite of how this kit expresses an authored value rather than a repair.
+The props are per-node and arbitrary -- a gap of 17, a max width of 613 -- so a class cannot carry them;
+the routes are a nonce'd `<style>` element per node, or CSS custom properties set from a nonce'd sheet, or
+a `CSSStyleSheet` built at runtime. `FormRenderer` already takes a `nonce` for the per-node CSS it emits,
+which is where such a design would start.
+
+That is a real piece of work with a design question in it: whether a kit's _layout_ props go down the
+same channel as a document's authored CSS. It belongs to whoever owns the project, and this run's job is
+not to answer it in passing. Bad to leave in the sense that it silently rules out a deployment class, and
+the README does not warn anybody. Recorded rather than hidden.
+
+## An unanswered group and an answer of `''` are the same thing — `kit-html/renderers.tsx:700`, area 5, item 20
+
+**MEDIUM.** `jsonToString(value)` is `''` for `undefined`, `null` and the empty string alike, so a
+`RadioItem` or an option whose value is `''` shows as selected on a group nobody has answered.
+
+Left because closing it means deciding what an empty-string option _means_, and the honest answer is
+probably that it is not an answer -- which is a document-model call, not a kit one. `isEmpty` in core
+already treats `''` as empty, and `required` refuses it, so the two layers agree that an empty string is
+a non-answer; what the kit does is show it as one anyway. Making the kit disagree with core about that
+would be worse than the symptom.
+
+The symptom needs a document that authors an option with an empty value, which the panel does not offer:
+`MembershipOptions` drops blank lines, and an option list is authored through it. Reachable by hand-edited
+JSON only.
+
 ## A `custom` rule with no evaluator passes — `validation.ts:415`, area 3, item 19
 
 **MEDIUM.** The finding is that `if (!options.evaluate) return undefined` lets every custom rule through

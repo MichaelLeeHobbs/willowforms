@@ -16,7 +16,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { ComponentNode, FormContext, FormData, FormDocument, PropValue } from '@formsmith/core'
-import { applyChange } from '@formsmith/core'
+import { MAX_ROWS, applyChange } from '@formsmith/core'
 
 import { FormRenderer, resolveProp } from './index.js'
 import type { NodeRendererProps, RendererKit } from './index.js'
@@ -1368,5 +1368,188 @@ describe('an evaluator that throws while resolving a prop', () => {
     expect(
       resolveProp({ kind: 'computed', expression: 'x' }, {}, {}, { evaluate: () => 'Hello' }),
     ).toBe('Hello')
+  })
+})
+
+/**
+ * What the renderer does with a document nobody gated.
+ *
+ * `resolveProp`'s docblock says it is total over an untrusted document, and
+ * `RenderNode` walks `children` the way core does everywhere else. Both claims
+ * had a hole, and both holes end in a throw during render -- which React 19
+ * answers by unmounting the tree.
+ */
+describe('a document shaped in ways the type forbids', () => {
+  const asDocument = (root: unknown): FormDocument =>
+    documentOf([]) && {
+      ...documentOf([]),
+      root: root as ComponentNode,
+    }
+
+  it.each([
+    ['a string', 'not-a-binding'],
+    ['null', null],
+    ['a list', []],
+    ['a number', 7],
+  ])('renders a prop holding %s rather than throwing', (_what, prop_) => {
+    const { container } = render(
+      <FormRenderer
+        document={asDocument({
+          key: 'root',
+          type: 'Screen',
+          props: {},
+          children: [{ key: 'field', type: 'Field', props: { label: prop_ } }],
+        })}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="field"]')).not.toBeNull()
+    expect(container.querySelector('[data-fs-failed]')).toBeNull()
+  })
+
+  it('renders a node whose children are not a list', () => {
+    // Core guards this shape in `rows.ts`, `context.ts` and `tree.ts`. The
+    // renderer called `.map` on it.
+    const { container } = render(
+      <FormRenderer
+        document={asDocument({
+          key: 'root',
+          type: 'Screen',
+          props: {},
+          children: 'nope',
+        })}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="root"]')).not.toBeNull()
+    expect(container.querySelector('[data-fs-failed]')).toBeNull()
+  })
+
+  it('draws no more rows than validation will check', () => {
+    /*
+     * `validateForm` refuses a repeater past `MAX_ROWS` rather than checking a
+     * prefix. The renderer had no cap, so a body with far more rows drew every
+     * one of them -- the browser tab rather than the server, from the same
+     * request.
+     */
+    const rows = Array.from({ length: MAX_ROWS + 25 }, () => ({ line1: 'x' }))
+    const { container } = render(
+      <FormRenderer
+        document={asDocument({
+          key: 'root',
+          type: 'Screen',
+          props: {},
+          children: [
+            {
+              key: 'addressList',
+              dataKey: 'addresses',
+              type: 'Screen',
+              props: {},
+              schema: { type: 'array', validations: [] },
+              children: [
+                {
+                  key: 'street',
+                  dataKey: 'line1',
+                  type: 'Field',
+                  props: {},
+                  schema: { type: 'string', validations: [] },
+                },
+              ],
+            },
+          ],
+        })}
+        kit={kit}
+        data={{ addresses: rows }}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelectorAll('[data-fs-key="street"]')).toHaveLength(MAX_ROWS)
+  })
+})
+
+/**
+ * A component that threw once and then stopped throwing.
+ *
+ * `failed` was never cleared, so the error box outlived the cause for the life
+ * of the mount. On the canvas that is the ordinary case: an author writes a
+ * property value that breaks a renderer, fixes it, and the box stays -- with
+ * nothing to click that would bring the component back, because the box is what
+ * replaced it.
+ */
+describe('a boundary after the cause has gone', () => {
+  it('draws the component again when the node it wraps changes', () => {
+    const throwing: RendererKit = {
+      id: 'sometimes',
+      renderers: {
+        Screen: Screen_,
+        Field,
+        Broken: () => {
+          throw new Error('this type never renders')
+        },
+      },
+    }
+
+    const { container, rerender } = render(
+      <FormRenderer
+        document={documentOf([{ key: 'thing', type: 'Broken', props: {} }])}
+        kit={throwing}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+    expect(container.querySelector('[data-fs-failed]')).not.toBeNull()
+
+    // The author fixes the type. Same key, a renderer that works.
+    rerender(
+      <FormRenderer
+        document={documentOf([{ key: 'thing', type: 'Field', props: {} }])}
+        kit={throwing}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-failed]')).toBeNull()
+    expect(container.querySelector('[data-fs-key="thing"]')).not.toBeNull()
+  })
+
+  it('keeps the fallback while the cause is still there', () => {
+    // The control. Clearing on every render would retry forever when the cause
+    // has not gone away.
+    const throwing: RendererKit = {
+      id: 'always',
+      renderers: {
+        Screen: Screen_,
+        Broken: () => {
+          throw new Error('this type never renders')
+        },
+      },
+    }
+
+    const { container, rerender } = render(
+      <FormRenderer
+        document={documentOf([{ key: 'thing', type: 'Broken', props: {} }])}
+        kit={throwing}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+    rerender(
+      <FormRenderer
+        document={documentOf([{ key: 'thing', type: 'Broken', props: {} }])}
+        kit={throwing}
+        data={{ anything: 'else' }}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-failed]')).not.toBeNull()
   })
 })

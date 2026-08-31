@@ -253,6 +253,21 @@ describe.each(
     expect(on('--fsh-danger', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
   })
 
+  it('the progress track is visible against the surface it sits on', () => {
+    /*
+     * `--fsh-field` and `--fsh-surface` are the same colour in the light
+     * palette, and the track was filled with the first -- so an empty progress
+     * bar was invisible and a bar at 10% read as a stray dash. WCAG 1.4.11 asks
+     * 3:1 of anything that identifies a component.
+     *
+     * The ring is what carries it, so `--fsh-border` is the pair. Darkening the
+     * track instead would have taken the *fill* against it under 3:1, and the
+     * boundary between fill and track is what conveys the value.
+     */
+    expect(on('--fsh-border', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
+    expect(on('--fsh-accent', '--fsh-field')).toBeGreaterThanOrEqual(AA_LARGE)
+  })
+
   it('helper text clears AA rather than fading into the surface', () => {
     expect(on('--fsh-muted', '--fsh-surface')).toBeGreaterThanOrEqual(AA_TEXT)
     expect(on('--fsh-muted', '--fsh-field')).toBeGreaterThanOrEqual(AA_TEXT)

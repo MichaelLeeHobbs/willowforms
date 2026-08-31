@@ -454,6 +454,23 @@ fieldset.fsh-field {
   border-inline-start-color: var(--fsh-danger);
 }
 
+/*
+ * The track needs a boundary, because its fill is the same colour as the page.
+ *
+ * `--fsh-field` and `--fsh-surface` are both `#ffffff` in the light palette, so
+ * an empty progress bar was invisible: nothing on screen said the component was
+ * there, and a bar at 10% read as a stray blue dash. WCAG 1.4.11 asks 3:1 of
+ * anything that identifies a component.
+ *
+ * A ring rather than a darker fill, and that is the whole design question here.
+ * Darkening the track to clear 3:1 against a white surface takes it to about
+ * #949494, which drops the *fill* against the track to 2.4:1 -- and the boundary
+ * between fill and track is what conveys the value. A 1px ring at
+ * `--fsh-border` clears 4.8:1 against the surface and leaves the fill its full
+ * contrast against a light track.
+ *
+ * `box-shadow` rather than `border`, so the 6px track stays 6px.
+ */
 .fsh-progress {
   position: relative;
   block-size: 6px;
@@ -461,6 +478,7 @@ fieldset.fsh-field {
   overflow: hidden;
   border-radius: 999px;
   background: var(--fsh-field);
+  box-shadow: inset 0 0 0 1px var(--fsh-border);
 }
 
 .fsh-progress__fill {

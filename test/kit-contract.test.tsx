@@ -781,6 +781,109 @@ describe('a select holding a number', () => {
 
 describe.each(KITS)('$name', ({ kit, renderers }) => {
   /**
+   * Three things a kit was doing to the accessibility tree.
+   *
+   * All three passed the contract suite, which is the point: it looks for an
+   * attribute *somewhere inside* the component, and none of these is about whether
+   * the attribute exists. They are about whether it reaches anybody.
+   */
+
+  const drawn = (node: ComponentNode): HTMLElement => {
+    const { container } = render(
+      <FormUnderTest
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error('nothing rendered')
+    return element
+  }
+
+  it('puts a radio group role on the element carrying its group state', () => {
+    /*
+     * A `<fieldset>` maps to `group`, which supports neither `aria-invalid` nor
+     * `aria-required` -- so both were set on an element that has no such state
+     * and neither reached a screen reader. `kit-html`'s comment claimed
+     * `role="radiogroup"` was implicit here. It is not.
+     */
+    const element = drawn({
+      key: 'target',
+      type: 'RadioGroup',
+      props: {},
+      schema: { type: 'string', validations: [{ key: 'required' }] },
+      children: [],
+    })
+
+    const group =
+      element.getAttribute('role') === 'radiogroup'
+        ? element
+        : element.querySelector('[role="radiogroup"]')
+
+    expect(group, 'no element in this component has role="radiogroup"').not.toBeNull()
+    expect(group?.getAttribute('aria-required')).toBe('true')
+  })
+
+  it('marks a required select on an element a screen reader reads', () => {
+    /*
+     * MUI's `select` renders a hidden native input plus a `div[role=button]`,
+     * and the required marking landed on the hidden one -- which is
+     * `aria-hidden`, so it reached nobody. The contract rule passed because it
+     * asked whether the attribute was anywhere in the component.
+     */
+    const element = drawn({
+      key: 'target',
+      type: 'Select',
+      props: {},
+      schema: { type: 'string', validations: [{ key: 'required' }] },
+    })
+
+    const marked = [...element.querySelectorAll('[aria-required="true"]')].filter(
+      (node) => node.closest('[aria-hidden="true"]') === null,
+    )
+
+    expect(
+      marked.length,
+      'every aria-required on this Select is inside aria-hidden',
+    ).toBeGreaterThan(0)
+  })
+
+  it('does not report a progress value that is not a number', () => {
+    /*
+     * `NaN` is a number, and `JsonValue` admits one, so a bare
+     * `typeof raw === 'number'` let it through as a determinate value and the
+     * bar reported `aria-valuenow="NaN"`.
+     */
+    const element = drawn({
+      key: 'target',
+      type: 'Progress',
+      props: { value: prop(Number.NaN) },
+    })
+
+    const bar =
+      element.getAttribute('role') === 'progressbar'
+        ? element
+        : element.querySelector('[role="progressbar"]')
+
+    expect(bar).not.toBeNull()
+    expect(bar?.getAttribute('aria-valuenow')).not.toBe('NaN')
+  })
+
+  it('still reports a progress value that is one', () => {
+    // The control. A bar that never reported a value would pass the row above.
+    const element = drawn({ key: 'target', type: 'Progress', props: { value: prop(40) } })
+    const bar =
+      element.getAttribute('role') === 'progressbar'
+        ? element
+        : element.querySelector('[role="progressbar"]')
+
+    expect(bar?.getAttribute('aria-valuenow')).toBe('40')
+  })
+
+  /**
    * What unit a length-valued prop carries.
    *
    * The contract says a document authored against one kit renders against the

@@ -17,7 +17,7 @@
  * these produces an inaccessible form no amount of designer polish can fix.
  */
 
-import { createContext, createElement, useContext, useId } from 'react'
+import { createContext, createElement, useContext, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ComponentNode } from '@formsmith/core'
 import {
@@ -630,11 +630,18 @@ function RadioGroupNode({
   /*
    * A fieldset with a legend, not a div with a label: a group of radios has one
    * question and many answers, and `aria-labelledby` on a div is the workaround
-   * for markup that cannot say that. `role="radiogroup"` is implicit here.
+   * for markup that cannot say that.
+   *
+   * `role="radiogroup"` is stated rather than assumed. This comment claimed it
+   * was implicit and it is not -- a `<fieldset>` maps to `group`, which does not
+   * support `aria-invalid` or `aria-required`, so both were being set on an
+   * element that has no such state and neither reached a screen reader. The role
+   * is what makes the two attributes mean something.
    */
   return (
     <fieldset
       {...nodeProps}
+      role="radiogroup"
       className="fsh-field"
       disabled={bool(props['disabled'])}
       aria-invalid={error ? true : undefined}
@@ -745,6 +752,8 @@ function FileUploadNode({
   onChange,
 }: NodeRendererProps): ReactNode {
   const id = useId()
+  /** How many files the last choice dropped for being over `maxSize`. */
+  const [dropped, setDropped] = useState(0)
   /*
    * The names the document holds, drawn beside the input.
    *
@@ -794,13 +803,29 @@ function FileUploadNode({
            */
           onChange={(e) => {
             const limit = num(props['maxSize'], 0) * 1024
-            const files = Array.from(e.target.files ?? [])
-              .filter((file) => limit <= 0 || file.size <= limit)
-              .map((file) => file.name)
-            onChange(multiple ? files : (files[0] ?? null))
+            const chosen = Array.from(e.target.files ?? [])
+            const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
+            /*
+             * Somebody is told when a file is dropped.
+             *
+             * `maxSize` filtered the reported names and said nothing, so
+             * choosing a file over the limit looked exactly like choosing none:
+             * the picker closed, the list did not change, and no message
+             * appeared. A refusal nobody can see is indistinguishable from a
+             * bug in the picker.
+             */
+            setDropped(chosen.length - kept.length)
+            onChange(multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null))
           }}
         />
         {filesHeld ? <p className="fsh-field__hint">Holding {filesHeld}</p> : null}
+        {dropped > 0 ? (
+          <p className="fsh-field__error" role="alert">
+            {dropped === 1
+              ? 'One file was too large and was not added.'
+              : String(dropped) + ' files were too large and were not added.'}
+          </p>
+        ) : null}
       </Field>
     </div>
   )
@@ -839,7 +864,9 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const circular = props['variant'] === 'circular'
   const raw = props['value']
-  const determinate = typeof raw === 'number'
+  // `Number.isFinite`, not `typeof === 'number'`: `NaN` is a number and a
+  // document can hold one. The same narrowing as `kit-mui`'s ProgressNode.
+  const determinate = typeof raw === 'number' && Number.isFinite(raw)
   const value = determinate ? Math.min(100, Math.max(0, raw)) : 0
 
   return (

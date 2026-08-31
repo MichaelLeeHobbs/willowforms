@@ -105,6 +105,10 @@ obligation missed.
 | The palette index has no colliding types                         | The type is how a node finds its renderer                                    |
 | A length-valued prop is CSS pixels                               | A number that means two things is a document that renders two ways           |
 | Two different lengths render differently                         | A kit hard-coding the tested value would satisfy the rule above              |
+| A radio group carries `role="radiogroup"`                        | A `<fieldset>` maps to `group`, which has no invalid or required state       |
+| A required control is marked where a screen reader reads it      | A marking inside `aria-hidden` reaches nobody                                |
+| A progress value that is not a number is not reported            | `NaN` is a number, and `aria-valuenow="NaN"` is worse than none              |
+| A progress value that is one still is                            | A bar that reported nothing would satisfy the rule above                     |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two
