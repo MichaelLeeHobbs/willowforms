@@ -527,3 +527,38 @@ the fix is not a different default: any default is a value two items would then 
 worse failure (two options that submit the same answer) arriving silently instead of loudly. What this
 wants is the palette refusing to leave a `RadioItem` without a value, in the panel where somebody can see
 it, and that is a feature rather than a default.
+
+## The HTML kit's stylesheet and two markup notes — area 5
+
+**LOW and NOTE, seven findings, each a real gap in a kit that is deliberately the simple one.**
+
+`@formsmith/kit-html` exists to prove a kit is a package rather than a rewrite: semantic elements and a
+stylesheet, no dependencies, about 2,000 lines. These seven all ask it to grow a piece of design work:
+
+- `.fsh-field__hint` has no rule in the stylesheet, so the file-upload line renders at the user agent's
+  defaults inside a `gap: 4px` column. Real, and a one-line rule -- but it is the only class in the kit
+  with no rule, so the question is whether that message should be a hint at all or the field's own
+  message element, which is a markup decision rather than a missing declaration.
+- `SwitchNode` and `RadioGroupNode` never add `is-invalid`, and neither has an `.fsh-input` for the
+  stylesheet's `.fsh-field.is-invalid .fsh-input` rule to colour. Making the error state visible on those
+  two means giving them the field markup the others have.
+- `role="group"` on the repeater's wrapper and on `ButtonGroup` carries no accessible name in either kit.
+  A name has to come from somewhere -- a prop, or the component's label -- and both kits would need the
+  same one, which is a contract change.
+- The `prefers-reduced-motion` block covers the progress sweep and not the switch's two transitions, and
+  `docs/accessibility.md` says the stylesheet has a block "for its own transitions". Adding the two
+  declarations is easy; auditing the claim so it stays true is the part worth doing.
+- The switch has no `forced-colors` fallback, and its whole state signal is a background colour with the
+  real checkbox at `opacity: 0`. In Windows high contrast that is a control with no visible state. This
+  is the most serious of the seven and it needs a design answer -- an outline, a glyph, or a different
+  markup -- rather than a token.
+- A determinate circular progress draws a partial-width ellipse, because `.fsh-progress--circular` only
+  rounds the box while the fill is still sized on the inline axis. A real arc is a conic gradient or an
+  SVG ring, which is new markup.
+- `.fsh-field__message:empty { display: none }` collapses the message line, so the form shifts when an
+  error appears -- and `kit-mui` deliberately does the opposite, reserving the line. Two kits with
+  opposite answers to one question is worth settling in the contract, not in one stylesheet.
+
+The eleven dark tokens duplicated in two blocks are already checked against each other by
+`test/contrast.test.ts`, which asserts the two dark blocks declare the same tokens -- so the duplication
+cannot drift silently, which was the concern.

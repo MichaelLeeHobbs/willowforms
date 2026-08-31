@@ -218,8 +218,16 @@ function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
    * because the element is still there.
    */
   const LEVELS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const
-  const asked = str(props['level'], 'h5')
-  const level: Variant = (LEVELS as readonly string[]).includes(asked) ? (asked as Variant) : 'h5'
+  /*
+   * `h2` when the document names no rank, which is what the HTML kit answers.
+   *
+   * This fell back to `h5`, so a hand-written document with no `level` rendered
+   * at a different rank depending on which kit drew it -- and a heading's rank
+   * is the document outline a screen reader navigates by. The palette still
+   * starts a *new* heading at `h5`, which is this kit's own call about size.
+   */
+  const asked = str(props['level'], 'h2')
+  const level: Variant = (LEVELS as readonly string[]).includes(asked) ? (asked as Variant) : 'h2'
   return (
     <Typography {...nodeProps} variant={level}>
       {str(props['text'])}

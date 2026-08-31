@@ -107,6 +107,11 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
 }
 
 /*
+ * (This paragraph is `Step`'s, further down. It sat directly above `Repeater`,
+ * so a reader taking a comment as documentation of the function beneath it was
+ * told the wrong thing about the more complicated of the two. The same drift
+ * was in `kit-mui`, copied along with the rest of the file.)
+ *
  * A step draws as a plain column. Everything that makes it a step is the
  * condition on it, which core evaluates, so there is nothing here for a kit to
  * decide beyond how a group of fields stacks up.
@@ -180,6 +185,15 @@ function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
    * binding, so the cast was a lie: a capitalised string made React treat it as
    * a component reference and throw, and any other string rendered a tag the
    * kit never intended.
+   */
+  /*
+   * `h2` when the document names no rank, in both kits.
+   *
+   * The MUI kit fell back to `h5`, so a hand-written document with no `level`
+   * rendered at a different rank depending on which kit drew it -- and a
+   * heading's rank is the document outline a screen reader navigates by, not a
+   * size. The two palettes still start a *new* heading at whatever rank suits
+   * them; this is only the answer for a document that says nothing.
    */
   const raw = str(props['level'], 'h2')
   const tag: Level = isLevel(raw) ? raw : 'h2'
@@ -608,6 +622,16 @@ function SwitchNode({
 interface RadioContext {
   name: string
   selected: string
+  /**
+   * The group's declared options, so a child can resolve its own value the way
+   * the group resolves one of its own.
+   *
+   * A `RadioItem` handed its value over as a string while the options path
+   * routed through `optionValue`, so a group holding both submitted a number
+   * from one control and the string spelling of it from the other -- one
+   * question with two answer types.
+   */
+  options: readonly JsonValue[]
   onSelect: (value: JsonValue) => void
 }
 
@@ -650,7 +674,7 @@ function RadioGroupNode({
     >
       <legend className="fsh-field__label">{str(props['label'])}</legend>
       <RadioGroupContext.Provider
-        value={{ name: id, selected: jsonToString(value), onSelect: onChange }}
+        value={{ name: id, selected: jsonToString(value), options, onSelect: onChange }}
       >
         <div
           className={
@@ -704,9 +728,27 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
         type="radio"
         name={group?.name}
         value={value}
-        checked={group ? group.selected === value : false}
+        /*
+         * A value nobody wrote is not the selected one.
+         *
+         * `RadioItem` ships with `value: ''` and an unanswered group's
+         * `selected` is `''` too, so a freshly dropped item rendered
+         * pre-checked -- and so did every other one, all at once. An empty
+         * value is a control that cannot answer anything, which is what the
+         * disabled state below already says.
+         */
+        checked={group ? value !== '' && group.selected === value : false}
         disabled={!group || bool(props['disabled'])}
-        onChange={() => group?.onSelect(value)}
+        /*
+         * Through `optionValue`, like the `options` path in the group above.
+         *
+         * This handed the raw string straight over, so a group holding both
+         * declared options and `RadioItem` children submitted a number from one
+         * control and the string spelling of it from the other -- one question
+         * with two answer types, which a server validating against the exported
+         * schema rejects for one of them.
+         */
+        onChange={() => group?.onSelect(optionValue(group.options, value))}
       />
       <span>{str(props['label'])}</span>
     </label>

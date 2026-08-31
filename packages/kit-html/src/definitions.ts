@@ -380,7 +380,7 @@ export const htmlKit: Kit = {
           // The same allowlist `Link.href` documents, and the same sink:
           // `safeHref`. Saying it on one and not the other made the rule
           // look like a property of links rather than of addresses.
-          hint: 'http, https, or a path. Anything else is refused.',
+          hint: 'http, https, mailto, tel, or a path. Anything else is refused.',
         },
         {
           name: 'alt',

@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 26, the spec and guide MEDIUMs. Stage 4 is done; item 27 is next.
+- **Last completed:** item 27, the core and kit LOW/NOTEs. Item 28 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/26-spec-guides`
+- **Last pushed item branch:** `build-out/b/27-core-kits-low`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -287,7 +287,7 @@ slice either fixed or in `triage.md` with a one-line reason.
 312 findings. Triage is expected to carry a large share of these, and a triage line with a reason counts as
 handling one. It is the only honest way to close out three hundred findings.
 
-- [ ] **27. core and both kits.** Areas 1 to 5, 67 findings.
+- [x] **27. core and both kits.** Areas 1 to 5, 67 findings.
 - [ ] **28. the designer.** Areas 6 to 9, 69 findings.
 - [ ] **29. the apps, the build, the lint config and CI.** Area 10, 54 findings. Includes `forms.json.tmp`
       missing from `.gitignore`, `cspell.json` being 40 lines of configuration no script runs, the Node

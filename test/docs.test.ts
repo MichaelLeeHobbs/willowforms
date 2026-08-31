@@ -400,7 +400,7 @@ const CONTRACT_RULES = 25
  * nowhere, so the spec presented the first table as the whole obligation set
  * while the suite ran nearly twice that.
  */
-const CONTRACT_RULES_PER_KIT = 15
+const CONTRACT_RULES_PER_KIT = 16
 
 /**
  * The describes that are about this repository rather than about a kit.
@@ -474,7 +474,17 @@ describe('the kit contract table', () => {
 
     // Everything but the describes that are about these two kits rather than
     // about kits, so a courtesy is not read as an obligation.
-    let outside = suite.slice(0, suite.indexOf('describe.each(KITS)'))
+    /*
+     * The whole file with the per-kit block cut out, not just what precedes it.
+     *
+     * This sliced to the start of that block, so a per-kit rule written *after*
+     * it was counted by nothing -- and one was, the day this guard was added.
+     * A guard that reads "everything before a marker" has the same weakness as
+     * one that reads "everything after" it.
+     */
+    const blockAt = suite.indexOf('describe.each(KITS)')
+    const blockEnds = suite.indexOf('\ndescribe(', blockAt)
+    let outside = suite.slice(0, blockAt) + (blockEnds === -1 ? '' : suite.slice(blockEnds))
     for (const name of NOT_OBLIGATIONS) {
       const at = outside.indexOf("describe('" + name)
       if (at === -1) continue
