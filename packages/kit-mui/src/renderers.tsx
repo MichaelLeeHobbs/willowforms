@@ -360,18 +360,24 @@ function SelectNode({
       /*
        * The required marking goes on the element a screen reader announces.
        *
-       * A MUI `select` renders a hidden native input plus a `div[role=button]`,
-       * and `htmlInput` lands on the hidden one -- which is `aria-hidden`, so
-       * `aria-required` on it reached nobody. The contract test passed because
-       * it looked for the attribute anywhere inside the component, which is the
-       * shape of guard this run keeps finding.
+       * A MUI `select` renders three nested boxes: an `InputBase` root, a
+       * `div[role="combobox"]` inside it, and a hidden native `input` beside
+       * that. `htmlInput` lands on the hidden one, which is `aria-hidden`, so
+       * `aria-required` there reached nobody -- and the contract test passed
+       * because it looked for the attribute anywhere inside the component.
        *
-       * `select` carries it on the element that has the role.
+       * `slotProps.select` was the first attempt at fixing that and it is not
+       * enough: it lands on the `InputBase` root, which carries no role, so the
+       * attribute still was not on the thing being announced. `aria-invalid`
+       * arrives on the combobox by itself, which is why only half of this was
+       * visible. `SelectDisplayProps` is MUI's own way through to the element
+       * with the role, and the contract test now looks at ARIA widget roles
+       * rather than native elements, so it can see the difference.
        */
       slotProps={{
         formHelperText: alertWhenError(error),
         htmlInput: requiredProps(node),
-        select: requiredProps(node),
+        select: { SelectDisplayProps: requiredProps(node) },
       }}
       onChange={(e) => onChange(optionValue(options, e.target.value))}
     >

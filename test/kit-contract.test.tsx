@@ -136,9 +136,57 @@ function documentOf(root: ComponentNode): FormDocument {
  */
 const DIVERGENT_VOCABULARY = new Set(['Button.variant'])
 
+/**
+ * The component types this file's rules are written against.
+ *
+ * Four rules here used to open with a bare `return` when the kit did not offer
+ * the component they drive, and two `it.each` tables were built by filtering a
+ * hard-coded type list against what the kits declare -- and vitest 2.1.9
+ * implements `each` as `cases.forEach(...)`, with no guard for an empty array.
+ * So renaming `Select` in both kits, or narrowing `Text.variant` to one option,
+ * turned obligations off rather than failing them, and the file reported green
+ * having registered fewer tests than it has rules.
+ *
+ * That is the pattern this suite already rejects for `RadioGroup` in its own
+ * words: "this used to return quietly ... which is the one thing a contract
+ * suite must never let a kit do". The list is here so the turning-off is a
+ * failure with a name, in one place, rather than four quiet exits.
+ */
+const DRIVEN = [
+  'Alert',
+  'Breadcrumbs',
+  'NumberField',
+  'RadioGroup',
+  'Select',
+  'Stack',
+  'Text',
+  'TextArea',
+  'TextField',
+] as const
+
+/**
+ * Ask before driving a component, and fail rather than skip when it is missing.
+ *
+ * Returns whether the kit offers it, so a caller can stop before producing a
+ * second, more confusing failure out of the same cause.
+ */
+function requires(kit: Kit, type: string): boolean {
+  const offered = kit.components.some((def) => def.type === type)
+  expect(
+    offered,
+    type + ' is a component this suite drives: dropping it must fail a rule, not silence one',
+  ).toBe(true)
+  return offered
+}
+
 describe('the two kits in this repository agree', () => {
   const html = new Map(htmlKit.components.map((c) => [c.type, c]))
   const mui = new Map(muiKit.components.map((c) => [c.type, c]))
+
+  it.each(KITS)('$name offers every component this suite drives', ({ kit }) => {
+    const offered = new Set(kit.components.map((def) => def.type))
+    expect(DRIVEN.filter((type) => !offered.has(type))).toEqual([])
+  })
 
   it.each([...DIVERGENT_VOCABULARY])(
     '%s still diverges, so the exemption still earns its place',
@@ -368,11 +416,21 @@ describe('what a data-bound control has to say about itself', () => {
     return element
   }
 
-  /** The control inside a component, whatever element the kit chose for it. */
+  /**
+   * The control inside a component, whatever element the kit chose for it.
+   *
+   * The ARIA widget roles are here because a kit is not obliged to use a native
+   * element: a combobox built from a `div` is a control, and looking only for
+   * `input, select, textarea` would find nothing and hand it to the fallback
+   * below, which used to pass it. Every role listed supports `aria-invalid` and
+   * `aria-required`.
+   */
+  const WIDGET =
+    'input, select, textarea, [role="combobox"], [role="textbox"], [role="listbox"],' +
+    ' [role="spinbutton"], [role="checkbox"], [role="radiogroup"], [role="switch"], [role="slider"]'
+
   function control(element: HTMLElement): HTMLElement | null {
-    return element.matches('input, select, textarea')
-      ? element
-      : element.querySelector('input, select, textarea')
+    return element.matches(WIDGET) ? element : element.querySelector<HTMLElement>(WIDGET)
   }
 
   it.each(KITS)('$name marks a failing control invalid', ({ kit, renderers }) => {
@@ -390,16 +448,20 @@ describe('what a data-bound control has to say about itself', () => {
         const target = control(element)
 
         /*
-         * A component with no control of its own cannot carry `aria-invalid` --
-         * it is supported on widget roles and inert on a container, which is
-         * what a `Repeater` is. Both kits set it there anyway and this rule
-         * found it and passed, which is a guard reporting a hole as a fix. Such
-         * a component satisfies the obligation by announcing instead: a message
-         * with `role="alert"`, which is what a screen reader will actually read.
+         * A data-bound, non-container component with no widget in it at all.
+         *
+         * This used to be satisfied by finding any `role="alert"` inside the
+         * component -- which every data-bound component is separately required
+         * to have, a few rules down, so the obligation was discharged by
+         * something already mandatory elsewhere. A kit whose control is a
+         * `div[role="combobox"]` passed without ever setting `aria-invalid`.
+         *
+         * The roles are part of `WIDGET` now, so a non-native control is found
+         * and held to the same rule, and reaching here means the component
+         * collects an answer through nothing a screen reader can be told about.
+         * That is reported, not excused.
          */
-        if (!target) {
-          return element.querySelector('[role="alert"]') === null
-        }
+        if (!target) return true
 
         return (
           target.getAttribute('aria-invalid') !== 'true' &&
@@ -468,19 +530,26 @@ describe('a control holding a value that is not a string', () => {
     schema: { type: dataType as 'string', validations: [] },
   })
 
-  it.each(
-    KITS.flatMap(({ name, kit, renderers }) =>
-      /*
-       * Not `DatePicker`: a `type="date"` input refuses a value that is not a
-       * date and clears itself, whatever the kit hands it, so the assertion
-       * would be about the browser rather than about the kit. It reads its value
-       * the same way as its neighbours; there is just no way to see that here.
-       */
-      ['TextField', 'TextArea', 'NumberField']
-        .filter((type) => kit.components.some((def) => def.type === type))
-        .map((type) => [name + ' ' + type, renderers, type] as const),
+  /*
+   * Not `DatePicker`: a `type="date"` input refuses a value that is not a date
+   * and clears itself, whatever the kit hands it, so the assertion would be
+   * about the browser rather than about the kit. It reads its value the same
+   * way as its neighbours; there is just no way to see that here.
+   */
+  const TEXTUAL = ['TextField', 'TextArea', 'NumberField']
+
+  const VALUE_CASES = KITS.flatMap(({ name, kit, renderers }) =>
+    TEXTUAL.filter((type) => kit.components.some((def) => def.type === type)).map(
+      (type) => [name + ' ' + type, renderers, type] as const,
     ),
-  )('%s shows it', (_what, renderers, type) => {
+  )
+
+  it('drives every value-holding control in every kit', () => {
+    // As above: an empty table is a green file that ran no rule at all.
+    expect(VALUE_CASES).toHaveLength(KITS.length * TEXTUAL.length)
+  })
+
+  it.each(VALUE_CASES)('%s shows it', (_what, renderers, type) => {
     const { container } = render(
       <FormUnderTest
         document={documentOf(holding(type, 'string'))}
@@ -548,7 +617,18 @@ describe('a document value a kit puts somewhere structural', () => {
       kit.components.find((def) => def.type === 'Text')?.props.find((p) => p.name === 'variant')
         ?.options ?? []
     ).map((option) => (typeof option.value === 'string' ? option.value : ''))
-    if (declared.length < 2) return
+
+    /*
+     * Two, not one. With a single declared variant this rule used to return
+     * quietly, and the narrowing test it is the control for would then pass
+     * because every variant collapses to the default and there is nowhere else
+     * to collapse to. `supplies options for every select prop` only asks for
+     * one, so nothing else here would notice.
+     */
+    expect(
+      declared.length,
+      'Text.variant needs two declared options, or telling variants apart proves nothing',
+    ).toBeGreaterThan(1)
 
     const [first, second] = declared as [string, string]
     const a = draw(renderers, nodeWith('Text', { text: 'hello', variant: first }))
@@ -651,13 +731,19 @@ describe('a component whose options a document got wrong', () => {
     ['Breadcrumbs', 'items'],
   ]
 
-  it.each(
-    KITS.flatMap(({ name, kit, renderers }) =>
-      LISTY.filter(([type]) => kit.components.some((def) => def.type === type)).map(
-        ([type, propName]) => [name + ' ' + type, renderers, type, propName] as const,
-      ),
+  const LIST_CASES = KITS.flatMap(({ name, kit, renderers }) =>
+    LISTY.filter(([type]) => kit.components.some((def) => def.type === type)).map(
+      ([type, propName]) => [name + ' ' + type, renderers, type, propName] as const,
     ),
-  )('%s renders anyway', (_what, renderers, type, propName) => {
+  )
+
+  it('drives every listy component in every kit', () => {
+    // An `it.each` over an empty table registers no tests and reports green, so
+    // the table's size is asserted rather than assumed. See `DRIVEN`.
+    expect(LIST_CASES).toHaveLength(KITS.length * LISTY.length)
+  })
+
+  it.each(LIST_CASES)('%s renders anyway', (_what, renderers, type, propName) => {
     const onError = vi.fn()
 
     const { container } = render(
@@ -685,7 +771,7 @@ describe('a component whose options a document got wrong', () => {
      * select with nothing in it, which is the same lost question by a quieter
      * route.
      */
-    if (!kit.components.some((def) => def.type === 'Select')) return
+    if (!requires(kit, 'Select')) return
 
     const { container } = render(
       <FormUnderTest
@@ -746,7 +832,7 @@ describe('a select holding a number', () => {
   }
 
   it.each(KITS)('$name shows the option the data names', ({ kit, renderers }) => {
-    if (!kit.components.some((def) => def.type === 'Select')) return
+    if (!requires(kit, 'Select')) return
 
     const { container } = render(
       <FormUnderTest
@@ -763,7 +849,7 @@ describe('a select holding a number', () => {
 
   it.each(KITS)('$name shows nothing when the data names no option', ({ kit, renderers }) => {
     // The control: "shows Two" must not be something it would say regardless.
-    if (!kit.components.some((def) => def.type === 'Select')) return
+    if (!requires(kit, 'Select')) return
 
     const { container } = render(
       <FormUnderTest
