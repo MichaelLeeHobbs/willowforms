@@ -301,6 +301,14 @@ interface NodeBoundaryProps {
    * are in the drag pipeline.
    */
   row: string | undefined
+  /**
+   * Whether the node it wraps is one `renderWhen` hides, drawn anyway.
+   *
+   * The same reason as `row` above: the canvas selects by these attributes, and
+   * `[data-fs-hidden]` is how it tells a revealed node from an ordinary one. A
+   * fallback without it reads as a component the form is really asking for.
+   */
+  hidden: boolean
   onError: ((error: Error, key: string) => void) | undefined
   children: ReactNode
 }
@@ -356,6 +364,7 @@ class NodeBoundary extends Component<
         data-fs-type={this.props.node.type}
         data-fs-scope={this.props.scope}
         {...(this.props.row === undefined ? {} : { 'data-fs-row': this.props.row })}
+        {...(this.props.hidden ? { 'data-fs-hidden': 'true' } : {})}
         /*
          * And a mark saying it is the fallback, which the three attributes above
          * cannot say.
@@ -557,14 +566,25 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
    */
   const all = repeats ? rowsOf(valueOf(row?.values ?? data, dataKey)) : EMPTY_ROWS
   const rows = all.length > MAX_ROWS ? all.slice(0, MAX_ROWS) : all
-  const drawn = revealHidden && repeats && rows.length === 0 ? [{}] : rows
+  /*
+   * `AUTHORED_ROW`, not a fresh `[{}]`.
+   *
+   * A new array holding a new object on every render is a new `value` for
+   * `Row`, whose `useMemo` lists it -- so the memo that exists to stop
+   * `isVisible` and `resolveProps` running for every node beneath a row on
+   * every keystroke never held for the one row an empty repeater draws on the
+   * canvas, which is the row an author is looking at while they type.
+   */
+  const drawn = revealHidden && repeats && rows.length === 0 ? AUTHORED_ROW : rows
 
   const children = repeats
     ? drawn.map((value, index) => (
         <Row
           key={index}
           path={row?.path ?? NO_ROWS}
-          name={dataKeyOf(node)}
+          // The same `dataKey` computed above, not a second call: two readings
+          // of one node's name are two things that can drift.
+          name={dataKey}
           index={index}
           value={value}
         >
@@ -604,7 +624,7 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
  * it did not cover.
  */
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
-  const { scope, onError } = useRenderContext()
+  const { scope, onError, data, options, revealHidden } = useRenderContext()
   // The same coordinate the body puts on `nodeProps`, so a fallback is findable
   // in the row that broke rather than in whichever row drew first.
   const row = useContext(RowCtx)
@@ -614,6 +634,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       node={node}
       scope={scope}
       row={row ? encodeRow(row.path) : undefined}
+      hidden={revealHidden && !isVisible(node, data, { ...options, ...(row ? { row } : {}) })}
       onError={onError}
     >
       <RenderNodeBody node={node} />
@@ -623,6 +644,14 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
 
 /** Shared, so a node that is not a repeater allocates no row list at all. */
 const EMPTY_ROWS: FormData[] = []
+
+/**
+ * The one row an empty repeater draws while it is being authored.
+ *
+ * Shared for the same reason as `EMPTY_ROWS`, and it matters more: this one is
+ * a `value` a memo compares by identity.
+ */
+const AUTHORED_ROW: FormData[] = [{}]
 
 export interface FormRendererProps {
   document: FormDocument
@@ -731,7 +760,20 @@ export function FormRenderer({
       language ?? document.defaultLanguage
     ]
     if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return NO_TRANSLATIONS
-    return bundle as Record<string, string>
+    /*
+     * The strings in it, not the object as it stands.
+     *
+     * This asserted a type after checking only that the bundle was a non-array
+     * object, so `translations: { en: { greeting: { a: 1 } } }` reached a kit
+     * as a label -- and both in-repo kits swallow a non-string to `''` through
+     * `str()`, so the label silently disappeared instead of falling back to the
+     * key. A translation that is not text is a translation nobody wrote.
+     */
+    const strings: Record<string, string> = {}
+    for (const [key, value] of Object.entries(bundle)) {
+      if (typeof value === 'string') strings[key] = value
+    }
+    return strings
   }, [document.translations, document.defaultLanguage, language])
 
   // Stable across renders, unique per instance, and the same on the server and

@@ -509,3 +509,21 @@ and twice in `rows.ts`. Extracting it means a shared narrowing helper crossing f
 modules, each of which reads slightly differently -- one wants the record, one wants to skip, one wants to
 continue a loop -- and no test can tell the extracted version from the copies. Worth doing when one of
 those functions is next opened for a reason.
+
+## `RadioGroup` and `RadioItem` in the MUI kit — area 4
+
+**LOW, both left as they are with the reason written down.**
+
+`RadioGroup` declares `container: true`, which is true -- it holds `RadioItem` children -- and the kit
+contract's three accessibility rules filter with `def.dataBound && !def.container`, so they never see it.
+The wiring is correct today and there is a rule of its own asserting the group carries
+`role="radiogroup"`, which is the part a container can get wrong. Widening the filter means deciding what
+"marks a required control required" means for a component whose control is its children, and the honest
+answer is a rule written for a group rather than a filter loosened until it catches one.
+
+`RadioItem`'s `defaultProps` set `value: ''`, and core reads `''` as no answer -- so a required
+`RadioGroup` whose items were never given values stays failing after a user picks one. That is real, and
+the fix is not a different default: any default is a value two items would then share, which is a
+worse failure (two options that submit the same answer) arriving silently instead of loudly. What this
+wants is the palette refusing to leave a `RadioItem` without a value, in the panel where somebody can see
+it, and that is a feature rather than a default.

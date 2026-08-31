@@ -1100,6 +1100,59 @@ describe('a component that throws while rendering', () => {
     ])
   })
 
+  it('marks a revealed component that failed as revealed', () => {
+    /*
+     * The fallback carries `data-fs-key`, `data-fs-type` and `data-fs-scope` so
+     * a broken component stays selectable, and it carried neither of the two
+     * attributes that say *which* copy of it this is: the row, fixed above, and
+     * this one. The canvas selects `[data-fs-hidden]` to tell a revealed node
+     * from one the form is really asking for, so a failed revealed node read as
+     * an ordinary one.
+     */
+    const doc = documentOf([
+      {
+        key: 'boom',
+        type: 'Boom',
+        props: {},
+        renderWhen: { kind: 'static', value: false },
+      },
+    ])
+
+    const { container } = quietly(() =>
+      render(
+        <FormRenderer
+          document={doc}
+          kit={boomKit}
+          data={{}}
+          revealHidden
+          onChange={() => undefined}
+        />,
+      ),
+    )
+
+    const fallback = container.querySelector('[data-fs-key="boom"]')
+    expect(fallback?.getAttribute('data-fs-hidden')).toBe('true')
+  })
+
+  it('leaves the mark off a failed component the form really asks for', () => {
+    // The control: marking every fallback hidden would make the attribute mean
+    // nothing, which is the same as not having it.
+    const { container } = quietly(() =>
+      render(
+        <FormRenderer
+          document={documentWithBoom()}
+          kit={boomKit}
+          data={{}}
+          onChange={() => undefined}
+        />,
+      ),
+    )
+
+    expect(container.querySelector('[data-fs-key="boom"]')?.hasAttribute('data-fs-hidden')).toBe(
+      false,
+    )
+  })
+
   it('says so where the component would have been', () => {
     const { container } = quietly(() =>
       render(
@@ -1725,5 +1778,56 @@ describe('a boundary after the cause has gone', () => {
     )
 
     expect(container.querySelector('[data-fs-failed]')).not.toBeNull()
+  })
+})
+
+/**
+ * A translation bundle holding something that is not a string.
+ *
+ * The lookup asserted `Record<string, string>` after checking only that the
+ * bundle was a non-array object, so `{ greeting: { a: 1 } }` reached a kit as a
+ * label -- and both in-repo kits swallow a non-string to `''`, so the label
+ * disappeared rather than falling back to the key a translator can search for.
+ */
+describe('a translation that is not text', () => {
+  const translated = (value: unknown): FormDocument => {
+    const doc = documentOf([
+      { key: 'email', type: 'Field', props: { label: { kind: 'i18n', key: 'email_label' } } },
+    ])
+    return { ...doc, translations: { 'en-US': { email_label: value } } } as FormDocument
+  }
+
+  /** What the kit was handed as the label, read back off the node. */
+  const labelOf = (document: FormDocument): unknown => {
+    let seen: unknown
+    const watching: RendererKit = {
+      id: 'watching',
+      renderers: {
+        Screen: Screen_,
+        Field: ({ nodeProps, props }: NodeRendererProps): ReactNode => {
+          seen = props['label']
+          return <div {...nodeProps} />
+        },
+      },
+    }
+
+    render(<FormRenderer document={document} kit={watching} data={{}} onChange={() => undefined} />)
+    return seen
+  }
+
+  it.each([
+    ['an object', { a: 1 }],
+    ['a list', ['a']],
+    ['a number', 42],
+    ['null', null],
+  ])('falls back to the key when the translation is %s', (_what, value) => {
+    // The key, which a translator can search for, rather than an empty label:
+    // both in-repo kits render a non-string as `''`, so the label vanished.
+    expect(labelOf(translated(value))).toBe('email_label')
+  })
+
+  it('still uses a translation that is text', () => {
+    // The control: narrowing the bundle must not stop it being read.
+    expect(labelOf(translated('Courriel'))).toBe('Courriel')
   })
 })

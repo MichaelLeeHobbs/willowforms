@@ -107,8 +107,14 @@ no index is ever authored. See [Repeated scope](#repeated-scope).
 **`FileUpload` reports a file name, not a file.** A file input is uncontrolled by design, and turning
 bytes into form data is an upload protocol this project does not own: the host reads the input when it
 submits. The value is the selected name, or an array of them, which is enough for `required` to mean
-"a file was chosen" and for the schema to describe the field. `maxSize` is advisory until a host enforces
-it. This is the one place the catalogue promises less than the type suggests.
+"a file was chosen" and for the schema to describe the field. This is the one place the catalogue promises
+less than the type suggests.
+
+`maxSize` is enforced by both kits at the moment of choosing: a file over it is dropped from the value and
+the count of what was dropped is announced. It is still not a security boundary -- the host reads the input
+itself when it submits, and nothing here can stop what a request contains -- so a host that cares has to
+check again. This paragraph said `maxSize` was advisory until a host enforced it, which was true before
+the kits did and had stayed on the page since.
 
 **`Link` refuses an address it does not recognise.** `href` comes from a document, and a form author is
 not always the person deploying the form, so `javascript:` in an `href` is the same code-execution
@@ -140,13 +146,13 @@ posted somewhere would be a backend, which is a non-goal.
 
 ### Selection
 
-| Component    | Status | Data type | Properties                                                |
-| ------------ | ------ | --------- | --------------------------------------------------------- |
-| `Select`     | Built  | `string`  | `label`, `options`, `helperText`, `disabled`              |
-| `Checkbox`   | Built  | `boolean` | `label`, `helperText`, `disabled`                         |
-| `RadioGroup` | Built  | `string`  | `label`, `options`, `direction`, `helperText`, `disabled` |
-| `RadioItem`  | Built  | no        | `label`, `value`, `disabled`                              |
-| `Switch`     | Built  | `boolean` | `label`, `helperText`, `disabled`                         |
+| Component    | Status | Data type | Properties                                                  |
+| ------------ | ------ | --------- | ----------------------------------------------------------- |
+| `Select`     | Built  | `string`  | `label`, `options`, `placeholder`, `helperText`, `disabled` |
+| `Checkbox`   | Built  | `boolean` | `label`, `helperText`, `disabled`                           |
+| `RadioGroup` | Built  | `string`  | `label`, `options`, `direction`, `helperText`, `disabled`   |
+| `RadioItem`  | Built  | no        | `label`, `value`, `disabled`                                |
+| `Switch`     | Built  | `boolean` | `label`, `helperText`, `disabled`                           |
 
 `options` is a `json` editor taking `{ label, value }[]`. Option values keep their type: a numeric value
 stays a number, and choosing that option submits the number. An earlier version replaced any non-string
