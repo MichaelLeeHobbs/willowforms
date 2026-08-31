@@ -20,6 +20,24 @@ const styleOf = async (designer: { page: Page }, key: string, property: string):
     [key, property],
   )
 
+/**
+ * The same reading, polled.
+ *
+ * Every assertion in this file used to be `expect(await styleOf(...)).toBe(...)`
+ * taken straight after `press('Enter')` -- a plain assertion, read once, on a
+ * value that needs a React commit and a `<style>` insertion to be true.
+ * `press()` resolves when the event is dispatched, not when the page has
+ * finished reacting to it, so those were races that happened to win.
+ *
+ * `expect.poll` retries until the timeout, which is what every other assertion
+ * in this suite gets from Playwright's own matchers.
+ */
+const expectStyle = (
+  designer: { page: Page },
+  key: string,
+  property: string,
+): ReturnType<typeof expect.poll> => expect.poll(() => styleOf(designer, key, property))
+
 test('a structured control styles the component on the canvas', async ({ designer }) => {
   await designer.select('website')
   await designer.openTab('Style')
@@ -34,8 +52,8 @@ test('a structured control styles the component on the canvas', async ({ designe
   await designer.page.getByLabel('Radius').fill('9px')
   await designer.page.getByLabel('Radius').press('Enter')
 
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
-  expect(await styleOf(designer, 'website', 'border-top-left-radius')).toBe('9px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('24px')
+  await expectStyle(designer, 'website', 'border-top-left-radius').toBe('9px')
 })
 
 test('a device rule overrides the base layer when that device is shown', async ({ designer }) => {
@@ -51,10 +69,10 @@ test('a device rule overrides the base layer when that device is shown', async (
 
   // Choosing a device in the Style tab moves the canvas to it, so what is on
   // screen is the rule being edited.
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('4px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('4px')
 
   await designer.page.getByRole('button', { name: 'Desktop' }).click()
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('24px')
 })
 
 test('CSS that would escape the component is not applied', async ({ designer }) => {
@@ -103,7 +121,7 @@ test('CSS that would escape the component is not applied', async ({ designer }) 
   expect(rules).toContain('padding')
   expect(rules).not.toContain('body')
   // And the component still has the styling that was accepted.
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('24px')
 })
 
 test('the canvas does not draw the form in the designer own typeface', async ({ designer }) => {

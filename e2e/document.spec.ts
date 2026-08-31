@@ -37,7 +37,7 @@ test('malformed JSON is refused and the form is left alone', async ({ designer }
 
   await expect(designer.page.getByRole('alert')).toBeVisible()
   await expect(designer.page.getByLabel('Form document JSON')).toBeVisible()
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 test('a document with a children field that is not an array is refused, not crashed on', async ({
@@ -55,7 +55,7 @@ test('a document with a children field that is not an array is refused, not cras
   await expect(designer.page.getByRole('alert')).toBeVisible()
   // Still a working builder afterwards, which is the whole point.
   await expect(designer.page.locator('.fs-shell')).toBeVisible()
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 test('every missing field is named at once, not one at a time', async ({ designer }) => {
@@ -238,7 +238,7 @@ test('an edit survives switching the kit', async ({ designer }) => {
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
 
   // The document the new kit is drawing, and the one that was persisted.
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
   await expect(designer.node('textField')).toBeVisible()
 })
 
@@ -305,5 +305,5 @@ test('Escape closes the dialog and leaves the document alone', async ({ designer
   await designer.page.keyboard.press('Escape')
 
   await expect(designer.page.getByLabel('Form document JSON')).toHaveCount(0)
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })

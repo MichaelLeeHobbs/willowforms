@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 24, the core and cross-cutting test suite MEDIUMs. Item 25 is next.
+- **Last completed:** item 25, the designer, renderer and Playwright suite MEDIUMs. Item 26 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/24-core-guard-suites`
+- **Last pushed item branch:** `build-out/b/25-designer-renderer-suites`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -279,7 +279,7 @@ slice either fixed or in `triage.md` with a one-line reason.
 - [x] **23. apps, build, lint config and CI, MEDIUMs.** Area 10, 13 findings. Includes nothing in CI ever
       loading a `dist`, and `copy-assets.mjs`'s hand-maintained asset list tied to nothing.
 - [x] **24. core and cross-cutting test suites, MEDIUMs.** Areas 11, 12 and 15, 30 findings.
-- [ ] **25. designer, renderer and Playwright suites, MEDIUMs.** Areas 13, 14 and 16, 34 findings.
+- [x] **25. designer, renderer and Playwright suites, MEDIUMs.** Areas 13, 14 and 16, 34 findings.
 - [ ] **26. spec and guides, MEDIUMs.** Areas 17 and 18, 23 findings.
 
 ## Stage 5 — the LOW and NOTE findings

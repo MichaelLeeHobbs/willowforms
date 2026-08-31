@@ -449,3 +449,22 @@ findings name code that has since changed:
 - `test/a11y.test.tsx:140-152`, the JSON dialog audited while not modal. Half of this was real and is
   fixed in this item: three `e2e/document.spec.ts` tests check `:modal`, the focus trap and Escape in a
   browser, and both documents say where that is checked and why it cannot be checked in jsdom.
+
+## No test with a layout engine draws a repeater with more than one row — area 16
+
+**MEDIUM, and it is the product's gap rather than the suite's.** The finding is right that
+`rowFromEventTarget`, the row-scoped `nodeElement` and the one-candidate-per-drawn-element measurement
+were all written for the bug where the outline, the label and the toolbar appeared around row 0 whichever
+row was clicked -- and that the rectangle half of that is checked nowhere.
+
+It cannot be checked yet. Rows are a projection of the answers, and nothing in the designer can produce a
+second answer: no kit renders an add-row control, edit mode swallows keystrokes so the canvas cannot be
+filled in, and preview starts with empty data. The canvas draws exactly one authored row so the subtree is
+reachable at all. `e2e/repeater.spec.ts` says this in its own comment and `found.md` carries it as the
+gap it is.
+
+What is covered instead: the projection, against supplied data, in `renderer.test.tsx` -- including rows
+added and removed, the re-addressing that follows, and the row coordinate surviving on a failed
+component's fallback. The identity half, `rowFromEventTarget` and `keyFromEventTarget`, is now tested
+directly in `geometry.test.ts`, which needs no layout engine. What is left needs an add-row control to
+exist, and that is a feature rather than a test.

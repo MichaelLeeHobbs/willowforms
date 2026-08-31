@@ -190,6 +190,39 @@ describe('two forms on one page', () => {
     expect(sheets[0]).not.toBe(sheets[1])
   })
 
+  it('carries the nonce a CSP host gave it onto the style element', () => {
+    /*
+     * The prop had no test anywhere in the repository, and what it decides is
+     * whether a host running `style-src 'self'` gets its authored styling at
+     * all or silently loses every rule. A dropped nonce is invisible from
+     * inside: the element is in the DOM, the CSS is in it, and the browser
+     * refuses it.
+     */
+    const doc = documentOf([field('email')])
+    doc.root.css = { any: 'color: rgb(4, 5, 6)' }
+
+    const { container } = render(
+      <FormRenderer document={doc} kit={kit} data={{}} nonce="abc123" onChange={() => undefined} />,
+    )
+
+    expect(container.querySelector('style')?.getAttribute('nonce')).toBe('abc123')
+  })
+
+  it('emits no nonce attribute when the host gave none', () => {
+    // The control: an empty `nonce=""` is not the same as no attribute, and a
+    // browser treats it as a nonce that matches nothing.
+    const doc = documentOf([field('email')])
+    doc.root.css = { any: 'color: rgb(4, 5, 6)' }
+
+    const { container } = render(
+      <FormRenderer document={doc} kit={kit} data={{}} onChange={() => undefined} />,
+    )
+
+    const style = container.querySelector('style')
+    expect(style).not.toBeNull()
+    expect(style?.hasAttribute('nonce')).toBe(false)
+  })
+
   it('puts the scope on the root as well, which a descendant selector would miss', () => {
     const doc = documentOf([field('email')])
     doc.root.css = { any: 'color: rgb(4, 5, 6)' }
@@ -387,6 +420,106 @@ describe('a repeater', () => {
     ])
 
   const twoRows = { email: 'a@b.co', addresses: [{ line1: 'one' }, { line1: 'two' }] }
+
+  it('follows the rows when the data gains and loses one', () => {
+    /*
+     * Every repeater test here rendered once against fixed data, and nothing in
+     * the designer can add a row, so no suite anywhere had ever re-rendered one
+     * with a different number of rows. What is drawn per row is the whole
+     * feature.
+     */
+    const { rerender } = render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+    expect(screen.getAllByLabelText('street')).toHaveLength(2)
+
+    rerender(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={{ ...twoRows, addresses: [{ line1: 'one' }, { line1: 'two' }, { line1: 'three' }] }}
+        onChange={() => undefined}
+      />,
+    )
+    expect(
+      screen.getAllByLabelText('street').map((input) => (input as HTMLInputElement).value),
+    ).toEqual(['one', 'two', 'three'])
+
+    rerender(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={{ ...twoRows, addresses: [{ line1: 'two' }] }}
+        onChange={() => undefined}
+      />,
+    )
+    expect(
+      screen.getAllByLabelText('street').map((input) => (input as HTMLInputElement).value),
+    ).toEqual(['two'])
+  })
+
+  it('re-addresses the rows that are left after one is removed', () => {
+    // The addresses, not just the values: an error is reported at
+    // `addresses[n].street`, so a row list that shifts without re-addressing
+    // points every message at the wrong row.
+    const { container, rerender } = render(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={{ ...twoRows, addresses: [{ line1: 'one' }, { line1: 'two' }, { line1: 'three' }] }}
+        onChange={() => undefined}
+      />,
+    )
+
+    rerender(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={{ ...twoRows, addresses: [{ line1: 'two' }, { line1: 'three' }] }}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(
+      [...container.querySelectorAll('[data-fs-key="street"]')].map((element) =>
+        element.getAttribute('data-fs-row'),
+      ),
+    ).toEqual(['addresses[0]', 'addresses[1]'])
+  })
+
+  it('keeps the element in place when the row under it changes, which is the cost of index keys', () => {
+    /*
+     * Rows are keyed by index, deliberately: a row is a position in a list and
+     * has no identity of its own to key on. The documented cost is that after
+     * deleting row 0 the instance that drew row 0 draws row 1 -- so anything
+     * the browser owns rather than React (a file input's contents, an IME
+     * composition, the selection, the scroll position) stays with the position
+     * rather than with the answer.
+     *
+     * Written down as a test because it is a real consequence that no failing
+     * case anywhere described, and because the day somebody keys rows on
+     * something else this should fail and be read rather than pass unnoticed.
+     */
+    const { container, rerender } = render(
+      <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
+    )
+
+    const first = container.querySelectorAll('[data-fs-key="street"] input')[0]
+    expect(first).toBeTruthy()
+
+    rerender(
+      <FormRenderer
+        document={repeating()}
+        kit={kit}
+        data={{ ...twoRows, addresses: [{ line1: 'two' }] }}
+        onChange={() => undefined}
+      />,
+    )
+
+    const remaining = container.querySelectorAll('[data-fs-key="street"] input')[0]
+    expect(remaining, 'the row element was replaced rather than reused').toBe(first)
+    expect((remaining as HTMLInputElement).value).toBe('two')
+  })
 
   it('draws its children once per row, with each row holding its own answer', () => {
     render(
@@ -924,6 +1057,47 @@ describe('a component that throws while rendering', () => {
     // Both siblings render, and the answers already in them are still there.
     expect(screen.getByLabelText('before')).toHaveProperty('value', 'kept')
     expect(screen.getByLabelText('after')).toHaveProperty('value', 'also kept')
+  })
+
+  it('keeps the row coordinate on the fallback, so the right row stays selectable', () => {
+    /*
+     * The `boom` fixture is flat and the repeater fixtures never throw, so the
+     * one place these two meet had no test. The fallback carries `data-fs-key`,
+     * `data-fs-type` and `data-fs-scope` so a broken component stays
+     * selectable -- and without the row coordinate as well,
+     * `rowFromEventTarget` answers nothing and `nodeElement` falls back to the
+     * first match, so the frame, the label and the row toolbar all land on row
+     * 0 whichever row broke. That is the exact bug those two functions were
+     * written to fix, reappearing in the one state nobody drew.
+     */
+    const doc = documentOf([
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [{ key: 'boom', type: 'Boom', props: {} }],
+      },
+    ])
+
+    const { container } = quietly(() =>
+      render(
+        <FormRenderer
+          document={doc}
+          kit={boomKit}
+          data={{ addresses: [{}, {}] }}
+          onChange={() => undefined}
+        />,
+      ),
+    )
+
+    const fallbacks = [...container.querySelectorAll('[data-fs-key="boom"]')]
+    expect(fallbacks).toHaveLength(2)
+    expect(fallbacks.map((element) => element.getAttribute('data-fs-row'))).toEqual([
+      'addresses[0]',
+      'addresses[1]',
+    ])
   })
 
   it('says so where the component would have been', () => {

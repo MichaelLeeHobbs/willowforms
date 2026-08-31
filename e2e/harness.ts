@@ -190,15 +190,38 @@ export async function stableBox(
  * both live in the canvas: that failed two passing canvas drags twice here, once
  * by measuring before scrolling and once by scrolling both.
  */
+/**
+ * Where a drag starts, scrolled into view before it is measured.
+ *
+ * Trap 13. `boundingBox()` answers for an element below the fold as readily as
+ * for one on screen -- the coordinates are simply outside the viewport, so
+ * `mouse.down()` presses on nothing, the gesture becomes a text selection, and
+ * the failure surfaces several steps later as a wrong document. That has
+ * already happened here, to a palette entry the layout pushed down; one more
+ * entry in the `layout` or `display` group puts the next one below the fold.
+ *
+ * The source only. Scrolling the *target* moves the source out from under a
+ * press that has already happened, which is a different way to lose the same
+ * gesture -- and a drop target that is off screen is a real failure worth
+ * seeing rather than one to paper over.
+ *
+ * Exported because two specs roll their own drag: one needs a modifier key
+ * mid-gesture, the other needs to press Escape, and neither fits `dragOnto`.
+ */
+export async function dragFrom(
+  source: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  await source.scrollIntoViewIfNeeded()
+  return stableBox(source)
+}
+
 export async function dragOnto(
   page: Page,
   from: Locator,
   to: Locator,
   where: 'top' | 'middle' | 'bottom' = 'middle',
 ): Promise<void> {
-  await from.scrollIntoViewIfNeeded()
-
-  const start = await stableBox(from)
+  const start = await dragFrom(from)
   const end = await stableBox(to)
 
   const targetY =
