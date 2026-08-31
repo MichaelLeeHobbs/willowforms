@@ -134,10 +134,11 @@ function DataKeyField({
   nodeKey: string
   value: string
   overridden: boolean
-  onCommit: (next: string) => void
+  onCommit: (next: string) => RenameResult
 }): ReactNode {
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
+  const [error, setError] = useState('')
 
   /*
    * Re-sync when the document changes underneath, without losing an edit in
@@ -167,8 +168,19 @@ function DataKeyField({
     const trimmed = draft.trim()
     if (trimmed !== draft) setDraft(trimmed)
     if (trimmed === value) return
+    /*
+     * Refused rather than stored, and the reason shown, which is the bargain
+     * `KeyField` below already makes. A data key is judged by the same grammar
+     * as a key, and this field applied none of it.
+     */
+    const result = onCommit(trimmed)
+    if (!result.ok) {
+      setError(result.reason)
+      setDraft(value)
+      return
+    }
+    setError('')
     setCommitted(trimmed)
-    onCommit(trimmed)
   }
 
   return (
@@ -179,7 +191,8 @@ function DataKeyField({
         type="text"
         value={draft}
         placeholder={nodeKey}
-        aria-describedby="fs-prop-datakey-hint"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? 'fs-prop-datakey-error' : 'fs-prop-datakey-hint'}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
@@ -187,9 +200,17 @@ function DataKeyField({
             e.preventDefault()
             commit()
           }
-          if (e.key === 'Escape') setDraft(value)
+          if (e.key === 'Escape') {
+            setDraft(value)
+            setError('')
+          }
         }}
       />
+      {error && (
+        <p id="fs-prop-datakey-error" className="fs-prop-row__error" role="alert">
+          {error}
+        </p>
+      )}
       <p id="fs-prop-datakey-hint" className="fs-prop-row__hint">
         {overridden
           ? 'Submitted as ' + value + ' rather than ' + nodeKey + '.'
@@ -658,7 +679,17 @@ function PropRow({
             onChange={(e) =>
               e.target.value === ''
                 ? onChange(undefined)
-                : set(optionValue(schema.options?.map((o) => o.value) ?? [], e.target.value))
+                : /*
+                   * The declared options, not their values.
+                   *
+                   * `optionValue` reads `option['value']` off each entry, so
+                   * `.map((o) => o.value)` unwrapped them before it could: the
+                   * declared-value pass matched nothing, the position pass
+                   * matched nothing, and the raw string fell out of the end. The
+                   * comment above this editor described the fix; the argument
+                   * stopped it happening.
+                   */
+                  set(optionValue(schema.options ?? [], e.target.value))
             }
           >
             <option value="">(default)</option>

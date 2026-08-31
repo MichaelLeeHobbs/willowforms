@@ -404,6 +404,29 @@ function LiteralField({
  * a postcode or a phone number, is the cost, and it is why the comparison
  * operators are the only place this matters.
  */
+/**
+ * What this box shows for a stored value: the inverse of `coerce`.
+ *
+ * `jsonToString` was used here, and it answers the empty string for an object,
+ * a list and `null` -- deliberately, because those carry no text and it is used
+ * where text is wanted. In this box a blank line is dropped on commit, so a
+ * document holding an object option showed a blank line and lost the option the
+ * first time anybody touched the control. `coerce` right below already parses
+ * `{`, `[` and `"` as JSON and its comment says an object "is what the box shows
+ * a document that already holds one". It was not.
+ *
+ * The quoting clause is the same defect one step quieter. A stored string `"18"`
+ * spelled as `18` comes back from `coerce` as the number, so editing an
+ * unrelated line silently changed a neighbour's type. Anything that does not
+ * survive the round trip is quoted, which is the escape hatch `coerce` already
+ * documents.
+ */
+function spell(value: JsonValue): string {
+  if (value === null || typeof value === 'object') return JSON.stringify(value)
+  const plain = jsonToString(value)
+  return coerce(plain) === value ? plain : JSON.stringify(value)
+}
+
 function coerce(text: string): JsonValue {
   if (text === '') return ''
 
@@ -450,18 +473,6 @@ function coerce(text: string): JsonValue {
 }
 
 /**
- * A literal as the text the box shows for it.
- *
- * A primitive spells itself. Everything else is JSON, because `jsonToString`
- * has nothing to say about an object and an empty box would claim the condition
- * tests nothing.
- */
-function spell(value: JsonValue): string {
-  if (value === null || typeof value === 'object') return JSON.stringify(value)
-  return jsonToString(value)
-}
-
-/**
  * The list of values a membership test compares against.
  *
  * Holds its own draft and commits on blur, which it has to: the stored value is
@@ -479,7 +490,7 @@ function OptionsField({
   options: JsonValue[]
   onCommit: (next: JsonValue[]) => void
 }): ReactNode {
-  const text = options.map((option) => jsonToString(option)).join('\n')
+  const text = options.map(spell).join('\n')
   const [draft, setDraft] = useState(text)
   const [committed, setCommitted] = useState(text)
 
@@ -528,7 +539,7 @@ function OptionsField({
 
     onCommit(parsed)
     // Show what was stored, so the box stops disagreeing with the document.
-    const stored = parsed.map((option) => jsonToString(option)).join('\n')
+    const stored = parsed.map(spell).join('\n')
     setCommitted(stored)
     setDraft(stored)
   }

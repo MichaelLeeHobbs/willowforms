@@ -556,3 +556,45 @@ describe('the translation key field', () => {
     expect(box).toHaveProperty('value', 'gree')
   })
 })
+
+/**
+ * The other control on the row that was fixed by position.
+ *
+ * Removal used to filter by tag, so one click deleted both rows when two shared
+ * one; that was fixed and pinned by the test above. The "Right to left"
+ * checkbox on the same row kept matching by tag, so ticking it on one flipped
+ * both -- one side of a symmetry fixed, the other left exactly as it was, with a
+ * passing test beside it.
+ */
+describe('two languages sharing a tag', () => {
+  it('takes the direction of the one that was ticked', async () => {
+    const { user, openTab, latest } = setup([
+      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'en', name: 'English again', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    const boxes = screen.getAllByRole('checkbox', { name: 'Right to left' })
+    expect(boxes).toHaveLength(2)
+    await user.click(boxes[1] as HTMLElement)
+
+    expect(latest().languages).toEqual([
+      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'en', name: 'English again', bidi: 'rtl' },
+    ])
+  })
+
+  it('still sets the direction when only one language has that tag', async () => {
+    // The control: matching by position must not have broken the ordinary case.
+    const { user, openTab, latest } = setup([
+      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'ar', name: 'Arabic', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    await user.click(screen.getAllByRole('checkbox', { name: 'Right to left' })[1] as HTMLElement)
+
+    expect(latest().languages[1]?.bidi).toBe('rtl')
+    expect(latest().languages[0]?.bidi).toBe('ltr')
+  })
+})

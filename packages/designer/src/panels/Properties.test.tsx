@@ -63,6 +63,22 @@ const kit: Kit = {
         { name: 'script', label: 'Script', editor: 'code' },
         { name: 'notes', label: 'Notes', editor: 'multiline' },
         { name: 'locked', label: 'Locked', editor: 'boolean', conditional: true },
+        /*
+         * A select whose declared values are not strings, which is the case the
+         * panel's own comment says it handles. Neither shipped kit declares one,
+         * which is the only reason the defect was invisible: the panel is the
+         * part a third kit meets first.
+         */
+        {
+          name: 'weight',
+          label: 'Weight',
+          editor: 'select',
+          options: [
+            { label: 'One', value: 1 },
+            { label: 'Two', value: 2 },
+            { label: 'Off', value: false },
+          ],
+        },
       ],
       events: ['onChange'],
     },
@@ -1482,5 +1498,331 @@ describe('typing a literal into a condition', () => {
     await harness.user.tab()
 
     expect(stored(harness)).toEqual({ kind: 'literal', value: true })
+  })
+})
+
+/**
+ * A select whose declared values are not strings.
+ *
+ * The comment above this editor says it reads and writes through `jsonToString`
+ * and `optionValue`, "which are inverses", and that treating the value as a
+ * string in both directions made a kit declaring `{ label: 'Two', value: 2 }`
+ * store `"2"`. The comment describes the fix; the call does not perform it.
+ *
+ * `optionValue(options, submitted)` reads `option['value']` off each entry, so
+ * it wants the declared options. The call passes `options.map((o) => o.value)`,
+ * which unwraps them first -- so the declared-value pass matches nothing, the
+ * position pass matches nothing either, and the raw string falls out of the end.
+ * Theme 2 of the review, in the panel a third kit meets first.
+ */
+describe('the select editor and a value that is not a string', () => {
+  /*
+   * By id, not by label text or by role and name. A property with a value set
+   * announces itself as "Weight (modified)", so an exact label misses after the
+   * first edit; a loose pattern then matches two comboboxes, because the binding
+   * mode selector on the same row carries the same label. Trap 4, twice, in four
+   * tests. The id is what names this one control.
+   */
+  const weightSelect = (): HTMLSelectElement => {
+    const element = document.getElementById('fs-prop-weight')
+    if (!(element instanceof HTMLSelectElement)) throw new Error('no Weight select')
+    return element
+  }
+
+  const withSelect = (): ComponentNode => ({
+    key: 'field',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  it('stores the number the kit declared, not its spelling', async () => {
+    const { user, latest, select } = setup(withSelect())
+    await select()
+
+    await user.selectOptions(weightSelect(), '2')
+
+    expect(latest()?.props?.['weight']).toEqual({ kind: 'static', value: 2 })
+  })
+
+  it('stores a boolean the same way', async () => {
+    const { user, latest, select } = setup(withSelect())
+    await select()
+
+    await user.selectOptions(weightSelect(), 'false')
+
+    expect(latest()?.props?.['weight']).toEqual({ kind: 'static', value: false })
+  })
+
+  it('shows the stored value as selected when it comes back', async () => {
+    /*
+     * The other direction, and the reason "inverses" is the word the comment
+     * uses. A panel that stored 2 and then showed nothing selected is the same
+     * defect read from the other end.
+     */
+    const { user, latest, select } = setup(withSelect())
+    await select()
+
+    await user.selectOptions(weightSelect(), '2')
+    expect(latest()?.props?.['weight']).toEqual({ kind: 'static', value: 2 })
+    expect(weightSelect().value).toBe('2')
+  })
+
+  it('still clears back to no value at all', async () => {
+    // The control: the empty placeholder must keep meaning "no value" rather
+    // than becoming a stored empty string.
+    const { user, latest, select } = setup(withSelect())
+    await select()
+
+    await user.selectOptions(weightSelect(), '2')
+    /*
+     * `/^Weight/`, because a property with a value set announces itself as
+     * "Weight (modified)". That is Trap 4 and it cost this control a run.
+     */
+    await user.selectOptions(weightSelect(), '')
+
+    expect(latest()?.props?.['weight']).toBeUndefined()
+  })
+})
+
+/**
+ * Choosing "Always" after authoring a condition.
+ *
+ * Consecutive edits sharing a coalescing label replace the entry on top rather
+ * than stacking on it, which is right for typing and wrong for changing what
+ * kind of rule this is. Every `setRenderWhen` write shared `renderWhen:<key>`,
+ * so selecting "Always" replaced the version holding the condition -- removing
+ * it from `past` and from `present` in one move, so it was reachable by neither
+ * undo nor redo, and the panel offers no other way back.
+ */
+describe('a visibility condition and the undo stack', () => {
+  const sibling = (): ComponentNode => ({
+    key: 'other',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  it('is reachable by undo after choosing Always, and by redo after that', async () => {
+    /*
+     * Authored here rather than loaded from the fixture, and that is what makes
+     * the test able to fail. Coalescing replaces the entry on *top* of the
+     * stack, so it only bites when the condition was written by an edit that is
+     * still the labelled one -- which is the ordinary case, and exactly what
+     * "choosing Always after authoring a condition" means. A fixture that
+     * arrives with the condition already in it has no labelled entry to
+     * replace, and the first version of this test passed against the defect for
+     * that reason.
+     */
+    const { user, latest, select } = setup(
+      { key: 'field', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+      [sibling()],
+    )
+    await select()
+
+    await user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+    const authored = latest()?.renderWhen
+    expect(authored).toBeDefined()
+
+    await user.selectOptions(screen.getByLabelText('Show when'), 'always')
+    expect(latest()?.renderWhen).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(latest()?.renderWhen, 'the condition was destroyed rather than undone').toEqual(authored)
+
+    /*
+     * And forward again. An undo that restores it while a redo cannot take it
+     * away would mean the entry was rebuilt rather than kept, which is a
+     * different bug with the same first half.
+     */
+    await user.click(screen.getByRole('button', { name: 'Redo' }))
+    expect(latest()?.renderWhen).toBeUndefined()
+  })
+
+  it('still folds a run of typing into one entry rather than one per keystroke', async () => {
+    /*
+     * The control, and the reason the label is not simply removed. Coalescing is
+     * what makes typing an expression one undo step, and without it each
+     * character would be its own -- one undo would leave `ab`.
+     *
+     * Three characters typed and one undo takes all of it *and* the mode change
+     * that created the empty expression, because that edit is the entry the
+     * typing folds into. That is the coalescing working, not a second bug: the
+     * empty expression a mode change produces is not a state anybody wants to
+     * return to.
+     */
+    const { user, latest, select } = setup(
+      { key: 'field', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+      [sibling()],
+    )
+    await select()
+
+    await user.selectOptions(screen.getByLabelText('Show when'), 'computed')
+    await user.type(screen.getByLabelText('Show when expression'), 'abc')
+    expect(latest()?.renderWhen).toEqual({ kind: 'computed', expression: 'abc' })
+
+    // One undo takes the whole run, not one character of it. Without the label
+    // this would be `{ kind: 'computed', expression: 'ab' }`.
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(latest()?.renderWhen).toBeUndefined()
+  })
+})
+
+/**
+ * The membership options box, and the values it could not spell.
+ *
+ * `coerce` parses a line beginning `{`, `[` or `"` as JSON, and its comment says
+ * an object "is what the box shows a document that already holds one". The box
+ * spelled its lines with `jsonToString`, which answers the empty string for an
+ * object, a list and `null` -- so the document's option showed as a blank line,
+ * and a blank line is dropped on commit. Touching the control at all deleted the
+ * option.
+ *
+ * The quoting half is the same defect one step quieter: a stored string `"18"`
+ * spelled as `18` came back from `coerce` as the number, so editing one line
+ * silently changed a neighbour's type.
+ */
+describe('the options a membership condition holds', () => {
+  const withOptions = (options: unknown[]): ComponentNode => ({
+    key: 'field',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'in',
+        value: { kind: 'ref', dataKey: 'other' },
+        options: options as never,
+      },
+    },
+  })
+
+  const sibling = (): ComponentNode => ({
+    key: 'other',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  const optionsBox = (): HTMLTextAreaElement =>
+    screen.getByLabelText<HTMLTextAreaElement>('Options, one per line')
+
+  it('shows an object option rather than a blank line', async () => {
+    const { select } = setup(withOptions([{ a: 1 }, 'GB']), [sibling()])
+    await select()
+
+    expect(optionsBox().value.split('\n')).toEqual(['{"a":1}', 'GB'])
+  })
+
+  it('keeps an object option when an unrelated line is edited', async () => {
+    /*
+     * The consequence. A blank line is dropped on commit, so the option was
+     * deleted by the first edit anybody made to any other line -- silently, and
+     * with the condition still looking right in the panel.
+     */
+    const { user, latest, select } = setup(withOptions([{ a: 1 }, 'GB']), [sibling()])
+    await select()
+
+    await user.click(optionsBox())
+    await user.keyboard('{End}X')
+    await user.tab()
+
+    const condition = latest()?.renderWhen
+    expect(condition?.kind).toBe('condition')
+    expect(condition?.kind === 'condition' ? condition.condition : undefined).toMatchObject({
+      options: [{ a: 1 }, 'GBX'],
+    })
+  })
+
+  it('keeps a stored string that is spelled like a number', async () => {
+    const { user, latest, select } = setup(withOptions(['18', 'GB']), [sibling()])
+    await select()
+
+    expect(optionsBox().value.split('\n')).toEqual(['"18"', 'GB'])
+
+    await user.click(optionsBox())
+    await user.keyboard('{End}X')
+    await user.tab()
+
+    const condition = latest()?.renderWhen
+    expect(condition?.kind === 'condition' ? condition.condition : undefined).toMatchObject({
+      options: ['18', 'GBX'],
+    })
+  })
+
+  it('still writes a number as a number, and a plain string plainly', async () => {
+    // The controls. Quoting everything would be its own defect: the panel's
+    // whole point is that `18` is the number and `"18"` is the text.
+    const { select } = setup(withOptions([18, 'GB', true]), [sibling()])
+    await select()
+
+    expect(optionsBox().value.split('\n')).toEqual(['18', 'GB', 'true'])
+  })
+})
+
+/**
+ * A data key judged by the rule a key is judged by.
+ *
+ * `setDataKey` never called `keyProblem`. Its only call site is `renameKey`, one
+ * function away, which validates and reports the reason so the field can show
+ * it -- so the panel refused `first-name` as a key and stored it as a data key,
+ * writing a document its own `validateDocument` reports as malformed.
+ *
+ * A data key does the same jobs a key does: it is the property name in the
+ * submitted payload, in exported JSON Schema, and the name a `ref` in a
+ * condition mentions. One rule, so a rename and a data key are judged the same
+ * way, which is exactly what `keys.ts` says about a rename and a paste.
+ */
+describe('a data key that breaks the key grammar', () => {
+  const field = (): ComponentNode => ({
+    key: 'emailField',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  const dataKeyInput = (): HTMLInputElement => screen.getByLabelText<HTMLInputElement>('Data key')
+
+  it.each([
+    ['first-name', 'a hyphen, which an expression reads as a subtraction'],
+    ['__proto__', 'a name that changes an object rather than filling it in'],
+    ['1st', 'a name no expression can mention'],
+  ])('refuses %s — %s', async (bad) => {
+    const { user, latest, select } = setup(field())
+    await select()
+
+    await user.clear(dataKeyInput())
+    await user.type(dataKeyInput(), bad)
+    await user.tab()
+
+    expect(latest()?.dataKey, 'the panel stored a data key its own gate refuses').toBeUndefined()
+  })
+
+  it('says why, rather than silently reverting', async () => {
+    const { user, select } = setup(field())
+    await select()
+
+    await user.clear(dataKeyInput())
+    await user.type(dataKeyInput(), 'first-name')
+    await user.tab()
+
+    expect(screen.getByRole('alert').textContent).toMatch(/subtraction/)
+  })
+
+  it('still accepts an ordinary data key, and still clears back to the key', async () => {
+    // The controls. A field that refused everything would pass every row above
+    // and make the override unauthorable.
+    const { user, latest, select } = setup(field())
+    await select()
+
+    await user.clear(dataKeyInput())
+    await user.type(dataKeyInput(), 'email')
+    await user.tab()
+    expect(latest()?.dataKey).toBe('email')
+
+    await user.clear(dataKeyInput())
+    await user.tab()
+    expect(latest()?.dataKey).toBeUndefined()
   })
 })

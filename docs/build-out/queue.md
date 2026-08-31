@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 12, the drag lifecycle. Item 13 is next.
+- **Last completed:** item 13, the inspector panels' HIGHs. Item 14 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/12-drag-lifecycle`
+- **Last pushed item branch:** `build-out/b/13-inspector-highs`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -194,7 +194,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       carry a comment describing this exact bug.
       _Check:_ standing gate, plus a test per finding, each seen red first.
 
-- [ ] **13. The inspector panels' HIGHs.** Areas 8 and 9, plus theme 4. `Properties.tsx:661` — the `select`
+- [x] **13. The inspector panels' HIGHs.** Areas 8 and 9, plus theme 4. `Properties.tsx:661` — the `select`
       editor hands `optionValue` unwrapped values, so its declared-value pass never matches and it returns
       the raw string, the exact bug the comment above it claims to have fixed. `Properties.tsx:344` —
       choosing "Always" after authoring a condition destroys it with no undo path, because both writes carry

@@ -30,10 +30,19 @@ export function jsonToString(value: JsonValue | undefined): string {
  * A submitted string matching nothing is returned as-is: that is the empty
  * placeholder, and inventing a value for it would be worse.
  */
-export function optionValue(options: readonly JsonValue[], submitted: string): JsonValue {
-  const declaredOf = (option: JsonValue | undefined): JsonValue | undefined =>
+export function optionValue(options: readonly unknown[], submitted: string): JsonValue {
+  /*
+   * `unknown`, because the two callers hand over two different shapes and both
+   * are right. The renderer passes a document's own option list, which is JSON.
+   * The Properties panel passes a kit's `PropOption[]`, which is `{ label,
+   * value }` and is not assignable to `JsonValue` for want of an index
+   * signature -- so the panel worked around the type by mapping to `o.value`
+   * first, which unwrapped exactly the field this function reads. The type was
+   * the reason the call was wrong.
+   */
+  const declaredOf = (option: unknown): JsonValue | undefined =>
     option !== null && typeof option === 'object' && !Array.isArray(option)
-      ? option['value']
+      ? ((option as Record<string, JsonValue>)['value'] ?? undefined)
       : undefined
 
   /*
