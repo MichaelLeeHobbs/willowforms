@@ -364,9 +364,27 @@ export function updateNode(
    * landed twice, and `moveNode` composes remove and insert, so a single node
    * ended up at two places in the tree.
    */
+  /*
+   * `found`, not `changed`, and the difference is a real case.
+   *
+   * This stopped at the first child whose subtree came back a *different
+   * object*, so an update that returns its input unchanged -- setting a property
+   * to the value it already holds, which every controlled editor in the panel
+   * does on a no-op edit -- left the flag down and the walk carried on into the
+   * next sibling. With a duplicate key, which `validateDocument` reports and
+   * cannot prevent, the second match was then edited instead.
+   *
+   * Whether the node was found and whether the result differs are two questions,
+   * and each decides a different thing: `found` decides where to stop walking,
+   * `changed` decides whether to rebuild this level at all. Structural sharing
+   * depends on the second and correctness on the first, which is why the one
+   * flag could not serve both.
+   */
+  let found = false
   let changed = false
   const children = root.children.map((child) => {
-    if (changed) return child
+    if (found) return child
+    if (findNode(child, key)) found = true
     const next = updateNode(child, key, update)
     if (next !== child) changed = true
     return next
@@ -666,7 +684,7 @@ const ROW_SCOPES: ReadonlySet<string> = new Set(ROW_SCOPE_LIST)
  * Far past anything a form has: a hundred levels of nesting is a layout nobody
  * can use, and the panel draws depth by indentation in a 288px pane.
  */
-const MAX_TREE_DEPTH = 500
+export const MAX_TREE_DEPTH = 500
 
 export function validateDocument(doc: FormDocument): StructuralError[] {
   const errors: StructuralError[] = []

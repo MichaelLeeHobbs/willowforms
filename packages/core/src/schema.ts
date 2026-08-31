@@ -11,7 +11,7 @@
  * components nest.
  */
 
-import { dataKeyOf, validationsOf, walk } from './tree.js'
+import { MAX_TREE_DEPTH, dataKeyOf, validationsOf, walk } from './tree.js'
 import { isRowScope } from './validation.js'
 import type {
   ComponentNode,
@@ -160,13 +160,29 @@ function baseType(type: FieldSchema['type']): JsonSchemaProperty {
  */
 function applyRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchemaProperty {
   const counting = property.type === 'array'
+  /*
+   * `minLength` on a number or a boolean is not a length at all.
+   *
+   * The choice was between the item keywords and the length keywords, decided by
+   * whether the type is `array` -- so a `minLength` rule on a `number` field
+   * exported `minLength`, which JSON Schema defines for strings only and every
+   * validator ignores. The form enforces the rule and the exported schema drops
+   * it, silently, which is the direction that matters: a server validating
+   * against the export accepts what the form refused.
+   *
+   * `unexportableRules` is where a rule that cannot be expressed is reported, so
+   * this returns the property unchanged and lets that reporting stand.
+   */
+  const measurable = property.type === 'array' || property.type === 'string'
 
   switch (rule.key) {
     case 'minLength':
+      if (!measurable) return property
       return counting
         ? { ...property, minItems: rule.value }
         : { ...property, minLength: rule.value }
     case 'maxLength':
+      if (!measurable) return property
       return counting
         ? { ...property, maxItems: rule.value }
         : { ...property, maxLength: rule.value }
@@ -235,15 +251,38 @@ function objectFor(root: ComponentNode): {
   properties: Record<string, JsonSchemaProperty>
   required: string[]
 } {
-  const properties: Record<string, JsonSchemaProperty> = {}
+  /*
+   * No prototype, the twin item 1 named and left here.
+   *
+   * `properties[name] = property` for a `dataKey` of `__proto__` runs the
+   * inherited setter and adds no own property, so the field vanishes from the
+   * exported schema -- and a server validating a payload against that export
+   * then has no constraint for it at all. Plain assignment rather than a
+   * coalesce, so this is quieter than `validateAcross` was and reaches the same
+   * place: `submittedData` and `validateForm` both build on a null prototype for
+   * exactly this reason, and the export did not.
+   *
+   * Spread into a plain object on the way out, like `submittedData` does: spread
+   * defines own properties rather than invoking the setter, so the schema a
+   * caller receives is an ordinary object that still holds the key.
+   */
+  const properties: Record<string, JsonSchemaProperty> = Object.create(null) as Record<
+    string,
+    JsonSchemaProperty
+  >
   const required: string[] = []
 
-  const visit = (node: ComponentNode): void => {
+  const visit = (node: ComponentNode, depth = 0): void => {
+    // The same bound `validateDocument` walks a tree with. An export runs on a
+    // document a host may never have gated, and a `RangeError` out of it is a
+    // 500 on a route whose whole job is to hand over a schema.
+    if (depth > MAX_TREE_DEPTH) return
+
     // Only data-bound components carry a schema, and only they appear in the
     // submitted data. Layout and display components are not in the projection.
     const field = node.schema
     if (!field) {
-      for (const child of node.children ?? []) visit(child)
+      for (const child of node.children ?? []) visit(child, depth + 1)
       return
     }
 
@@ -302,5 +341,7 @@ function objectFor(root: ComponentNode): {
   if (root.schema && !isRowScope(root)) visit(root)
   else for (const child of root.children ?? []) visit(child)
 
-  return { properties, required }
+  // Spread on the way out, so a caller gets an ordinary object that still
+  // holds a key named after something on `Object.prototype`.
+  return { properties: { ...properties }, required }
 }

@@ -529,3 +529,48 @@ describe('a condition nested beyond any reasonable depth, through not and throug
     ).not.toThrow()
   })
 })
+
+/**
+ * A membership test whose options are not a list.
+ *
+ * Every branch in `evaluate` answers `undefined` for a shape it cannot read, and
+ * `not` passes that through rather than inverting it -- which is the whole
+ * reason the distinction exists and is explained three comments above the
+ * branch. `in` and `notIn` answered `false`, so `not(in(x, "oops"))` was `true`
+ * and a component whose rule nobody can read was *shown*.
+ */
+describe('a membership condition whose options are malformed', () => {
+  const malformed = (op: 'in' | 'notIn'): Condition => ({
+    op,
+    value: { kind: 'literal', value: 'a' },
+    options: 'not-a-list' as never,
+  })
+
+  it.each(['in', 'notIn'] as const)('reads %s as unreadable rather than false', (op) => {
+    // The boundary turns unreadable into hidden, which is what an unreadable
+    // rule gets everywhere else in this file.
+    expect(evaluateCondition(malformed(op), {})).toBe(false)
+  })
+
+  it.each(['in', 'notIn'] as const)('does not show the component when %s is negated', (op) => {
+    /*
+     * The half that matters. `false` inverted is `true`: the component whose
+     * rule could not be read was the one that appeared.
+     */
+    expect(evaluateCondition({ op: 'not', condition: malformed(op) }, {})).toBe(false)
+  })
+
+  it('still answers a membership test whose options are a list', () => {
+    // The controls, in both directions.
+    const held: Condition = {
+      op: 'in',
+      value: { kind: 'literal', value: 'a' },
+      options: ['a', 'b'],
+    }
+    expect(evaluateCondition(held, {})).toBe(true)
+    expect(evaluateCondition({ op: 'not', condition: held }, {})).toBe(false)
+    expect(
+      evaluateCondition({ op: 'in', value: { kind: 'literal', value: 'z' }, options: ['a'] }, {}),
+    ).toBe(false)
+  })
+})

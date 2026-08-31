@@ -19,7 +19,7 @@
 
 import { same } from './condition.js'
 import { readPath } from './json.js'
-import { validationsOf } from './tree.js'
+import { MAX_TREE_DEPTH, validationsOf } from './tree.js'
 import type {
   ComponentNode,
   Condition,
@@ -89,7 +89,11 @@ export function contextKeys(root: ComponentNode): Set<string> {
    * this at startup, which is before anything has had a chance to refuse the
    * document — so throwing is the one thing it must not do.
    */
-  const visit = (node: ComponentNode): void => {
+  const visit = (node: ComponentNode, depth = 0): void => {
+    // The same bound `validateDocument` walks a tree with. This docblock promises
+    // totality on a document that was never gated, and an unbounded walk is the
+    // one way a total function stops being one.
+    if (depth > MAX_TREE_DEPTH) return
     if (!node || typeof node !== 'object') return
 
     fromPropValue(node.renderWhen, keys)
@@ -103,7 +107,7 @@ export function contextKeys(root: ComponentNode): Set<string> {
     const rules = validationsOf(node)
     for (const rule of rules) fromPropValue(rule?.when, keys)
 
-    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
+    for (const child of Array.isArray(node.children) ? node.children : []) visit(child, depth + 1)
   }
   visit(root)
 
@@ -134,8 +138,11 @@ export function contextKeys(root: ComponentNode): Set<string> {
 export function evaluatorKeys(root: ComponentNode): string[] {
   const keys = new Set<string>()
 
-  const walkNode = (node: ComponentNode): void => {
+  const walkNode = (node: ComponentNode, depth = 0): void => {
     if (!node || typeof node !== 'object') return
+    // The same bound `validateDocument` walks a tree with. This runs on a
+    // document a host may never have gated.
+    if (depth > MAX_TREE_DEPTH) return
 
     const needs = (value: PropValue | undefined): boolean => value?.kind === 'computed'
 
@@ -153,7 +160,8 @@ export function evaluatorKeys(root: ComponentNode): string[] {
 
     if (expression && typeof node.key === 'string') keys.add(node.key)
 
-    for (const child of Array.isArray(node.children) ? node.children : []) walkNode(child)
+    for (const child of Array.isArray(node.children) ? node.children : [])
+      walkNode(child, depth + 1)
   }
   walkNode(root)
 
@@ -282,8 +290,11 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
    * called at a host's startup, before anything has refused the document, so
    * `flatten` assuming `children` is an array is an assumption it cannot make.
    */
-  const walkNode = (node: ComponentNode): void => {
+  const walkNode = (node: ComponentNode, depth = 0): void => {
     if (!node || typeof node !== 'object') return
+    // The same bound `validateDocument` walks a tree with. This runs on a
+    // document a host may never have gated.
+    if (depth > MAX_TREE_DEPTH) return
 
     const collect = (value: PropValue | undefined): void => {
       if (value && typeof value === 'object' && value.kind === 'condition') visit(value.condition)
@@ -300,7 +311,8 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
     const rules = validationsOf(node)
     for (const rule of rules) collect(rule?.when)
 
-    for (const child of Array.isArray(node.children) ? node.children : []) walkNode(child)
+    for (const child of Array.isArray(node.children) ? node.children : [])
+      walkNode(child, depth + 1)
   }
   walkNode(root)
 

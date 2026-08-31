@@ -1441,3 +1441,105 @@ describe('an evaluator that throws', () => {
     })
   })
 })
+
+/**
+ * Three ways a rule read the wrong thing, or nothing.
+ */
+describe('rules that a document can malform or misplace', () => {
+  it('fails a pattern rule that carries no pattern rather than throwing', () => {
+    /*
+     * A document is data, so `{ key: 'pattern' }` with no `value` arrives from a
+     * paste, and `nestedUnbounded(undefined)` read `.length` off it -- out of
+     * `validateForm`, which is a 500 on submit. The same answer a pattern this
+     * refuses to run already gets.
+     */
+    expect(() => check({ key: 'pattern' } as ValidationRule, 'x')).not.toThrow()
+    expect(check({ key: 'pattern' } as ValidationRule, 'x')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it('evaluates a custom rule inside a row against that row', () => {
+    /*
+     * `validateField` already resolves the *value* from the row, and the custom
+     * rule handed the expression top-level `FormData` -- so it checked a key
+     * from outside the row and reported against the row it never read.
+     *
+     * The fixture's two names differ, because that is the distinction the code
+     * branches on: the row is addressed by the repeater's data key.
+     */
+    const seen: FormData[] = []
+    const evaluate: Evaluator = (_expression, data) => {
+      seen.push(data)
+      return data['line1'] === 'in the row'
+    }
+
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'addressList',
+          dataKey: 'addresses',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [
+            {
+              key: 'street',
+              dataKey: 'line1',
+              type: 'TextField',
+              props: {},
+              schema: { type: 'string', validations: [{ key: 'custom', expression: 'row()' }] },
+            },
+          ],
+        },
+      ],
+    }
+
+    const errors = validateForm(
+      root,
+      { line1: 'at the top level', addresses: [{ line1: 'in the row' }] },
+      { evaluate },
+    )
+
+    expect(errors).toEqual({})
+    expect(seen[0]?.['line1']).toBe('in the row')
+  })
+
+  it('still lets a custom rule inside a row read a form-level answer', () => {
+    /*
+     * The control, and why the row's values are layered over the form's rather
+     * than replacing them: an expression comparing a row answer against
+     * something asked once, at the top of the form, has to reach both.
+     */
+    const evaluate: Evaluator = (_expression, data) => data['country'] === 'GB'
+
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'addressList',
+          dataKey: 'addresses',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [
+            {
+              key: 'street',
+              dataKey: 'line1',
+              type: 'TextField',
+              props: {},
+              schema: { type: 'string', validations: [{ key: 'custom', expression: 'top()' }] },
+            },
+          ],
+        },
+      ],
+    }
+
+    expect(
+      validateForm(root, { country: 'GB', addresses: [{ line1: 'a' }] }, { evaluate }),
+    ).toEqual({})
+  })
+})

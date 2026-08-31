@@ -17,6 +17,51 @@ Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`; first-pass en
 
 ## Second pass (from 2026-08-31)
 
+## A `custom` rule with no evaluator passes — `validation.ts:415`, area 3, item 19
+
+**MEDIUM.** The finding is that `if (!options.evaluate) return undefined` lets every custom rule through
+on a host that injected no sandbox. That is the documented degradation, stated in this file's own header
+and in `docs/spec/08-validation.md`, and reversing it would make the library unusable without an
+evaluator: every custom rule would fail for a host that has deliberately declined to supply one.
+
+The failure the finding is really about is a host that _needs_ an evaluator and has not noticed, and that
+already has an answer at the right layer: `evaluatorKeys(root)` reports every component whose rules need
+one, and `apps/demo-server` refuses to accept a submit for such a document with a 500 naming the
+components. A boot-time check is where "this host is misconfigured" belongs; a per-rule guess is not.
+
+What did change in item 8 is the case this finding is next to: an evaluator that _throws_ now fails the
+rule, because a broken expression is not a configuration choice.
+
+## `validateAcross` multiplies scopes by rows — `validation.ts:707-711`, area 3, item 19
+
+**MEDIUM.** Each scope walks the whole tree, and `MAX_ROWS` bounds the rows inside one walk, so a
+document with many steps multiplies a bounded quantity by a document-controlled one. Both factors are
+already bounded in practice: the scopes come from `contextValues(root, 'step')`, which is the set of
+distinct literals a document compares `context.step` against, and a document deep enough to matter is
+refused by `MAX_TREE_DEPTH` first.
+
+Left because the honest fix is a work budget across the whole validation pass rather than another
+constant, and that is a design with a number in it that nobody has measured. What made the original
+report worth acting on -- a _request_-controlled multiplier -- is `MAX_ROWS`, which exists. The demo
+server also refuses a body over `MAX_BODY` before any of this runs, and item 14 made that a real limit.
+
+Worth revisiting with a profile rather than by argument.
+
+## `applyChange` and `rowContext` disagree about a row that is not an object — `rows.ts:502`, area 2, item 19
+
+**MEDIUM, partly fixed.** `rowContext` coerces a row that is not a plain object to `{}` so the renderer
+can draw it, and `applyChange` refuses to write into one -- so a row arriving as a string draws as an
+empty row whose keystrokes go nowhere.
+
+Not reconciled here, and the reason is that both halves are right for their own caller. Drawing nothing
+for a malformed row would hide a row the data says exists; writing into it would mean choosing what
+`"nope"` becomes when somebody types into its `line1`, which is inventing an answer. What was missing is
+that nobody is told, and item 18 added the report at the layer that can give one: `validateForm` now
+reports `NOT_A_LIST` for a repeater whose value is not a list, which is the same shape one level up.
+
+A row inside a well-formed list that is itself malformed still draws empty and refuses writes. Closing
+that means deciding whether the renderer may replace a row, which is a document-model question.
+
 ## `eslint .` does lint `aliases.ts` — area 10, item 5
 
 **MEDIUM, refuted.** The finding says the file `CLAUDE.md` calls load-bearing is never linted. It is.

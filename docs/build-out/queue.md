@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 18, the test suites' HIGHs. Stage 3 is done; item 19 is next.
+- **Last completed:** item 19, the core MEDIUMs. Item 20 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/18-test-highs`
+- **Last pushed item branch:** `build-out/b/19-core-mediums`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -265,7 +265,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
 174 findings. Each item is a slice of the review; the check is the standing gate plus every finding in the
 slice either fixed or in `triage.md` with a one-line reason.
 
-- [ ] **19. core MEDIUMs.** Review areas 1, 2 and 3, 22 findings across `types.ts`, `factory.ts`, `keys.ts`,
+- [x] **19. core MEDIUMs.** Review areas 1, 2 and 3, 22 findings across `types.ts`, `factory.ts`, `keys.ts`,
       `kit.ts`, `language.ts`, `json.ts`, `schema.ts`, `tree.ts`, `rows.ts`, `validation.ts`, `condition.ts`,
       `visibility.ts`, `context.ts` and `css.ts`. Includes `schema.ts:238`'s `__proto__` accumulator and
       `json.ts:84`'s dropped bare-string labels.

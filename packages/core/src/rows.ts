@@ -247,7 +247,23 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
     const gather = (inner: ComponentNode, depth: number): void => {
       if (depth > MAX_TREE_DEPTH) return
       if (inner !== node && inner?.schema) names.add(dataKeyOf(inner))
-      for (const child of kids(inner)) gather(child, depth + 1)
+      /*
+       * A nested repeater's own row is a different scope, so its contents are
+       * not this row's keys. This descended through them, crediting an outer row
+       * with names that live one row further down -- so a `scope: 'row'` ref
+       * naming an inner field read as correct from the outer row, where it reads
+       * nothing.
+       *
+       * The repeater node itself is counted, because the *list* is an answer the
+       * outer row holds. Only its contents belong to the row below.
+       */
+      for (const child of kids(inner)) {
+        if (isRowScopeNode(child)) {
+          if (child.schema) names.add(dataKeyOf(child))
+          continue
+        }
+        gather(child, depth + 1)
+      }
     }
     gather(node, 0)
     return names

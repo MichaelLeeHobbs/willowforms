@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { isEmpty, jsonToString, optionValue, readPath, safeHref, valueOf } from './json.js'
+import {
+  isEmpty,
+  jsonToString,
+  optionEntry,
+  optionValue,
+  readPath,
+  safeHref,
+  valueOf,
+} from './json.js'
 
 describe('jsonToString', () => {
   it('passes strings through and renders primitives', () => {
@@ -337,5 +345,42 @@ describe('valueOf', () => {
     // be nothing, because no field was answered.
     const body = JSON.parse('{"__proto__":{"role":"admin"}}') as Record<string, never>
     expect(valueOf(body, 'role')).toBeUndefined()
+  })
+})
+
+/**
+ * A bare string option is its own value.
+ *
+ * `options: ['Yes', 'No']` is the shortest list an author writes and the shape
+ * every JSON Schema `enum` has. `optionEntry` used the *position* whenever no
+ * `value` was declared, and a plain string declares one by being one -- so both
+ * kits drew a select reading `0`, `1`, `2`, and the answer stored was the index.
+ */
+describe('an option that is a plain string', () => {
+  it('uses itself as its value and its label', () => {
+    expect(optionEntry('Yes', 0)).toEqual({ value: 'Yes', label: 'Yes' })
+    expect(optionEntry('No', 1)).toEqual({ value: 'No', label: 'No' })
+  })
+
+  it('uses itself when it is a number or a boolean too', () => {
+    expect(optionEntry(18, 0)).toEqual({ value: '18', label: '18' })
+    expect(optionEntry(true, 3)).toEqual({ value: 'true', label: 'true' })
+  })
+
+  it('still reads a declared value and label off an object', () => {
+    // The control for the shape that always worked.
+    expect(optionEntry({ label: 'Two', value: 2 }, 0)).toEqual({ value: '2', label: 'Two' })
+    expect(optionEntry({ label: 'Two' }, 5)).toEqual({ value: '5', label: 'Two' })
+  })
+
+  it('still falls back to the position for an option that names nothing', () => {
+    /*
+     * The other control. An option carrying neither a value nor anything a value
+     * could be read from has only its position to be named by, and inventing a
+     * name for it would be worse.
+     */
+    expect(optionEntry({}, 4)).toEqual({ value: '4', label: '4' })
+    expect(optionEntry(null, 2)).toEqual({ value: '2', label: '2' })
+    expect(optionEntry(undefined, 7)).toEqual({ value: '7', label: '7' })
   })
 })

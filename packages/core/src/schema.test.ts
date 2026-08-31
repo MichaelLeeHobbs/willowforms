@@ -583,3 +583,94 @@ describe('a rule that applies only sometimes', () => {
     expect(toJsonSchema(plain).required).toEqual(['vat'])
   })
 })
+
+/**
+ * What the export does with a document nobody gated.
+ *
+ * `toJsonSchema` runs on whatever a host hands it, and a server validating a
+ * payload against its output is trusting it -- so a constraint the form enforces
+ * and the export drops is accepted where the form refused. Silently, which is
+ * the direction that matters.
+ */
+describe('the exported schema and a document that is data', () => {
+  const withField = (node: ComponentNode): FormDocument => ({
+    ...createDocument('Export', 'export'),
+    root: { key: 'root', type: 'Screen', props: {}, children: [node] },
+  })
+
+  it('keeps a property whose data key is a name on Object.prototype', () => {
+    /*
+     * `properties[name] = property` for a `dataKey` of `__proto__` runs the
+     * inherited setter and adds no own property, so the field vanished from the
+     * export -- and a server checking a payload against it then had no
+     * constraint for that answer at all. The twin item 1 named and left here.
+     */
+    const schema = toJsonSchema(
+      withField({
+        key: 'sneaky',
+        dataKey: '__proto__',
+        type: 'TextField',
+        props: {},
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      }),
+    )
+
+    expect(Object.hasOwn(schema.properties, '__proto__')).toBe(true)
+    expect(schema.required).toContain('__proto__')
+  })
+
+  it('does not put a length keyword on a type that has no length', () => {
+    /*
+     * `minLength` is defined for strings, and every validator ignores it on a
+     * number -- so the form enforced the rule and the export dropped it. The
+     * choice was made by asking whether the type is `array`, which answers the
+     * wrong question for everything that is neither a list nor a string.
+     */
+    const schema = toJsonSchema(
+      withField({
+        key: 'age',
+        type: 'NumberField',
+        props: {},
+        schema: { type: 'number', validations: [{ key: 'minLength', value: 3 }] },
+      }),
+    )
+
+    expect(schema.properties['age']).not.toHaveProperty('minLength')
+    expect(schema.properties['age']).not.toHaveProperty('minItems')
+  })
+
+  it('still puts one on a string and on a list', () => {
+    // The controls. A rule that dropped every length keyword would pass the row
+    // above and export nothing useful.
+    const text = toJsonSchema(
+      withField({
+        key: 'name',
+        type: 'TextField',
+        props: {},
+        schema: { type: 'string', validations: [{ key: 'minLength', value: 3 }] },
+      }),
+    )
+    expect(text.properties['name']).toHaveProperty('minLength', 3)
+
+    const list = toJsonSchema(
+      withField({
+        key: 'tags',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [{ key: 'minLength', value: 3 }] },
+        children: [],
+      }),
+    )
+    expect(list.properties['tags']).toHaveProperty('minItems', 3)
+  })
+
+  it('does not overflow on a document nested deeper than the gate walks', () => {
+    // Built with a loop, because building it recursively would overflow first.
+    let node: ComponentNode = { key: 'leaf', type: 'Box', props: {} }
+    for (let i = 0; i < 50_000; i += 1) {
+      node = { key: 'box' + String(i), type: 'Box', props: {}, children: [node] }
+    }
+
+    expect(() => toJsonSchema(withField(node))).not.toThrow()
+  })
+})

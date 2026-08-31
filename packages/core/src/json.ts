@@ -87,8 +87,18 @@ export function optionEntry(
   const record =
     option !== null && typeof option === 'object' && !Array.isArray(option) ? option : undefined
 
-  const declared = record?.['value']
-  const value = declared === undefined ? String(index) : jsonToString(declared)
+  /*
+   * A bare option is its own value, not its position.
+   *
+   * `options: ['Yes', 'No']` is the shortest thing an author writes and the
+   * shape every JSON Schema `enum` has, and it rendered as `0` and `1` in both
+   * kits: the position was used because no `value` was *declared*, and a plain
+   * string declares one by being one. The index remains the fallback for an
+   * option that carries neither -- `{}`, `null`, a nested list -- because a
+   * position is the only name such an option has.
+   */
+  const declared = record ? record['value'] : option
+  const value = declared === undefined || declared === null ? String(index) : jsonToString(declared)
   // The value is the fallback label, so an option always draws as something.
   const label = typeof record?.['label'] === 'string' ? record['label'] : value
 
