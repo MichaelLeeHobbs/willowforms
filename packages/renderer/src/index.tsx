@@ -166,7 +166,27 @@ export function resolveProp(
       return evaluateCondition(value.condition, data, options.context, options.row)
     case 'computed':
       // No sandbox means no evaluation. Render the field rather than crash the form.
-      return options.evaluate ? options.evaluate(value.expression, data, options.context) : null
+      if (!options.evaluate) return null
+      /*
+       * And a throw gets the same answer, for the same reason.
+       *
+       * This was the last render-time evaluator call site in the project without
+       * a `try`. `visibility.ts` wraps it and says why; `validation.ts`'s two
+       * sites were wrapped in item 8. An expression is authored in a document
+       * and the evaluator belongs to the host, so a throw here is neither side's
+       * to own -- and it took the form down through a path the boundary did not
+       * cover either.
+       *
+       * `null`, not the boundary's fallback. A single bad prop expression is not
+       * a reason to replace a working component with an error box, and this line
+       * already promised exactly this answer for a host that supplied no
+       * evaluator at all.
+       */
+      try {
+        return options.evaluate(value.expression, data, options.context)
+      } catch {
+        return null
+      }
 
     /*
      * A kind this code does not have. `null` rather than falling off the end
@@ -359,9 +379,22 @@ function Row({
   return <RowCtx.Provider value={context}>{children}</RowCtx.Provider>
 }
 
-export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
+/**
+ * One node, inside its boundary.
+ *
+ * The boundary used to wrap `<Component>` and nothing else, so everything below
+ * this line -- the kit lookup, `isVisible`, `resolveProps`, the row mapping --
+ * ran outside it. A kit is third-party code, which is the premise the boundary's
+ * own comment argues from, and `kit.renderers[node.type]` is a property read on
+ * an object this package did not write.
+ *
+ * Split in two so the boundary is a parent rather than a wrapper around the last
+ * expression. `RenderNode` now reads the context and returns the boundary;
+ * everything else is here, where a throw is caught.
+ */
+function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
-  const { scope, revealHidden, kit, data, errors, translations, options, onChange, onError } = ctx
+  const { scope, revealHidden, kit, data, errors, translations, options, onChange } = ctx
   const row = useContext(RowCtx)
 
   // Everything a rule reads has to know which row it is in, or the renderer and
@@ -472,19 +505,39 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     : node.children?.map((child) => <RenderNode key={child.key} node={child} />)
 
   return (
+    <Component
+      node={node}
+      props={props}
+      nodeProps={nodeProps}
+      // Value by data key, error by node key. Two components may share a data
+      // key; they can still fail for different reasons.
+      value={valueOf(row?.values ?? data, dataKey)}
+      error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
+      onChange={handleChange}
+    >
+      {children}
+    </Component>
+  )
+}
+
+/**
+ * One node's blast radius, and it now covers the whole node.
+ *
+ * Nothing here can throw for a reason a document controls: it reads a context
+ * and returns a boundary. `RenderNodeBody` does the work, inside it.
+ *
+ * This is also what gives the document root a boundary. `FormRenderer` renders
+ * `<RenderNode node={document.root} />` with nothing above it, so a throw at the
+ * root unmounted the whole tree -- a blank page in whatever host embedded the
+ * form, which is the one outcome the boundary exists to prevent, at the one node
+ * it did not cover.
+ */
+export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
+  const { scope, onError } = useRenderContext()
+
+  return (
     <NodeBoundary node={node} scope={scope} onError={onError}>
-      <Component
-        node={node}
-        props={props}
-        nodeProps={nodeProps}
-        // Value by data key, error by node key. Two components may share a data
-        // key; they can still fail for different reasons.
-        value={valueOf(row?.values ?? data, dataKey)}
-        error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
-        onChange={handleChange}
-      >
-        {children}
-      </Component>
+      <RenderNodeBody node={node} />
     </NodeBoundary>
   )
 }

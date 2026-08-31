@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 8, the core HIGHs. Item 9 is next.
+- **Last completed:** item 9, the renderer HIGHs. Item 10 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/08-core-highs`
+- **Last pushed item branch:** `build-out/b/09-renderer-highs`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -158,7 +158,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       expression escapes `validateForm`; `visibility.ts` wraps the same call and explains why.
       _Check:_ standing gate, plus a test per finding, each seen red first.
 
-- [ ] **9. renderer HIGHs.** Area 4. `renderer/src/index.tsx:459` — `NodeBoundary` wraps only the kit's
+- [x] **9. renderer HIGHs.** Area 4. `renderer/src/index.tsx:459` — `NodeBoundary` wraps only the kit's
       `<Component>`, not `RenderNode`'s own body, so the blast-radius guarantee in its doc comment does not
       hold and the document root has no boundary at all. `:169` — the host evaluator is called with no
       `try`/`catch`, unlike every other render-time evaluator call site in the project.
