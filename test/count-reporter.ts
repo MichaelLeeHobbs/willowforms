@@ -64,8 +64,10 @@ function testFilesOnDisk(): number {
   })) {
     if (entry.isDirectory()) walk('packages/' + entry.name + '/src/')
   }
+  for (const entry of readdirSync(fileURLToPath(new URL('apps', root)), { withFileTypes: true })) {
+    if (entry.isDirectory()) walk('apps/' + entry.name + '/src/')
+  }
   walk('test/')
-
   return found
 }
 
