@@ -304,11 +304,29 @@ describe('a renderWhen this code cannot read', () => {
     expect(isVisible(field('a', typo as unknown as ComponentNode['renderWhen']), {})).toBe(true)
   })
 
-  it('never answers undefined, which is what made this invisible', () => {
-    // The failure was not "the wrong boolean", it was "not a boolean at all".
-    expect(typeof isVisible(field('a', typo as unknown as ComponentNode['renderWhen']), {})).toBe(
-      'boolean',
-    )
+  it('never answers undefined for any tag, which is what made this invisible', () => {
+    /*
+     * The failure was not "the wrong boolean", it was "not a boolean at all".
+     *
+     * Asserting that on the same fixture as the test above adds nothing:
+     * `toBe(true)` already excludes `undefined`, so this could not fail unless
+     * that one did first. The tags here are the other shapes a hand-edited
+     * document produces -- a missing kind, a kind that is not text, a
+     * `renderWhen` that is not an object at all -- and each of them used to
+     * fall off the switch.
+     */
+    const shapes: unknown[] = [
+      { kind: 'conditon', condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'a' } } },
+      { kind: 42 },
+      {},
+      'always',
+      [],
+    ]
+
+    for (const shape of shapes) {
+      const answer = isVisible(field('a', shape as ComponentNode['renderWhen']), {})
+      expect(typeof answer, JSON.stringify(shape)).toBe('boolean')
+    }
   })
 
   it('keeps the field in validation, which is the point', () => {

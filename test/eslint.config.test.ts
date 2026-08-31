@@ -215,6 +215,19 @@ describe('the invariants are enforced by the linter, not only by CLAUDE.md', () 
     async () => {
       const byPath = await lintAll()
 
+      /*
+       * Every fixture was linted at all.
+       *
+       * `byPath.get(...) ?? []` reads a file ESLint declined to lint -- one
+       * outside every `files` pattern, or in an ignored directory -- as a clean
+       * result, which is indistinguishable from a passing control and hides a
+       * failing case. If the config's scoping ever stops matching these
+       * fixtures, every "did not report" assertion below becomes vacuous at
+       * once.
+       */
+      const unlinted = CASES.filter((each) => !byPath.has(abs(each.path))).map((each) => each.what)
+      expect(unlinted, 'ESLint did not lint these fixtures at all').toEqual([])
+
       const wrong: string[] = []
       for (const each of CASES) {
         const rules = byPath.get(abs(each.path)) ?? []

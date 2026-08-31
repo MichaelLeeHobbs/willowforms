@@ -719,6 +719,25 @@ describe('the decision log', () => {
 })
 
 describe('the accessibility document', () => {
+  it('lists exactly the axe rules the suite disables', () => {
+    /*
+     * `NEEDS_LAYOUT` in `a11y.test.tsx` names the rules turned off because
+     * jsdom has no layout engine, and `docs/accessibility.md` lists the same
+     * three for a reader deciding how much the audit is worth. Nothing compared
+     * them, so disabling a fourth rule would have gone unmentioned in the one
+     * document that says what is checked.
+     */
+    const suite = read('test/a11y.test.tsx')
+    const declared = [
+      ...(/const NEEDS_LAYOUT = \[([^\]]*)\]/.exec(suite)?.[1] ?? '').matchAll(/'([\w-]+)'/g),
+    ].map((match) => match[1] ?? '')
+
+    expect(declared.length, 'the disabled-rule list was not found').toBeGreaterThan(0)
+
+    const document = read('docs/accessibility.md')
+    expect(declared.filter((rule) => !document.includes(rule))).toEqual([])
+  })
+
   const doc = read('docs/accessibility.md')
 
   it('quotes the number of states axe actually audits', () => {

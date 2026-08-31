@@ -781,3 +781,36 @@ a public type's docblock; the listing route reading an array as a document and r
 `[object Object]` as an id; the claim that CI runs the gates "in that order"; and the playground build,
 which nothing ran -- so the anchored-alias failure its own docblock describes would have reached a release
 rather than a run.
+
+## Nine test-suite observations left as they are — areas 11, 12 and 15
+
+**LOW and NOTE, and several are notes about a test rather than about a gap:**
+
+- `rows.test.ts`'s `data` fixtures are describe-scope constants shared by every test in their block
+  rather than factories. They survive because `applyChange`'s immutability is separately asserted, which
+  is the property that makes sharing safe -- and converting three blocks to factories is churn until a
+  test mutates one.
+- `keys.test.ts`'s "leaves the path characters free on purpose" reads as the opposite of what it asserts
+  until you know "free" means "reserved for the row-path grammar". Renaming it means renaming the
+  vocabulary the key grammar's own comment uses.
+- `context.test.ts`'s denial-of-service test asserts an upper bound rather than the cap, so it also
+  passes if the walk collects nothing -- and the control beside it is what makes the pair meaningful,
+  which is the shape this repository uses everywhere.
+- `visibility.test.ts` blesses a fail-open as correct and says so; the pairing that makes it safe -- a
+  host being able to detect the missing evaluator -- lives in `context.test.ts`, which is the right place
+  for it and not obvious from either file.
+- `css.test.ts` pins `safeStyleValue` refusing every fetching function and says nothing about
+  `safeDeclarations` deliberately allowing `url()` through the Style tab. That asymmetry is a decision,
+  and it is recorded in `docs/decisions.md` rather than in a test.
+- `docs.test.ts` derives three counts by slicing text and matching source, so a `describe.each` or a
+  stray pipe-prefixed line would miscount. Both slices are now bounded, and counting the run rather than
+  the source is what `count-reporter.ts` exists for; a third mechanism for the same job is not obviously
+  better than the two.
+- `contrast.ts` compares thresholds against a ratio rounded to two places, so 4.4951 clears 4.5. Real,
+  and changing it means re-measuring every pair the table quotes -- worth doing with the figures open.
+- `kit-css-injection.test.tsx` finds the style attribute by position after `data-fs-key`, which depends
+  on the kit spreading `nodeProps` before `style`. A parser would be the answer, and the test is about
+  what text reached the page rather than what a parser makes of it.
+- `test/setup.ts` patches `Element.prototype.scrollIntoView` globally and never restores it. Every test
+  file in the worker sees the stub whether it opted in or not -- which is what a setup file is for, and
+  the alternative is every file installing its own.

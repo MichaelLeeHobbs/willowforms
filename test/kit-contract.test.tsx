@@ -679,13 +679,32 @@ describe('a document value a kit puts somewhere structural', () => {
   })
 
   it.each(KITS)('$name does not put an arbitrary scheme in an image src', ({ renderers }) => {
-    // `LinkNode` runs `href` through `safeHref`; `Image` put `src` straight into
-    // the DOM. Not script execution, but an outbound request with a referrer on
-    // every render, to an address the document chose.
-    const element = draw(renderers, nodeWith('Image', { src: 'javascript:alert(1)', alt: 'x' }))
-    const img = element.tagName === 'IMG' ? element : element.querySelector('img')
+    /*
+     * `LinkNode` runs `href` through `safeHref`; `Image` put `src` straight
+     * into the DOM. Not script execution, but an outbound request with a
+     * referrer on every render, to an address the document chose.
+     *
+     * Every scheme `safeHref` refuses, not just `javascript:`. The assertion
+     * was `not.toContain('javascript:')`, which is a denylist of one string in
+     * a rule whose name says "arbitrary scheme" -- a kit that stripped that one
+     * word and passed `data:text/html,...` through would have satisfied it.
+     */
+    const refused = [
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      'file:///etc/passwd',
+      '//evil.example.com/a.png',
+    ]
 
-    expect(img?.getAttribute('src') ?? '').not.toContain('javascript:')
+    const kept = refused.filter((src) => {
+      const element = draw(renderers, nodeWith('Image', { src, alt: 'x' }))
+      const img = element.tagName === 'IMG' ? element : element.querySelector('img')
+      const drawn = img?.getAttribute('src') ?? ''
+      return drawn !== '' && src.startsWith(drawn.slice(0, 6))
+    })
+
+    expect(kept).toEqual([])
   })
 
   it.each(KITS)('$name still shows an image with an ordinary address', ({ renderers }) => {

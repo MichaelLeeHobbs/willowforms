@@ -353,6 +353,22 @@ describe('declarations round-trip, so two editors can share one string', () => {
     ])
   })
 
+  it('is not confused by an escaped separator outside a string either', () => {
+    /*
+     * The other escape branch. A backslash escapes the next character wherever
+     * it appears in CSS, and only the in-quote branch had a test -- so the
+     * out-of-quote one could be deleted while an escaped `;` or `:` split a
+     * declaration CSS reads as one.
+     */
+    expect(parseDeclarations('content: a\\; b; padding: 8px')).toEqual([
+      ['content', 'a\\; b'],
+      ['padding', '8px'],
+    ])
+
+    // And the same for the name/value split, which walks with the same reader.
+    expect(parseDeclarations('grid-template: a\\: b')).toEqual([['grid-template', 'a\\: b']])
+  })
+
   it('ignores a fragment that is not a declaration', () => {
     expect(parseDeclarations('padding: 8px; nonsense; : 4px; color:')).toEqual([['padding', '8px']])
   })

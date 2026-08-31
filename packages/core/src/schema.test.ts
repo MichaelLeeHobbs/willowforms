@@ -409,6 +409,20 @@ describe('dataKey in the export', () => {
 
     expect(Object.keys(schema.properties)).toEqual(['email'])
   })
+
+  it('names the shared key once in required, not twice', () => {
+    /*
+     * The guard the test above cannot reach: neither of its fields carries a
+     * rule, so `!required.includes(name)` is never the thing preventing a
+     * duplicate. Two required components sharing one data key exported
+     * `required: ['email', 'email']` -- valid JSON Schema, and a payload
+     * validator reporting the same missing field twice.
+     */
+    const a = { ...field('personalEmail', 'string', [{ key: 'required' }]), dataKey: 'email' }
+    const b = { ...field('workEmail', 'string', [{ key: 'required' }]), dataKey: 'email' }
+
+    expect(toJsonSchema(doc([a, b])).required).toEqual(['email'])
+  })
 })
 
 describe('a repeater in the exported schema', () => {

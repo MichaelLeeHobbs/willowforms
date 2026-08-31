@@ -111,12 +111,28 @@ interface Violation {
 }
 
 async function audit(element: HTMLElement): Promise<Violation[]> {
+  /*
+   * Something was audited, and rules were applied to it.
+   *
+   * `results.violations` is empty for a designer that rendered nothing at all,
+   * so every state in this file passed for a container with no elements in it
+   * -- which is the shape a broken driver produces. axe reports what it
+   * checked; asking for that is what makes an empty answer mean "nothing was
+   * wrong" rather than "nothing was there".
+   */
   const results = await axe.run(element, {
     // Only the rules an accessible result actually depends on. Best-practice
     // rules are excluded so a failure here always means a real barrier.
     runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
     rules: Object.fromEntries(NEEDS_LAYOUT.map((id) => [id, { enabled: false }])),
   })
+
+  if (element.querySelectorAll('*').length < 10) {
+    throw new Error('the audited subtree is too small to be the designer')
+  }
+  if (results.passes.length + results.violations.length === 0) {
+    throw new Error('axe applied no rule to this subtree')
+  }
 
   return results.violations.map((violation) => ({
     id: violation.id,

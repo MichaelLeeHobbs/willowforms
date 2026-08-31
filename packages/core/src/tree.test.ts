@@ -12,6 +12,7 @@ import {
   duplicateNode,
   findNode,
   findParent,
+  flatten,
   generateKey,
   insertNode,
   moveNode,
@@ -19,6 +20,7 @@ import {
   removeNode,
   updateNode,
   validateDocument,
+  walk,
 } from './tree.js'
 import type { StructuralError } from './tree.js'
 
@@ -89,7 +91,7 @@ describe('generateKey', () => {
   })
 })
 
-describe('mutations are immutable', () => {
+describe('mutations: what they return, and what they leave alone', () => {
   it('insertNode leaves the original tree untouched', () => {
     const before = fixture()
     const after = insertNode(before, 'stack', leaf('d'))
@@ -105,6 +107,20 @@ describe('mutations are immutable', () => {
   it('clamps an out-of-range index instead of producing holes', () => {
     const after = insertNode(fixture(), 'stack', leaf('d'), 99)
     expect(findNode(after, 'stack')?.children?.map((c) => c.key)).toEqual(['a', 'b', 'd'])
+  })
+
+  it('clamps a negative index to the front', () => {
+    /*
+     * The other half of the same clamp, and it has to be an index the array is
+     * long enough to feel: `splice` clamps a start below `-length` to zero by
+     * itself, so `-3` on two children lands at the front either way. `-1` on
+     * three children lands *before the last one* without `Math.max`, which is
+     * the difference the clamp exists for.
+     */
+    const wide = container('root', [container('stack', [leaf('a'), leaf('b'), leaf('c')])])
+
+    const after = insertNode(wide, 'stack', leaf('d'), -1)
+    expect(findNode(after, 'stack')?.children?.map((c) => c.key)).toEqual(['d', 'a', 'b', 'c'])
   })
 
   it('appends for an index that is not a position at all', () => {
@@ -2040,5 +2056,50 @@ describe('validateDocument and a node with no usable key', () => {
     }
 
     expect(validateDocument(fine)).toEqual([])
+  })
+})
+
+/**
+ * `flatten` and `walk`, in the package that owns them.
+ *
+ * Both are exported from `tree.ts` and neither was imported by this file:
+ * `flatten`'s `parentKey`/`index`/`depth` contract was pinned only in
+ * `packages/designer/src/keyboard.test.ts`, so core's own traversal was
+ * described by a test in another package that could be deleted with core's
+ * suite staying green -- and `walk` is what `styleSheetFor`,
+ * `unexportableRules` and `collectKeys` all traverse with.
+ */
+describe('flatten', () => {
+  it('reports every node with its parent, index and depth, in document order', () => {
+    expect(flatten(fixture())).toEqual([
+      { node: expect.objectContaining({ key: 'root' }), parentKey: undefined, index: 0, depth: 0 },
+      { node: expect.objectContaining({ key: 'stack' }), parentKey: 'root', index: 0, depth: 1 },
+      { node: expect.objectContaining({ key: 'a' }), parentKey: 'stack', index: 0, depth: 2 },
+      { node: expect.objectContaining({ key: 'b' }), parentKey: 'stack', index: 1, depth: 2 },
+      { node: expect.objectContaining({ key: 'c' }), parentKey: 'root', index: 1, depth: 1 },
+    ])
+  })
+
+  it('gives the nodes themselves, not copies of them', () => {
+    // Callers compare identity: the tree panel keys rows on the node, and a
+    // fresh object per call would make every row new on every render.
+    const tree = fixture()
+    expect(flatten(tree)[0]?.node).toBe(tree)
+  })
+})
+
+describe('walk', () => {
+  it('visits parents before children, with the parent it came from', () => {
+    const seen: string[] = []
+    walk(fixture(), (node, parent) => seen.push(node.key + '<' + (parent?.key ?? '-')))
+
+    expect(seen).toEqual(['root<-', 'stack<root', 'a<stack', 'b<stack', 'c<root'])
+  })
+
+  it('visits a leaf it is handed directly', () => {
+    const seen: string[] = []
+    walk(leaf('only'), (node) => seen.push(node.key))
+
+    expect(seen).toEqual(['only'])
   })
 })

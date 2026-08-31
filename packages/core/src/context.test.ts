@@ -466,7 +466,7 @@ describe('evaluatorKeys', () => {
 })
 
 /**
- * The three exported functions are told to run at a host's startup, which is
+ * The four exported functions are told to run at a host's startup, which is
  * before anything has had a chance to refuse the document.
  */
 describe('the boot-time questions, on a document nobody checked', () => {
@@ -486,6 +486,11 @@ describe('the boot-time questions, on a document nobody checked', () => {
     expect(() => contextKeys(broken(patch))).not.toThrow()
     expect(() => missingContext(broken(patch), {})).not.toThrow()
     expect(() => contextValues(broken(patch), 'step')).not.toThrow()
+    // The fourth boot-time export. The docstring above says "the three
+    // exported functions" and there are four, and `evaluatorKeys` -- the one a
+    // host calls to decide whether it needs a sandbox at all -- was the one
+    // this sweep left out.
+    expect(() => evaluatorKeys(broken(patch))).not.toThrow()
   })
 
   it('answers rather than overflowing on a condition nested past any bound', () => {

@@ -472,6 +472,20 @@ describe('writing an answer at an address', () => {
     }
   })
 
+  it('changes nothing when the row is not an object', () => {
+    /*
+     * The third branch of the same guard, and the one the list above cannot
+     * reach: a missing row and a list that is not a list were both covered, and
+     * a list whose *entry* is a string or a number was not. A row is read as a
+     * record to write into, and writing into `'text'` produces an object with
+     * one key and nothing of the row left.
+     */
+    for (const row of ['text', 7, null, ['a']]) {
+      const ragged = { addresses: [row] }
+      expect(applyChange(ragged, 'addresses[0].postcode', 'x'), JSON.stringify(row)).toBe(ragged)
+    }
+  })
+
   it('reads an address back', () => {
     expect(decodeAddress('postcode')).toEqual({ path: NO_ROWS, name: 'postcode' })
     expect(decodeAddress('addresses[1].postcode')?.name).toBe('postcode')
