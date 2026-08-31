@@ -4,6 +4,59 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The demo server refuses a body nested deeper than core reads
+
+- **Decided:** `bodyOf` measures the parsed body's depth with an explicit stack and returns nothing past
+  `MAX_CONDITION_DEPTH`, which the existing 400 answers. `MAX_CONDITION_DEPTH` is now exported from
+  `@formsmith/core`. `apps/demo-server/src/index.ts` also exports `app` and calls `serve` only when it is
+  the file that was run, and takes its store path from `FORMSMITH_DEMO_STORE`.
+- **Why:** bounding the six walkers did not close the endpoint. `JSON.parse` takes a hundred thousand
+  levels without complaint because V8 parses iteratively; `JSON.stringify` does not, and throws past
+  roughly five thousand. So a 12 KB body under a key the form collects validated clean, was projected by
+  `submittedData`, and took the process down inside `c.json` — uncaught, a 500 with a stack trace. Size
+  was never the thing protecting that route.
+- **Why that bound:** an answer nested deeper than the evaluator walks cannot be compared against
+  anything, so accepting it is agreeing to do work whose result is already known to be unreadable.
+  Refusing at the door is what the rest of this project does with input it cannot honour.
+- **Rejected: a `try`/`catch` around the response.** It catches the crash after the work, and it leaves
+  the route answering 500 for a request that was never answerable. Refusing costs one pass over a body
+  already in memory.
+- **Rejected: lowering `MAX_BODY`.** 6 000 levels is 12 KB. No size cap anybody would accept stops this.
+- **Rejected: testing the sequence rather than the route.** Reading the store, calling `validateAcross`
+  and projecting by hand, in the test file, is a check on a copy of the endpoint — item 4 of the queue is
+  a guard whose only call site is itself, and writing another one while fixing that would be absurd.
+  Hence the export and the entry guard: `app.request(...)` runs the real handler and binds no port.
+- **What it costs:** one exported constant, one env var nothing sets in normal use, and a `serve` that no
+  longer runs on import. `node src/index.ts` was run and still answers 200 on `/api/forms`.
+- **Reversal:** cheap in code. The behaviour change is a 400 where there was a 500, which nothing can be
+  relying on.
+- **When:** 2026-08-31.
+
+### The condition walkers all stop where the evaluator stops
+
+- **Decided:** `MAX_CONDITION_DEPTH`, exported from `condition.ts`, bounds all six: `same` through
+  arrays, `evaluate` through `and`/`or`, `validateDocument`'s condition walker, `repointBinding`'s
+  `inCondition`, and the ref collectors in `rows.ts`. `rowScopedRefs` and `formScopedRefs` are now one
+  function taking the scope it wants.
+- **Why one number:** `validateDocument` bounded at `MAX_TREE_DEPTH`, 500, would accept a condition
+  `evaluate` reads as unreadable at 200 — a gate passing what the renderer cannot answer, which is the
+  gate saying the opposite of what it exists to say. Two constants that agree today are the shape this
+  run exists to remove.
+- **Why merge the two ref collectors:** they were character-identical apart from one predicate reading
+  `scope === 'row'` one way in one and the other way in the other. Neither was bounded, and both had to
+  be found to know that. A symmetry that cannot be half-fixed is better than a symmetry somebody
+  remembers to check.
+- **What each answers past the bound:** `same` says not equal, because refusing would make `ne` true and
+  show a component whose rule could not be read. `evaluate` says unreadable, which the boundary turns
+  into hidden. `validateDocument` and `rowScopeProblems` report a problem, because a check that answers
+  "nothing wrong" when what happened was "did not look" is the permissive failure this project is
+  organised against. `repointBinding` returns the condition unrewritten, which its own doc comment
+  already promised for every other unreadable shape.
+- **Rejected: raising the bound instead.** The stack is the constraint, not the number, and 200 is
+  already two hundred levels past anything the panel can draw in a 288px pane.
+- **Reversal:** one constant and six call sites.
+- **When:** 2026-08-31.
+
 ### Every own name on `Object.prototype` is a reserved key
 
 - **Decided:** `RESERVED_KEYS` grows from three names to thirteen: the twelve own properties of

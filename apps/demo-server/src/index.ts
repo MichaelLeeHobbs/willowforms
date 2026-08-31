@@ -16,11 +16,13 @@
  */
 
 import { readFile, rename, writeFile } from 'node:fs/promises'
+import { pathToFileURL } from 'node:url'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { FormContext, FormData, FormDocument } from '@formsmith/core'
 import {
+  MAX_CONDITION_DEPTH,
   contextValues,
   evaluatorKeys,
   missingContext,
@@ -29,7 +31,16 @@ import {
   validateDocument,
 } from '@formsmith/core'
 
-const STORE = new URL('../forms.json', import.meta.url)
+/*
+ * Where the forms live, overridable so this file can be exercised.
+ *
+ * A demo with one hard-coded path is a demo no test can touch without writing
+ * into the checkout, and the alternative -- a test that re-implements the route
+ * it is checking -- is the shape this whole remediation run exists to remove.
+ * `FORMSMITH_DEMO_STORE` takes a filesystem path; nothing sets it in normal use.
+ */
+const storePath = process.env['FORMSMITH_DEMO_STORE']
+const STORE = storePath ? pathToFileURL(storePath) : new URL('../forms.json', import.meta.url)
 /*
  * A port, or a refusal to start.
  *
@@ -159,11 +170,57 @@ const MAX_BODY = 1_000_000
 async function bodyOf(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
   const text = await c.req.text()
   if (text.length > MAX_BODY) return undefined
+  let parsed: unknown
   try {
-    return JSON.parse(text) as unknown
+    parsed = JSON.parse(text) as unknown
   } catch {
     return undefined
   }
+  /*
+   * And refused if it is nested deeper than anything downstream will walk.
+   *
+   * `JSON.parse` is happy with a hundred thousand levels -- V8 parses
+   * iteratively -- so the crash lands later and somewhere less obvious.
+   * `JSON.stringify` is *not* iterative and throws past roughly five thousand,
+   * which is what the echo on a successful submit calls: a 200 KB body of
+   * `[[[[…]]]]` under a key the form collects validated clean, was projected by
+   * `submittedData`, and then took the process down inside `c.json`. Uncaught,
+   * so a 500 with a stack trace rather than an answer.
+   *
+   * `MAX_CONDITION_DEPTH` because that is where core stops reading: an answer
+   * nested deeper than the evaluator walks cannot be compared against anything
+   * anyway, so accepting it would only be agreeing to do work whose result is
+   * already known to be unreadable. Refusing at the door is what the rest of
+   * this project does with input it cannot honour.
+   */
+  if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return undefined
+  return parsed
+}
+
+/**
+ * Whether a parsed body nests deeper than `limit`, measured without recursing.
+ *
+ * A recursive depth check on a body chosen by an attacker is the bug it exists
+ * to find, wearing the fix's clothes. This walks an explicit stack, and stops
+ * the moment the answer is yes rather than measuring how much worse it gets.
+ */
+function deeperThan(value: unknown, limit: number): boolean {
+  const stack: { value: unknown; depth: number }[] = [{ value, depth: 0 }]
+
+  while (stack.length > 0) {
+    const top = stack.pop()
+    if (!top) break
+    if (top.depth > limit) return true
+
+    const held = top.value
+    if (Array.isArray(held)) {
+      for (const item of held) stack.push({ value: item, depth: top.depth + 1 })
+    } else if (held !== null && typeof held === 'object') {
+      for (const item of Object.values(held)) stack.push({ value: item, depth: top.depth + 1 })
+    }
+  }
+
+  return false
 }
 
 app.get('/api/forms', async (c) => {
@@ -345,12 +402,31 @@ app.post('/api/forms/:id/submit', async (c) => {
   return c.json({ ok: true, received: submitted })
 })
 
-/*
- * Localhost only, which is what the line below already claimed.
+/**
+ * The routes, for a test that wants to call one.
  *
- * With no `hostname` the server binds every interface, so an unauthenticated
- * store of somebody's form documents was reachable from the network the laptop
- * happened to be on — a coffee shop, a conference, a client's office.
+ * Hono apps answer `app.request(...)` directly, with no socket, so exporting
+ * this is the difference between checking the submit endpoint and checking a
+ * copy of it written in the test file.
  */
-serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' })
-console.log('Formsmith demo server on http://localhost:' + String(PORT))
+export { app }
+
+/*
+ * Only when this file is the thing that was run.
+ *
+ * Importing it used to bind a port as a side effect, which is why nothing ever
+ * tested it: a suite that starts a server on 5181 fights the dev server and
+ * leaks a handle. `node src/index.ts` still serves; `import` does not.
+ */
+const entry = process.argv[1]
+if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
+  /*
+   * Localhost only, which is what the line below already claimed.
+   *
+   * With no `hostname` the server binds every interface, so an unauthenticated
+   * store of somebody's form documents was reachable from the network the laptop
+   * happened to be on — a coffee shop, a conference, a client's office.
+   */
+  serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' })
+  console.log('Formsmith demo server on http://localhost:' + String(PORT))
+}

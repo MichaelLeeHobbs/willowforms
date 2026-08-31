@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 1, the `validateAcross` fail-open. Item 2 is next.
+- **Last completed:** item 2, the unbounded walkers. Item 3 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/01-validate-across`
+- **Last pushed item branch:** `build-out/b/02-bounded-walkers`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -81,7 +81,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a test that submits a document with a required field keyed `toString`
       and asserts `validateAcross` reports it, seen red first.
 
-- [ ] **2. Bound every recursive walker, not one of them.** CRITICAL plus four HIGHs, areas 2, 3 and 12.
+- [x] **2. Bound every recursive walker, not one of them.** CRITICAL plus four HIGHs, areas 2, 3 and 12.
       `tree.ts:936` (`visitShape`'s `condition()` walker, inside the function documented as total),
       `tree.ts:210` (`repointBinding`'s `inCondition`), `rows.ts:405,433` (`rowScopedRefs`,
       `formScopedRefs`), `condition.ts:33` (`same` drops `depth` through arrays), `condition.ts:280`

@@ -22,14 +22,17 @@ import type { Condition, FormContext, FormData, JsonValue, Operand } from './typ
 export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth = 0): boolean {
   // Beyond the bound, two values are not equal. Refusing to answer would make
   // `ne` true, which shows a component whose rule could not be read.
-  if (depth > MAX_DEPTH) return false
+  if (depth > MAX_CONDITION_DEPTH) return false
   if (a === b) return true
   if (a === undefined || b === undefined || a === null || b === null) return false
   if (typeof a !== 'object' || typeof b !== 'object') return false
 
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
-    return a.every((item, i) => same(item, b[i]))
+    // `depth + 1`, like the object branch below. This dropped it, so the bound
+    // above counted only the levels reached through objects and a list nested
+    // inside a list inside a list recursed without one.
+    return a.every((item, i) => same(item, b[i], depth + 1))
   }
 
   const keys = Object.keys(a)
@@ -55,8 +58,15 @@ export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth =
  * High enough that nothing a person authors can reach it: the panel draws
  * nesting by indentation in a 288px pane, and a hundred levels is already
  * unreadable. Low enough that the stack does not.
+ *
+ * Exported because four other walkers cross a condition and every one of them
+ * has to stop where the evaluator stops. `validateDocument` bounded at 500
+ * would pass a condition `evaluate` reads as unreadable at 200, so the gate
+ * would accept documents the renderer cannot answer — which is the gate saying
+ * the opposite of what it exists to say. One number, imported, rather than a
+ * second one that agrees today.
  */
-const MAX_DEPTH = 200
+export const MAX_CONDITION_DEPTH = 200
 
 /**
  * An operand this code cannot read at all.
@@ -190,7 +200,7 @@ function evaluate(
   if (!condition || typeof condition !== 'object') return undefined
   // Unreadable rather than false, so `not` passes it through instead of
   // inverting it into "show this".
-  if (depth > MAX_DEPTH) return undefined
+  if (depth > MAX_CONDITION_DEPTH) return undefined
 
   const read = (value: Operand | undefined): Reading => operand(value, data, context, row)
 
@@ -277,7 +287,13 @@ function evaluate(
     case 'and':
     case 'or': {
       if (!Array.isArray(condition.conditions)) return undefined
-      const answers = condition.conditions.map((inner) => evaluate(inner, data, context, row))
+      // `depth + 1`, like `not` below. This dropped it, so `MAX_CONDITION_DEPTH` bounded
+      // only chains of `not` -- and `and` and `or` are the two an author's
+      // nesting actually goes through, because they are the ones the panel
+      // draws a group for.
+      const answers = condition.conditions.map((inner) =>
+        evaluate(inner, data, context, row, depth + 1),
+      )
       if (answers.includes(undefined)) return undefined
       return condition.op === 'and' ? answers.every(Boolean) : answers.some(Boolean)
     }

@@ -17,6 +17,7 @@
  * `]`. That is the return on holding them back when the key grammar landed.
  */
 
+import { MAX_CONDITION_DEPTH } from './condition.js'
 import { keyProblem } from './keys.js'
 import { dataKeyOf } from './tree.js'
 import type { ComponentNode, Condition, FormData, JsonValue } from './types.js'
@@ -269,6 +270,35 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
   }
   mark(root, false, 0)
 
+  /*
+   * The refs at one scope, and a reported problem if the walk stopped short.
+   *
+   * A check that reports problems must never answer "no problem" when what
+   * happened was "did not look". Reported once per node, because all three
+   * branches below ask the same condition the same question and three identical
+   * lines about one component is noise.
+   */
+  const tooDeep = new Set<string>()
+  const refsOf = (
+    node: ComponentNode,
+    condition: Condition | undefined,
+    wanted: 'row' | 'form',
+  ): string[] => {
+    const { refs, truncated } = refsAtScope(condition, wanted)
+    if (truncated && !tooDeep.has(node.key)) {
+      tooDeep.add(node.key)
+      problems.push({
+        key: node.key,
+        problem:
+          node.key +
+          ' holds a condition nested deeper than this library will walk, so its refs ' +
+          'could not be checked. The renderer cannot read it either, which leaves the ' +
+          'component hidden and never validated.',
+      })
+    }
+    return refs
+  }
+
   const visit = (node: ComponentNode, enclosing: Set<string> | undefined, depth = 0): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     if (enclosing) {
@@ -290,7 +320,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
 
       for (const value of [node.renderWhen, ...props, ...guards]) {
         if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
-        for (const ref of formScopedRefs(value.condition)) {
+        for (const ref of refsOf(node, value.condition, 'form')) {
           if (enclosing.has(ref) && !formKeys.has(ref)) {
             problems.push({
               key: node.key,
@@ -324,7 +354,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
 
       for (const value of [node.renderWhen, ...props, ...guards]) {
         if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
-        for (const ref of rowScopedRefs(value.condition)) {
+        for (const ref of refsOf(node, value.condition, 'row')) {
           problems.push({
             key: node.key,
             problem:
@@ -363,7 +393,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
 
       for (const value of [node.renderWhen, ...props, ...guards]) {
         if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
-        for (const ref of rowScopedRefs(value.condition)) {
+        for (const ref of refsOf(node, value.condition, 'row')) {
           if (!enclosing.has(ref) && formKeys.has(ref)) {
             problems.push({
               key: node.key,
@@ -391,59 +421,58 @@ function isRowScopeNode(node: ComponentNode): boolean {
   return node?.schema?.type === 'array' && Array.isArray(node.children)
 }
 
-/** Every data key a condition reads at row scope, however deeply nested. */
-function rowScopedRefs(condition: Condition | undefined): string[] {
-  const found: string[] = []
+/**
+ * Every data key a condition reads at one scope, however deeply nested.
+ *
+ * One function with a `wanted` scope rather than two that differ by a single
+ * predicate. They were two, character-for-character identical apart from
+ * `if (shape.scope === 'row')` reading one way in one and the other way in the
+ * other -- so a fix to either was a fix to one side of a symmetry, which is the
+ * exact shape the whole of this remediation run exists to remove. Neither was
+ * bounded, and both had to be found to know that.
+ *
+ * Bounded at the depth the evaluator stops at. Past it there is nothing to
+ * collect: a ref nested deeper than `MAX_CONDITION_DEPTH` is one `evaluate`
+ * never reads, so it cannot be the cause of the silently-hidden component this
+ * check reports. `truncated` says the walk stopped, because a caller that
+ * reports problems must not report "no problem" when what happened was "did not
+ * look".
+ */
+function refsAtScope(
+  condition: Condition | undefined,
+  wanted: 'row' | 'form',
+): { refs: string[]; truncated: boolean } {
+  const refs: string[] = []
+  let truncated = false
 
   const operand = (value: unknown): void => {
     if (!value || typeof value !== 'object') return
     const shape = value as { kind?: unknown; dataKey?: unknown; scope?: unknown }
     if (shape.kind !== 'ref' || typeof shape.dataKey !== 'string') return
-    if (shape.scope === 'row') found.push(shape.dataKey)
+    // Absent means the form, which is what every ref written before repeaters
+    // existed already meant.
+    const scope = shape.scope === 'row' ? 'row' : 'form'
+    if (scope === wanted) refs.push(shape.dataKey)
   }
 
-  const visit = (inner: Condition | undefined): void => {
+  const visit = (inner: Condition | undefined, depth: number): void => {
     if (!inner || typeof inner !== 'object') return
+    if (depth > MAX_CONDITION_DEPTH) {
+      truncated = true
+      return
+    }
     const shape = inner as Partial<Record<string, unknown>>
     operand(shape['left'])
     operand(shape['right'])
     operand(shape['value'])
     if (Array.isArray(shape['conditions'])) {
-      for (const nested of shape['conditions'] as Condition[]) visit(nested)
+      for (const nested of shape['conditions'] as Condition[]) visit(nested, depth + 1)
     }
-    visit(shape['condition'] as Condition | undefined)
-  }
-  visit(condition)
-
-  return found
-}
-
-/** Every data key a condition reads at form scope, however deeply nested. */
-function formScopedRefs(condition: Condition | undefined): string[] {
-  const found: string[] = []
-
-  const operand = (value: unknown): void => {
-    if (!value || typeof value !== 'object') return
-    const shape = value as { kind?: unknown; dataKey?: unknown; scope?: unknown }
-    if (shape.kind !== 'ref' || typeof shape.dataKey !== 'string') return
-    if (shape.scope === 'row') return
-    found.push(shape.dataKey)
+    visit(shape['condition'] as Condition | undefined, depth + 1)
   }
 
-  const visit = (inner: Condition | undefined): void => {
-    if (!inner || typeof inner !== 'object') return
-    const shape = inner as Partial<Record<string, unknown>>
-    operand(shape['left'])
-    operand(shape['right'])
-    operand(shape['value'])
-    if (Array.isArray(shape['conditions'])) {
-      for (const nested of shape['conditions'] as Condition[]) visit(nested)
-    }
-    visit(shape['condition'] as Condition | undefined)
-  }
-
-  visit(condition)
-  return found
+  visit(condition, 0)
+  return { refs, truncated }
 }
 
 /** An address split into the rows it sits under and the name at the end. */
