@@ -674,7 +674,16 @@ function PropRow({
             type="number"
             value={typeof raw === 'number' ? raw : ''}
             onChange={(e) =>
-              e.target.value === '' ? onChange(undefined) : set(Number(e.target.value))
+              /*
+               * A number, or nothing. `Number('1e999')` is `Infinity` and
+               * `Number('-')` is `NaN`, and neither is JSON -- so the document
+               * held a value `JSON.stringify` writes as `null` and the export
+               * and the payload disagreed about what the author typed. The
+               * Rules tab's own number field already refuses both.
+               */
+              e.target.value === '' || !Number.isFinite(Number(e.target.value))
+                ? onChange(undefined)
+                : set(Number(e.target.value))
             }
           />
         ) : schema.editor === 'select' ? (

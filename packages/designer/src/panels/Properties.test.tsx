@@ -58,6 +58,8 @@ const kit: Kit = {
       defaultProps: {},
       props: [
         { name: 'label', label: 'Label', editor: 'string' },
+        // A number editor, so what this panel stores for one can be checked.
+        { name: 'padding', label: 'Padding', editor: 'number' },
         { name: 'tint', label: 'Tint', editor: 'color' },
         { name: 'glyph', label: 'Glyph', editor: 'icon' },
         { name: 'script', label: 'Script', editor: 'code' },

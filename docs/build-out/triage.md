@@ -621,3 +621,50 @@ finding does not reach, or that needs a browser to settle:
 - Two adjacent comments in `Canvas.tsx` disagree about a bounds check that does not exist. Both describe
   real history -- one records that adding the check broke a drop -- and untangling which sentence
   survives needs the person who wrote them, not a sweep.
+
+## Two number-field fixes that jsdom cannot exercise — area 8
+
+**LOW, both fixed, neither testable in this suite.** The property panel's number editor stored whatever
+`Number()` returned, so `1e999` entered the document as `Infinity` -- which `JSON.stringify` writes as
+`null`, so the export and the payload disagreed with what the author typed. And the Rules tab's number
+field updated `committed` without `draft` on a normalising commit, so the box could show text the
+document does not hold.
+
+Both are fixed. Neither can be driven from a unit test: jsdom's `type="number"` input refuses `1e999`
+outright (the value becomes `''`), and `userEvent` normalises `5.50` to `5.5` before the component ever
+sees it -- so a test written through the DOM passes whether or not the guard is there, which is worse
+than no test. Reaching them needs a real browser, where the value sanitisation is the specification's
+rather than jsdom's, and that belongs with the Playwright coverage of the inspector panels, which does
+not exist yet.
+
+A vacuous test for each was written, seen to pass against the unfixed code, and deleted rather than kept.
+
+## Seven inspector findings left as they are — area 8
+
+**LOW and NOTE.**
+
+- The icon picker stores `''` for "(none)" instead of clearing the property. Real, and the fix is one
+  line -- but "(none)" is also a legitimate stored value for a kit whose icon prop has no default, and
+  telling those apart is a decision about what an empty icon means rather than a bug in the writer.
+- `indexKit(kit)` and `keyScopesFor(document, key)` both run in the Properties panel's body, so every
+  keystroke in any property rebuilds a map over the kit and walks the whole document. Worth memoising,
+  and worth measuring first: both are cheap on the documents this repository has, and a `useMemo` whose
+  dependency is the document root re-runs on every edit anyway.
+- A `PropSchema.section` outside the three-value union is dropped from every tab rather than falling back
+  to `main`, so a third-party kit's unknown section makes a property invisible. Same shape as the palette
+  group fixed in area 6; the fix here is a decision about whether an unknown section is `main` or an
+  error, and the panel has no way to report the latter.
+- The text, colour, code and multiline editors render `''` for a stored value that is not a string, so
+  the first keystroke overwrites a value the box never showed. True of four editors, and the answer is
+  the one `KeyField` uses -- show what is there, refuse to commit what cannot be read -- which is a
+  rewrite of four editors rather than a guard.
+- `asCondition` validates the operator and not the operand shape, so a condition missing the keys its
+  operator implies draws a row with nothing editable. The engine reads such a condition as unreadable and
+  hides the component, which is the right answer; making the panel repair it means writing to a document
+  because somebody looked at it.
+- Adding a bounds rule writes `value: 0` immediately -- a real constraint nobody chose. Leaving the value
+  absent means every consumer has to treat a rule with no parameter as inert, which is a change to the
+  rule model rather than to the panel.
+- `RuleRow` is keyed by rule key and index but not by component, and `Rules` is not remounted per
+  selection. The same shape the spec records as a real bug for the JSON editor; it needs the same fix,
+  which is a `key` on the panel rather than on the row.
