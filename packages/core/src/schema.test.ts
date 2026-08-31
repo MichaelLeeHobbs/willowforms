@@ -186,6 +186,24 @@ describe('toJsonSchema', () => {
     expect(toJsonSchema(doc([node])).properties['agree']?.title).toBe('Terms')
   })
 
+  it('exports a document whose props are not an object at all', () => {
+    /*
+     * `props` is required on `ComponentNode`, so only a cast reaches this, and
+     * a cast is exactly how it happens: the JSON dialog is where somebody looks
+     * at a pasted document, and a pasted document has been through no gate.
+     * `validateDocument` reports a malformed `props` and reporting is not
+     * refusing. Delete the guard at `schema.ts:204` and `toJsonSchema` throws a
+     * `TypeError` in the one place a person is deliberately holding something
+     * broken.
+     */
+    for (const props of [null, 'nope', 42, ['label']]) {
+      const node = { ...field('email', 'string'), props } as unknown as ComponentNode
+      const schema = toJsonSchema(doc([node]))
+
+      expect(schema.properties['email'], JSON.stringify(props)).toEqual({ type: 'string' })
+    }
+  })
+
   it('leaves the title off when the label is a binding rather than static text', () => {
     const node = field('email', 'string')
     node.props['label'] = { kind: 'i18n', key: 'email_label' }
@@ -204,6 +222,46 @@ describe('toJsonSchema', () => {
 describe('unexportableRules', () => {
   it('reports nothing for a form JSON Schema can express', () => {
     expect(unexportableRules(doc([field('email', 'string', [{ key: 'email' }])]))).toEqual([])
+  })
+
+  it('reports the second of two format rules, which the export silently drops', () => {
+    /*
+     * `email`, `url` and `uuid` all write `format`, and a property has one, so
+     * a field carrying two of them exports only the last. Every fixture in this
+     * file put one format rule on a field, so the branch that reports the
+     * collapse was never executed: delete `schema.ts:111-117` and the suite
+     * stayed green while the dialog called a lossy export lossless, which is
+     * the single thing this function exists to prevent.
+     *
+     * The rule reported is the one being discarded -- the earlier one -- not
+     * the one that survives.
+     */
+    const document = doc([field('id', 'string', [{ key: 'email' }, { key: 'uuid' }])])
+
+    expect(unexportableRules(document)).toEqual([{ key: 'id', rule: 'email' }])
+    expect(toJsonSchema(document).properties['id']?.format).toBe('uuid')
+  })
+
+  it('reports every format rule but the last when a field carries three', () => {
+    const document = doc([
+      field('id', 'string', [{ key: 'email' }, { key: 'url' }, { key: 'uuid' }]),
+    ])
+
+    expect(unexportableRules(document)).toEqual([
+      { key: 'id', rule: 'email' },
+      { key: 'id', rule: 'url' },
+    ])
+  })
+
+  it('reports nothing for one format rule beside rules of other kinds', () => {
+    // The control: `slice(0, -1)` on a one-element list is empty, and the
+    // neighbouring `minLength` is not a format rule and must not be counted as
+    // one. Without this, reporting every format rule would also pass.
+    expect(
+      unexportableRules(
+        doc([field('email', 'string', [{ key: 'email' }, { key: 'minLength', value: 3 }])]),
+      ),
+    ).toEqual([])
   })
 
   it('names the fields whose rules will be lost', () => {

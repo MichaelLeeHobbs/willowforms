@@ -178,6 +178,55 @@ describe('safeHref', () => {
     expect(safeHref('file:///etc/passwd')).toBeUndefined()
   })
 
+  it('refuses a hostile scheme that the URL parser cannot read either', () => {
+    /*
+     * The other half of the decision, and the half no fixture reached.
+     *
+     * Every hostile string above parses, so `URL.parse` answers and the scheme
+     * check on the parsed protocol refuses it. The fallback below that -- the
+     * scheme read off the raw text -- runs only when the parse fails, and it is
+     * the branch a runtime without `URL.parse` takes for everything. Replace it
+     * with `return raw` and this file stays green while an unparseable
+     * `javascript:` URL is handed straight to an `href`.
+     *
+     * These strings were measured rather than assumed: an unterminated IPv6
+     * host is what the WHATWG parser actually rejects, while the more obvious
+     * `javascript:alert(1)#[` parses without complaint.
+     */
+    expect(URL.parse('javascript://[')).toBeNull()
+
+    expect(safeHref('javascript://[')).toBeUndefined()
+    expect(safeHref('vbscript://[')).toBeUndefined()
+    expect(safeHref('data://[')).toBeUndefined()
+  })
+
+  it('still allows a safe scheme the parser cannot read', () => {
+    // The control. The fallback refuses by scheme, not by parseability, or a
+    // link a browser would follow would vanish from the form.
+    expect(URL.parse('https://[')).toBeNull()
+    expect(safeHref('https://[')).toBe('https://[')
+  })
+
+  it('decides by scheme on a runtime with no URL.parse', () => {
+    /*
+     * Node before 22.1 and Safari before 18. The whole function then runs
+     * through the fallback, so this is the one arrangement where the allowlist
+     * below is the only thing standing between a document and an href.
+     */
+    const parse = URL.parse
+    try {
+      // @ts-expect-error -- deleting an optional static is the point of the test
+      delete URL.parse
+
+      expect(safeHref('https://example.com/a')).toBe('https://example.com/a')
+      expect(safeHref('mailto:someone@example.com')).toBe('mailto:someone@example.com')
+      expect(safeHref('javascript:alert(1)')).toBeUndefined()
+      expect(safeHref('data:text/html,<script>alert(1)</script>')).toBeUndefined()
+    } finally {
+      URL.parse = parse
+    }
+  })
+
   it('treats an empty or non-text value as no link at all', () => {
     expect(safeHref('')).toBeUndefined()
     expect(safeHref('   ')).toBeUndefined()

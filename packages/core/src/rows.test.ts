@@ -83,6 +83,27 @@ describe('the row coordinate', () => {
     }
   })
 
+  it('bounds the index at the digits a double still counts one by one', () => {
+    /*
+     * The one part of the grammar carrying a stated invariant, and the one part
+     * the rejection list never reached: its longest index was `addresses[1]`.
+     *
+     * Fifteen digits is the last width where `String(Number(text))` gives back
+     * the text it was given. Relax the quantifier to `[0-9]*` and
+     * `addresses[1000000000000000000000]` decodes to `1e21`, which `encodeRow`
+     * writes as `addresses[1e+21]` -- a coordinate that no longer round-trips,
+     * so an error is reported at an address no input can be found at.
+     */
+    const fifteen = '999999999999999'
+    const path = decodeRow('addresses[' + fifteen + ']')
+
+    expect(path).toEqual([{ key: 'addresses', index: 999999999999999 }])
+    expect(encodeRow(path ?? NO_ROWS)).toBe('addresses[' + fifteen + ']')
+
+    expect(decodeRow('addresses[' + fifteen + '9]')).toBeUndefined()
+    expect(decodeRow('addresses[1000000000000000000000]')).toBeUndefined()
+  })
+
   it('treats a value that is not a list as no rows', () => {
     for (const value of [undefined, null, 'text', 7, {}]) {
       expect(rowsOf(value as never), JSON.stringify(value)).toEqual([])
@@ -662,13 +683,25 @@ describe('a repeater whose two names differ', () => {
  * one, and `submittedData` reads the tree back out.
  */
 describe('a repeater inside a repeater', () => {
+  /*
+   * Every name differs from every other name, on purpose.
+   *
+   * Trap 11, the same collapse the single-level describe above was rescued from
+   * and this one was not: both repeaters set `key` and `dataKey` to the same
+   * string and neither inner field carried a `dataKey` at all, so a frame built
+   * from `dataKeyOf(node)` and a frame built from `node.key` produced identical
+   * output at every level. This describe added nesting and no coverage of the
+   * thing nesting was supposed to prove. `orderList` holds `orders`, `lineList`
+   * holds `lines`, `reference` holds `ref` and `sku` holds `code`, so which of
+   * the two names each position uses is now visible in every assertion.
+   */
   const root: ComponentNode = {
     key: 'root',
     type: 'Screen',
     props: {},
     children: [
       {
-        key: 'orders',
+        key: 'orderList',
         type: 'Repeater',
         props: {},
         dataKey: 'orders',
@@ -676,12 +709,13 @@ describe('a repeater inside a repeater', () => {
         children: [
           {
             key: 'reference',
+            dataKey: 'ref',
             type: 'TextField',
             props: {},
             schema: { type: 'string', validations: [{ key: 'required' }] },
           },
           {
-            key: 'lines',
+            key: 'lineList',
             type: 'Repeater',
             props: {},
             dataKey: 'lines',
@@ -689,6 +723,7 @@ describe('a repeater inside a repeater', () => {
             children: [
               {
                 key: 'sku',
+                dataKey: 'code',
                 type: 'TextField',
                 props: {},
                 schema: { type: 'string', validations: [{ key: 'required' }] },
@@ -701,7 +736,7 @@ describe('a repeater inside a repeater', () => {
   }
 
   const data: FormData = {
-    orders: [{ reference: 'A1', lines: [{ sku: 'x' }, {}] }, { lines: [{}] }],
+    orders: [{ ref: 'A1', lines: [{ code: 'x' }, {}] }, { lines: [{}] }],
   }
 
   it('reports each missing answer at its full address', () => {
@@ -713,10 +748,12 @@ describe('a repeater inside a repeater', () => {
   })
 
   it('writes a keystroke into the inner row it was typed in', () => {
-    const next = applyChange(data, 'orders[0].lines[1].sku', 'y')
+    // The leaf is the answer name here, not the node name: a write is addressed
+    // as data all the way down, while an error is reported at the node.
+    const next = applyChange(data, 'orders[0].lines[1].code', 'y')
     const orders = next['orders'] as FormData[]
 
-    expect((orders[0]?.['lines'] as FormData[])[1]).toEqual({ sku: 'y' })
+    expect((orders[0]?.['lines'] as FormData[])[1]).toEqual({ code: 'y' })
     // The sibling row and the sibling order are untouched, and identically so.
     expect((orders[0]?.['lines'] as FormData[])[0]).toBe(
       ((data['orders'] as FormData[])[0]?.['lines'] as FormData[])[0],
@@ -725,13 +762,17 @@ describe('a repeater inside a repeater', () => {
   })
 
   it('collects both levels under their answer names', () => {
+    // Not one node key anywhere in the payload: no `orderList`, no `lineList`,
+    // no `reference`, no `sku`.
     expect(submittedData(root, data)).toEqual({
-      orders: [{ reference: 'A1', lines: [{ sku: 'x' }, {}] }, { lines: [{}] }],
+      orders: [{ ref: 'A1', lines: [{ code: 'x' }, {}] }, { lines: [{}] }],
     })
   })
 
   it('keeps a row coordinate readable in both directions', () => {
     const address = 'orders[1].lines[0].sku'
+    // Both prefixes are data keys and the leaf is a node key, which is the whole
+    // rule in one string.
     const decoded = decodeAddress(address)
     expect(decoded?.name).toBe('sku')
     expect(encodeRow(decoded?.path ?? NO_ROWS)).toBe('orders[1].lines[0]')

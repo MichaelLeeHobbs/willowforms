@@ -173,6 +173,56 @@ describe('moveNode', () => {
     expect(collectKeys(moveNode(fixture(), 'ghost', 'stack'))).toEqual(collectKeys(fixture()))
     expect(collectKeys(moveNode(fixture(), 'a', 'ghost'))).toEqual(collectKeys(fixture()))
   })
+
+  /*
+   * Reordering inside one parent, which is the commonest gesture in the
+   * designer and the only one this describe never made.
+   *
+   * The index is read after the node has been taken out, because `moveNode`
+   * composes `insertNode(removeNode(...))`. That is not an accident to be tidied
+   * away later: `dnd.ts:253` and `:411` both subtract one from an index measured
+   * against the children as they are drawn, precisely because of it, and
+   * `dnd.test.ts:463` pins that arithmetic from the other side. What was missing
+   * was anything saying which of the two conventions this function holds, so a
+   * reader had to derive it from the composition and a caller could reasonably
+   * guess wrong.
+   */
+  const order = (root: ComponentNode, parent: string): string[] | undefined =>
+    findNode(root, parent)?.children?.map((child) => child.key)
+
+  const three = (): ComponentNode =>
+    container('root', [container('stack', [leaf('a'), leaf('b'), leaf('c')])])
+
+  it('reorders within one parent, counting from the list without the node', () => {
+    // `a` out first leaves [b, c], so index 2 is the end and index 1 is between
+    // them. Counting in the list as drawn, index 2 would mean before `c`.
+    expect(order(moveNode(three(), 'a', 'stack', 2), 'stack')).toEqual(['b', 'c', 'a'])
+    expect(order(moveNode(three(), 'a', 'stack', 1), 'stack')).toEqual(['b', 'a', 'c'])
+  })
+
+  it('reorders upwards by the same rule', () => {
+    expect(order(moveNode(three(), 'c', 'stack', 0), 'stack')).toEqual(['c', 'a', 'b'])
+    expect(order(moveNode(three(), 'c', 'stack', 1), 'stack')).toEqual(['a', 'c', 'b'])
+  })
+
+  it('keeps the node exactly once, wherever it lands', () => {
+    /*
+     * The control. An off-by-one is a wrong position; a remove that missed, or
+     * an insert that ran twice, is a duplicated key, and the two read alike in
+     * an assertion that only looks at one slot.
+     */
+    for (const index of [0, 1, 2, 3, 99]) {
+      expect(order(moveNode(three(), 'b', 'stack', index), 'stack')?.sort()).toEqual([
+        'a',
+        'b',
+        'c',
+      ])
+    }
+  })
+
+  it('moves to the end when no index is given', () => {
+    expect(order(moveNode(three(), 'a', 'stack'), 'stack')).toEqual(['b', 'c', 'a'])
+  })
 })
 
 describe('validateDocument', () => {
@@ -704,6 +754,142 @@ describe('duplicateNode', () => {
     const before = JSON.stringify(original)
     duplicateNode(original, 'stack')
     expect(JSON.stringify(original)).toBe(before)
+  })
+
+  /*
+   * The same rewrite, in the shapes a condition actually takes.
+   *
+   * Every fixture above is one flat `eq`, so the rewrite was only ever proven
+   * against a condition one level deep with two operands. `repointBinding`
+   * (tree.ts:233-246) also walks `conditions` and `condition` for the boolean
+   * operators and rewrites the `options` array for `in` and `notIn` -- three
+   * branches nothing reached. Delete the recursion and a Step wrapped in a
+   * one-element `and` duplicates still carrying the original's key: both steps
+   * render at once and the copy can never be asked for, which is exactly the
+   * defect the flat case was written for.
+   */
+  const step = (renderWhen: ComponentNode['renderWhen']): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [{ key: 'step', type: 'Step', props: {}, ...(renderWhen ? { renderWhen } : {}) }],
+  })
+
+  it('re-points a key nested inside a boolean condition', () => {
+    const copy = duplicateNode(
+      step({
+        kind: 'condition',
+        condition: {
+          op: 'and',
+          conditions: [
+            {
+              op: 'or',
+              conditions: [
+                {
+                  op: 'eq',
+                  left: { kind: 'context', path: 'step' },
+                  right: { kind: 'literal', value: 'step' },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      'step',
+    )
+
+    expect(copy?.key).toBe('step2')
+    expect(copy?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'and',
+        conditions: [
+          {
+            op: 'or',
+            conditions: [
+              {
+                op: 'eq',
+                left: { kind: 'context', path: 'step' },
+                right: { kind: 'literal', value: 'step2' },
+              },
+            ],
+          },
+        ],
+      },
+    })
+  })
+
+  it('re-points a key nested inside a not', () => {
+    // `not` carries a single `condition`, not a `conditions` list, so it is a
+    // separate line in the walk and a separate way to miss the subtree.
+    const copy = duplicateNode(
+      step({
+        kind: 'condition',
+        condition: {
+          op: 'not',
+          condition: {
+            op: 'eq',
+            left: { kind: 'context', path: 'step' },
+            right: { kind: 'literal', value: 'step' },
+          },
+        },
+      }),
+      'step',
+    )
+
+    expect(copy?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'not',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: 'step2' },
+        },
+      },
+    })
+  })
+
+  it('re-points the copied key inside an in list, and leaves its neighbours', () => {
+    const copy = duplicateNode(
+      step({
+        kind: 'condition',
+        condition: {
+          op: 'in',
+          left: { kind: 'context', path: 'step' },
+          options: ['welcome', 'step', 'done'],
+        },
+      }),
+      'step',
+    )
+
+    expect(copy?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'in',
+        left: { kind: 'context', path: 'step' },
+        options: ['welcome', 'step2', 'done'],
+      },
+    })
+  })
+
+  it('leaves an in list alone when nothing in the comparison reads the context', () => {
+    /*
+     * The control for the options rewrite, and the same rule the flat case
+     * holds: a list of answers that happens to contain the copied key is about
+     * the answers. `readsContext` gates the whole rewrite, so a `ref` on the
+     * left has to leave the list byte-identical.
+     */
+    const condition = {
+      kind: 'condition' as const,
+      condition: {
+        op: 'in' as const,
+        left: { kind: 'ref' as const, dataKey: 'chosen' },
+        options: ['welcome', 'step', 'done'],
+      },
+    }
+
+    expect(duplicateNode(step(condition), 'step')?.renderWhen).toEqual(condition)
   })
 })
 
