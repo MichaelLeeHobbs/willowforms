@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 13, the inspector panels' HIGHs. Item 14 is next.
+- **Last completed:** item 14, the demo-server HIGHs. Item 15 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/13-inspector-highs`
+- **Last pushed item branch:** `build-out/b/14-demo-server-highs`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -207,7 +207,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a test per finding, each seen red first. The undo one must assert the
       condition is reachable by undo **and** redo.
 
-- [ ] **14. demo-server HIGHs.** Area 10. `:207-216` — the lost update the comment at :92-98 claims to have
+- [x] **14. demo-server HIGHs.** Area 10. `:207-216` — the lost update the comment at :92-98 claims to have
       fixed is live: the read-modify-write straddles an `await` and only the write half is serialized.
       `:159-167` — `MAX_BODY` is not a body limit; `await c.req.text()` buffers the whole stream before
       `text.length` is compared. `:344` — for a multi-step document the echoed payload drops every step but

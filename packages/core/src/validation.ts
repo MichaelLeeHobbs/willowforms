@@ -747,6 +747,45 @@ export function submittedData(
 }
 
 /**
+ * The projection a multi-step form submits, taken across every step.
+ *
+ * `validateAcross` exists because a wizard's steps are hidden from each other
+ * and hidden means not validated -- so at submit every step has to be checked,
+ * and checking under one environment misses the rest. The projection has exactly
+ * the same problem and did not have the same answer: the demo server validated
+ * across all scopes and then projected under `scopes[0]`, so every answer given
+ * on step two onwards was dropped from the payload. A form that validated a
+ * required field and then submitted without it.
+ *
+ * Merged the way `validateAcross` merges, and for the same reason: steps
+ * partition the tree, so a key belongs to at most one of them and there is
+ * nothing to resolve. Where scopes overlap the first answer wins, which is the
+ * order everywhere else in this file.
+ *
+ * No scopes is not the same as one empty scope. A document with no steps yields
+ * no scopes, and the honest projection across nothing is nothing -- a caller
+ * that means the whole form calls `submittedData`, which is what
+ * `validateAcross` says about the same case one function below.
+ */
+export function submittedAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormData {
+  // No prototype, for the reason `submittedData` has none and `validateAcross`
+  // has none: a key from a document is a key an attacker may have chosen.
+  const merged: FormData = Object.create(null) as FormData
+
+  for (const scope of scopes) {
+    for (const [key, value] of Object.entries(submittedData(root, data, scope))) {
+      merged[key] ??= value
+    }
+  }
+
+  return { ...merged }
+}
+
+/**
  * Validate one document under several evaluation environments, merged.
  *
  * A multi-step form needs two different answers from the same rules. While the

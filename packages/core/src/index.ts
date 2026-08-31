@@ -116,6 +116,7 @@ export {
   validateField,
   isRequired,
   isRowScope,
+  submittedAcross,
   validateAcross,
   validateForm,
 } from './validation.js'
