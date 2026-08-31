@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 3, the kit-contract suite. Stage 1 is done; item 4 is next.
+- **Last completed:** item 4, the designer CSS guard. Item 5 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/03-kit-contract`
+- **Last pushed item branch:** `build-out/b/04-css-guard`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -104,7 +104,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
 
 ## Stage 2 — the guards that cannot fail
 
-- [ ] **4. Repair the designer CSS guard.** HIGH plus the guard hole, areas 13 and 10.
+- [x] **4. Repair the designer CSS guard.** HIGH plus the guard hole, areas 13 and 10.
       `designer.css.test.ts:259-288` — the guard-of-the-guard written to stop `declarationsFor` reading only
       a selector's first block never calls `declarationsFor`. It re-implements the scan inline over a
       synthetic sheet with a different algorithm, and its only call site is the other test. And

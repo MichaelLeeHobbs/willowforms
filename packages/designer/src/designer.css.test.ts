@@ -41,12 +41,12 @@ function selectors(source: string): string[] {
  * could set anything at all and the pinning check below would never see it. The
  * two blocks are merged now; the reader is fixed so the next pair cannot hide.
  */
-function declarationsFor(selector: string): string[] {
+function declarationsFor(selector: string, source: string = withoutComments): string[] {
   const names: string[] = []
 
   let from = 0
   for (;;) {
-    const start = withoutComments.indexOf(selector, from)
+    const start = source.indexOf(selector, from)
     if (start === -1) break
     from = start + selector.length
 
@@ -55,17 +55,17 @@ function declarationsFor(selector: string): string[] {
      * `.fs-drop` appears inside `.fs-drop--bar`, and a substring match would
      * read the wrong block's declarations and call them the first's.
      */
-    const open = withoutComments.indexOf('{', from)
+    const open = source.indexOf('{', from)
     if (open === -1) break
-    if (withoutComments.slice(from, open).trim() !== '') continue
-    const before = withoutComments.slice(0, start)
+    if (source.slice(from, open).trim() !== '') continue
+    const before = source.slice(0, start)
     const boundary = before.slice(before.lastIndexOf('}') + 1).trim()
     if (boundary !== '' && !boundary.endsWith(',')) continue
 
-    const close = withoutComments.indexOf('}', open)
+    const close = source.indexOf('}', open)
     if (close === -1) break
 
-    for (const line of withoutComments.slice(open + 1, close).split(';')) {
+    for (const line of source.slice(open + 1, close).split(';')) {
       const name = line.split(':')[0]?.trim()
       if (name) names.push(name)
     }
@@ -123,12 +123,53 @@ const CHROME_UNDER_CANVAS = new Set([
   '.fs-canvas__data',
 ])
 
-/** The compound selectors of one selector, in order, split on combinators. */
+/**
+ * The compound selectors of one selector, in order, split on combinators.
+ *
+ * Only at paren depth zero. A naive split on whitespace shatters
+ * `:where(.fs-shell, .fs-canvas)` into two pieces that are each half a selector,
+ * and the checks below then read them as two compounds that mean nothing.
+ */
 function compounds(selector: string): string[] {
-  return selector
-    .split(/[\s>+~]+/)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+
+  const flush = (): void => {
+    const part = current.trim()
+    if (part) parts.push(part)
+    current = ''
+  }
+
+  for (const character of selector) {
+    if (character === '(') depth += 1
+    else if (character === ')') depth -= 1
+
+    if (depth === 0 && /[\s>+~]/.test(character)) flush()
+    else current += character
+  }
+  flush()
+
+  return parts
+}
+
+/**
+ * A functional pseudo-class holding alternatives, which this guard cannot read.
+ *
+ * `:is(.fs-drop, input)` targets an `input`, and every check here that asks
+ * "does this compound carry an `fs-` class" answers yes because one of the two
+ * alternatives does. Rather than guess, the guard says it cannot read the rule.
+ * No such selector exists in the file, so this costs nothing today and refuses
+ * the class rather than waiting to be surprised by it.
+ */
+function holdsAlternatives(compound: string): boolean {
+  let depth = 0
+  for (const character of compound) {
+    if (character === '(') depth += 1
+    else if (character === ')') depth -= 1
+    else if (character === ',' && depth > 0) return true
+  }
+  return false
 }
 
 /**
@@ -150,11 +191,25 @@ function reachesIntoTheForm(selector: string): boolean {
   const target = parts[parts.length - 1]
   if (target === undefined || parts.length < 2) return false
 
+  /*
+   * Anywhere in the compound, not anchored at its start.
+   *
+   * This was `/^\.fs-(shell|canvas)/`, which asks whether the compound *begins*
+   * with the scope. `:where(.fs-shell) input` begins with `:where(`, so it named
+   * no scope, so there was nothing to reach from and the rule passed -- and it
+   * passed the namespace check too, because `.fs-` does appear in the string. A
+   * selector wrapping the scope in a zero-specificity pseudo is the ordinary way
+   * to write that rule, and it is the exact rule that broke MUI's notched
+   * outline. Wrapping a scope does not stop it being the scope.
+   */
   const insideTheForm = parts
     .slice(0, -1)
-    .some((part) => /^\.fs-(shell|canvas)/.test(part) && !CHROME_UNDER_CANVAS.has(part))
+    .some((part) => /\.fs-(shell|canvas)/.test(part) && !CHROME_UNDER_CANVAS.has(part))
 
   if (!insideTheForm) return false
+
+  // A compound the guard cannot read is refused rather than guessed at.
+  if (holdsAlternatives(target)) return true
 
   // An `fs-` class anywhere in the final compound means it targets the
   // designer's own markup, which the designer is entitled to style.
@@ -184,6 +239,21 @@ describe('designer.css isolation', () => {
   it('parses the stylesheet', () => {
     expect(all.length).toBeGreaterThan(20)
     expect(all).toContain('.fs-shell')
+  })
+
+  it('reads the rules inside an at-rule, not just the ones beside it', () => {
+    /*
+     * The third helper in this file, guarded for the same reason as the other
+     * two. Every dark-theme rule lives inside `@media`, so a reader that stopped
+     * at the at-rule prelude would leave the whole dark palette unchecked and
+     * both assertions above would still pass -- 20 selectors and `.fs-shell` are
+     * both satisfied long before the file gets there.
+     *
+     * Asserted against the real sheet rather than a synthetic one, so it is a
+     * claim about the file this guard actually reads.
+     */
+    expect(all).toContain(".fs-shell:where(:not([data-fs-theme='light']))")
+    expect(selectors('@media (min-width: 1px) { .fs-x .y { color: red } }')).toEqual(['.fs-x .y'])
   })
 
   it('only reaches into the form through the sanctioned exceptions', () => {
@@ -220,6 +290,23 @@ describe('designer.css isolation', () => {
       ['.fs-canvas input', 'and at any other depth'],
       ['.fs-shell [data-fs-key] label', 'reaching by attribute rather than by element'],
       ['.fs-canvas__frame > *', 'or by wildcard'],
+      /*
+       * The scope wrapped in a zero-specificity pseudo, which is the ordinary
+       * way somebody writes that rule and the way the guard could not see. The
+       * scope test was anchored at the start of the compound, so `:where(` meant
+       * no scope was named, so there was nothing to reach from -- and the
+       * namespace check passed too, because `.fs-` is in the string.
+       */
+      [':where(.fs-shell) input', 'the original incident, with the scope in :where()'],
+      [':is(.fs-canvas__frame) input', 'and in :is()'],
+      ['.fs-shell:where(:not([data-fs-theme="light"])) input', 'and qualified after the scope'],
+      ['.fs-canvas__frame :where(input)', 'or with the target wrapped instead'],
+      /*
+       * And a compound the guard cannot read. One alternative carries an `fs-`
+       * class and the other does not, so every "does this target our own markup"
+       * check answers yes while the rule styles an `input`.
+       */
+      ['.fs-canvas__frame :is(.fs-drop, input)', 'alternatives it cannot choose between'],
     ])('flags %s — %s', (selector) => {
       expect(reachesIntoTheForm(selector)).toBe(true)
     })
@@ -249,6 +336,14 @@ describe('designer.css isolation', () => {
       ['.fs-canvas__bar button', 'chrome that is, and is named in CLAUDE.md'],
       ['.fs-panel .fs-prop-row', 'the designer styling its own markup'],
       ['.fs-canvas__frame .fs-drop', 'and doing it over the canvas'],
+      /*
+       * The controls for the widened scope test. Unanchoring it must not make
+       * every rule mentioning the shell a reach, and it must not break the one
+       * selector in the file that already qualifies a scope with a pseudo.
+       */
+      ['.fs-shell:where(:not([data-fs-theme="light"]))', 'the scope, qualified, on its own'],
+      ['.fs-canvas__bar :where(.fs-icon)', 'chrome under chrome, wrapped'],
+      ['.fs-panel button:not(:disabled)', 'a state on a control the designer renders'],
     ])('leaves %s alone — %s', (selector) => {
       // Without these the guard could be `() => true` and the suite would pass
       // by refusing a stylesheet that has to exist.
@@ -256,35 +351,65 @@ describe('designer.css isolation', () => {
     })
   })
 
-  it('reads every block a selector has, not the first one', () => {
+  describe('the reader the pinning check depends on', () => {
     /*
-     * The guard-of-the-guard for the reader above. Two blocks on one selector is
-     * legal CSS and this file had two such pairs, so an allowlisted selector
-     * could have been given a second block setting anything at all and the
-     * pinning check would have compared the first block and passed.
+     * These call `declarationsFor`. That sentence is the whole repair.
+     *
+     * The guard-of-the-guard written for this reader re-implemented the scan
+     * inline, over a synthetic sheet, with a different algorithm -- so it proved
+     * that the twenty lines in the test body read every block, and said nothing
+     * about the function shipped beside it. `declarationsFor` could have been
+     * deleted and this stayed green. It is the same defect as the contract suite
+     * in item 3, one level up: a check whose subject is not the thing it names.
+     *
+     * `declarationsFor` now takes the sheet to read, which is what made calling
+     * it possible at all. Nothing else about it changed.
      */
-    const sheet = [
-      '.a { color: red }',
-      '.b { padding: 0 }',
-      '.a { background: blue; z-index: 1 }',
-    ].join(String.fromCharCode(10))
+    const newline = String.fromCharCode(10)
 
-    const names: string[] = []
-    let from = 0
-    for (;;) {
-      const start = sheet.indexOf('.a', from)
-      if (start === -1) break
-      from = start + 2
-      const open = sheet.indexOf('{', from)
-      if (open === -1 || sheet.slice(from, open).trim() !== '') continue
-      const close = sheet.indexOf('}', open)
-      for (const line of sheet.slice(open + 1, close).split(';')) {
-        const name = line.split(':')[0]?.trim()
-        if (name) names.push(name)
-      }
-    }
+    it('reads every block a selector has, not the first one', () => {
+      /*
+       * Two blocks on one selector is legal CSS and this file had two such
+       * pairs, so an allowlisted selector could have been given a second block
+       * setting anything at all and the pinning check would have compared the
+       * first block and passed.
+       */
+      const sheet = [
+        '.a { color: red }',
+        '.b { padding: 0 }',
+        '.a { background: blue; z-index: 1 }',
+      ].join(newline)
 
-    expect(names).toEqual(['color', 'background', 'z-index'])
+      expect(declarationsFor('.a', sheet)).toEqual(['color', 'background', 'z-index'])
+    })
+
+    it('does not read a block belonging to a selector that merely starts the same', () => {
+      // `.fs-drop` appears inside `.fs-drop--bar`. A substring match would call
+      // the wrong block's declarations the first's.
+      const sheet = ['.a--wide { color: red }', '.a { padding: 0 }'].join(newline)
+
+      expect(declarationsFor('.a', sheet)).toEqual(['padding'])
+    })
+
+    it('does not read a block belonging to a selector that merely ends the same', () => {
+      const sheet = ['.outer .a { color: red }', '.a { padding: 0 }'].join(newline)
+
+      expect(declarationsFor('.a', sheet)).toEqual(['padding'])
+    })
+
+    it('reads a selector that shares its block with another', () => {
+      // `.a, .b { … }` declares both. Skipping it would let an allowlisted
+      // selector pick up properties by joining a list.
+      const sheet = ['.b, .a { color: red }'].join(newline)
+
+      expect(declarationsFor('.a', sheet)).toEqual(['color'])
+    })
+
+    it('finds nothing for a selector the sheet does not have', () => {
+      // The control. A reader that returned the previous rule's declarations
+      // would make the pinning check pass for an exception that was deleted.
+      expect(declarationsFor('.missing', '.a { color: red }')).toEqual([])
+    })
   })
 
   it('keeps every sanctioned exception to exactly what it was allowed', () => {
