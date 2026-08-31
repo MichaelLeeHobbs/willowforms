@@ -5,5 +5,13 @@
     "lib": ["ES2022"],
     "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  /*
+   * The packages this app imports, so `tsc --build` builds them before it
+   * checks this project. Without them the app was checked first on a clean
+   * checkout, `@formsmith/core` resolved to a `dist/index.d.ts` that did not
+   * exist yet, and every import came back TS2307 -- green locally, where dist
+   * was left over from an earlier build, and red on CI.
+   */
+  "references": [{ "path": "../../packages/core" }]
 }

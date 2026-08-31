@@ -80,6 +80,12 @@ The tests this run is proudest of are the ones that were watched failing first.
   a run. It also no longer retries a failed browser test, no longer cancels a `main` build, and cannot hang
   a runner for six hours.
 
+- **`tsc --build` builds the packages before it checks the apps.** Adding the two apps to the build was
+  one of this run's fixes, and it shipped without the project references that order the work -- so on a
+  clean checkout each app was checked before the `dist/index.d.ts` it imports existed. Locally it passed,
+  every time, on dist left over from an earlier build. CI is the only thing in this repository that starts
+  from nothing, and it is the reason the failure was ever seen.
+
 ## What was refused, and why
 
 Triage carried 54 groups of findings, most of them in stage 5. Three refusals are worth naming because

@@ -4,5 +4,13 @@
     "noEmit": true,
     "types": ["vite/client"]
   },
-  "include": ["src/**/*", "vite.config.ts"]
+  "include": ["src/**/*", "vite.config.ts"],
+  /* Build order, for the reason `apps/demo-server/tsconfig.json` gives. */
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/renderer" },
+    { "path": "../../packages/designer" },
+    { "path": "../../packages/kit-html" },
+    { "path": "../../packages/kit-mui" }
+  ]
 }

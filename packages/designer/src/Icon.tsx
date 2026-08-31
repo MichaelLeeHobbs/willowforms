@@ -253,14 +253,15 @@ export function Icon({ name, size = 16 }: IconProps): ReactNode {
 /**
  * Every name the vocabulary declares, for tests and for a future icon picker.
  *
- * `Object.keys` types as `string[]`, and this file's own comment said the cast
- * had been "replaced by asking the type for its own keys" while the cast was
- * still on the line -- and `keyof typeof GLYPHS` *is* `IconName`, so it was the
- * `string[] -> IconName[]` assertion the comment claimed was gone. Asking the
- * declaration for its keys is what `Object.entries` of a typed record already
- * gives, and it needs no assertion at all.
+ * The assertion is real and stays. `Object.keys` is typed `string[]` because a
+ * value can carry keys its type does not declare, so no amount of typing on
+ * `GLYPHS` makes TypeScript hand back `IconName[]` on its own -- `Object.entries`
+ * does not either, which is what an earlier version of this comment claimed
+ * while its `.map()` still asserted on every element. A comment that says a cast
+ * is gone, with the cast on the next line, has now been written here twice.
  *
- * The `.slice()` went with it: it copied an array `Object.keys` had just
- * allocated for this call and nothing else holds.
+ * What makes the assertion safe is the annotation on `GLYPHS`: `Record<IconName,
+ * ReactNode>` is missing-key checked, so a name added to `IconName` in core
+ * stops this file compiling until a glyph exists for it.
  */
-export const ICON_NAMES: IconName[] = Object.entries(GLYPHS).map(([name]) => name as IconName)
+export const ICON_NAMES: IconName[] = Object.keys(GLYPHS) as IconName[]
