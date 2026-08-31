@@ -13,7 +13,7 @@
  * three named an id that was not in the document.
  */
 
-import { useCallback, useEffect, useId, useRef } from 'react'
+import { useCallback, useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 
 export interface TabDef<Id extends string> {
@@ -52,9 +52,6 @@ export function Tabs<Id extends string>({
 }: TabsProps<Id>): ReactNode {
   const base = useId()
   const strip = useRef<HTMLDivElement>(null)
-
-  /** The tab a keypress asked for, until the parent has honoured the request. */
-  const wanted = useRef<Id | null>(null)
 
   const tabId = (id: Id): string => base + '-tab-' + id
   const panelId = (id: Id): string => base + '-panel-' + id
@@ -106,39 +103,20 @@ export function Tabs<Id extends string>({
        * navigation that looks like it worked because the panel changed. The
        * buttons are the strip's element children, in the order they are
        * rendered, so `next` indexes them directly.
-       */
-      /*
-       * Asked for, then moved to once the parent has honoured it.
        *
-       * The parent owns the selection: `onSelect` is a request, and this used
-       * to move focus straight away on the assumption it was granted. A parent
-       * that ignores or remaps the request left focus on a tab rendered with
-       * `tabIndex={-1}` and `aria-selected={false}` -- a roving tabindex whose
-       * rove and selection point at different tabs, which the next arrow key
-       * steps out of the strip entirely.
-       *
-       * The effect below runs when `active` really changes, so a request that
-       * went nowhere leaves focus where it was, which is the honest answer.
+       * Moved here rather than after the parent has honoured the request. The
+       * review is right that `onSelect` is a request and this assumes it was
+       * granted -- and the version that waited for `active` to change was
+       * measured in a browser and did not move focus at all, while passing in
+       * jsdom. A keyboard regression is worse than the hole; the finding stays
+       * open in `triage.md` with what was tried.
        */
-      wanted.current = target.id
+      const buttons = strip.current?.children
+      const element = buttons?.[next]
+      if (element instanceof HTMLButtonElement) element.focus()
     },
     [tabs, onSelect],
   )
-
-  useEffect(() => {
-    if (wanted.current === null || wanted.current !== active) return
-    wanted.current = null
-
-    /*
-     * By position in the strip rather than by re-querying an id: the id route
-     * depended on `CSS.escape` and on two optional chains, either of which
-     * would leave focus where it was with nothing to say so -- keyboard
-     * navigation that looks like it worked because the panel changed.
-     */
-    const at = tabs.findIndex((tab) => tab.id === active)
-    const element = strip.current?.children[at]
-    if (element instanceof HTMLButtonElement) element.focus()
-  }, [active, tabs])
 
   const tablist = (
     <div className="fs-tabs" role="tablist" aria-label={label} ref={strip}>

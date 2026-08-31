@@ -48,6 +48,7 @@ fighting specificity.
 | `--fs-panel-width`            | Side pane width                                     |
 | `--fs-scrollbar-thumb`        | Scrollbar thumb; the track is transparent           |
 | `--fs-font`, `--fs-font-size` | Type                                                |
+| `--fs-font-mono`              | The JSON editor, the raw CSS box, the code editor   |
 
 ## HTML kit tokens
 

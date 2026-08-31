@@ -316,7 +316,23 @@ export function TranslationEditor({
         translations={translations}
         onRename={(next, carried) => {
           onChange({ kind: 'i18n', key: next })
-          for (const [language, text] of carried) onTranslate(language, next, text)
+
+          /*
+           * Written under the new key, and cleared from the old one.
+           *
+           * The comment above says the rename "carries the translations with
+           * it" and it only copied them: every rename left the old key's text
+           * in every bundle, unreachable from the panel and exported with the
+           * document. A translator opening the file sees two entries for one
+           * string and no way to tell which one the form reads.
+           *
+           * `setTranslation` deletes a key when the text is empty, which is the
+           * same path clearing a box takes.
+           */
+          for (const [language, text] of carried) {
+            onTranslate(language, next, text)
+            onTranslate(language, value.key, '')
+          }
         }}
       />
 

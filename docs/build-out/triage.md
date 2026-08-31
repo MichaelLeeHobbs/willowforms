@@ -668,3 +668,47 @@ A vacuous test for each was written, seen to pass against the unfixed code, and 
 - `RuleRow` is keyed by rule key and index but not by component, and `Rules` is not remounted per
   selection. The same shape the spec records as a real bug for the JSON editor; it needs the same fix,
   which is a `key` on the panel rather than on the row.
+
+## Eight panel findings left as they are — area 9
+
+**LOW and NOTE.**
+
+- Every id in `StyleTab` and the JSON dialog is a hard-coded literal, so two `<Designer>` instances on
+  one page produce duplicate ids and a `htmlFor` that points at the wrong box. Real, and the fix is
+  `useId` in five files -- worth doing as one deliberate pass over every panel rather than in the two
+  that a review happened to name, because a half-converted panel is worse than a consistent one.
+- A key rename is not one undo step: the binding commits under one label and each translation under its
+  own, and the store coalesces by label. Making it one step means a label that spans several writers,
+  which is a change to how coalescing works rather than to this panel.
+- `<li key={tag}>` duplicates when two languages share a tag, dropping a row -- the same hazard
+  `FormSettings` guards by index. That panel guards it because two languages sharing a tag is a state it
+  can produce; this one lists what the document holds, and the fix is the same one line when somebody is
+  next in the file.
+- `role="alert"` added to an already-mounted `<p>` in the same commit that fills it, and the JSON
+  dialog's note being created only when non-empty, are both the live-region timing problem
+  `docs/accessibility.md` describes: a region created and populated together is announced unreliably. The
+  answer is one always-mounted region per panel, which is a pattern to apply everywhere at once.
+- `role="alert"` on the error `<ul>` replaces its list semantics, so a screen reader reads the text
+  without "list of 4 items". Wrapping the list in a `<div role="alert">` is the fix and it changes the
+  markup the dialog's tests assert against; worth doing with those tests open.
+- The dialog's note renders inside the tab children, so a message about the schema stays on screen after
+  switching to the Document tab. Moving it above the tabs is right and it moves an element the tests
+  find by role from inside the panel to outside it.
+
+## The tab strip moves focus before the parent has honoured the request — area 6
+
+**LOW, attempted, reverted, and left open with what was tried.** The finding is right: `onSelect` is a
+request, the parent owns the selection, and the strip moves focus on the assumption that the request was
+granted. A parent that ignores or remaps it leaves focus on a tab rendered `aria-selected="false"` with
+`tabIndex={-1}`, which the next arrow key steps out of the strip entirely.
+
+The obvious repair is to record what was asked for and move focus in an effect when `active` really
+becomes it. That was written, and it passed in jsdom -- and then `e2e/keyboard.spec.ts` failed in
+Chromium: the tab was selected, `aria-selected` moved, and focus never left the tab it started on. The
+effect's own logging never reached the browser console, so what did not happen is not yet understood, and
+guessing at a second version is how a keyboard regression ships.
+
+So the synchronous focus stays, with a comment at the site saying why, and this is the note for whoever
+picks it up: the jsdom test for the refusal case passes against the broken version, so the check that
+matters is the Playwright one, and the first question is why an effect in `Tabs` appears not to run in
+that build at all.

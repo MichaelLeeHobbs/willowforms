@@ -1,4 +1,15 @@
 /**
+ * How much of a chosen file the import will read.
+ *
+ * `accept="application/json,.json"` is a picker filter, not a constraint: a
+ * person can choose anything, and `file.text()` on a multi-hundred-megabyte
+ * file decodes the whole thing into a string and then puts it in a textarea. A
+ * form document is kilobytes; ten megabytes is far past anything real and far
+ * short of what hurts.
+ */
+const MAX_IMPORT = 10 * 1024 * 1024
+
+/**
  * Import, export, and raw JSON editing.
  *
  * A native `<dialog>` opened with `showModal()`, which brings focus trapping,
@@ -87,7 +98,27 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
       return
     }
 
-    const problems = documentProblems(parsed)
+    /*
+     * Inside the `try` as well.
+     *
+     * The `catch` covered `JSON.parse` and stopped there, while
+     * `documentProblems` -- and `validateDocument` through it -- ran outside
+     * it. Both are total today, and this is the one panel whose whole purpose
+     * is to be handed a document nobody has checked: a throw from the gate is
+     * the dialog disappearing rather than reporting, which is the outcome the
+     * gate exists to prevent.
+     */
+    let problems: string[]
+    try {
+      problems = documentProblems(parsed)
+    } catch (error) {
+      setErrors([
+        'That document could not be checked: ' +
+          (error instanceof Error ? error.message : 'unknown error'),
+      ])
+      return
+    }
+
     if (problems.length > 0) {
       setErrors(problems)
       return
@@ -140,6 +171,10 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
 
   const onFile = useCallback((file: File | undefined) => {
     if (!file) return
+    if (file.size > MAX_IMPORT) {
+      setErrors(['That file is too large to be a form document.'])
+      return
+    }
     file
       .text()
       .then((text) => {

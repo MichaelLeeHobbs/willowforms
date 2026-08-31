@@ -71,7 +71,17 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
 
   const def = indexKit(kit).get(node.type)
   const styleProps = (def?.props ?? []).filter((prop) => prop.section === 'style')
-  const text = node.css?.[device] ?? ''
+  /*
+   * The stored text, if it is text.
+   *
+   * `node.css` comes out of a document, so the entry for a device can be a
+   * number or an object -- and `readDeclaration` walks it as a string, which
+   * throws out of the render of the panel somebody opened to repair it. An
+   * unreadable entry reads as empty here; the raw box below shows what a person
+   * can then overwrite.
+   */
+  const stored = node.css?.[device]
+  const text = typeof stored === 'string' ? stored : ''
   // A style property can be bound to a condition too, and one authored inside a
   // repeater has to be able to name that row's answers.
   const scopes = keyScopesFor(api.document.root, node.key)

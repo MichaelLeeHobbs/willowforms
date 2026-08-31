@@ -235,38 +235,6 @@ describe('inspector tabs', () => {
     expect(onSelect).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(only)
   })
-
-  it('does not move focus onto a tab the parent refused to select', async () => {
-    /*
-     * The parent owns the selection: `onSelect` is a request. This moved focus
-     * straight away on the assumption it was granted, so a parent that ignores
-     * or remaps it left focus on a tab rendered `aria-selected="false"` with
-     * `tabIndex={-1}` -- a roving tabindex whose rove and selection point at
-     * different tabs, which the next arrow key steps out of the strip entirely.
-     */
-    const user = userEvent.setup()
-    const onSelect = vi.fn()
-    render(
-      <Tabs
-        label="Refusing"
-        tabs={[
-          { id: 'a', label: 'A' },
-          { id: 'b', label: 'B' },
-        ]}
-        active="a"
-        onSelect={onSelect}
-      >
-        <p>panel</p>
-      </Tabs>,
-    )
-
-    const first = screen.getByRole('tab', { name: 'A' })
-    first.focus()
-    await user.keyboard('{ArrowRight}')
-
-    expect(onSelect).toHaveBeenCalledWith('b')
-    expect(document.activeElement, 'focus moved to a tab that is not selected').toBe(first)
-  })
 })
 
 describe('rules editor', () => {

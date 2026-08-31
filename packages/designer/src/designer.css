@@ -34,6 +34,16 @@
   --fs-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --fs-font-size: 14px;
 
+  /*
+   * The code stack, as a token.
+   *
+   * It was written out three times -- the JSON editor, the raw CSS box and the
+   * code editor -- while `11-theming.md` documents `--fs-font` as the type a
+   * host overrides. A host restyling the builder had two answers and could
+   * change only one of them.
+   */
+  --fs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -274,6 +284,16 @@
   padding: 4px 8px;
   border-radius: var(--fs-radius);
   cursor: pointer;
+
+  /*
+   * The drop feedback's two declarations, folded in from the second block this
+   * selector used to have five hundred lines down. Two blocks for one selector
+   * is the hazard the comment above this section says was eliminated, and it
+   * had come back: `position` and `touch-action` are what the `::before` rules
+   * near the drop feedback need, and they belong with the row that has them.
+   */
+  position: relative;
+  touch-action: none;
 }
 
 .fs-tree__row:hover {
@@ -446,7 +466,12 @@
   padding-block-start: 12px;
 }
 
-.fs-tabs__panel:focus-visible,
+/*
+ * The tab, not the panel. `Tabs` renders the tabpanel with no `tabIndex` and
+ * explains why, so `.fs-tabs__panel:focus-visible` could never match -- a rule
+ * that reads as though the panel takes focus, in a file whose own guard is
+ * about selectors meaning what they say.
+ */
 .fs-tabs__tab:focus-visible {
   outline: 2px solid var(--fs-primary);
   outline-offset: -2px;
@@ -472,13 +497,6 @@
   background: rgb(0 0 0 / 0.5);
 }
 
-.fs-dialog__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-block-end: 12px;
-}
-
 .fs-dialog__close {
   font: inherit;
   font-size: 18px;
@@ -500,7 +518,7 @@
   display: block;
   width: 100%;
   min-height: 46vh;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--fs-font-mono);
   font-size: 12px;
   line-height: 1.5;
   color: var(--fs-text);
@@ -590,7 +608,7 @@
 .fs-binding__key {
   display: block;
   width: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--fs-font-mono);
   font-size: 12px;
 }
 
@@ -825,11 +843,6 @@
  * Tree drop feedback. A line above or below the row for a reorder, and a filled
  * outline when the drop goes inside a container.
  */
-.fs-tree__row {
-  position: relative;
-  touch-action: none;
-}
-
 .fs-tree__row.is-drop-before::before,
 .fs-tree__row.is-drop-after::before {
   content: '';
@@ -1075,10 +1088,19 @@
   z-index: 4000;
 }
 
+/*
+ * The hover outline, at full strength.
+ *
+ * `opacity: 0.7` composited `--fs-primary` against the canvas at roughly
+ * 2.93:1, marginally under the 3:1 WCAG 1.4.11 asks of a user interface
+ * component -- and `test/contrast.test.ts` measures tokens, so a ratio built by
+ * compositing is one no assertion in this repository can see. Dashed and thin
+ * is what distinguishes it from the selection frame; the transparency was
+ * doing the same job twice.
+ */
 .fs-selection--hover {
   outline: 1px dashed var(--fs-primary);
   outline-offset: 2px;
-  opacity: 0.7;
 }
 
 .fs-selection--active {
@@ -1234,6 +1256,19 @@
   background: var(--fs-accent);
 }
 
+/*
+ * The label a condition-bound row keeps.
+ *
+ * `Properties.tsx` renders this for every row whose value is a condition -- the
+ * `<label>` is gone in that state, because there is no single control to point
+ * at -- and the stylesheet had no rule for it, so it rendered at body size in
+ * body colour where a label had been.
+ */
+.fs-prop-row__caption {
+  font-size: 12px;
+  color: var(--fs-text-muted);
+}
+
 .fs-prop-row__hint {
   grid-column: 1 / -1;
   margin: 0;
@@ -1244,12 +1279,6 @@
 .fs-prop-row__clear {
   padding: 2px 6px;
   font-size: 12px;
-}
-
-.fs-prop-binding {
-  font-size: 12px;
-  font-style: italic;
-  color: var(--fs-accent);
 }
 
 /*
@@ -1310,7 +1339,7 @@
 .fs-code__area {
   display: block;
   inline-size: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--fs-font-mono);
   font-size: 12px;
   line-height: 1.5;
   white-space: pre;

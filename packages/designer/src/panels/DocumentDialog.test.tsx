@@ -314,6 +314,42 @@ describe('the JSON dialog', () => {
     expect(JSON.parse(editor().value)).toMatchObject({ name: 'Second read' })
   })
 
+  it('refuses a file too large to be a form document', async () => {
+    /*
+     * `accept="application/json,.json"` is a picker filter, not a constraint:
+     * anything can be chosen, and `file.text()` on a very large file decodes
+     * the whole thing into a string and then puts it in a textarea. A form
+     * document is kilobytes.
+     */
+    const { user, open, editor } = setup()
+    await open()
+
+    const huge = asFile('form.json', '{}')
+    Object.defineProperty(huge, 'size', { value: 11 * 1024 * 1024 })
+    Object.defineProperty(huge, 'text', {
+      value: () => {
+        throw new Error('the file was read after all')
+      },
+    })
+
+    const before = editor().value
+    await chooseFile(user, huge)
+
+    expect(within(await screen.findByRole('alert')).getByText(/too large/)).toBeTruthy()
+    expect(editor().value).toBe(before)
+  })
+
+  it('still takes a file of an ordinary size', async () => {
+    // The control: a cap that refused everything would pass the test above.
+    const { user, open, editor } = setup()
+    await open()
+
+    const named = { ...JSON.parse(editor().value), name: 'Small enough' } as Record<string, unknown>
+    await chooseFile(user, asFile('form.json', JSON.stringify(named)))
+
+    expect(JSON.parse(editor().value)).toMatchObject({ name: 'Small enough' })
+  })
+
   it('says so when the file cannot be read', async () => {
     const { user, open, editor } = setup()
     await open()
