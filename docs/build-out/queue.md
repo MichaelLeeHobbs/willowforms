@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 6, the counting, documentation and contrast guards. Item 7 is next.
+- **Last completed:** item 7, the symmetry audit. Stage 2 is done; item 8 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/06-count-docs-contrast`
+- **Last pushed item branch:** `build-out/b/07-symmetry-audit`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -138,7 +138,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus: a document in `DOCS_WITH_COUNTS` that quotes no total fails the run, and
       every border token in `designer.css` is either asserted or listed with a reason.
 
-- [ ] **7. The symmetry and guard-recheck audit.** The process finding, and the highest-value item here.
+- [x] **7. The symmetry and guard-recheck audit.** The process finding, and the highest-value item here.
       All four CRITICALs and several HIGHs are the same mistake: a fix applied to one of two twins, or a
       guard not re-checked against the code the fix changed. Cross-cutting theme 1 names ten pairs; theme 2
       names four comments that describe an intent the code does not carry out. Walk the first remediation
