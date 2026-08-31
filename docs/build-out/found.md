@@ -1,9 +1,23 @@
 # Found during the build-out
 
-Work discovered while remediating the 2026-08-30 review that is **outside the frozen queue**. Nothing
+Work discovered while remediating the 2026-08-30 reviews that is **outside the frozen queue**. Nothing
 here gates completion. This file is the starting point for normal work on the project once the run ends.
 
 Add an entry as: what it is, where, why it is out of scope, and how bad it would be to leave.
+
+Entries below the second-pass heading came from the run against
+`docs/reviews/2026-08-30-second-pass.md`. Everything above it came from the first pass and is still open;
+the second review re-derived five of those independently, which is worth knowing before closing one.
+
+---
+
+## Second pass (from 2026-08-31)
+
+_Nothing yet._
+
+---
+
+## First pass (2026-08-30)
 
 ## The CI actions still target Node 20
 

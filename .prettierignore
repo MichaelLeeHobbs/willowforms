@@ -7,3 +7,7 @@ pnpm-lock.yaml
 # fork them, and the next re-sync would revert whatever prettier did.
 .claude/skills/codebase-design
 .claude/skills/steelman
+
+# Review reports are received artefacts, not repo prose. Reformatting one would change
+# the line numbers its own findings cite, and every queue item cites them too.
+docs/reviews
