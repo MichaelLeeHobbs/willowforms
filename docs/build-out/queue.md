@@ -3,11 +3,7 @@
 Paste this to start or resume the run:
 
 ```
-/goal Every item in docs/build-out/queue.md is checked off with its stated check passing and its own
-branch pushed. Print the full queue state, the branch you pushed for the item you just finished, and
-the current time at the end of every turn so this is judgeable from the transcript. Finishing an item
-means starting the next one, never stopping. Do not open background shells or subagents that outlive
-a turn. Follow docs/build-out/RUN.md.
+/goal Every item in docs/build-out/queue.md is checked off with its stated check passing and its own branch pushed. Print the full queue state, the branch you pushed for the item you just finished, and the current time at the end of every turn so this is judgeable from the transcript. Finishing an item means starting the next one, never stopping. Do not open background shells or subagents that outlive a turn. Follow docs/build-out/RUN.md.
 ```
 
 ## Run status
@@ -16,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** nothing yet. Item 0 is next.
-- **Run branch:** `build-out/review-b`, cut from `origin/main`
-- **Last pushed item branch:** none yet (prep PR branch is `build-out/b/00-prep`)
+- **Last completed:** item 0, the base. Item 1 is next.
+- **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
+- **Last pushed item branch:** `build-out/b/00-base`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -59,7 +55,7 @@ Plus, for every item, **its own pushed branch**. See the git section of `docs/bu
 
 ## Stage 0 — the base
 
-- [ ] **0. Establish the base and prove the gate is green on it.**
+- [x] **0. Establish the base and prove the gate is green on it.**
       The prep landed on `build-out/b/00-prep`. Merge it, cut `build-out/review-b` from an updated main,
       and run the standing gate against the untouched base so that every later failure is attributable.
       Confirm the review copy at `docs/reviews/2026-08-30-second-pass.md` matches the source byte for byte
