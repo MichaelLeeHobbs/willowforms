@@ -32,19 +32,46 @@ function selectors(source: string): string[] {
   return out
 }
 
-/** Declaration property names inside the block that follows a selector. */
+/**
+ * Every declaration property name under a selector, across all of its blocks.
+ *
+ * All of them, not the first. A selector can be declared twice in one file --
+ * legal CSS, and two of them were, five hundred lines apart -- and reading only
+ * the first textual occurrence meant a second block on an allowlisted selector
+ * could set anything at all and the pinning check below would never see it. The
+ * two blocks are merged now; the reader is fixed so the next pair cannot hide.
+ */
 function declarationsFor(selector: string): string[] {
-  const start = withoutComments.indexOf(selector)
-  if (start === -1) return []
-  const open = withoutComments.indexOf('{', start + selector.length)
-  const close = withoutComments.indexOf('}', open)
-  if (open === -1 || close === -1) return []
+  const names: string[] = []
 
-  return withoutComments
-    .slice(open + 1, close)
-    .split(';')
-    .map((line) => line.split(':')[0]?.trim())
-    .filter((name): name is string => Boolean(name))
+  let from = 0
+  for (;;) {
+    const start = withoutComments.indexOf(selector, from)
+    if (start === -1) break
+    from = start + selector.length
+
+    /*
+     * The selector has to be the whole of the rule's prelude, not part of it:
+     * `.fs-drop` appears inside `.fs-drop--bar`, and a substring match would
+     * read the wrong block's declarations and call them the first's.
+     */
+    const open = withoutComments.indexOf('{', from)
+    if (open === -1) break
+    if (withoutComments.slice(from, open).trim() !== '') continue
+    const before = withoutComments.slice(0, start)
+    const boundary = before.slice(before.lastIndexOf('}') + 1).trim()
+    if (boundary !== '' && !boundary.endsWith(',')) continue
+
+    const close = withoutComments.indexOf('}', open)
+    if (close === -1) break
+
+    for (const line of withoutComments.slice(open + 1, close).split(';')) {
+      const name = line.split(':')[0]?.trim()
+      if (name) names.push(name)
+    }
+  }
+
+  return names
 }
 
 /**
@@ -227,6 +254,37 @@ describe('designer.css isolation', () => {
       // by refusing a stylesheet that has to exist.
       expect(reachesIntoTheForm(selector)).toBe(false)
     })
+  })
+
+  it('reads every block a selector has, not the first one', () => {
+    /*
+     * The guard-of-the-guard for the reader above. Two blocks on one selector is
+     * legal CSS and this file had two such pairs, so an allowlisted selector
+     * could have been given a second block setting anything at all and the
+     * pinning check would have compared the first block and passed.
+     */
+    const sheet = [
+      '.a { color: red }',
+      '.b { padding: 0 }',
+      '.a { background: blue; z-index: 1 }',
+    ].join(String.fromCharCode(10))
+
+    const names: string[] = []
+    let from = 0
+    for (;;) {
+      const start = sheet.indexOf('.a', from)
+      if (start === -1) break
+      from = start + 2
+      const open = sheet.indexOf('{', from)
+      if (open === -1 || sheet.slice(from, open).trim() !== '') continue
+      const close = sheet.indexOf('}', open)
+      for (const line of sheet.slice(open + 1, close).split(';')) {
+        const name = line.split(':')[0]?.trim()
+        if (name) names.push(name)
+      }
+    }
+
+    expect(names).toEqual(['color', 'background', 'z-index'])
   })
 
   it('keeps every sanctioned exception to exactly what it was allowed', () => {

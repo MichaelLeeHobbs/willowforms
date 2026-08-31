@@ -623,17 +623,22 @@ describe('the visibility row', () => {
   })
 
   it.each([
-    ['static true', { kind: 'static', value: true }, 'always'],
+    ['static true', { kind: 'static', value: true }, 'other'],
     ['static false', { kind: 'static', value: false }, 'never'],
-    ['a translation key', { kind: 'i18n', key: 'x' }, 'always'],
+    ['a translation key', { kind: 'i18n', key: 'x' }, 'other'],
     ['an expression', { kind: 'computed', expression: 'a' }, 'computed'],
   ])('reads %s out of a hand-edited document as %s', async (_label, renderWhen, expected) => {
     /*
      * `renderWhen` is a PropValue, so a document can hold any of its kinds.
      * Reading anything truthy as "a condition" left the select saying so while
      * rendering no editor, which made those documents unfixable from the panel.
-     * A static truthy and a translation key both behave as no condition, which
-     * is what isVisible does with them.
+     *
+     * A static truthy and a translation key both *behave* as no condition, which
+     * is what `isVisible` does with them -- and they read as `other` rather than
+     * `always`, because a select already showing Always fires no change when
+     * Always is chosen, so the row displayed the stray value and could not
+     * remove it. The option says "Always (unrecognised rule)" and choosing
+     * anything replaces it.
      */
     const harness = setup({ ...dataField(), renderWhen: renderWhen as PropValue }, [
       { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
@@ -641,6 +646,17 @@ describe('the visibility row', () => {
     await harness.select()
 
     expect(screen.getByLabelText('Show when')).toHaveProperty('value', expected)
+  })
+
+  it('lets an unrecognised rule be cleared, which is why it is not named Always', async () => {
+    const harness = setup({ ...dataField(), renderWhen: { kind: 'i18n', key: 'x' } }, [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'always')
+
+    expect(harness.latest()?.renderWhen).toBeUndefined()
   })
 
   it('sets a static false for Never, which is not the same as absent', async () => {
@@ -798,6 +814,72 @@ describe('the condition binding mode', () => {
       .querySelector<HTMLOptionElement>('option[value="condition"]')
 
     expect(option?.disabled).toBe(true)
+  })
+})
+
+describe('a literal the plain grammar cannot spell', () => {
+  const withCondition = (literal: unknown): ComponentNode =>
+    ({
+      ...dataField(),
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'ref', dataKey: 'firstName' },
+          right: { kind: 'literal', value: literal },
+        },
+      },
+    }) as ComponentNode
+
+  const open = async (literal: unknown): Promise<ReturnType<typeof setup>> => {
+    const harness = setup(withCondition(literal), [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+    return harness
+  }
+
+  it('shows an object literal as JSON rather than as an empty box', async () => {
+    // An empty box says the condition compares against nothing, which is not
+    // what the document says -- and typing into it replaced the structure.
+    await open({ a: 1 })
+    expect(screen.getByDisplayValue('{"a":1}')).toBeTruthy()
+  })
+
+  it('shows null as null', async () => {
+    await open(null)
+    expect(screen.getByDisplayValue('null')).toBeTruthy()
+  })
+
+  it('lets a quoted string be authored as a string', async () => {
+    /*
+     * `true` and `18` become the boolean and the number, which is what a form
+     * needs and what made the *words* unauthorable: a condition testing a text
+     * field whose answer is "true" could not be written here at all. Quoting is
+     * the escape hatch, and it is JSON's own.
+     */
+    const harness = await open('x')
+    const box = screen.getByDisplayValue('x')
+    await harness.user.clear(box)
+    await harness.user.type(box, '"true"')
+    await harness.user.tab()
+
+    const condition = harness.latest()?.renderWhen
+    expect(condition).toMatchObject({
+      condition: { right: { kind: 'literal', value: 'true' } },
+    })
+  })
+
+  it('still reads an unquoted true as the boolean', async () => {
+    const harness = await open('x')
+    const box = screen.getByDisplayValue('x')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'true')
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toMatchObject({
+      condition: { right: { kind: 'literal', value: true } },
+    })
   })
 })
 

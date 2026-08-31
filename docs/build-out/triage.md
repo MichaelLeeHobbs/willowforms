@@ -114,3 +114,29 @@ squarely inside the form's own geometry. The client box is the wrong question, a
 "is this point inside any container?" -- is what `resolveDrop` already answers by returning nothing.
 The guard exists one layer down. The fabricated `dragId` of `0` in the same finding was real and is
 fixed: it is `-1` now, a value no drag can be holding.
+
+## Perf notes with no defect behind them — areas 5 and 6
+
+**NOTE, five findings.** `groupKit` is O(components × groups) and `findLanguage` is linear, both over
+lists of at most a few dozen entries; `indexKit(kit)` allocates a Map per pointer move in `Tree.tsx`, on
+a kit with 27 components; `measureIn` reads 2N rectangles where N+1 would do, per drag rather than per
+move; and `DocumentDialog` re-serialises the document on every keystroke in a textarea nobody types a
+whole document into. Each is a real observation and none of them is a defect: the numbers are small, the
+work is not on a frame budget, and the fix in every case is a memo or a shared instance that has to stay
+correct across an edit. Worth doing on evidence -- a profile, a form somebody says is slow -- and not
+before.
+
+## `LeftPane` re-renders `Tree` when `api` changes — `LeftPane.tsx:55-65`, area 5
+
+**NOTE, no longer true.** The finding says `api` is a new object every render. `useDesigner` memoises it
+now, so it changes when the document, the selection or one of its callbacks does -- which is when the
+tree has something new to draw.
+
+## Two glyphs hardcode `opacity` — `Icon.tsx:111,166`, area 5
+
+**NOTE.** In forced-colors mode the browser replaces the colour and leaves the opacity, so those two
+glyphs stay faint where the rest go solid. The fix is an SVG attribute that cannot be media-queried from
+this file, so it means either drawing the two glyphs differently or moving icon styling into
+`designer.css` and giving every glyph a class -- a change to how icons are drawn, made for a mode
+neither kit has been tested in. It is worth doing as part of a forced-colors pass, with something to
+check the result against.

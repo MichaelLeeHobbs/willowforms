@@ -64,7 +64,12 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
     const language: Language = {
       code: primary.toLowerCase(),
       ...(region ? { dialect: region.toUpperCase() } : {}),
-      name: name.trim() || raw,
+      /*
+       * The typed name, or none. It fell back to the raw code, so a language
+       * added without a name displayed as "pt-BR pt-BR" -- the tag twice. The
+       * list draws the tag on its own when there is no name.
+       */
+      name: name.trim(),
       bidi: 'ltr',
     }
     const tag = languageTag(language)
@@ -79,9 +84,17 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
     setError('')
   }
 
-  const remove = (target: string): void => {
+  /*
+   * Removed by position, not by tag.
+   *
+   * A tag is not unique: nothing stops a document holding `en` twice, and a
+   * hand-edited one can, so filtering by tag deleted both entries for one click
+   * -- and with a translation bundle keyed by that tag, the author had no way to
+   * tell which of the two they had lost.
+   */
+  const remove = (at: number): void => {
     if (doc.languages.length === 1) return
-    api.setLanguages(doc.languages.filter((l) => languageTag(l) !== target))
+    api.setLanguages(doc.languages.filter((_, index) => index !== at))
   }
 
   return (
@@ -101,13 +114,26 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
       </h3>
 
       <ul className="fs-languages">
-        {doc.languages.map((language) => {
+        {doc.languages.map((language, at) => {
           const tag = languageTag(language)
           const isDefault = tag === doc.defaultLanguage
           return (
-            <li key={tag} className="fs-languages__item">
+            // Keyed by position and tag: a document can hold one tag twice, and
+            // a duplicated React key drops a row without a word.
+            <li key={String(at) + ':' + tag} className="fs-languages__item">
               <span className="fs-languages__name">
-                {language.name} <code>{tag}</code>
+                {/*
+                 * The tag when there is no name. It fell back to the raw code,
+                 * which for `pt-BR` produced "pt-BR pt-BR" -- the same string
+                 * twice, reading as though something had gone wrong.
+                 */}
+                {language.name.trim() ? (
+                  <>
+                    {language.name} <code>{tag}</code>
+                  </>
+                ) : (
+                  <code>{tag}</code>
+                )}
               </span>
 
               <div className="fs-languages__controls">
@@ -141,11 +167,11 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                 <button
                   type="button"
                   className="fs-rule__remove"
-                  aria-label={'Remove ' + language.name}
+                  aria-label={'Remove ' + (language.name.trim() || tag)}
                   // A document with no languages renders every translation as its
                   // raw key, so the last one cannot be removed.
                   disabled={doc.languages.length === 1}
-                  onClick={() => remove(languageTag(language))}
+                  onClick={() => remove(at)}
                 >
                   &times;
                 </button>
@@ -163,6 +189,14 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
             type="text"
             placeholder="fr"
             value={code}
+            /*
+             * Flagged and described, the way `KeyField` does it. `role="alert"`
+             * reads the refusal once as it appears and then it is gone: a
+             * screen-reader user who tabbed back to the box had no way to hear
+             * why the code was refused, or to know that it was.
+             */
+            aria-invalid={error ? true : undefined}
+            {...(error ? { 'aria-describedby': 'fs-language-error' } : {})}
             onChange={(e) => setCode(e.target.value)}
           />
         </div>
@@ -180,7 +214,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
           Add language
         </button>
         {error && (
-          <p className="fs-languages__error" role="alert">
+          <p id="fs-language-error" className="fs-languages__error" role="alert">
             {error}
           </p>
         )}

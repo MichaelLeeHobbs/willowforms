@@ -18,11 +18,26 @@ import type { ReactNode } from 'react'
 import { languageTag } from '@formsmith/core'
 import type { Language, PropSchema, PropValue } from '@formsmith/core'
 
+import { unreadableTag } from '@formsmith/core'
+
 import { emptyCondition } from './ConditionEditor.js'
 
 export type BindingKind = PropValue['kind']
 
-/** The conventional key for a translated property, per ARCHITECTURE.md. */
+/**
+ * The conventional key for a translated property, per ARCHITECTURE.md.
+ *
+ * Baked in when the binding is made, and never rewritten afterwards: renaming
+ * the component leaves `email_label` on a component now keyed `contact`, and the
+ * translation still resolves, because the key is a string in the document and
+ * the bundle is keyed by that string.
+ *
+ * So the convention holds until the first rename, and it is a convention rather
+ * than a rule for that reason -- a translation key belongs to the text, not to
+ * the component that happens to show it, and rewriting bundles on a rename would
+ * be a migration with two ways to go wrong (a key two components share, a key a
+ * host also uses) to keep a naming habit tidy.
+ */
 export function translationKey(componentKey: string, propName: string): string {
   return componentKey + '_' + propName
 }
@@ -84,24 +99,39 @@ export function BindingMode({
         onChange={(e) => {
           const kind = e.target.value as BindingKind
           if (kind === current) return
-          // Switching mode starts that mode empty rather than trying to carry a
-          // value across: an expression is not a label, and a translation key is
-          // not either.
-          if (kind === 'static') onChange(undefined)
-          if (kind === 'computed') onChange({ kind: 'computed', expression: '' })
-          if (kind === 'i18n') {
-            onChange({ kind: 'i18n', key: translationKey(componentKey, schema.name) })
-          }
+
           /*
-           * Without this the option was in the list and selecting it did
-           * nothing, which is the dead-control failure this project treats as
-           * worst. It is reachable only for a property whose schema opts in.
+           * A switch, so a fifth `PropValue` kind is a compile error here rather
+           * than an option in the list that does nothing when chosen. This was
+           * four independent `if`s, which is exactly the shape the comment
+           * beneath them warns about: the `condition` arm had been added late
+           * because nothing made its absence visible.
+           *
+           * Switching mode starts that mode empty rather than carrying a value
+           * across: an expression is not a label, and a translation key is not
+           * either.
            */
-          if (kind === 'condition' && firstDataKey) {
-            onChange({
-              kind: 'condition',
-              condition: emptyCondition(firstDataKey, firstDataKeyScope),
-            })
+          switch (kind) {
+            case 'static':
+              onChange(undefined)
+              return
+            case 'computed':
+              onChange({ kind: 'computed', expression: '' })
+              return
+            case 'i18n':
+              onChange({ kind: 'i18n', key: translationKey(componentKey, schema.name) })
+              return
+            case 'condition':
+              // Only with a field to test; the option is disabled without one.
+              if (firstDataKey) {
+                onChange({
+                  kind: 'condition',
+                  condition: emptyCondition(firstDataKey, firstDataKeyScope),
+                })
+              }
+              return
+            default:
+              return unreadableTag(kind, undefined)
           }
         }}
       >

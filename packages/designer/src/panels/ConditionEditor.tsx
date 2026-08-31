@@ -348,7 +348,15 @@ function LiteralField({
   value: JsonValue
   onCommit: (next: JsonValue) => void
 }): ReactNode {
-  const text = jsonToString(value)
+  /*
+   * `jsonToString` answers `''` for an object, an array and `null`, so a literal
+   * a hand-edited document holds -- `{ kind: 'literal', value: { a: 1 } }` --
+   * drew an empty box. An empty box says the condition compares against nothing,
+   * which is not what the document says, and typing into it silently replaced a
+   * structure with a string. JSON is what those values are, so JSON is what the
+   * box shows, and committing it parses the JSON back.
+   */
+  const text = spell(value)
   const [draft, setDraft] = useState(text)
   const [committed, setCommitted] = useState(text)
 
@@ -363,7 +371,7 @@ function LiteralField({
     if (draft === committed) return
     const parsed = coerce(draft)
     // Show what was stored, so the box stops disagreeing with the document.
-    const stored = jsonToString(parsed)
+    const stored = spell(parsed)
     setCommitted(stored)
     setDraft(stored)
     onCommit(parsed)
@@ -398,6 +406,27 @@ function LiteralField({
  */
 function coerce(text: string): JsonValue {
   if (text === '') return ''
+
+  /*
+   * JSON first, for the values plain typing cannot reach.
+   *
+   * `true`, `false` and anything spelled like a number become that value, which
+   * is right for a form and left the *strings* `"true"` and `"18"` unauthorable
+   * -- a condition testing a text field whose answer is the word "true" could
+   * not be written in this panel at all. Quoting is the escape hatch, and it is
+   * the same one JSON uses: `"true"` is the string, `true` is the boolean. An
+   * object or a list is the same story from the other end, and is what the box
+   * shows a document that already holds one.
+   */
+  const first = text.trim()[0]
+  if (first === '"' || first === '{' || first === '[') {
+    try {
+      return JSON.parse(text) as JsonValue
+    } catch {
+      // Not JSON after all. Fall through and treat it as the text it is.
+    }
+  }
+
   if (text === 'true') return true
   if (text === 'false') return false
 
@@ -418,6 +447,18 @@ function coerce(text: string): JsonValue {
   const asNumber = Number(text)
   if (!Number.isNaN(asNumber) && String(asNumber) === text) return asNumber
   return text
+}
+
+/**
+ * A literal as the text the box shows for it.
+ *
+ * A primitive spells itself. Everything else is JSON, because `jsonToString`
+ * has nothing to say about an object and an empty box would claim the condition
+ * tests nothing.
+ */
+function spell(value: JsonValue): string {
+  if (value === null || typeof value === 'object') return JSON.stringify(value)
+  return jsonToString(value)
 }
 
 /**

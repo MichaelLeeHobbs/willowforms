@@ -15,7 +15,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-30
-- **Last completed:** item 25 — the 69 LOW and NOTE findings in core, the renderer and both kits
+- **Last completed:** item 26 — the 70 LOW and NOTE findings in the designer shell, canvas and panels
 - **Work list:** `tmp/formsmith-review-2026-08-30.md`, gitignored, in one working copy only
 
 Keep these three current as items are ticked off.
@@ -159,7 +159,7 @@ finding that is a style preference wearing the clothes of a bug gets triaged, no
 is a real outcome, but it has to be written down.
 
 - [x] **25. Core, renderer, both kits — areas 1, 2, 3, 4.** T = 69. _fixed 65 / triaged 4 / total 69._
-- [ ] **26. Designer shell, canvas, panels — areas 5, 6, 7.** T = 70.
+- [x] **26. Designer shell, canvas, panels — areas 5, 6, 7.** T = 70. _fixed 62 / triaged 8 / total 70._
 - [ ] **27. Apps, tests, docs — areas 8, 9, 10, 11, addendum.** T = 61.
 
 ---

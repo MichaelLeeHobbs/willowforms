@@ -270,8 +270,39 @@ describe('rules editor', () => {
     const input = screen.getByLabelText('Value')
     await user.clear(input)
     await user.type(input, '8')
+    // Committed on blur, because the box holds a draft: written straight
+    // through, clearing it would have stored `Number('') === 0`.
+    await user.tab()
 
     expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 8 }])
+  })
+
+  it('leaves the rule alone while the box is empty', async () => {
+    /*
+     * `Number('')` is `0`, so backspacing the last digit used to set
+     * `minLength` to zero -- a rule that passes everything, written by somebody
+     * in the middle of typing a different number.
+     */
+    const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
+
+    await selectRow('email')
+    await openRules()
+    await user.clear(screen.getByLabelText('Value'))
+
+    expect(screen.getByLabelText('Value')).toHaveProperty('value', '')
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 3 }])
+  })
+
+  it('puts the stored number back when an empty box is left', async () => {
+    const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
+
+    await selectRow('email')
+    await openRules()
+    await user.clear(screen.getByLabelText('Value'))
+    await user.tab()
+
+    expect(screen.getByLabelText('Value')).toHaveProperty('value', '3')
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 3 }])
   })
 
   it('drops the message key rather than storing an empty string', async () => {

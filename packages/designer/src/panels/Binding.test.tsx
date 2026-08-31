@@ -341,6 +341,41 @@ describe('form settings', () => {
     ])
   })
 
+  it('adds a language with no name rather than inventing one from the code', async () => {
+    /*
+     * It used to fall back to the raw code, so the row read "pt-BR pt-BR" --
+     * the same string twice, which reads as a bug rather than as a language
+     * nobody has named. The list draws the tag alone when there is no name.
+     */
+    const { user, openTab, latest } = setup()
+    await openTab('Settings')
+
+    await user.type(screen.getByLabelText('Code'), 'pt-BR')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    expect(latest().languages[1]).toEqual({ code: 'pt', dialect: 'BR', name: '', bidi: 'ltr' })
+    const pane = document.querySelector<HTMLElement>('.fs-panel--left')
+    if (!pane) throw new Error('no left pane')
+    expect(within(pane).getByText('pt-BR')).toBeTruthy()
+  })
+
+  it('removes the language that was clicked when two share a tag', async () => {
+    /*
+     * Nothing stops a hand-edited document holding one tag twice, and removal
+     * filtered by tag: one click deleted both rows, with a bundle keyed by that
+     * tag and no way to tell which of the two had gone.
+     */
+    const { user, openTab, latest } = setup([
+      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'en', name: 'English again', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    await user.click(screen.getByRole('button', { name: 'Remove English again' }))
+
+    expect(latest().languages).toEqual([{ code: 'en', name: 'English', bidi: 'ltr' }])
+  })
+
   it('refuses a duplicate language code', async () => {
     const { user, openTab, latest } = setup()
     await openTab('Settings')

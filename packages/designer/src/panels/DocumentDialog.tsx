@@ -181,8 +181,15 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
 
             {errors.length > 0 && (
               <ul className="fs-dialog__errors" role="alert">
-                {errors.map((message) => (
-                  <li key={message}>{message}</li>
+                {/*
+                 * Keyed by position as well as text. `validateDocument` reports
+                 * per node, so two components can produce the same sentence --
+                 * "root.children[0] is not a component node" for a document with
+                 * two of them -- and React kept one row and dropped the other,
+                 * so the count on screen disagreed with the list.
+                 */}
+                {errors.map((message, index) => (
+                  <li key={String(index) + ':' + message}>{message}</li>
                 ))}
               </ul>
             )}
@@ -191,10 +198,17 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
               <button type="button" className="is-primary" onClick={apply}>
                 Apply
               </button>
-              <button type="button" onClick={() => copy(documentJson, 'The document')}>
+              {/*
+               * The draft, not the stored document. These serialised `doc`, so
+               * after editing the textarea both handed over the version from
+               * before the edit -- silently, with the edit still on screen. Copy
+               * and Download are about what is in front of you; Revert is the
+               * button that means "give me the stored one back".
+               */}
+              <button type="button" onClick={() => copy(draft, 'The document')}>
                 Copy
               </button>
-              <button type="button" onClick={() => download(documentJson, slug + '.json')}>
+              <button type="button" onClick={() => download(draft, slug + '.json')}>
                 Download
               </button>
               <label className="fs-dialog__file">

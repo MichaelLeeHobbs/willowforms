@@ -182,7 +182,6 @@
  * notched outline so every label sat on top of its border. The canvas surface
  * must inherit nothing from here.
  */
-.fs-chrome button,
 .fs-toolbar button,
 .fs-panel button,
 .fs-canvas__bar button {
@@ -243,6 +242,13 @@
   align-items: center;
   gap: 8px;
   text-align: start;
+  /*
+   * Declared here rather than in a second block five hundred lines down. A
+   * selector with two blocks is legal CSS and a hazard for this file's own
+   * guard: `declarationsFor` reads the first textual occurrence, so a second
+   * block on an allowlisted selector would set properties nothing checks.
+   */
+  touch-action: none;
 }
 
 /*
@@ -346,7 +352,14 @@
   position: relative;
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  /*
+   * Top padding of 40px, the rest 24px. The selection toolbar sits above the
+   * frame -- about 27px of buttons plus a 4px gap -- so selecting the topmost
+   * component in the form drew it into the surface's 24px of padding and the
+   * overflow clipped it, with nothing to scroll to because it is above the
+   * content. The extra padding is the room it needs.
+   */
+  padding: 40px 24px 24px;
 }
 
 /*
@@ -734,16 +747,33 @@
  * Same discipline as the selection frames: absolutely positioned siblings that
  * never wrap a component, so a drag cannot disturb the kit's layout.
  */
+/*
+ * Above the kit's output, whatever the kit thinks its own z-index is.
+ *
+ * These sat at 2 and 3, in the same stacking context as the rendered form, so a
+ * component that raises itself drew over them: MUI's `AppBar` defaults to 1100
+ * and hid the drop indicator entirely, which is a drag with no visible target.
+ * The designer's overlays are chrome about the form and belong over all of it.
+ */
 .fs-drop {
   position: absolute;
   pointer-events: none;
-  z-index: 3;
+  z-index: 5000;
 }
 
 .fs-drop--bar {
   background: var(--fs-accent);
   border-radius: 2px;
-  box-shadow: 0 0 0 1px var(--fs-bg-app);
+  /*
+   * A halo in the form's own background, not the canvas's. The bar is drawn
+   * between two components, which sit on whatever the kit paints -- usually
+   * white -- and the ring was the app background, the one colour the bar is
+   * never drawn against. `Canvas` is a neutral pair that reads as a separation
+   * on either.
+   */
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 65%),
+    0 0 0 2px rgb(0 0 0 / 20%);
 }
 
 .fs-drop--empty {
@@ -764,10 +794,6 @@
   color: var(--fs-primary-text);
   background: var(--fs-primary);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
-}
-
-.fs-palette__item {
-  touch-action: none;
 }
 
 /*
@@ -833,13 +859,26 @@
   color: revert;
 }
 
+/*
+ * A device frame is a width, plus something to see it by.
+ *
+ * No `overflow: hidden` and no background of its own, which is what it used to
+ * carry. Both changed the form rather than the viewport, and only at tablet and
+ * mobile, so the canvas answered a different question depending on which button
+ * was pressed: `overflow: hidden` clipped a focus ring drawn with a positive
+ * offset and turned every `position: sticky` inside the form into a plain one,
+ * and the panel background painted the designer's own colour behind a kit that
+ * has a background of its own -- a dark builder around a light form, unreadable
+ * at two widths out of three.
+ *
+ * The border and the shadow stay: they say where the device edge is, and they
+ * are drawn outside the content rather than over it.
+ */
 .fs-canvas__frame[data-fs-viewport='tablet'],
 .fs-canvas__frame[data-fs-viewport='mobile'] {
   border: 1px solid var(--fs-border);
   border-radius: calc(var(--fs-radius) * 2);
-  background: var(--fs-bg-panel);
   box-shadow: 0 1px 12px rgb(0 0 0 / 12%);
-  overflow: hidden;
 }
 
 /*
@@ -990,7 +1029,8 @@
   position: absolute;
   pointer-events: none;
   border-radius: 3px;
-  z-index: 2;
+  /* Above the kit's output, for the reason `.fs-drop` gives. */
+  z-index: 4000;
 }
 
 .fs-selection--hover {

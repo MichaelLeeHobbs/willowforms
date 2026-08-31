@@ -245,10 +245,18 @@ export function Tree({
     const x = dragState.x - snapshot.origin.x
     const y = dragState.y - snapshot.origin.y
 
-    // Only claim the drop while the pointer is over the tree, or the canvas and
-    // the tree would both try to handle the same release.
-    const width = snapshot.rows[0]?.rect.width ?? 0
-    if (x < 0 || x > width) return undefined
+    /*
+     * Only claim the drop while the pointer is over the tree, or the canvas and
+     * the tree would both try to handle the same release.
+     *
+     * The widest row rather than the first, and no drop at all when there are no
+     * rows. `rows[0]?.rect.width ?? 0` silently rejected every drop whenever the
+     * first row was missing -- which is what a filtered or empty tree is -- and
+     * a zone that answers "not mine" to everything is indistinguishable from one
+     * that is broken.
+     */
+    const width = Math.max(0, ...snapshot.rows.map((row) => row.rect.width))
+    if (width === 0 || x < 0 || x > width) return undefined
 
     const dragged = dragState.source.kind === 'move' ? dragState.source.key : undefined
     return resolveTreeDrop(snapshot.rows, y, dragged)
@@ -266,7 +274,8 @@ export function Tree({
       if (!snap) return undefined
 
       const x = clientX - snap.origin.x
-      const width = snap.rows[0]?.rect.width ?? 0
+      // The widest row, for the reason the indicator's copy above gives.
+      const width = Math.max(0, ...snap.rows.map((row) => row.rect.width))
       if (x < 0 || x > width) return undefined
 
       const resolved = resolveTreeDrop(snap.rows, clientY - snap.origin.y, draggedKey)
@@ -355,6 +364,14 @@ function TreeItem({
         data-fs-tree-row={node.key}
         aria-selected={selected}
         aria-level={depth + 1}
+        /*
+         * Always `true` for a row that has children, because every node is
+         * expanded and there is no way to collapse one. That is a real state
+         * rather than a placeholder -- a tree with no collapse affordance is a
+         * tree whose branches are all open -- and `keyboard.ts` relies on it:
+         * Right steps to the first child, which has to be in the flattened list
+         * for focus to reach it.
+         */
         aria-expanded={children.length > 0 ? true : undefined}
         // Roving tabindex: exactly one row is in the tab order, so Tab reaches
         // the tree once and the arrows take over inside it.

@@ -309,8 +309,22 @@ function VisibilityRow({
    * `isVisible` treats a static truthy and a translation key alike as no
    * condition expressed, so both read as Always, which is what they do.
    */
-  const mode =
-    value?.kind === 'computed'
+  /*
+   * A `renderWhen` this row cannot author -- a translation key, or a static
+   * `true` -- reads as Always, because that is what it does. Naming it Always in
+   * the select made it unremovable: the select already showed Always, so
+   * choosing Always fired no change, and the stray value sat in the document
+   * with no way to clear it from the panel that displays it.
+   */
+  const stray =
+    value !== undefined &&
+    value.kind !== 'computed' &&
+    value.kind !== 'condition' &&
+    !(value.kind === 'static' && !value.value)
+
+  const mode = stray
+    ? 'other'
+    : value?.kind === 'computed'
       ? 'computed'
       : value?.kind === 'condition'
         ? 'condition'
@@ -339,6 +353,11 @@ function VisibilityRow({
         >
           <option value="always">Always</option>
           <option value="never">Never</option>
+          {stray && (
+            // Only when the document holds one. Choosing anything else replaces
+            // it, which is the point: the row can now let go of it.
+            <option value="other">Always (unrecognised rule)</option>
+          )}
           {/*
             Disabled when there is nothing to test. A condition naming no field
             evaluates to false, so choosing it would hide the component
@@ -540,7 +559,14 @@ function PropRow({
   if (value?.kind === 'condition') {
     return (
       <div className="fs-prop-row is-set is-binding">
-        <label htmlFor={id + '-op'}>{schema.label}</label>
+        {/*
+         * A caption, not a label. It pointed at the operator select inside the
+         * condition editor, which already has a hidden label of its own -- so
+         * that select announced itself as "Helper text Comparison", two labels
+         * concatenated, and the row's own name pointed at a control three levels
+         * down that it does not describe.
+         */}
+        <span className="fs-prop-row__caption">{schema.label}</span>
         <div className="fs-prop-row__control">
           {mode}
           <ConditionEditor
@@ -719,6 +745,13 @@ function JsonEditor({
         spellCheck={false}
         value={draft}
         aria-invalid={error ? true : undefined}
+        /*
+         * And named as the box's description, which it was not. `role="alert"`
+         * reads the message once as it appears; a screen-reader user who moves
+         * away and comes back had no way to hear it again, and no way to know
+         * the field is invalid beyond a flag with nothing attached to it.
+         */
+        {...(error ? { 'aria-describedby': id + '-error' } : {})}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           const text = draft.trim()
@@ -737,7 +770,7 @@ function JsonEditor({
         }}
       />
       {error && (
-        <p className="fs-prop-row__error" role="alert">
+        <p id={id + '-error'} className="fs-prop-row__error" role="alert">
           {error}
         </p>
       )}
