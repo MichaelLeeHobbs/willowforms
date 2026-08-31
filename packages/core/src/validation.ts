@@ -702,7 +702,24 @@ export function validateAcross(
   data: FormData,
   scopes: EvalOptions[],
 ): FormErrors {
-  const merged: FormErrors = {}
+  /*
+   * No prototype, for the reason `validateForm` has none, and this is the
+   * function where it mattered more.
+   *
+   * `validateForm` assigns, so only `__proto__` bit there. This merge
+   * *coalesces*: `merged[key] ??= message` reads before it writes, and on an
+   * object literal that read finds `Object.prototype.toString` for a field keyed
+   * `toString`. Not nullish, so the write never happens, so the message is
+   * discarded and `Object.keys(merged)` comes back empty. Empty is what every
+   * caller reads as a valid form, and this is the function a server calls at
+   * submit. `toString`, `valueOf`, `hasOwnProperty`, `constructor` and
+   * `isPrototypeOf` all pass `KEY_PATTERN`, so nothing has to be bypassed.
+   *
+   * `RESERVED_KEYS` now names them too, but that is the second lock rather than
+   * this one: nothing on the render or validate path calls `validateDocument`,
+   * so a document carrying such a key reaches here regardless.
+   */
+  const merged: FormErrors = Object.create(null) as FormErrors
 
   for (const scope of scopes) {
     for (const [key, message] of Object.entries(validateForm(root, data, scope))) {

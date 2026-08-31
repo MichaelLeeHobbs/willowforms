@@ -4,6 +4,51 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### Every own name on `Object.prototype` is a reserved key
+
+- **Decided:** `RESERVED_KEYS` grows from three names to thirteen: the twelve own properties of
+  `Object.prototype` plus `prototype`, which is not on it and is refused for reading as one of the set.
+  Written as a literal, not derived from `Object.getOwnPropertyNames`, with `keys.test.ts` asserting the
+  literal covers the running engine.
+- **Why:** these names pass `KEY_PATTERN` and shadow a builtin everywhere a key is used as a property
+  name, and the review found one shadowing live at the submit gate. The rule `keys.ts` already states is
+  that a key namespace expressions can name has to be an identifier namespace; a name whose meaning in
+  JavaScript is not "the answer to this field" fails that for the same reason a hyphen does.
+- **Rejected: deriving the list at runtime.** Self-maintaining, and it makes the format engine-dependent.
+  A document authored on Node 22 could stop validating on Node 30 with no change to the document or the
+  library. Which keys are legal is part of the format, so it is written down; the test is what keeps the
+  written form honest.
+- **Rejected: leaving the list at three.** The null prototype closes the vulnerability, so this is only
+  the second lock. But a key that resolves to a function in a host evaluator, in exported JSON Schema
+  properties, and in host-supplied `FormData` is a hazard in places core does not own, and no null
+  prototype of ours reaches those.
+- **What it costs:** documents using any of the ten new names as a `key` or `dataKey` are now refused by
+  `validateDocument` and by the Properties panel rename, and a row address naming one no longer parses.
+  `generateKey` sanitises a component labelled "toString" to `field` instead. Nothing in the repository
+  used one. The library is unpublished at `0.0.0`, so the real-world cost is zero today and rises the
+  day it is not.
+- **Reversal:** delete lines from one array. The staleness test would then need its expectation changed
+  too, which is the intended friction.
+- **When:** 2026-08-31.
+
+### The merge that gates a submit builds on a null prototype
+
+- **Decided:** `validateAcross` builds `merged` with `Object.create(null)`, matching `validateForm` one
+  function above. `??=` stays, so first-message-wins is unchanged.
+- **Why:** `validateForm` assigns, so only `__proto__` bit there. The merge _coalesces_, and the read in
+  `merged[key] ??= message` finds an inherited value for any of a dozen names. Not nullish, so the write
+  never happens: the error is discarded and `Object.keys(merged)` is empty. Empty is what every caller
+  reads as valid, and `apps/demo-server` submits on exactly that. A required answer missing and a clean
+  submit is the permissive failure this project is organised against.
+- **Rejected: `Object.hasOwn(merged, key)` guarding a plain assignment.** It fixes the read and leaves
+  `merged['__proto__'] = message` invoking the inherited setter. Two mechanisms to remember instead of
+  one; the null prototype removes the whole class.
+- **Rejected: relying on the widened `RESERVED_KEYS` alone.** Nothing on the render or validate path
+  calls `validateDocument`. That is what made `__proto__` reachable in the first place and it is
+  unchanged, so a blocklist cannot be the fix here.
+- **Reversal:** one expression. Twelve tests would go red first.
+- **When:** 2026-08-31.
+
 ### The second review is committed; the first one is not
 
 - **Decided:** `docs/reviews/2026-08-30-second-pass.md` is tracked. The first pass stays gitignored in

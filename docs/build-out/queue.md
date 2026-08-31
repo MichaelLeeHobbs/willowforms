@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 0, the base. Item 1 is next.
+- **Last completed:** item 1, the `validateAcross` fail-open. Item 2 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/00-base`
+- **Last pushed item branch:** `build-out/b/01-validate-across`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -69,7 +69,7 @@ The whole reason this pass exists. All four are in code the first remediation ru
 share one shape: **a fix landed on one side of a symmetry, or a guard was not re-checked against the code
 the fix changed.** Fix the instance, then look for the twin before ticking the item.
 
-- [ ] **1. Close the `validateAcross` fail-open, and rule on the key class.** CRITICAL, review area 3.
+- [x] **1. Close the `validateAcross` fail-open, and rule on the key class.** CRITICAL, review area 3.
       `validation.ts:705,709` merges into a plain object literal with `merged[key] ??= message`, so any
       error keyed with a name inherited from `Object.prototype` is discarded and the form reports as valid.
       `toString`, `valueOf` and `hasOwnProperty` all pass `KEY_PATTERN` and are not in `RESERVED_KEYS`, so

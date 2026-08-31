@@ -699,6 +699,108 @@ describe('validateAcross, and the submit it exists to stop', () => {
   })
 })
 
+/**
+ * The merge is the submit gate, and it read names off `Object.prototype`.
+ *
+ * `validateForm` builds its errors on a null prototype and explains why. The
+ * merge one function below built on `{}` and coalesced with `??=`, so a message
+ * keyed `toString` was compared against `Object.prototype.toString`, found not
+ * nullish, and dropped. `Object.keys` on the result is then empty, and empty is
+ * what every caller reads as a valid form — `apps/demo-server` submits on
+ * exactly that check.
+ *
+ * Nothing has to be bypassed to reach it. `toString`, `valueOf` and
+ * `hasOwnProperty` all pass `KEY_PATTERN`, and nothing on the render or
+ * validate path calls `validateDocument`, which is the same reason the
+ * `__proto__` twin above is reachable.
+ */
+describe('validateAcross and a key that lives on Object.prototype', () => {
+  const required = (key: string): ComponentNode => ({
+    key,
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'required' }] },
+  })
+
+  const step = (name: string, children: ComponentNode[]): ComponentNode => ({
+    key: 'step' + name.charAt(0).toUpperCase() + name.slice(1),
+    type: 'Box',
+    props: {},
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: name },
+      },
+    },
+    children,
+  })
+
+  const onStep = (name: string): EvalOptions => ({ context: { step: name } })
+
+  /*
+   * Two scopes, not one, so the coalescing branch is the code under test rather
+   * than a single pass that never merges anything.
+   */
+  const scopes = ['who', 'where'].map(onStep)
+
+  const wizardWith = (key: string): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [step('who', [required(key)]), step('where', [required('city')])],
+  })
+
+  // The answer to every field except the one under test, so the only thing that
+  // can make the gate report a problem is the inherited key.
+  const answered: FormData = { city: 'Ely' }
+
+  const inherited = ['toString', 'valueOf', 'hasOwnProperty', 'constructor', 'isPrototypeOf']
+
+  it.each(inherited)('reports a required field keyed %s', (key) => {
+    const errors = validateAcross(wizardWith(key), answered, scopes)
+
+    expect(Object.hasOwn(errors, key)).toBe(true)
+    expect(errors[key]).toBe(DEFAULT_MESSAGES.required)
+  })
+
+  it.each(inherited)('does not read as a valid form when only %s is missing', (key) => {
+    /*
+     * The consequence in the shape the caller reads it. The demo server
+     * submits when `Object.keys(errors).length === 0`, so a dropped message is
+     * not a cosmetic loss — it is a submit accepted with a required answer
+     * missing.
+     */
+    expect(Object.keys(validateAcross(wizardWith(key), answered, scopes))).toEqual([key])
+  })
+
+  it('reports a field whose key is __proto__', () => {
+    // The twin of the `validateForm` pin above. It was pinned for the walk and
+    // not for the merge, which is the shape this whole run exists to stop.
+    const errors = validateAcross(wizardWith('__proto__'), answered, scopes)
+
+    expect(Object.keys(errors)).toEqual(['__proto__'])
+    expect(Object.hasOwn(errors, '__proto__')).toBe(true)
+  })
+
+  it('does not let a hostile key reshape the errors it returns', () => {
+    const hostile: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [step('who', [required('__proto__'), required('email')])],
+    }
+
+    const errors = validateAcross(hostile, {}, scopes)
+
+    expect(Object.keys(errors).sort()).toEqual(['__proto__', 'email'])
+    // A control. The merge never reached the inherited setter even unfixed,
+    // because `??=` read a truthy `Object.prototype` and skipped the write.
+    expect(({} as Record<string, unknown>)['email']).toBeUndefined()
+  })
+})
+
 describe('length rules on a value that is not text', () => {
   /*
    * `jsonToString` returns '' for anything that is not a string, number or
