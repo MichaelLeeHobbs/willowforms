@@ -1,25 +1,34 @@
 # Property bindings
 
-**Status: built.** All three modes are authored in the panel. Expression authoring is a plain textarea
-with no completion, and translation keys do not follow a rename.
+**Status: partial.** Every mode is authored in the panel, and the weakest section here is expression
+authoring: a plain textarea with no completion, no syntax check and no way to try an expression out.
+Translation keys do not follow a rename either.
 
-Any property can be a literal value, an expression computed at render time, or a key into a translation
-bundle. Which of the three a property may be is declared by its `PropSchema`, not chosen freely.
+Any property can be a literal value, an expression computed at render time, a key into a translation
+bundle, or -- where the schema opts in -- a structured condition. Which of them a property may be is
+declared by its `PropSchema`, not chosen freely.
 
-## The three modes
+## The four modes
 
 ```ts
 type PropValue =
   | { kind: 'static'; value: JsonValue }
   | { kind: 'computed'; expression: string }
   | { kind: 'i18n'; key: string }
+  | { kind: 'condition'; condition: Condition }
 ```
 
-| Mode       | Panel label | Resolves to                                                            |
-| ---------- | ----------- | ---------------------------------------------------------------------- |
-| `static`   | Value       | the literal, unchanged                                                 |
-| `computed` | Expression  | whatever the injected evaluator returns, or `null` with no evaluator   |
-| `i18n`     | Translation | the bundle entry for the active language, or the key itself if missing |
+| Mode        | Panel label | Resolves to                                                            |
+| ----------- | ----------- | ---------------------------------------------------------------------- |
+| `static`    | Value       | the literal, unchanged                                                 |
+| `computed`  | Expression  | whatever the injected evaluator returns, or `null` with no evaluator   |
+| `i18n`      | Translation | the bundle entry for the active language, or the key itself if missing |
+| `condition` | Condition   | a boolean, evaluated in core with no sandbox                           |
+
+`condition` is offered only where a schema opts in with `conditional: true`, and it is what `renderWhen`
+and a validation rule's `when` guard hold. It is listed here because it is a member of the same union,
+so anything switching on `kind` has to handle it -- see
+[08-validation.md](08-validation.md#guards) for what a guard of each kind needs.
 
 Resolution happens once, in the renderer, for every kit. A kit renderer receives resolved plain JSON and
 never sees a `PropValue` — see [02-kit-contract.md](02-kit-contract.md).

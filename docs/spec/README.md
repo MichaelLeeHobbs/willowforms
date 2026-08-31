@@ -33,14 +33,14 @@ by anything.
 | [00-product.md](00-product.md)               | Purpose, users, scope, non-goals                         | —       |
 | [01-document-model.md](01-document-model.md) | `FormDocument`, `ComponentNode`, `PropValue`, versioning | Partial |
 | [02-kit-contract.md](02-kit-contract.md)     | The two halves of a kit and the one obligation           | Built   |
-| [03-components.md](03-components.md)         | The component catalogue                                  | Partial |
-| [04-shell.md](04-shell.md)                   | Layout, panels, toolbar, viewport, keyboard              | Partial |
+| [03-components.md](03-components.md)         | The component catalogue                                  | Built   |
+| [04-shell.md](04-shell.md)                   | Layout, panels, toolbar, viewport, keyboard              | Built   |
 | [05-canvas.md](05-canvas.md)                 | Selection, drag and drop, drop resolution                | Partial |
 | [06-inspector.md](06-inspector.md)           | Properties, Style, Actions, Rules, and the editors       | Partial |
 | [07-bindings.md](07-bindings.md)             | Static, computed, and translated property values         | Partial |
 | [08-validation.md](08-validation.md)         | The rule catalogue and its semantics                     | Partial |
 | [09-actions.md](09-actions.md)               | Events, code actions, and the sandbox boundary           | Planned |
-| [10-interchange.md](10-interchange.md)       | Import, export, and JSON Schema                          | Partial |
+| [10-interchange.md](10-interchange.md)       | Import, export, and JSON Schema                          | Built   |
 | [11-theming.md](11-theming.md)               | Token vocabulary for the designer and for kits           | Partial |
 | [12-api.md](12-api.md)                       | What a consumer imports, and the platform baseline       | Partial |
 
@@ -50,9 +50,13 @@ Adjacent documents that are not contracts:
 - [../accessibility.md](../accessibility.md) — what is checked, how, and what is missing
 - [../prior-art/README.md](../prior-art/README.md) — what the competitor study found and the rules for using it
 
-A file's status is the weakest of its sections, not an average. `07` and `08` describe built behaviour
-and each contains a section that is not, so both read Partial: a reader scanning this table for what is
-safe to depend on is asking the pessimistic question.
+A file's status is the weakest of its sections, not an average, and it has to match what the file itself
+opens with. A reader scanning this table for what is safe to depend on is asking the pessimistic
+question, and an index that answers Partial over a file reading Built answers a third question nobody
+asked.
+
+`05`, `06`, `07`, `08`, `11` and `12` read Partial because each has a named gap in it, and each of those
+files says which one in its own preamble. `09` is Planned because actions are a design with no code.
 
 ## Vocabulary
 

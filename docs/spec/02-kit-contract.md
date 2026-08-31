@@ -132,7 +132,7 @@ are obligations a kit author is trusted with, and saying so is better than imply
 
 ## Writing your own kit
 
-Copy `packages/kit-html`. It is semantic elements and a stylesheet, around 620 lines across renderers,
+Copy `packages/kit-html`. It is semantic elements and a stylesheet, about 2,000 lines across renderers,
 definitions and CSS, with no dependencies beyond React.
 
 1. Export a `Kit` from `@formsmith/core` and a `RendererKit` from `@formsmith/renderer`, sharing an `id`.

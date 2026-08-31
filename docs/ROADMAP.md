@@ -16,7 +16,7 @@ you can compose a form, edit its properties, write validation rules, bind proper
 translations, preview it, and export it.
 
 The shell is there: tabbed panes that collapse, viewport simulation, a selection toolbar, and a catalogue
-of twenty-five components in both kits.
+of 27 components in both kits.
 
 What is left is behaviour, and the order changed once we looked at what real forms actually do.
 

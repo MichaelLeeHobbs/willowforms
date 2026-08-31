@@ -275,7 +275,10 @@ built a patched copy of core and ran both designs.
 ### Row addressing: rows are a projection, not nodes
 
 Designed four ways in parallel under different constraints — minimal interface, maximal flexibility,
-common-case-trivial, ports-and-adapters — then judged. Not yet built; this is the shape the build follows.
+common-case-trivial, ports-and-adapters — then judged, and now built: `rows.ts` in core, the row context
+in the renderer, `applyChange` for writes, and a fixture in three suites that keeps `key` and `dataKey`
+different so this design and its opposite cannot produce the same output. It is also the newest design
+here and the least settled, so the reversal note below is the part to read first.
 
 - **Decided, and unanimous across all four designs:** **rows never mint keys.** The authored subtree
   exists once in the document; rows exist in the DOM, in `FormData` and in `FormErrors`, and never in the
@@ -324,7 +327,8 @@ JSONForms had to bolt on is, here, one optional field on one member.
   nesting is refused, which is a narrowing rather than a rewrite. Everything cut for a first version —
   outward anchors, row offsets, row facts beyond the index — is an additive union member that the
   compiler will point at.
-- **When:** 2026-08-29, designed on `feat/steps`, not yet built.
+- **When:** 2026-08-29, designed on `feat/steps`. Built 2026-08-30, with the row-scope discriminant and
+  its three boot-time checks; what remains unbuilt is any way to _add_ a row, which `found.md` covers.
 
 ### The key grammar is the JavaScript identifier subset
 

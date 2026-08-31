@@ -208,8 +208,9 @@ lifecycle events are declared only by `Screen`. Settle them when something reads
 
 1. Add the `ComponentDef` to both kits' metadata.
 2. Add a renderer to both kits, spreading `nodeProps`.
-3. Run `test/kit-contract.test.tsx`. It checks sixteen obligations against every kit. Most hold for the
-   kit as a whole; the `nodeProps` rule runs once per component.
+3. Run `test/kit-contract.test.tsx`. It checks twenty obligations against every kit, one per row of the
+   table in [02-kit-contract.md](02-kit-contract.md), and `docs.test.ts` fails when the two counts
+   disagree. Most hold for the kit as a whole; the `nodeProps` rule runs once per component.
 4. Add a row above and mark it Built.
 
 ## Repeated scope

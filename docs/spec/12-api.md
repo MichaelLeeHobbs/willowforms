@@ -93,8 +93,13 @@ const [errors, setErrors] = useState<FormErrors>({})
 ### What `onChange` reports is an address, not a key
 
 Outside a repeater an address is the bare key and nothing has changed. Inside one it carries the row
-it came from, outermost first: `addresses[1].line1`. `errors` is keyed the same way, so a message can
-name the row it belongs to.
+it came from, outermost first: `addresses[1].line1`.
+
+The row coordinate is built from **answer** names and the leaf from the **component** name, which are
+the same string until somebody sets a `dataKey`. So a `street` field holding `line1`, inside a repeater
+keyed `addressList` holding `addresses`, reports changes at `addresses[1].line1` and takes its error at
+`addresses[1].street`: two components may share an answer and still fail for different reasons.
+`validateForm` keys `errors` that way, and `FormRenderer` reads them that way.
 
 Use `applyChange` from `@formsmith/core` to write one. Spreading the address into an object literal,
 `{ ...d, [address]: value }`, is the mistake this shape invites: it creates a property whose name is
@@ -112,7 +117,10 @@ See [08-validation.md](08-validation.md#server-parity).
 give a spouse's name, untick it: `validateForm` correctly stops checking that field, and the answer is
 still in the payload. The form submits an answer to a question it is no longer asking.
 
-`submittedData(root, data, evaluate?)` is the projection a host applies when it submits. It is not done
+`submittedData(root, data, options?)` is the projection a host applies when it submits. The third
+argument is the same `EvalOptions` bag `validateForm` takes, and it has to be the same one: this decides
+which answers leave, using the same visibility rules, so handing it a different context than the
+renderer had strips answers to questions the user was actually asked. It is not done
 to the value as it is held, because the host owns `data` and hiding is often temporary — an accordion
 closing must not destroy what someone typed. Visibility comes from the same `isVisible` the renderer and
 `validateForm` use, so all three agree about what is on screen.
@@ -223,11 +231,15 @@ properties, and the `when` guard on a validation rule. Expressions are not cover
 string of JavaScript reads is the evaluator's business, and core does not parse it. A path holding
 `false` or `0` is supplied, not missing, or a host would learn to ignore the report.
 
-#### Still open: a row's own scope
+#### A row's own scope
 
-Reading "this row's index" or "the row above" needs addressing that does not exist yet. That is
-`Repeater`'s scoping problem and it is deliberately not answered here. See
-[03-components.md](03-components.md#what-is-deliberately-absent).
+**Status: built.** A condition inside a repeater says which scope it means: `scope: 'row'` reads the
+enclosing row, and the absence of it reads the form, which is what every document written before rows
+existed already meant. `rowScopeProblems` reports the three mismatches at boot rather than letting a
+condition read nothing and quietly hide a component.
+
+Reading "the row above" or an index as a value is still not addressable, and is deliberately left alone.
+See [03-components.md](03-components.md#repeated-scope).
 
 ### A type the kit does not have
 
@@ -295,14 +307,14 @@ than thirteen. See [06-inspector.md](06-inspector.md#editing-granularity).
 **Status: built**, in the sense that the code already assumes all of it. None of it had been written
 down.
 
-| Requirement            | Because                                            |
-| ---------------------- | -------------------------------------------------- |
-| React 18 or 19         | The peer range on every package                    |
-| Node 22+               | `engines`, and core is expected to run on a server |
-| `URL.canParse`         | The `url` validation rule, in core                 |
-| `<dialog>.showModal()` | The JSON dialog                                    |
-| `CSS.escape`           | Selecting a node by key                            |
-| `ResizeObserver`       | Keeping the selection frame on its target          |
+| Requirement            | Because                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| React 18 or 19         | The peer range on every package                            |
+| Node 20+               | `engines` on every package. The repo itself develops on 22 |
+| `URL.canParse`         | The `url` validation rule, in core                         |
+| `<dialog>.showModal()` | The JSON dialog                                            |
+| `CSS.escape`           | Selecting a node by key                                    |
+| `ResizeObserver`       | Keeping the selection frame on its target                  |
 
 `URL.canParse` sets the floor, and it lives in core, so it constrains a server as much as a browser:
 Node 18.17, Chrome 120, Safari 17. Everything else here is older. In practice the baseline is the

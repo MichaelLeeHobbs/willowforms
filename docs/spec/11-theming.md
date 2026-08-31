@@ -79,7 +79,9 @@ nothing. See [04-shell.md](04-shell.md#toolbar).
 base, and computes every ratio. A token change that breaks one fails CI.
 
 Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for interface component boundaries and focus
-indicators. The lowest measured value in any palette is 4.15:1 against a 3:1 requirement.
+indicators. The lowest measured value in any palette is 3.35:1 against a 3:1 requirement, and it is a
+user interface component rather than text: the scrollbar thumb on the designer's well background. The
+lowest text pair is 5.25:1 against a 4.5:1 requirement.
 
 Our primary button label is 5.49:1 in light and 6.39:1 in dark. Contrast failures in shipped builders
 are common enough that measuring is the only way to know, which is why this is a test and not a goal.
@@ -130,9 +132,12 @@ glyphs, and a host-supplied renderer, which leaves the palette looking broken un
 `ComponentDef.icon` stays optional, because a third-party kit is allowed to ship without icons. The
 contract test requires one of the kits in this repository, since those are what a kit author copies.
 
-**Missing:** `Icon` is not exported from `@formsmith/designer`, and the `icon` property editor named in
-[06-inspector.md](06-inspector.md#property-editors) still does not exist. Both wait for something that
-needs to pick an icon rather than declare one.
+The `icon` property editor named in [06-inspector.md](06-inspector.md#property-editors) exists: it offers
+the vocabulary as a select with the glyph drawn beside it, so a kit property whose value is an icon name
+is authored rather than typed.
+
+**Missing:** `Icon` is not exported from `@formsmith/designer`. It waits for a host that needs to draw
+one of these glyphs itself rather than name it.
 
 ## What is not themeable
 

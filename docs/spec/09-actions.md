@@ -19,10 +19,12 @@ filling the form in are not the same person.
 which means most deployments would ship it.
 
 ```ts
-type Evaluator = (expression: string, data: FormData) => JsonValue
+type Evaluator = (expression: string, data: FormData, context?: FormContext) => JsonValue
 ```
 
-That signature is the whole contract. Everything that runs author code — computed properties, `custom`
+That signature is the whole contract. The third argument is what the host knows and does not submit --
+the signed-in user, the step, the tenant -- and it is passed separately from `data` on purpose: an
+expression can read it, and nothing can submit it. Everything that runs author code — computed properties, `custom`
 rules, rule guards, and the actions below — goes through it.
 
 ### What a host must supply

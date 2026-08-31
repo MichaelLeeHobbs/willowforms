@@ -237,11 +237,16 @@ type PropValue =
   | { kind: 'static'; value: JsonValue }
   | { kind: 'computed'; expression: string }
   | { kind: 'i18n'; key: string }
+  | { kind: 'condition'; condition: Condition }
 ```
 
 A tagged union rather than a bag discriminated by which optional field happens to be present. Every
-consumer switches on `kind` exhaustively, so adding a fourth binding mode is a compile error at every
-call site instead of a silent fallthrough. FormEngine uses the other shape.
+consumer switches on `kind` exhaustively, so adding a binding mode is a compile error at every call site
+instead of a silent fallthrough. FormEngine uses the other shape.
+
+`condition` is the fourth member and the newest. It is what `renderWhen` and a rule's `when` guard hold,
+and the reason both work with no evaluator injected: a condition is data the engine reads, not a string
+somebody has to sandbox.
 
 Switching a property between modes starts the new mode empty. An expression is not a label, and seeding
 one with the other produces something that looks authored and is broken.

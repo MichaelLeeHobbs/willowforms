@@ -83,11 +83,14 @@ type PropValue =
   | { kind: 'static'; value: JsonValue }
   | { kind: 'computed'; expression: string }
   | { kind: 'i18n'; key: string }
+  | { kind: 'condition'; condition: Condition }
 ```
 
 FormEngine's equivalent is a bag discriminated by the _presence_ of an optional `computeType` field.
-A tagged union means every consumer switches exhaustively, so adding a fourth binding mode is a compile
-error at every call site rather than a silent fallthrough.
+A tagged union means every consumer switches exhaustively, so adding a binding mode is a compile error
+at every call site rather than a silent fallthrough. That is not hypothetical: `condition` is the fourth
+member, added when `renderWhen` and rule guards needed a rule the engine can evaluate without a sandbox,
+and the compiler named every place that had to learn about it.
 
 ### Validation rules carry their parameters
 
@@ -139,13 +142,23 @@ reached straight into the MUI components on the canvas, overrode their padding, 
 outline so every field label sat on top of its own border. The canvas hosts the kit's components and
 must inherit nothing from the builder.
 
-There is exactly one deliberate exception, and it sets no visual property:
+There are two deliberate exceptions, and neither sets a visual property. Both are allowlisted in
+`designer.css.test.ts`, pinned to the exact declarations they may carry, so a third one cannot arrive
+without somebody saying so:
 
 ```css
 .fs-canvas__surface:not(.is-preview) [data-fs-key] {
   pointer-events: auto;
 }
+
+.fs-canvas__surface [data-fs-key] {
+  scrollbar-color: ...;
+  scrollbar-width: ...;
+}
 ```
+
+The first gives a kit component back the hit-testing the surface took from it. The second undoes the
+scrollbar styling the surface would otherwise push inward.
 
 MUI sets `pointer-events: none` on a disabled Button, and a kit is free to do the same on any disabled
 control. Without this rule that component cannot be clicked on the canvas, and the click silently

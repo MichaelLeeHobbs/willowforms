@@ -46,9 +46,12 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 1. **`@formsmith/core` imports no React and no component library.** Server-side validation depends on it.
 2. **`@formsmith/designer` imports no component library.** It consumes `ComponentDef` metadata only. If
    you find yourself importing MUI into the designer, the abstraction has leaked.
-3. **Designer CSS is scoped to `.fs-toolbar`, `.fs-panel`, `.fs-canvas__bar` — never `.fs-shell`.** A
-   bare `.fs-shell input` rule reaches into the kit's components on the canvas and breaks them. This has
-   already happened once.
+3. **Designer CSS styles the designer's own markup and nothing else.** Every selector must name an
+   `fs-` class, and a selector that descends from a scope containing the form (`.fs-shell`,
+   `.fs-canvas` and anything under them that is not chrome) must end on one — so `.fs-shell` itself is
+   fine and carries the theme tokens, while `.fs-shell input` or `.fs-canvas__frame input` reaches into
+   the kit's components on the canvas and breaks them. That has already happened once, to MUI's notched
+   outline. Two exceptions are allowlisted in the test, each pinned to the properties it may set.
 4. **Tree operations are immutable.** Undo holds references to prior documents.
 5. **Only `required` fails on an empty value.** Every other rule passes when the value is empty.
 6. **No `eval` default for computed values.** The host injects an evaluator and owns the sandbox.

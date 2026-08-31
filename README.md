@@ -28,8 +28,10 @@ year for a drag-and-drop panel.
 ## What works
 
 - **Canvas.** Click a component to select it, with a selection frame and hover outline. Drag from the
-  palette onto the canvas or the tree, drag components to move them, reorder and reparent in the
-  structure tree. Drop indicators show exactly where a release lands.
+  palette onto the canvas, drag components to move them, reorder and reparent in the structure tree.
+  Drop indicators show exactly where a release lands. (The palette and the tree share a tabbed pane, so
+  they are never on screen together and a palette drag has only the canvas to land on. What that cost
+  and what would win it back: `docs/ideas.md`.)
 - **Properties.** Per-type panels built from kit metadata. Any property can be a literal value, a
   computed expression, or a translation key, with an editor for each.
 - **Validation.** Ten rule types carrying their parameters in the type system, edited in a Rules tab,

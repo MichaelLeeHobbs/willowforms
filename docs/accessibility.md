@@ -28,12 +28,17 @@ These fail the build, not a review.
 Measured from the stylesheets themselves, so a token change that breaks a ratio fails CI. Lowest
 measured value in each palette:
 
-| Palette         | Lowest ratio | Pair                                 |
-| --------------- | ------------ | ------------------------------------ |
-| Designer, light | 5.25:1       | muted text on the well background    |
-| Designer, dark  | 5.05:1       | focus ring on the panel, needs 3:1   |
-| HTML kit, light | 4.83:1       | field border on the field, needs 3:1 |
-| HTML kit, dark  | 4.15:1       | field border on the field, needs 3:1 |
+| Palette         | Lowest ratio | Pair                                    |
+| --------------- | ------------ | --------------------------------------- |
+| Designer, light | 3.35:1       | scrollbar thumb on the well, needs 3:1  |
+| Designer, dark  | 3.65:1       | scrollbar thumb on the panel, needs 3:1 |
+| HTML kit, light | 4.83:1       | field border on the field, needs 3:1    |
+| HTML kit, dark  | 4.15:1       | field border on the field, needs 3:1    |
+
+Each row is the lowest pair the suite asserts in that palette, and the two designer rows are user
+interface components rather than text, so 3:1 is the floor they have to clear. Body text is well above
+it: the lowest text pair is muted text on the well at 5.25:1 light. Quoting that figure as the minimum,
+which this table used to, made the designer look safer than it is.
 
 The primary button label, which the prior-art study recorded at 3.03:1 in the product this project
 studied, sits at 5.49:1 light and 6.39:1 dark. See `docs/prior-art`.
@@ -96,8 +101,9 @@ word is visually hidden text inside the label.
 
 Honest list. None of these are hard, they are simply not done.
 
-- **The automated audit cannot see layout.** axe-core runs over the designer at rest, with a component
-  selected, on the Rules and Form tabs, in validated preview, and with the JSON dialog open. jsdom has no
+- **The automated audit cannot see layout.** axe-core runs over the designer in nine states: at rest,
+  with a component selected, on the Rules, Settings and Style tabs, with a condition being edited, in
+  validated preview, with both panes collapsed, and with the JSON dialog open. jsdom has no
   rendering engine, so `color-contrast`, `target-size`, and `scrollable-region-focusable` are disabled by
   name rather than reporting nothing useful. Contrast is covered separately by computing the ratios from
   the stylesheets. Running axe in a real browser would close the rest.
@@ -108,8 +114,9 @@ Honest list. None of these are hard, they are simply not done.
   rendered nodes, which fights with the kit's own focusable controls.
 - **The palette is a plain list of buttons.** Reachable by Tab, but with no grouping semantics, so its
   category headings are visual only.
-- **No reduced-motion handling**, because nothing currently animates. Worth remembering before anything
-  does.
+- **Reduced motion is handled where something moves, and nowhere else.** The HTML kit's stylesheet has a
+  `prefers-reduced-motion` block for its own transitions. The designer chrome has none, because nothing
+  in it animates; the moment something does, that is the first thing to write.
 - **No skip link** past the palette to the canvas.
 - **Colour is load-bearing in one place**: the drop indicator during a drag is a coloured bar with no
   other signal. It is transient and pointer-only, so it affects nobody using the keyboard path, but it
