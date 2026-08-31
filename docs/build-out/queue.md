@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 28, the designer LOW/NOTEs. Item 29 is next.
+- **Last completed:** item 29, the apps, build, lint config and CI LOW/NOTEs. Item 30 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/28-designer-low`
+- **Last pushed item branch:** `build-out/b/29-apps-build-low`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -289,7 +289,7 @@ handling one. It is the only honest way to close out three hundred findings.
 
 - [x] **27. core and both kits.** Areas 1 to 5, 67 findings.
 - [x] **28. the designer.** Areas 6 to 9, 69 findings.
-- [ ] **29. the apps, the build, the lint config and CI.** Area 10, 54 findings. Includes `forms.json.tmp`
+- [x] **29. the apps, the build, the lint config and CI.** Area 10, 54 findings. Includes `forms.json.tmp`
       missing from `.gitignore`, `cspell.json` being 40 lines of configuration no script runs, the Node
       engines drift between the root, the five packages and `CLAUDE.md`, and the CI job having no
       `timeout-minutes`.

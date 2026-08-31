@@ -712,3 +712,72 @@ So the synchronous focus stays, with a comment at the site saying why, and this 
 picks it up: the jsdom test for the refusal case passes against the broken version, so the check that
 matters is the Playwright one, and the first question is why an effect in `Tabs` appears not to run in
 that build at all.
+
+## The `ResizeObserver` counters do not count — area 10
+
+**LOW, half fixed, and the rest written down because it is not understood yet.** `test/setup.ts` stubs
+`ResizeObserver` and counts what it is asked to do, with a comment saying the counting exists so an
+observer leak cannot be invisible -- "an effect that rebuilt them per render would look identical to one
+that does not". `observerCount` is exported and read by no file in the repository, which the review
+noticed.
+
+Half of it is fixed: the stub was installed only `if (!('ResizeObserver' in globalThis))`, and this
+environment provides one, so the counting stub was never installed at all and the counters read zero
+forever -- the always-reads-zero silent pass the file's own docblock warns about, arriving through the
+other door. It is installed unconditionally now.
+
+The other half is open. With the stub installed, a test that mounts the designer, selects a component and
+unmounts still reads `{made: 0, observing: 0, disconnects: 0}` -- while `SelectionLayer` constructs a
+`ResizeObserver` in a layout effect that runs whenever the canvas surface exists, and the surface does
+exist. Something between those two is not what it looks like, and a test written before that is
+understood would be asserting a zero for the wrong reason. The test was written, seen to fail, and
+deleted rather than weakened into one that passes.
+
+## The rest of area 10, in groups
+
+**Thirty-eight LOW and NOTE findings about the apps, the build and the configuration.** Grouped because
+the reasons repeat:
+
+**The demo server is a demo.** Its `CLAUDE.md` entry says so. Every route re-reads and re-parses the whole
+store with no cache and no ceiling; `bodyOf` collapses "too large" and "malformed" into one `undefined`,
+so an oversize body is a 400 whose message already names both possibilities rather than a 413; the temp
+file for the write-and-rename is a fixed path that two processes would collide on; and `body as
+FormDocument` is a cast immediately followed by the gate that makes it true. All four are real and all
+four are properties of a fixture that exists so the playground has somewhere to save to. Making it a
+server worth hardening is a different project from remediating this review.
+
+**Configuration that describes something nobody runs.** `allowImportingTsExtensions` with no relative
+imports to allow; `preview` without `strictPort` where `server` has it; `exclude` replacing vitest's
+defaults rather than extending them; `coverage` with reporters and no thresholds, and an `include` that
+skips `apps/`; `paths` in `tsconfig.eslint.json` not mapping the two stylesheet subpaths; `sideEffects`
+naming `**/*.css`; `files` declared at the bottom of one manifest and after `exports` in the others;
+`auto-install-peers` restating pnpm's default; `coverage/` absent from eslint's ignores. Each is a line of
+configuration that is true, unused, or redundant, and each would be a one-line change on the day somebody
+is in the file for another reason.
+
+**Publishing.** `version: "0.0.0"` on all five packages with `publishConfig.access: "public"`, and an
+`exports` map with no `require` condition and no `./package.json` entry. Both matter at the first publish
+and neither is decidable before it: the version comes from whatever release process is chosen, and adding
+a CommonJS condition means deciding whether this project ships CJS at all.
+
+**Things a browser or a bigger fixture would settle.** `App.tsx` persists on every keystroke with a full
+`JSON.stringify` and a synchronous `localStorage.setItem`, which wants a debounce and a document large
+enough to measure it against. `contrast.ts` reads the last declaration for a token, splits a value on the
+first colon, and accepts only hex -- all three constrain what colour syntax the stylesheets may use, which
+is a deliberate trade the file should state rather than a defect. `parseHex` refusing `oklch()` is the
+same trade.
+
+**Already answered elsewhere.** The reporter's `onFinished` naming (`REPORTER_MARK` catches a reporter
+that stops being called), `copy-assets.mjs`'s cwd anchoring (fixed in item 23), and the digit bound on
+the count pattern (widened in item 15) are all closed.
+
+**Fixed here:** `retries: 1` on CI, which turned a positional failure that only shows up sometimes into a
+green run; `cancel-in-progress` cancelling `main` builds, which leaves the merged commit with no verdict;
+no `timeout-minutes`; the two apps' `tsconfig.json` files being referenced by nothing, so the demo
+server's deliberate DOM-free `lib` was never in force; `pnpm clean` walking `node_modules` for
+`.tsbuildinfo`; the demo server not declaring the Node floor its own scripts require; `cspell.json`, forty
+lines of configuration no script runs, deleted; the competitor's name in a published source comment and in
+a public type's docblock; the listing route reading an array as a document and rendering
+`[object Object]` as an id; the claim that CI runs the gates "in that order"; and the playground build,
+which nothing ran -- so the anchored-alias failure its own docblock describes would have reached a release
+rather than a run.

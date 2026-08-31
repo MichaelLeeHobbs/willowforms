@@ -137,9 +137,13 @@ export interface FieldSchema {
 }
 
 /**
- * Validation rules carry their parameters in the type. FormEngine's equivalent
- * is an untyped `{key, message?}`, which cannot express `minLength` without a
- * side channel.
+ * Validation rules carry their parameters in the type.
+ *
+ * A discriminated union rather than an untyped `{ key, message? }`: the latter
+ * cannot say that `minLength` has a number and `required` has nothing, so the
+ * parameter travels in a side channel and every reader guesses. The comparison
+ * that motivated this is in `docs/prior-art`, which is where competitive
+ * material belongs; this is a public type in an MIT package.
  */
 export type ValidationRule =
   | { key: 'required'; message?: string; when?: PropValue }

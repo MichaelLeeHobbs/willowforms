@@ -14,7 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "clean": "rimraf \"packages/*/dist\" \"apps/*/dist\" \"**/*.tsbuildinfo\"",
+    "clean": "rimraf \"packages/*/dist\" \"apps/*/dist\" \"packages/*/*.tsbuildinfo\" \"apps/*/*.tsbuildinfo\" \"*.tsbuildinfo\"",
     "lint:fix": "eslint . --fix",
     "format:check": "prettier --check .",
     "e2e": "playwright test",

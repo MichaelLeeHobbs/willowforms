@@ -48,8 +48,16 @@ export const SAMPLE_DOCUMENT: FormDocument = {
         key: 'website',
         type: 'TextField',
         props: { label: prop('Website') },
-        // Optional on purpose: a blank value passes, unlike the FormEngine demo,
-        // where a url-only field still reported "Required".
+        /*
+         * Optional on purpose: a blank value passes.
+         *
+         * Only `required` fails on an empty value -- invariant 5 -- so a field
+         * carrying a `url` rule and nothing else is "optional, but must be a
+         * URL if given". A builder that folds requiredness into every other
+         * rule cannot express that at all, and the prior-art study found one
+         * that does not; naming it belongs in `docs/prior-art`, not in a
+         * sample document this repository publishes.
+         */
         schema: { type: 'string', validations: [{ key: 'url' }] },
       },
       {
