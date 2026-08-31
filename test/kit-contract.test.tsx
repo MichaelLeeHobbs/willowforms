@@ -16,9 +16,9 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react'
-import type { ReactElement } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
 import { prop } from '@formsmith/core'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentDef, ComponentNode, FormDocument, Kit } from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
@@ -30,6 +30,67 @@ const KITS: { name: string; kit: Kit; renderers: RendererKit }[] = [
   { name: '@formsmith/kit-mui', kit: muiKit, renderers: muiRendererKit },
   { name: '@formsmith/kit-html', kit: htmlKit, renderers: htmlRendererKit },
 ]
+
+/**
+ * Every error the renderer's boundary caught during the test that just ran.
+ *
+ * This file could not fail on a kit that throws. Two of its rules read
+ * `data-fs-key`, `data-fs-type` and `data-fs-scope` off the rendered element to
+ * prove a kit spreads `nodeProps` -- and the boundary's fallback emits all three,
+ * so a kit renderer replaced by `throw new Error()` satisfied both. A third
+ * asserted `expect(render).not.toThrow()`, which a boundary guarantees by
+ * existing. Three contract rules, green since before the boundary was written,
+ * checking nothing.
+ *
+ * The boundary is right and stays. What was missing is that nothing in this file
+ * ever asked whether it had fired.
+ */
+const caught: { key: string; error: Error }[] = []
+
+beforeEach(() => {
+  caught.length = 0
+})
+
+afterEach(() => {
+  if (caught.length === 0) return
+  /*
+   * Thrown rather than asserted, for two reasons. `expect` outside a test block
+   * is what `vitest/no-standalone-expect` exists to stop, and it is right to:
+   * this runs after the test, so an assertion here reads as belonging to a test
+   * that has finished. And the message matters more than the matcher -- naming
+   * the component and what it threw is the difference between a report and
+   * `1 !== 0`.
+   */
+  throw new Error(
+    'The renderer caught an error, so a kit renderer did not render. Whatever this test ' +
+      'asserted about the DOM, it was reading the fallback. ' +
+      caught.map((failure) => failure.key + ': ' + failure.error.message).join('; '),
+  )
+})
+
+/**
+ * `FormRenderer` with the trap already wired.
+ *
+ * Every render in this file goes through this rather than `FormRenderer`, and
+ * that is the mechanism: a new rule written here inherits the check instead of
+ * having to remember it. Wiring `onError` per test is what would rot, because
+ * the rule that needs it most is the one somebody adds in a hurry.
+ *
+ * A caller's own `onError` is still called. One test passes a spy and asserts it
+ * was not called, which is the same claim from the other end.
+ */
+function FormUnderTest(props: ComponentProps<typeof FormRenderer>): ReactElement {
+  const { onError, ...rest } = props
+  return (
+    <FormRenderer
+      {...rest}
+      onError={(error, key) => {
+        caught.push({ key, error })
+        onError?.(error, key)
+      }}
+    />
+  )
+}
 
 function documentOf(root: ComponentNode): FormDocument {
   return {
@@ -173,7 +234,7 @@ describe('a length means the same thing in both kits', () => {
 
   function formOf(renderers: RendererKit): ReactElement {
     return (
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(box())}
         kit={renderers}
         data={{}}
@@ -293,7 +354,7 @@ describe('what a data-bound control has to say about itself', () => {
     }
 
     const { container } = render(
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(node)}
         kit={renderers}
         data={{}}
@@ -421,7 +482,7 @@ describe('a control holding a value that is not a string', () => {
     ),
   )('%s shows it', (_what, renderers, type) => {
     const { container } = render(
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(holding(type, 'string'))}
         kit={renderers}
         data={{ target: 30 }}
@@ -447,7 +508,7 @@ describe('a document value a kit puts somewhere structural', () => {
 
   function draw(renderers: RendererKit, node: ComponentNode): HTMLElement {
     const { container } = render(
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(node)}
         kit={renderers}
         data={{}}
@@ -510,6 +571,31 @@ describe('a document value a kit puts somewhere structural', () => {
     // Either it is treated as the default severity, or it is announced. What it
     // must not do is silently become a class name of its own.
     expect(element.className).not.toContain('eror')
+    /*
+     * And the role, which is the thing this rule is named after and never
+     * checked. Its only expectation was the class-name spelling above, so a kit
+     * that narrowed the severity and then announced nothing passed.
+     *
+     * `note` rather than `alert`, and that is the point: an unrecognised
+     * severity narrows to `info`, and only an error interrupts. Asserting the
+     * exact role rather than "some role" is what tells a narrowed alert from a
+     * kit that gave up and announced everything.
+     */
+    expect(element.getAttribute('role')).toBe('note')
+  })
+
+  it.each(KITS)('$name still announces an Alert that really is an error', ({ renderers }) => {
+    /*
+     * The control for the rule above. A kit that answered `note` for everything
+     * would pass it, and a form whose error banner does not interrupt is the
+     * failure both rules exist to stop.
+     */
+    const element = draw(
+      renderers,
+      nodeWith('Alert', { text: 'Something failed', severity: 'error' }),
+    )
+
+    expect(element.getAttribute('role')).toBe('alert')
   })
 
   it.each(KITS)('$name does not put an arbitrary scheme in an image src', ({ renderers }) => {
@@ -575,7 +661,7 @@ describe('a component whose options a document got wrong', () => {
     const onError = vi.fn()
 
     const { container } = render(
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(listNode(type, propName))}
         kit={renderers}
         data={{}}
@@ -602,7 +688,7 @@ describe('a component whose options a document got wrong', () => {
     if (!kit.components.some((def) => def.type === 'Select')) return
 
     const { container } = render(
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(listNode('Select', 'options'))}
         kit={renderers}
         data={{ target: 7 }}
@@ -663,7 +749,7 @@ describe('a select holding a number', () => {
     if (!kit.components.some((def) => def.type === 'Select')) return
 
     const { container } = render(
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(numeric())}
         kit={renderers}
         data={{ target: 2 }}
@@ -680,7 +766,7 @@ describe('a select holding a number', () => {
     if (!kit.components.some((def) => def.type === 'Select')) return
 
     const { container } = render(
-      <FormRenderer
+      <FormUnderTest
         document={documentOf(numeric())}
         kit={renderers}
         data={{}}
@@ -764,7 +850,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
          * of component rather than merely unmet.
          */
         const { container: dom } = render(
-          <FormRenderer
+          <FormUnderTest
             document={documentOf(node)}
             kit={renderers}
             data={{}}
@@ -779,6 +865,21 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
           `${type} does not put data-fs-key in the DOM, so the designer cannot select it. ` +
             'Spread nodeProps onto the outermost element.',
         ).not.toBeNull()
+        /*
+         * And it has to be the kit's element rather than the boundary's.
+         *
+         * The fallback emits `data-fs-key` and `data-fs-type` too, deliberately,
+         * so a component that broke stays selectable. That made this rule
+         * unfailable: a renderer replaced by `throw new Error()` satisfied both
+         * assertions above from the fallback. The `afterEach` at the top of this
+         * file now catches that for every rule at once; this says it here as
+         * well, because a rule that can only fail through a file-wide net is one
+         * somebody will move to another file.
+         */
+        expect(
+          element?.hasAttribute('data-fs-failed'),
+          `${type} threw, and the boundary's fallback answered for it`,
+        ).toBe(false)
         expect(element?.getAttribute('data-fs-type')).toBe(type)
       },
     )
@@ -796,7 +897,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         node.key = 'target'
 
         const { container: dom } = render(
-          <FormRenderer
+          <FormUnderTest
             document={documentOf(node)}
             kit={renderers}
             data={{}}
@@ -805,9 +906,15 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
           />,
         )
 
-        const scope = dom.querySelector('[data-fs-key="target"]')?.getAttribute('data-fs-scope')
+        const element = dom.querySelector('[data-fs-key="target"]')
+        // The boundary's fallback carries `data-fs-scope` as well, so reading it
+        // off whatever is in the DOM proved nothing about the kit.
         expect(
-          scope,
+          element?.hasAttribute('data-fs-failed'),
+          `${type} threw, and the boundary's fallback answered for it`,
+        ).toBe(false)
+        expect(
+          element?.getAttribute('data-fs-scope'),
           `${type} does not put data-fs-scope in the DOM, so its per-component CSS is not ` +
             'confined to one form. Spread all of nodeProps rather than picking attributes out.',
         ).toBeTruthy()
@@ -828,7 +935,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         }
 
         const { container: dom } = render(
-          <FormRenderer
+          <FormUnderTest
             document={documentOf(parent)}
             kit={renderers}
             data={{}}
@@ -847,20 +954,36 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     })
 
     it('renders a data-bound component without crashing on an absent value', () => {
-      // A freshly dropped field has no data yet. Any renderer that assumes one
-      // takes the whole canvas down the moment it is added.
+      /*
+       * A freshly dropped field has no data yet. Any renderer that assumes one
+       * takes the whole canvas down the moment it is added.
+       *
+       * This was `expect(render).not.toThrow()`, which the boundary guarantees by
+       * existing: it catches, so `render` returns normally whatever the kit did.
+       * The rule had no way to fail. What it actually means is that the kit drew
+       * the component, so that is what it asks now -- the boundary did not fire,
+       * and the element in the DOM is the kit's rather than the fallback's.
+       */
       for (const def of kit.components.filter((c) => c.dataBound)) {
         const node = instantiate(def, { key: 'r', type: 'r', props: {} })
-        expect(() =>
-          render(
-            <FormRenderer
-              document={documentOf(node)}
-              kit={renderers}
-              data={{}}
-              onChange={() => undefined}
-            />,
-          ),
-        ).not.toThrow()
+        node.key = 'target'
+
+        const { container: dom } = render(
+          <FormUnderTest
+            document={documentOf(node)}
+            kit={renderers}
+            data={{}}
+            revealHidden
+            onChange={() => undefined}
+          />,
+        )
+
+        const element = dom.querySelector('[data-fs-key="target"]')
+        expect(element, `${def.type} rendered nothing at all with no value`).not.toBeNull()
+        expect(
+          element?.hasAttribute('data-fs-failed'),
+          `${def.type} threw on an absent value, so a freshly dropped field breaks the canvas`,
+        ).toBe(false)
       }
     })
 
@@ -873,7 +996,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         node.key = 'field'
 
         const { container: dom } = render(
-          <FormRenderer
+          <FormUnderTest
             document={documentOf(node)}
             kit={renderers}
             data={{}}
@@ -901,7 +1024,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         node.key = 'field'
 
         const { container: dom } = render(
-          <FormRenderer
+          <FormUnderTest
             document={documentOf(node)}
             kit={renderers}
             data={{}}
@@ -928,7 +1051,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         // attached only at the moment it changes and is announced twice or not
         // at all depending on the screen reader.
         const { container: dom } = render(
-          <FormRenderer
+          <FormUnderTest
             document={documentOf(node)}
             kit={renderers}
             data={{}}
@@ -1040,7 +1163,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
 
     const onChange = vi.fn()
     render(
-      <FormRenderer document={documentOf(node)} kit={renderers} data={{}} onChange={onChange} />,
+      <FormUnderTest document={documentOf(node)} kit={renderers} data={{}} onChange={onChange} />,
     )
 
     fireEvent.click(screen.getByLabelText('The custom one'))

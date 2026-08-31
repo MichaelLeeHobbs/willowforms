@@ -13,7 +13,37 @@ the second review re-derived five of those independently, which is worth knowing
 
 ## Second pass (from 2026-08-31)
 
-_Nothing yet._
+## Every tree walker outside `validateDocument` is unbounded, and the gate is what protects them
+
+Item 2 bounded the six walkers that cross a _condition_. There are about a dozen more that walk the
+_tree_, and none of them counts depth: `collectKeys` and `flatten` in `tree.ts`, `duplicateNode`'s
+`copy`, `visit` and `collect` in `validation.ts`, `visit` in `schema.ts`, `visit` and `collect` in
+`context.ts`, `measureTree` in the designer's `geometry.ts`, and the Tree panel's row walk.
+
+They are safe today for one reason: `validateDocument` refuses a tree deeper than `MAX_TREE_DEPTH`, 500,
+and 500 frames is nothing. So every walker downstream of the gate is protected by the gate. That holds
+exactly as far as "nothing reaches those functions without passing the gate first", and that is a
+sentence nobody has checked. The playground loads documents from `localStorage`; the designer's store
+takes a pasted document through the JSON dialog. If either reaches `flatten` before
+`validateDocument`, the protection is a coincidence.
+
+Out of scope because item 2 names its six and the queue is frozen, and because the fix is not "add a
+depth counter to twelve functions" -- it is deciding where the gate is, which is a design question worth
+one answer rather than twelve. Not bad to leave: no path is known to be open. Worth doing because the
+argument that it is closed is currently unwritten, which is how the four CRITICALs in this review got
+there.
+
+## `MAX_BODY` is a size cap and nothing checks the shape of what it lets through
+
+`apps/demo-server/src/index.ts` — item 2 added a depth bound on the parsed body, because a 12 KB body
+nested 6 000 deep took the submit route down inside `c.json` where `JSON.stringify` is not iterative.
+Depth is one shape. Width is another: a body of a million single-character keys is under 1 MB, parses,
+and makes `validateForm` do a million lookups. Item 14 owns `MAX_BODY` not being a body limit, so the
+streaming half is queued; the "what else about a 1 MB body is expensive" half is not.
+
+Out of scope because it needs a threat model rather than a patch, and this is a demo server that binds
+localhost only. Worth writing down because the depth bound is now the only shape-of-input check on the
+route, and one check tends to read as coverage.
 
 ---
 

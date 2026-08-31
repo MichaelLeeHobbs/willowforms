@@ -473,15 +473,20 @@ describe('a malformed operand', () => {
 })
 
 /**
- * A condition nested deeper than anything can walk.
+ * Two of the branches a condition can nest through, and only two.
  *
- * `evaluate` and `same` both recurse with no bound, in a function whose whole
- * contract is that it is total. A document is data, so the nesting is whatever
- * somebody stored — and a `RangeError` out of `isVisible` is an unhandled 500 on
- * submit and a blank form in the browser, which is the one outcome "total"
- * exists to rule out.
+ * This block was written as though it covered `evaluate` and `same`, and for a
+ * year it covered `not` and object nesting: the two recursions that already
+ * propagated their depth. `and`, `or` and arrays dropped it, so the three
+ * branches an author's nesting actually goes through were unbounded the whole
+ * time these tests were green. A test that exercises the branch which never had
+ * the bug is the review's cross-cutting theme in one file.
+ *
+ * `depth.test.ts` is now the table over every walker, one row per branch, and it
+ * is the file to add to. These stay because a `not` chain and a nested object
+ * are still worth pinning, and because the names now say which two they are.
  */
-describe('a condition nested beyond any reasonable depth', () => {
+describe('a condition nested beyond any reasonable depth, through not and through objects', () => {
   /** `not(not(not(…)))`, n deep. */
   const deep = (n: number): Condition => {
     let condition: Condition = { op: 'truthy', value: { kind: 'literal', value: true } }
@@ -489,7 +494,7 @@ describe('a condition nested beyond any reasonable depth', () => {
     return condition
   }
 
-  it('answers rather than throwing', () => {
+  it('answers rather than throwing, for a chain of not', () => {
     expect(() => evaluateCondition(deep(50_000), {})).not.toThrow()
   })
 
@@ -505,7 +510,7 @@ describe('a condition nested beyond any reasonable depth', () => {
     expect(evaluateCondition(deep(20), {})).toBe(true)
   })
 
-  it('does not throw comparing deeply nested values either', () => {
+  it('does not throw comparing values nested through objects', () => {
     const nest = (n: number): JsonValue => {
       let value: JsonValue = 1
       for (let i = 0; i < n; i += 1) value = { inner: value }

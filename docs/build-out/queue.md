@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 0, the base. Item 1 is next.
+- **Last completed:** item 3, the kit-contract suite. Stage 1 is done; item 4 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/00-base`
+- **Last pushed item branch:** `build-out/b/03-kit-contract`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -69,7 +69,7 @@ The whole reason this pass exists. All four are in code the first remediation ru
 share one shape: **a fix landed on one side of a symmetry, or a guard was not re-checked against the code
 the fix changed.** Fix the instance, then look for the twin before ticking the item.
 
-- [ ] **1. Close the `validateAcross` fail-open, and rule on the key class.** CRITICAL, review area 3.
+- [x] **1. Close the `validateAcross` fail-open, and rule on the key class.** CRITICAL, review area 3.
       `validation.ts:705,709` merges into a plain object literal with `merged[key] ??= message`, so any
       error keyed with a name inherited from `Object.prototype` is discarded and the form reports as valid.
       `toString`, `valueOf` and `hasOwnProperty` all pass `KEY_PATTERN` and are not in `RESERVED_KEYS`, so
@@ -81,7 +81,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a test that submits a document with a required field keyed `toString`
       and asserts `validateAcross` reports it, seen red first.
 
-- [ ] **2. Bound every recursive walker, not one of them.** CRITICAL plus four HIGHs, areas 2, 3 and 12.
+- [x] **2. Bound every recursive walker, not one of them.** CRITICAL plus four HIGHs, areas 2, 3 and 12.
       `tree.ts:936` (`visitShape`'s `condition()` walker, inside the function documented as total),
       `tree.ts:210` (`repointBinding`'s `inCondition`), `rows.ts:405,433` (`rowScopedRefs`,
       `formScopedRefs`), `condition.ts:33` (`same` drops `depth` through arrays), `condition.ts:280`
@@ -92,7 +92,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       through the branch that lacks it and asserts a reported problem rather than a `RangeError`, every row
       seen red first. A 200 KB body must not reach `RangeError` on the demo server's submit endpoint.
 
-- [ ] **3. Make the kit-contract suite able to fail.** Two CRITICALs plus two HIGHs, area 15.
+- [x] **3. Make the kit-contract suite able to fail.** Two CRITICALs plus two HIGHs, area 15.
       `kit-contract.test.tsx:752-784` and `:786-815` read `data-fs-key`, `data-fs-type` and `data-fs-scope`
       off the rendered element, and the renderer's error boundary fallback emits all three
       (`renderer/src/index.tsx:286-296`), with no `onError` passed. A kit renderer replaced with

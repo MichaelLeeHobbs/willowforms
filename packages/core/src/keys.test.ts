@@ -83,11 +83,55 @@ describe('the names that are refused by name', () => {
   /*
    * Written out rather than read from `RESERVED_KEYS`. The loop that iterates
    * the list is vacuous if the list is emptied -- zero iterations, zero
-   * assertions, green -- so the three names are also stated here, where
-   * deleting one from the source makes a test that names it go red.
+   * assertions, green -- so every name is also stated here, where deleting one
+   * from the source makes a test that names it go red.
    */
-  it.each(['__proto__', 'constructor', 'prototype'])('refuses %s', (key) => {
+  it.each([
+    '__defineGetter__',
+    '__defineSetter__',
+    '__lookupGetter__',
+    '__lookupSetter__',
+    '__proto__',
+    'constructor',
+    'hasOwnProperty',
+    'isPrototypeOf',
+    'propertyIsEnumerable',
+    'prototype',
+    'toLocaleString',
+    'toString',
+    'valueOf',
+  ])('refuses %s', (key) => {
     expect(keyProblem(key)).toBeTruthy()
+  })
+
+  it('covers every own name the running engine puts on Object.prototype', () => {
+    /*
+     * The staleness guard for the decision above. `RESERVED_KEYS` is a written
+     * literal so that a document's validity does not depend on the engine
+     * reading it. But a literal can go stale, and the failure mode is silent: a
+     * new member of `Object.prototype` would be a key that passes the grammar
+     * and shadows a builtin, exactly the class this list closes.
+     *
+     * So the engine is the oracle and the literal is the contract. If they ever
+     * disagree this goes red and a person decides whether to widen the format,
+     * rather than the format widening itself on whichever Node happens to run.
+     */
+    const missing = Object.getOwnPropertyNames(Object.prototype).filter(
+      (name) => !RESERVED_KEYS.includes(name),
+    )
+
+    expect(missing).toEqual([])
+  })
+
+  it('reserves nothing the grammar already refuses, so every entry does work', () => {
+    /*
+     * The other half. An entry the pattern rejects anyway would be a line that
+     * looks like protection and provides none, and the loop over
+     * `RESERVED_KEYS` above could not tell the difference.
+     */
+    for (const key of RESERVED_KEYS) {
+      expect(KEY_PATTERN.test(key), key).toBe(true)
+    }
   })
 
   it('says why, in words a panel can show', () => {

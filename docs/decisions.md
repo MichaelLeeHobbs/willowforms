@@ -4,6 +4,124 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The boundary's fallback says it is the fallback
+
+- **Decided:** `NodeBoundary`'s fallback emits `data-fs-failed=""` alongside the three attributes it
+  already carried, and every render in `test/kit-contract.test.tsx` goes through one wrapper that records
+  what the boundary caught, with an `afterEach` that fails the test if anything was.
+- **Why:** the fallback emits `data-fs-key`, `data-fs-type` and `data-fs-scope` so a component that broke
+  stays selectable, which is right and stays. The cost was that three contract rules read exactly those
+  attributes to prove a kit renders, so the boundary answered for the kit. Measured: with one `kit-html`
+  renderer replaced by `throw new Error()`, the contract suite passed 211 of 211.
+- **Why both mechanisms:** the wrapper is what makes a rule added next year inherit the check instead of
+  having to remember it. The attribute is what lets an individual rule fail on its own, so a rule moved to
+  another file does not quietly lose its teeth. Either alone would have been the shape this run is about.
+- **Rejected: dropping the attributes from the fallback.** It would make the contract honest by making a
+  broken component unselectable in the designer, which is the failure the fallback was written to prevent.
+- **Rejected: wiring `onError` per test.** Seventeen call sites, and the rule that needs it most is the
+  one somebody adds in a hurry.
+- **What it costs:** one attribute on a `div` nobody styles, and a wrapper component in one test file.
+- **Reversal:** free.
+- **When:** 2026-08-31.
+
+### The demo server refuses a body nested deeper than core reads
+
+- **Decided:** `bodyOf` measures the parsed body's depth with an explicit stack and returns nothing past
+  `MAX_CONDITION_DEPTH`, which the existing 400 answers. `MAX_CONDITION_DEPTH` is now exported from
+  `@formsmith/core`. `apps/demo-server/src/index.ts` also exports `app` and calls `serve` only when it is
+  the file that was run, and takes its store path from `FORMSMITH_DEMO_STORE`.
+- **Why:** bounding the six walkers did not close the endpoint. `JSON.parse` takes a hundred thousand
+  levels without complaint because V8 parses iteratively; `JSON.stringify` does not, and throws past
+  roughly five thousand. So a 12 KB body under a key the form collects validated clean, was projected by
+  `submittedData`, and took the process down inside `c.json` — uncaught, a 500 with a stack trace. Size
+  was never the thing protecting that route.
+- **Why that bound:** an answer nested deeper than the evaluator walks cannot be compared against
+  anything, so accepting it is agreeing to do work whose result is already known to be unreadable.
+  Refusing at the door is what the rest of this project does with input it cannot honour.
+- **Rejected: a `try`/`catch` around the response.** It catches the crash after the work, and it leaves
+  the route answering 500 for a request that was never answerable. Refusing costs one pass over a body
+  already in memory.
+- **Rejected: lowering `MAX_BODY`.** 6 000 levels is 12 KB. No size cap anybody would accept stops this.
+- **Rejected: testing the sequence rather than the route.** Reading the store, calling `validateAcross`
+  and projecting by hand, in the test file, is a check on a copy of the endpoint — item 4 of the queue is
+  a guard whose only call site is itself, and writing another one while fixing that would be absurd.
+  Hence the export and the entry guard: `app.request(...)` runs the real handler and binds no port.
+- **What it costs:** one exported constant, one env var nothing sets in normal use, and a `serve` that no
+  longer runs on import. `node src/index.ts` was run and still answers 200 on `/api/forms`.
+- **Reversal:** cheap in code. The behaviour change is a 400 where there was a 500, which nothing can be
+  relying on.
+- **When:** 2026-08-31.
+
+### The condition walkers all stop where the evaluator stops
+
+- **Decided:** `MAX_CONDITION_DEPTH`, exported from `condition.ts`, bounds all six: `same` through
+  arrays, `evaluate` through `and`/`or`, `validateDocument`'s condition walker, `repointBinding`'s
+  `inCondition`, and the ref collectors in `rows.ts`. `rowScopedRefs` and `formScopedRefs` are now one
+  function taking the scope it wants.
+- **Why one number:** `validateDocument` bounded at `MAX_TREE_DEPTH`, 500, would accept a condition
+  `evaluate` reads as unreadable at 200 — a gate passing what the renderer cannot answer, which is the
+  gate saying the opposite of what it exists to say. Two constants that agree today are the shape this
+  run exists to remove.
+- **Why merge the two ref collectors:** they were character-identical apart from one predicate reading
+  `scope === 'row'` one way in one and the other way in the other. Neither was bounded, and both had to
+  be found to know that. A symmetry that cannot be half-fixed is better than a symmetry somebody
+  remembers to check.
+- **What each answers past the bound:** `same` says not equal, because refusing would make `ne` true and
+  show a component whose rule could not be read. `evaluate` says unreadable, which the boundary turns
+  into hidden. `validateDocument` and `rowScopeProblems` report a problem, because a check that answers
+  "nothing wrong" when what happened was "did not look" is the permissive failure this project is
+  organised against. `repointBinding` returns the condition unrewritten, which its own doc comment
+  already promised for every other unreadable shape.
+- **Rejected: raising the bound instead.** The stack is the constraint, not the number, and 200 is
+  already two hundred levels past anything the panel can draw in a 288px pane.
+- **Reversal:** one constant and six call sites.
+- **When:** 2026-08-31.
+
+### Every own name on `Object.prototype` is a reserved key
+
+- **Decided:** `RESERVED_KEYS` grows from three names to thirteen: the twelve own properties of
+  `Object.prototype` plus `prototype`, which is not on it and is refused for reading as one of the set.
+  Written as a literal, not derived from `Object.getOwnPropertyNames`, with `keys.test.ts` asserting the
+  literal covers the running engine.
+- **Why:** these names pass `KEY_PATTERN` and shadow a builtin everywhere a key is used as a property
+  name, and the review found one shadowing live at the submit gate. The rule `keys.ts` already states is
+  that a key namespace expressions can name has to be an identifier namespace; a name whose meaning in
+  JavaScript is not "the answer to this field" fails that for the same reason a hyphen does.
+- **Rejected: deriving the list at runtime.** Self-maintaining, and it makes the format engine-dependent.
+  A document authored on Node 22 could stop validating on Node 30 with no change to the document or the
+  library. Which keys are legal is part of the format, so it is written down; the test is what keeps the
+  written form honest.
+- **Rejected: leaving the list at three.** The null prototype closes the vulnerability, so this is only
+  the second lock. But a key that resolves to a function in a host evaluator, in exported JSON Schema
+  properties, and in host-supplied `FormData` is a hazard in places core does not own, and no null
+  prototype of ours reaches those.
+- **What it costs:** documents using any of the ten new names as a `key` or `dataKey` are now refused by
+  `validateDocument` and by the Properties panel rename, and a row address naming one no longer parses.
+  `generateKey` sanitises a component labelled "toString" to `field` instead. Nothing in the repository
+  used one. The library is unpublished at `0.0.0`, so the real-world cost is zero today and rises the
+  day it is not.
+- **Reversal:** delete lines from one array. The staleness test would then need its expectation changed
+  too, which is the intended friction.
+- **When:** 2026-08-31.
+
+### The merge that gates a submit builds on a null prototype
+
+- **Decided:** `validateAcross` builds `merged` with `Object.create(null)`, matching `validateForm` one
+  function above. `??=` stays, so first-message-wins is unchanged.
+- **Why:** `validateForm` assigns, so only `__proto__` bit there. The merge _coalesces_, and the read in
+  `merged[key] ??= message` finds an inherited value for any of a dozen names. Not nullish, so the write
+  never happens: the error is discarded and `Object.keys(merged)` is empty. Empty is what every caller
+  reads as valid, and `apps/demo-server` submits on exactly that. A required answer missing and a clean
+  submit is the permissive failure this project is organised against.
+- **Rejected: `Object.hasOwn(merged, key)` guarding a plain assignment.** It fixes the read and leaves
+  `merged['__proto__'] = message` invoking the inherited setter. Two mechanisms to remember instead of
+  one; the null prototype removes the whole class.
+- **Rejected: relying on the widened `RESERVED_KEYS` alone.** Nothing on the render or validate path
+  calls `validateDocument`. That is what made `__proto__` reachable in the first place and it is
+  unchanged, so a blocklist cannot be the fix here.
+- **Reversal:** one expression. Twelve tests would go red first.
+- **When:** 2026-08-31.
+
 ### The second review is committed; the first one is not
 
 - **Decided:** `docs/reviews/2026-08-30-second-pass.md` is tracked. The first pass stays gitignored in

@@ -5,6 +5,7 @@
  * designer's undo stack holds references to prior states. Nothing here mutates.
  */
 
+import { MAX_CONDITION_DEPTH } from './condition.js'
 import { keyProblem } from './keys.js'
 import { rowScopeProblems } from './rows.js'
 import type {
@@ -207,8 +208,19 @@ const SIDES = ['left', 'right', 'value'] as const
 export function repointBinding(value: PropValue, from: string, to: string): PropValue {
   if (value.kind !== 'condition') return value
 
-  const inCondition = (condition: Condition): Condition => {
+  const inCondition = (condition: Condition, depth = 0): Condition => {
     if (!condition || typeof condition !== 'object') return condition
+    /*
+     * Returned as it stands past the bound, which is what "total, and anything
+     * unreadable is returned as it stands" above already promised for every
+     * other malformed shape. It had no bound at all, so a document nested deep
+     * enough turned a duplicate or a rename into a `RangeError` in the store.
+     *
+     * The same number the evaluator stops at: a condition deeper than that is
+     * one nothing will ever read, so leaving it unrewritten changes no
+     * behaviour a form can observe.
+     */
+    if (depth > MAX_CONDITION_DEPTH) return condition
 
     const operand = (side: Operand | undefined): Operand | undefined =>
       side?.kind === 'literal' && side.value === from ? { kind: 'literal', value: to } : side
@@ -238,10 +250,18 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
     }
 
     if (Array.isArray(shape['conditions'])) {
-      next['conditions'] = (shape['conditions'] as Condition[]).map(inCondition)
+      /*
+       * `(each) => inCondition(each, depth + 1)`, never a bare `.map(inCondition)`.
+       * `map` hands its callback the index as a second argument, so passing the
+       * function directly would feed the array position in as the depth and
+       * bound nothing.
+       */
+      next['conditions'] = (shape['conditions'] as Condition[]).map((each) =>
+        inCondition(each, depth + 1),
+      )
     }
     if (shape['condition'] !== undefined) {
-      next['condition'] = inCondition(shape['condition'] as Condition)
+      next['condition'] = inCondition(shape['condition'] as Condition, depth + 1)
     }
 
     return next as unknown as Condition
@@ -933,9 +953,25 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
      * reachable at render time as one at the top, and `evaluateCondition`
      * descends into every one of them.
      */
-    const condition = (value: unknown, what: string): void => {
+    const condition = (value: unknown, what: string, depth = 0): void => {
       if (!isRecord(value)) {
         malformed(where(what) + ' must be an object.')
+        return
+      }
+      /*
+       * The same bound the evaluator uses, imported rather than restated. The
+       * outer `visit` was given `MAX_TREE_DEPTH` and this walker, nested inside
+       * the function documented as total, was not -- so a condition nested deep
+       * enough threw a `RangeError` out of the gate whose whole job is to be the
+       * thing that never throws on a document.
+       *
+       * `MAX_CONDITION_DEPTH`, not `MAX_TREE_DEPTH`: a condition this gate
+       * accepted at 500 is one `evaluate` reads as unreadable at 200, and a gate
+       * that passes what the renderer cannot answer is saying the opposite of
+       * what it exists to say.
+       */
+      if (depth > MAX_CONDITION_DEPTH) {
+        malformed(where(what) + ' is nested deeper than this library will walk.')
         return
       }
       const op = value['op']
@@ -947,11 +983,11 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
           malformed(where(what) + ' must hold a list of conditions.')
           return
         }
-        inner.forEach((each, i) => condition(each, what + '[' + String(i) + ']'))
+        inner.forEach((each, i) => condition(each, what + '[' + String(i) + ']', depth + 1))
         return
       }
       if (op === 'not') {
-        condition(value['condition'], what + "'s inner condition")
+        condition(value['condition'], what + "'s inner condition", depth + 1)
         return
       }
       if (op === 'in' || op === 'notIn') {
