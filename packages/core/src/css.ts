@@ -147,9 +147,13 @@ export function safeStyleValue(value: string | undefined): string | undefined {
  * out of the style element itself, which is script injection rather than a
  * broken rule. `<` is escaped for that reason rather than for CSS's.
  *
- * Six-digit hex escapes, because CSS stops consuming after the sixth digit and
- * a shorter one needs a trailing space that the next character could swallow.
- * Control characters go the same way: a raw newline ends a CSS string.
+ * Six-digit hex escapes with a space after them, which is what the grammar
+ * wants: a CSS parser reads at most six hex digits and then swallows one
+ * following whitespace character as the terminator. Without a space of our own
+ * it swallowed the author's -- a key of `" b` produced an escape followed by
+ * the real space, which parses as `"b`, so the selector named a string the
+ * attribute does not hold and the rule matched nothing. Control characters go
+ * the same way: a raw newline ends a CSS string.
  */
 function escapeKey(key: string): string {
   return key.replace(
@@ -157,7 +161,7 @@ function escapeKey(key: string): string {
     // inside a CSS string ends it, and a key can hold either.
     // eslint-disable-next-line no-control-regex
     /["\\<]|[\u0000-\u001f\u007f]/g,
-    (ch) => '\\' + (ch.codePointAt(0) ?? 0).toString(16).padStart(6, '0'),
+    (ch) => '\\' + (ch.codePointAt(0) ?? 0).toString(16).padStart(6, '0') + ' ',
   )
 }
 
@@ -296,7 +300,13 @@ function splitTop(text: string, separator: string, limit = Infinity): string[] {
       else if (ch === quote) quote = undefined
       continue
     }
-    if (ch === '"' || ch === "'") quote = ch
+    /*
+     * Outside a string as well. A backslash escapes the next character wherever
+     * it appears in CSS, and this honoured one only inside quotes -- so an
+     * escaped separator split a declaration that CSS reads as a single one.
+     */
+    if (ch === '\\') i += 1
+    else if (ch === '"' || ch === "'") quote = ch
     else if (ch === '(') depth += 1
     else if (ch === ')') depth = Math.max(0, depth - 1)
     else if (ch === separator && depth === 0 && splits < limit) {

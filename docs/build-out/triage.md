@@ -12,8 +12,6 @@ wrong; if it is merely inconvenient, fix it.
 
 Add an entry as: `area / file:line` — the finding in one clause, then the reason in one line.
 
-_Nothing yet._
-
 ## Catastrophic backtracking is bounded, not closed — `validation.ts` pattern rule
 
 **HIGH, area 2.** An author's `pattern` is compiled and run on the server against text an attacker
@@ -56,3 +54,53 @@ happens and what it costs.
 **What would close it:** a row identity that lives outside `data`, held by the renderer for the lifetime
 of the mount. That is a real design, it is not small, and it reopens a decision that was settled with
 reasons. It belongs to whoever owns the project, not to a remediation run.
+
+## `JsonValue` admits `NaN` and `Infinity` — `types.ts:9`, area 1
+
+**LOW.** `JSON.stringify({a: NaN})` is `{"a": null}`, so a context value the browser compared as a
+number arrives at the server as `null` and the two disagree about the same condition. TypeScript cannot
+express "a number that is finite", so the type cannot carry the rule. What could be done was: `order`
+now answers "unordered" for `NaN` instead of subtracting, so a comparison against one is false rather
+than accidentally true, and two infinities compare equal. The round trip stays the host's problem, and
+`FormContext`'s docblock already says the values have to survive `JSON.stringify`.
+
+## `ValidationRule['when']` admits `i18n` and `computed` — `types.ts:120-129`, area 1
+
+**NOTE.** A guard is a boolean and `PropValue` has four members, two of which do not denote one. Narrowing
+the field to `static | computed | condition` is a compile-time improvement only: `when` arrives from a
+pasted document, so `guardPasses` still has to be total and still has to choose an answer for a kind it
+does not know. The complaint that the two consumers "chose opposite polarities" was the real defect and it
+is not one -- both answer `true`, both meaning "no guard was expressed" -- but only one of them said so.
+Now both do.
+
+## `pattern` is unanchored — `validation.ts:183`, area 2
+
+**LOW.** It matches JSON Schema, not `<input pattern>`, so `\d{5}` accepts `abc12345` and an author
+copying from an HTML tutorial gets a weaker rule than the one they copied. Anchoring it would make the
+engine disagree with the schema the same document exports, and a server validating a submission against
+that export would then accept what the form refused -- silently, which is the failure mode this project
+is organised against. Documented instead, in `08-validation.md` where an author reads it and beside the
+code that does it.
+
+## The MUI helper-text spacer is already a non-breaking space — `renderers.tsx:52-55`, area 3
+
+**LOW, refuted.** The finding says the comment claims U+00A0 while the literal is U+0020. The file holds
+`M-BM- ` on that line, which is U+00A0 in UTF-8: the review read the rendered character rather than the
+bytes. Nothing to change.
+
+## A "circular" Progress in the HTML kit is a disc, not an arc — `kit-html.css:447-451`, area 4
+
+**NOTE.** MUI draws a real `CircularProgress`; the HTML kit draws a round element with the same fill,
+which reads as a pie rather than a ring. Making them match means an SVG arc with its own animation, its
+own reduced-motion behaviour and its own determinate geometry — a component, not a repair, and the kit's
+stated job is to prove a kit is a package rather than to match MUI's drawing. The two agree on the
+semantics that matter and the contract checks: `role="progressbar"`, the value attributes, and the
+absence of them when indeterminate.
+
+## `FormData` and `FormContext` cannot be told apart in both directions — `types.ts:186,207`, area 1
+
+**LOW, partly fixed.** `FormContext` is `Readonly` now, so handing a context to something that wants data
+is a type error — the direction where the host's own facts would end up in the payload. The opposite
+direction still compiles, and closing it needs a nominal brand, which would make every host cast an
+object literal to call `validateForm`. A library that is unpleasant to call is a library people wrap,
+and a wrapper is where the two get swapped for real.

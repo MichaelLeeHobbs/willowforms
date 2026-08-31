@@ -653,8 +653,17 @@ describe('validateDocument and data keys', () => {
     expect(errors.map((e) => e.code)).toEqual(['empty-data-key'])
   })
 
-  it('rejects a data key that is not a string', () => {
-    expect(validateDocument(withDataKey(7)).map((e) => e.code)).toEqual(['empty-data-key'])
+  it('rejects a data key that is not a string, and says that is what is wrong', () => {
+    // It used to be reported as `empty-data-key`, "has an empty data key",
+    // which is not what is wrong with `dataKey: 7` and sends the reader looking
+    // for a blank field. The message is the whole product of this function.
+    const errors = validateDocument(withDataKey(7))
+    expect(errors.map((e) => e.code)).toEqual(['invalid-data-key'])
+    expect(errors[0]?.message).toContain('not text')
+  })
+
+  it('still calls an all-whitespace data key empty', () => {
+    expect(validateDocument(withDataKey('   ')).map((e) => e.code)).toEqual(['empty-data-key'])
   })
 
   it('accepts an absent data key', () => {

@@ -122,7 +122,21 @@ export function collectKeys(root: ComponentNode): string[] {
  * textField3. Matches the convention users already expect from other builders.
  */
 export function generateKey(root: ComponentNode, type: string): string {
-  return freeKey(new Set(collectKeys(root)), type.charAt(0).toLowerCase() + type.slice(1))
+  const camel = type.charAt(0).toLowerCase() + type.slice(1)
+
+  /*
+   * Held to the same grammar the document's own validator applies. A kit is free
+   * to type a component `Date-Picker` or `2FA`, and the key minted from it went
+   * straight into a document `validateDocument` then refused -- a component the
+   * palette adds and the JSON dialog will not accept back.
+   *
+   * Stripping rather than refusing: dropping a component is not the answer to a
+   * hyphen in a type name, and `field` is always a name.
+   */
+  const cleaned = camel.replace(/[^A-Za-z0-9_]/g, '')
+  const base = keyProblem(cleaned) ? 'field' : cleaned
+
+  return freeKey(new Set(collectKeys(root)), base)
 }
 
 /**
@@ -720,7 +734,19 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
        * fields write the same answer.
        */
       const dataKey = value['dataKey']
-      if (dataKey !== undefined && (typeof dataKey !== 'string' || !dataKey.trim())) {
+      if (dataKey !== undefined && typeof dataKey !== 'string') {
+        /*
+         * Told apart from an empty one, because "has an empty data key" is not
+         * what is wrong with `dataKey: 42` and the message is what somebody
+         * reads before deciding what to fix.
+         */
+        errors.push({
+          code: 'invalid-data-key',
+          message:
+            'Component ' + key + ' has a data key that is not text: ' + JSON.stringify(dataKey),
+          key,
+        })
+      } else if (dataKey !== undefined && !dataKey.trim()) {
         errors.push({
           code: 'empty-data-key',
           message: 'Component ' + key + ' has an empty data key.',

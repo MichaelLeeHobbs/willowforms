@@ -69,7 +69,17 @@ const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T)
 const requiredProps = (node: ComponentNode): { 'aria-required'?: true } =>
   isRequired(node) ? { 'aria-required': true } : {}
 const bool = (v: unknown): boolean => v === true
-const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback)
+/*
+ * A finite number, or the fallback.
+ *
+ * `typeof NaN` is `'number'`, and a document can hold one: `JSON.parse('{"a":1e999}')`
+ * gives `Infinity`, and an expression can return either. It reached
+ * `aria-valuenow="NaN"` and an inline width of `NaN%`, which browsers drop --
+ * so an indeterminate progress bar painted itself full and told a screen
+ * reader a number that is not one.
+ */
+const num = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? v : fallback
 
 function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   return (
@@ -117,10 +127,20 @@ function Repeater({ props, nodeProps, children, error }: NodeRendererProps): Rea
        * nowhere else to appear, which is why the kit contract's message
        * obligation applies here like anywhere else.
        */}
+      {/*
+       * `role="group"` and a description, not `aria-invalid`.
+       *
+       * `aria-invalid` is supported on widget roles -- a textbox, a combobox, a
+       * radiogroup -- and this is a container of components. On a generic
+       * element it is inert: the attribute is in the DOM, a test can find it,
+       * and no screen reader will ever say it. What does work is a group that
+       * names the message describing it, plus the `role="alert"` below, which
+       * announces the error when it appears.
+       */}
       <div
+        role="group"
         className="fsh-stack"
         style={{ flexDirection: 'column', gap: num(props['gap'], 16) }}
-        aria-invalid={error ? true : undefined}
         aria-describedby={messageId}
       >
         {children}
@@ -301,7 +321,13 @@ function CheckboxNode({
           className={'fsh-field__message' + (error ? ' is-error' : '')}
           {...(error ? { role: 'alert' } : {})}
         >
-          {error ?? ''}
+          {/*
+           * The error, or the helper text when there is no error -- which is
+           * what every other field in this kit does and what the MUI kit's
+           * checkbox already did. This one drew the error and dropped the
+           * helper text on the floor.
+           */}
+          {error ?? str(props['helperText'])}
         </p>
       </div>
     </div>
@@ -333,7 +359,7 @@ function SelectNode({
           aria-describedby={id + '-message'}
           onChange={(e) => onChange(optionValue(options, e.target.value))}
         >
-          <option value="">Choose…</option>
+          <option value="">{str(props['placeholder'], 'Choose…')}</option>
           {options.map((option, i) => {
             /*
              * `optionEntry` in core, which is `optionValue`'s inverse: the two
@@ -343,7 +369,7 @@ function SelectNode({
              */
             const { value: v, label } = optionEntry(option, i)
             return (
-              <option key={v || String(i)} value={v}>
+              <option key={String(i) + ':' + v} value={v}>
                 {label}
               </option>
             )
@@ -628,7 +654,7 @@ function RadioGroupNode({
           {options.map((option, i) => {
             const { value: v, label } = optionEntry(option, i)
             return (
-              <label key={v || String(i)} className="fsh-radio">
+              <label key={String(i) + ':' + v} className="fsh-radio">
                 <input
                   type="radio"
                   name={id}
@@ -756,8 +782,21 @@ function FileUploadNode({
           aria-invalid={error ? true : undefined}
           {...requiredProps(node)}
           aria-describedby={id + '-message'}
+          /*
+           * `maxSize` is honoured here rather than left to a host that may never
+           * look. It was a number in a panel with a hint admitting it did
+           * nothing, which is a control that lies about being one.
+           *
+           * A refusal, not a truncation: the oversized files are left out and
+           * the ones that fit are kept, so choosing five files and one of them
+           * being too large does not silently drop the other four. The size is
+           * in kilobytes, which is what the label says.
+           */
           onChange={(e) => {
-            const files = Array.from(e.target.files ?? []).map((file) => file.name)
+            const limit = num(props['maxSize'], 0) * 1024
+            const files = Array.from(e.target.files ?? [])
+              .filter((file) => limit <= 0 || file.size <= limit)
+              .map((file) => file.name)
             onChange(multiple ? files : (files[0] ?? null))
           }}
         />
@@ -783,7 +822,13 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <div
       {...nodeProps}
       className={'fsh-alert fsh-alert--' + severity}
-      {...(severity === 'error' ? { role: 'alert' as const } : {})}
+      /*
+       * An error announces itself; the other three are still a notice rather
+       * than a paragraph, and `role="note"` says so without interrupting. The
+       * MUI kit gives its alerts that role, so without this one document had two
+       * different accessibility trees depending on which kit rendered it.
+       */
+      {...(severity === 'error' ? { role: 'alert' as const } : { role: 'note' as const })}
     >
       {title && <strong className="fsh-alert__title">{title}</strong>}
       <span>{str(props['text'])}</span>
@@ -857,7 +902,10 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const last = items.length - 1
 
   return (
-    <nav {...nodeProps} aria-label="Breadcrumb">
+    // The landmark's name, which a screen reader reads out. It was the English
+    // word regardless of the form's language, on a component whose every other
+    // string is translatable.
+    <nav {...nodeProps} aria-label={str(props['label'], 'Breadcrumb')}>
       <ol className="fsh-breadcrumbs">
         {items.map((item, i) => {
           /*

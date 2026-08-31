@@ -129,7 +129,7 @@ statement from having forgotten.
 | `DatePicker`  | Built  | `date`    | `label`, `helperText`, `min`, `max`, `disabled`                    |
 | `FileUpload`  | Built  | `file`    | `label`, `helperText`, `accept`, `multiple`, `maxSize`, `disabled` |
 | `Button`      | Built  | no        | `text`, `variant`, `disabled`                                      |
-| `ButtonGroup` | Built  | no        | `orientation`, `variant`                                           |
+| `ButtonGroup` | Built  | no        | `orientation`                                                      |
 
 `TextArea` exists separately rather than as `TextField` with `multiline`, because the two have different
 properties (`rows` versus nothing) and a palette entry that changes shape based on a checkbox is harder
@@ -143,10 +143,10 @@ posted somewhere would be a backend, which is a non-goal.
 | Component    | Status | Data type | Properties                                                |
 | ------------ | ------ | --------- | --------------------------------------------------------- |
 | `Select`     | Built  | `string`  | `label`, `options`, `helperText`, `disabled`              |
-| `Checkbox`   | Built  | `boolean` | `label`, `disabled`                                       |
+| `Checkbox`   | Built  | `boolean` | `label`, `helperText`, `disabled`                         |
 | `RadioGroup` | Built  | `string`  | `label`, `options`, `direction`, `helperText`, `disabled` |
 | `RadioItem`  | Built  | no        | `label`, `value`, `disabled`                              |
-| `Switch`     | Built  | `boolean` | `label`, `disabled`                                       |
+| `Switch`     | Built  | `boolean` | `label`, `helperText`, `disabled`                         |
 
 `options` is a `json` editor taking `{ label, value }[]`. Option values keep their type: a numeric value
 stays a number, and choosing that option submits the number. An earlier version replaced any non-string

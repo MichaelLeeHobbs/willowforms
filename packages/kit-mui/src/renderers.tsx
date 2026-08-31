@@ -56,7 +56,17 @@ type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
  */
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' && v ? v : fallback)
 const bool = (v: unknown): boolean => v === true
-const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback)
+/*
+ * A finite number, or the fallback.
+ *
+ * `typeof NaN` is `'number'`, and a document can hold one: `JSON.parse('{"a":1e999}')`
+ * gives `Infinity`, and an expression can return either. It reached
+ * `aria-valuenow="NaN"` and an inline width of `NaN%`, which browsers drop --
+ * so an indeterminate progress bar painted itself full and told a screen
+ * reader a number that is not one.
+ */
+const num = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? v : fallback
 
 /**
  * Lengths as CSS strings, not as theme multiples.
@@ -148,10 +158,15 @@ function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps):
        * nowhere else to appear, which is why the kit contract's message
        * obligation applies here like anywhere else.
        */}
+      {/*
+       * `role="group"` and a description, not `aria-invalid`, which is supported
+       * on widget roles and inert on a container of components. The message
+       * below carries `role="alert"`, which is what actually announces it.
+       */}
       <Stack
+        role="group"
         direction="column"
         gap={num(props['gap'], 2)}
-        aria-invalid={error ? true : undefined}
         aria-describedby={messageId}
       >
         {children}
@@ -312,6 +327,15 @@ function SelectNode({
       slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
       onChange={(e) => onChange(optionValue(options, e.target.value))}
     >
+      {/*
+       * The empty choice, which this kit did not draw at all.
+       *
+       * Without it a MUI select could be answered and never unanswered: there
+       * was no option to pick that means "none", so clearing a non-required
+       * field was impossible once anybody had touched it. The HTML kit had one
+       * and hardcoded its English; both now read the authored `placeholder`.
+       */}
+      <MenuItem value="">{str(props['placeholder'], 'Choose…')}</MenuItem>
       {options.map((option, i) => {
         /*
          * `optionEntry` in core, which is `optionValue`'s inverse: the two have
@@ -320,7 +344,7 @@ function SelectNode({
          */
         const { value: v, label } = optionEntry(option, i)
         return (
-          <MenuItem key={v || String(i)} value={v}>
+          <MenuItem key={String(i) + ':' + v} value={v}>
             {label}
           </MenuItem>
         )
@@ -562,7 +586,14 @@ function RadioGroupNode({
         {options.map((option, i) => {
           const { value: v, label } = optionEntry(option, i)
           return (
-            <FormControlLabel key={v || String(i)} value={v} control={<Radio />} label={label} />
+            <FormControlLabel
+              // Position first, so two options sharing a value are still two
+              // keys. React drops one of a duplicated pair without a word.
+              key={String(i) + ':' + v}
+              value={v}
+              control={<Radio />}
+              label={label}
+            />
           )
         })}
         {/* Children are RadioItems, for options that need their own layout. */}
@@ -689,8 +720,25 @@ function FileUploadNode({
         },
       }}
       onChange={(e) => {
-        const input = e.target as unknown as HTMLInputElement
-        const files = Array.from(input.files ?? []).map((file) => file.name)
+        /*
+         * Narrowed, not laundered. `as unknown as HTMLInputElement` asserted a
+         * type nothing had checked -- and this handler is reachable from a
+         * `TextField` that is not a file input, where `files` is undefined and
+         * the assertion would have said otherwise.
+         */
+        const input = e.target
+        if (!(input instanceof HTMLInputElement)) return
+        /*
+         * `maxSize` is honoured here rather than left to a host that may never
+         * look: it was a number in a panel whose own hint admitted it did
+         * nothing. Oversized files are left out and the rest are kept, so one
+         * file being too large does not silently drop the others. Kilobytes,
+         * which is what the label says.
+         */
+        const limit = num(props['maxSize'], 0) * 1024
+        const files = Array.from(input.files ?? [])
+          .filter((file) => limit <= 0 || file.size <= limit)
+          .map((file) => file.name)
         onChange(multiple ? files : (files[0] ?? null))
       }}
     />

@@ -78,7 +78,16 @@ export function addressOf(path: RowPath, name: string): string {
   return prefix === '' ? name : prefix + '.' + name
 }
 
-const SEGMENT = /^([A-Za-z_][A-Za-z0-9_]*)\[(0|[1-9][0-9]*)\]$/
+/*
+ * A coordinate segment: a name, then an index in brackets.
+ *
+ * The index is bounded at fifteen digits. Without a bound, `addresses[1e21]`
+ * cannot be written -- but `addresses[1000000000000000000000]` can, and
+ * `String(Number(...))` gives it back in exponential form, so a coordinate this
+ * decoded no longer re-encoded to itself. Fifteen digits stays inside the
+ * integers a double represents exactly, and a list that long is not a list.
+ */
+const SEGMENT = /^([A-Za-z_][A-Za-z0-9_]*)\[(0|[1-9][0-9]{0,14})\]$/
 
 /**
  * A coordinate read back, or nothing if it is not one.
@@ -243,13 +252,17 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
     return names
   }
 
+  /*
+   * Only the form-level answers. Which keys a given row holds is `rowKeys`'s
+   * question and it is asked per repeater, so a set of every key inside any
+   * repeater was collected here and read by nothing.
+   */
   const formKeys = new Set<string>()
-  const inRepeater = new Set<string>()
 
   const mark = (node: ComponentNode, repeating: boolean, depth: number): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
-    if (node.schema && !isRowScopeNode(node)) {
-      ;(repeating ? inRepeater : formKeys).add(dataKeyOf(node))
+    if (node.schema && !isRowScopeNode(node) && !repeating) {
+      formKeys.add(dataKeyOf(node))
     }
     const deeper = repeating || isRowScopeNode(node)
     for (const child of kids(node)) mark(child, deeper, depth + 1)
@@ -472,9 +485,11 @@ export function decodeAddress(address: string): ParsedAddress | undefined {
  * which keeps a hostile index from minting a sparse array.
  */
 export function applyChange(data: FormData, address: string, value: JsonValue): FormData {
+  // `decodeAddress` refuses a reserved or malformed name on both of its
+  // branches, so the name is already known good here. It used to be checked
+  // twice, which reads as though one of the two might not do it.
   const parsed = decodeAddress(address)
   if (!parsed) return data
-  if (keyProblem(parsed.name)) return data
 
   const place = (holder: FormData, depth: number): FormData | undefined => {
     const frame = parsed.path[depth]

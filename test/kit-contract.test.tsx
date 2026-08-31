@@ -322,10 +322,21 @@ describe('what a data-bound control has to say about itself', () => {
           schema: { type: def.dataType ?? 'string', validations: [] },
         })
         const target = control(element)
-        // Some controls are a group rather than a single input; then the
-        // element carrying the key is the one that has to say it.
+
+        /*
+         * A component with no control of its own cannot carry `aria-invalid` --
+         * it is supported on widget roles and inert on a container, which is
+         * what a `Repeater` is. Both kits set it there anyway and this rule
+         * found it and passed, which is a guard reporting a hole as a fix. Such
+         * a component satisfies the obligation by announcing instead: a message
+         * with `role="alert"`, which is what a screen reader will actually read.
+         */
+        if (!target) {
+          return element.querySelector('[role="alert"]') === null
+        }
+
         return (
-          target?.getAttribute('aria-invalid') !== 'true' &&
+          target.getAttribute('aria-invalid') !== 'true' &&
           element.getAttribute('aria-invalid') !== 'true'
         )
       })

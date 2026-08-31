@@ -430,10 +430,16 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
    * close for a conditional component, so it is the same flag. A person filling
    * in the form still sees no rows until there are some.
    */
-  const rows = rowsOf(valueOf(row?.values ?? data, dataKey))
-  const drawn = revealHidden && rows.length === 0 ? [{}] : rows
+  /*
+   * Computed only for a repeater, which is what asks for it. Every node in the
+   * document used to read its own value out of the data and build a row list
+   * from it, on every render, to answer a question only a row scope asks.
+   */
+  const repeats = isRowScope(node)
+  const rows = repeats ? rowsOf(valueOf(row?.values ?? data, dataKey)) : EMPTY_ROWS
+  const drawn = revealHidden && repeats && rows.length === 0 ? [{}] : rows
 
-  const children = isRowScope(node)
+  const children = repeats
     ? drawn.map((value, index) => (
         <Row
           key={index}
@@ -466,6 +472,9 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
     </NodeBoundary>
   )
 }
+
+/** Shared, so a node that is not a repeater allocates no row list at all. */
+const EMPTY_ROWS: FormData[] = []
 
 export interface FormRendererProps {
   document: FormDocument
@@ -519,6 +528,15 @@ export interface FormRendererProps {
    */
   onError?: (error: Error, key: string) => void
   /**
+   * The CSP nonce for the stylesheet this renders.
+   *
+   * Per-component styling is one `<style>` element, and a host serving
+   * `style-src 'self'` drops it -- with no error, because a blocked style is not
+   * one. The form then renders with every authored style missing and nothing
+   * says why. Pass the same nonce the response header carries.
+   */
+  nonce?: string
+  /**
    * One field changed, reported at an address.
    *
    * Outside a repeater the address is the bare key, which is why this went
@@ -542,6 +560,7 @@ export function FormRenderer({
   device,
   context,
   onError,
+  nonce,
   onChange,
 }: FormRendererProps): ReactNode {
   /*
@@ -591,7 +610,14 @@ export function FormRenderer({
 
   return (
     <Ctx.Provider value={ctx}>
-      {sheet && <style>{sheet}</style>}
+      {/*
+       * `nonce`, because a host with `style-src 'self'` drops this element and
+       * every per-component style with it -- silently, since a blocked style is
+       * not an error anybody sees. There is no default: a nonce this library
+       * invented would not match the header the host sent, and pretending
+       * otherwise is worse than saying nothing.
+       */}
+      {sheet && <style {...(nonce === undefined ? {} : { nonce })}>{sheet}</style>}
       <RenderNode node={document.root} />
     </Ctx.Provider>
   )

@@ -31,18 +31,29 @@ export function jsonToString(value: JsonValue | undefined): string {
  * placeholder, and inventing a value for it would be worse.
  */
 export function optionValue(options: readonly JsonValue[], submitted: string): JsonValue {
-  for (let i = 0; i < options.length; i++) {
-    const option = options[i]
-    const declared =
-      option !== null && typeof option === 'object' && !Array.isArray(option)
-        ? option['value']
-        : undefined
-    if (declared === undefined) {
-      if (String(i) === submitted) return submitted
-      continue
-    }
-    if (jsonToString(declared) === submitted) return declared
+  const declaredOf = (option: JsonValue | undefined): JsonValue | undefined =>
+    option !== null && typeof option === 'object' && !Array.isArray(option)
+      ? option['value']
+      : undefined
+
+  /*
+   * Declared values first, positions second, in two passes rather than one.
+   *
+   * A list mixing the two -- `['Yes', { label: 'No', value: '0' }]` -- has an
+   * option whose declared value is the string `0` and an option whose position
+   * is 0, and a single pass returned whichever came first in the list. An
+   * author who wrote a value meant that value; a position is what an option
+   * falls back to when nobody wrote one.
+   */
+  for (const option of options) {
+    const declared = declaredOf(option)
+    if (declared !== undefined && jsonToString(declared) === submitted) return declared
   }
+
+  for (let i = 0; i < options.length; i++) {
+    if (declaredOf(options[i]) === undefined && String(i) === submitted) return submitted
+  }
+
   return submitted
 }
 
@@ -120,7 +131,15 @@ export function safeHref(value: JsonValue | undefined): string | undefined {
   const parsed = URL.parse ? URL.parse(raw) : null
   if (parsed) return SAFE_SCHEMES.has(parsed.protocol) ? raw : undefined
 
-  // Older runtimes: fall back to matching the scheme directly.
+  /*
+   * Two ways to arrive here, and the comment used to name only the first.
+   *
+   * A runtime with no `URL.parse` -- Node before 22.1, Safari before 18 -- and a
+   * string that names a scheme and does not parse as a URL, which on every
+   * current runtime is the one that actually happens: `https://[` is a scheme
+   * with nothing usable after it. Either way the scheme is what decides, and
+   * anything outside the allowlist is refused rather than guessed at.
+   */
   const scheme = raw.slice(0, raw.indexOf(':') + 1).toLowerCase()
   return SAFE_SCHEMES.has(scheme) ? raw : undefined
 }
@@ -182,6 +201,16 @@ export function valueOf(data: FormData, dataKey: string): JsonValue | undefined 
  * A key containing a dot is unreachable. That is a real limit and it is stated
  * rather than worked around, because an escape syntax is a parser, and a parser
  * is a thing with its own bugs sitting in the middle of a security boundary.
+ *
+ * So is a step through an array. `addresses.0.country` reads nothing, on
+ * purpose: an index in a path is the beginning of an addressing scheme, and this
+ * project already has one -- for rows, in `rows.ts`, where it is checked. A host
+ * that needs an element of a list can put it in the context under a name.
+ *
+ * Both limits look the same from outside: `missingContext` reports an
+ * unreachable path exactly as it reports an absent one, because "the document
+ * asks for something this context does not answer" is one fact from the form's
+ * point of view and both have the same fix -- supply it under a name.
  */
 export function readPath(source: JsonValue | undefined, path: string): JsonValue | undefined {
   if (typeof path !== 'string' || path === '') return undefined

@@ -214,6 +214,14 @@ function nestedUnbounded(source: string): boolean {
  * fails. A pattern that cannot be trusted has not been satisfied, and passing
  * silently is how a constraint stops applying on the server, which is the
  * failure this whole project is organised against.
+ *
+ * Unanchored, like JSON Schema's `pattern` and unlike `<input pattern>`, which
+ * is implicitly wrapped in `^(?:...)$`. That is a trap for an author copying a
+ * pattern out of an HTML tutorial -- `\d{5}` accepts `abc12345` here -- and it
+ * is still the right way round: `pattern` is exported verbatim into JSON
+ * Schema, so anchoring it in the engine would make the form and the schema a
+ * server validates against disagree about the same document, silently. The spec
+ * says so where an author reads it, and `^...$` is two characters to type.
  */
 function matchesPattern(pattern: string, value: string): boolean {
   if (value.length > PATTERN_INPUT_LIMIT) return false
@@ -313,6 +321,13 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       return options.evaluate
         ? Boolean(options.evaluate(when.expression, data, options.context))
         : false
+    /*
+     * A translation key is not a condition, so this reads as "no guard was
+     * expressed" and the rule applies -- the same answer `isVisible` gives the
+     * same kind, where "no condition expressed" means visible. Both directions
+     * are the permissive one: a rule that still runs, and a component that is
+     * still shown.
+     */
     case 'i18n':
       return true
     // No sandbox needed, so a guarded rule works where an expression would not.
@@ -618,8 +633,18 @@ export function submittedData(
      */
     if (isRowScope(node)) {
       const key = dataKeyOf(node)
-      const rows = rowsOf(valueOf(held, key))
+      const stored = valueOf(held, key)
+      const rows = rowsOf(stored)
       const path = scope.row?.path ?? NO_ROWS
+
+      /*
+       * No answer stays no answer. `rowsOf` reads anything that is not a list as
+       * no rows, so a repeater nobody touched -- and one whose value is a string
+       * -- used to leave `key: []` in the payload: an empty list is an answer,
+       * and this function's whole job is to submit only what was asked and
+       * given. A repeater with a real empty list keeps it.
+       */
+      if (!Array.isArray(stored)) return
 
       into[key] = rows.map((row, index) => {
         const inner: EvalOptions = {

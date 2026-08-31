@@ -54,6 +54,9 @@ export {
   setDeclaration,
   styleSheetFor,
 } from './css.js'
+// The options bag `styleSheetFor` takes. Exporting the function and not the
+// shape of its argument leaves a consumer unable to name what it is passing.
+export type { StyleSheetOptions } from './css.js'
 
 export { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
 

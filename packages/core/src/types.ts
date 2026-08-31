@@ -204,6 +204,17 @@ export type FormData = Record<string, JsonValue>
  * kit's business, and no condition can read them. See
  * [12-api.md](../../../docs/spec/12-api.md#state-that-is-not-an-answer).
  */
-export type FormContext = Record<string, JsonValue>
+/*
+ * `Readonly`, which is the only part of the split above a compiler can hold.
+ *
+ * `FormData` and `FormContext` were the identical type, so nothing stopped
+ * `validateForm(root, context, { context: data })` -- the two swapped, the form
+ * validated against the host's own facts, and the answers treated as context.
+ * Readonly makes the direction that matters a type error: a context cannot be
+ * handed to something that wants data. The other direction stays legal, because
+ * a host that hands its data over as context is doing something odd but not
+ * dangerous, and a nominal brand would make every host cast an object literal.
+ */
+export type FormContext = Readonly<Record<string, JsonValue>>
 /** Runtime validation errors, keyed by component key. */
 export type FormErrors = Record<string, string>

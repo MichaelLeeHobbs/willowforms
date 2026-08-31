@@ -13,7 +13,13 @@
 
 import { dataKeyOf, walk } from './tree.js'
 import { isRowScope } from './validation.js'
-import type { ComponentNode, FieldSchema, FormDocument, ValidationRule } from './types.js'
+import type {
+  ComponentNode,
+  FieldSchema,
+  FormDocument,
+  PropValue,
+  ValidationRule,
+} from './types.js'
 
 export interface JsonSchemaProperty {
   type?: string
@@ -95,6 +101,21 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
    * and constraints are discarded. Reported rather than resolved: which of two
    * authored schemas is the real one is not a question this can answer.
    */
+  /*
+   * Two format rules on one field collapse the same way, one level down.
+   * `email`, `url` and `uuid` each write `format`, and a property has one, so a
+   * field carrying two of them exported only the last -- silently, while the
+   * dialog called the export lossless. Which of two formats an answer really
+   * has is not a question this can answer either.
+   */
+  const FORMAT_RULES = new Set(['email', 'url', 'uuid'])
+  walk(document.root, (node) => {
+    const formats = (node.schema?.validations ?? []).filter((rule) => FORMAT_RULES.has(rule.key))
+    for (const rule of formats.slice(0, -1)) {
+      lossy.push({ key: node.key, rule: rule.key })
+    }
+  })
+
   const claimed = new Set<string>()
   walk(document.root, (node) => {
     if (!node.schema) return
@@ -172,7 +193,18 @@ function applyRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSche
 
 /** A component's static `label`, if it has one, for the property title. */
 function titleOf(node: ComponentNode): string | undefined {
-  const label = node.props['label'] ?? node.props['text']
+  /*
+   * Guarded, because `props` can be anything. `validateDocument` reports a
+   * malformed `props` and reporting is not refusing: a host that exports a
+   * schema from a document it never gated, or gated and chose to keep, reached
+   * here and threw on `undefined['label']` -- in the JSON dialog, which is the
+   * one place somebody is looking at a broken document on purpose.
+   */
+  const props: unknown = node.props
+  if (!props || typeof props !== 'object' || Array.isArray(props)) return undefined
+
+  const held = props as Record<string, PropValue | undefined>
+  const label = held['label'] ?? held['text']
   if (label?.kind === 'static' && typeof label.value === 'string' && label.value) return label.value
   return undefined
 }
@@ -259,7 +291,16 @@ function objectFor(root: ComponentNode): {
     for (const child of node.children ?? []) visit(child)
   }
 
-  for (const child of root.children ?? []) visit(child)
+  /*
+   * Either the root is itself a field -- `validateForm(stepNode, data)` hands
+   * this a subtree, and that subtree can carry a schema -- or it is a container
+   * whose children are the fields. Visiting the root and then its children
+   * walked every child twice, once directly and once through the root, which
+   * doubled the work and made the "two components claim one answer" check below
+   * report a node as colliding with itself.
+   */
   if (root.schema && !isRowScope(root)) visit(root)
+  else for (const child of root.children ?? []) visit(child)
+
   return { properties, required }
 }

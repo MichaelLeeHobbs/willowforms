@@ -114,7 +114,19 @@ describe('styleSheetFor', () => {
     // Keys are author-controlled, so one holding a quote must not end the
     // attribute selector and start a different one.
     const sheet = styleSheetFor(root([node('a"] , body [x="', { any: 'color: red' })]))
-    expect(sheet).toBe('[data-fs-key="a\\000022] , body [x=\\000022"]{color: red}')
+    expect(sheet).toBe('[data-fs-key="a\\000022 ] , body [x=\\000022 "]{color: red}')
+  })
+
+  it('terminates an escape so it cannot eat the character after it', () => {
+    /*
+     * A CSS parser reads at most six hex digits and then swallows one following
+     * whitespace as the terminator. With no space of ours it ate the author's:
+     * a key of `" b` produced an escape immediately followed by the real space,
+     * which parses as `"b` -- a selector naming a string no element carries, so
+     * the component's styling silently applied to nothing.
+     */
+    const sheet = styleSheetFor(root([node('" b', { any: 'color: red' })]))
+    expect(sheet).toBe('[data-fs-key="\\000022  b"]{color: red}')
   })
 
   it('escapes a key that would otherwise break out of the style element', () => {

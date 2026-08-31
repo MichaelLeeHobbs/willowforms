@@ -213,6 +213,19 @@ describe.each(
     expect(on('--fsh-text', '--fsh-surface')).toBeGreaterThanOrEqual(AA_TEXT)
   })
 
+  it('the state colours on an alert are distinguishable from the surface', () => {
+    /*
+     * The success and warning stripes were hex literals sitting beside their
+     * rules, so they were outside the token swap -- the same colour in both
+     * themes -- and outside this suite, which reads tokens. A 4px stripe is the
+     * only thing distinguishing one alert from another, which makes it a user
+     * interface component: 3:1.
+     */
+    expect(on('--fsh-success', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
+    expect(on('--fsh-warning', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
+    expect(on('--fsh-danger', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
+  })
+
   it('helper text clears AA rather than fading into the surface', () => {
     expect(on('--fsh-muted', '--fsh-surface')).toBeGreaterThanOrEqual(AA_TEXT)
     expect(on('--fsh-muted', '--fsh-field')).toBeGreaterThanOrEqual(AA_TEXT)

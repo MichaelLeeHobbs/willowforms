@@ -19,7 +19,7 @@ import type { RowContext } from './rows.js'
 import type { Condition, FormContext, FormData, JsonValue, Operand } from './types.js'
 
 /** Deep equality over JSON, which is the only equality a document can express. */
-function same(a: JsonValue | undefined, b: JsonValue | undefined, depth = 0): boolean {
+export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth = 0): boolean {
   // Beyond the bound, two values are not equal. Refusing to answer would make
   // `ne` true, which shows a component whose rule could not be read.
   if (depth > MAX_DEPTH) return false
@@ -136,7 +136,16 @@ function operand(
  * `'10' > 9` has no answer a form author would predict, so it does not get one.
  */
 function order(a: JsonValue | undefined, b: JsonValue | undefined): number | undefined {
-  if (typeof a === 'number' && typeof b === 'number') return a - b
+  /*
+   * Compared, not subtracted. `Infinity - Infinity` is `NaN`, so every
+   * comparison between two infinities answered false and `gte` on a pair of
+   * equal values hid the component -- and `JsonValue` admits an infinity
+   * because a host can hand one over as a context value.
+   */
+  if (typeof a === 'number' && typeof b === 'number') {
+    if (Number.isNaN(a) || Number.isNaN(b)) return undefined
+    return a < b ? -1 : a > b ? 1 : 0
+  }
   if (typeof a === 'string' && typeof b === 'string') return a < b ? -1 : a > b ? 1 : 0
   return undefined
 }

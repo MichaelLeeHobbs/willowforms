@@ -991,8 +991,20 @@ describe('branches this file used to leave unexecuted', () => {
       expect(submittedData(withRows(), data)).toEqual({ addresses: [{ line1: 'kept' }], email: '' })
     })
 
-    it('reads a repeater whose stored value is not a list as no rows', () => {
-      expect(submittedData(withRows(), { addresses: 'nonsense', email: '' })).toEqual({
+    it('reads a repeater whose stored value is not a list as no answer at all', () => {
+      /*
+       * Not `addresses: []`, which is what this used to expect. An empty list is
+       * an answer -- "I have no addresses" -- and inventing one for a value the
+       * form never collected is the thing `submittedData` exists to stop: it
+       * submits what was asked and given, and nothing else.
+       */
+      const out = submittedData(withRows(), { addresses: 'nonsense', email: '' })
+      expect(out).toEqual({ email: '' })
+      expect(Object.hasOwn(out, 'addresses')).toBe(false)
+    })
+
+    it('keeps a real empty list, which is an answer somebody gave', () => {
+      expect(submittedData(withRows(), { addresses: [], email: '' })).toEqual({
         addresses: [],
         email: '',
       })

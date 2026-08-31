@@ -81,6 +81,12 @@ correct. Neither the type checker nor the suite had an opinion, because nothing 
 
 **Status: built.**
 
+- A **`pattern` is unanchored**, like JSON Schema's and unlike `<input pattern>`, which browsers wrap in
+  `^(?:...)$` for you. So `\d{5}` accepts `abc12345`, and an author copying a pattern out of an HTML
+  tutorial gets a weaker rule than the one they copied. It stays this way round because `pattern` is
+  exported verbatim into JSON Schema: anchoring it in the engine would make the form and the schema a
+  server validates the same submission against disagree, and that disagreement is silent. Write `^` and
+  `$` yourself.
 - A **`pattern` that will not compile** matches nothing instead of throwing. The expression is authored
   one character at a time, so it is a syntax error for most of the time it is being typed. An uncaught
   throw here took Preview down in the browser and reached the server as an unhandled 500.

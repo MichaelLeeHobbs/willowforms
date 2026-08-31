@@ -17,6 +17,7 @@
  * for, and the host decides what to do about it.
  */
 
+import { same } from './condition.js'
 import { readPath } from './json.js'
 import type {
   ComponentNode,
@@ -27,8 +28,19 @@ import type {
   PropValue,
 } from './types.js'
 
+/**
+ * How deep a condition may nest before a walk here stops reading it.
+ *
+ * The same bound `condition.ts` evaluates under, for the same reason: these
+ * walks run over a document nobody has validated yet, and a hand-written
+ * `{ and: [{ and: [ ... ] }] }` is a stack overflow in a function whose whole
+ * job is to survive malformed input.
+ */
+const MAX_CONDITION_DEPTH = 200
+
 /** Every context path a condition anywhere in this condition reads. */
-function fromCondition(condition: Condition | undefined, out: Set<string>): void {
+function fromCondition(condition: Condition | undefined, out: Set<string>, depth = 0): void {
+  if (depth > MAX_CONDITION_DEPTH) return
   if (!condition || typeof condition !== 'object') return
 
   const operand = (value: Operand | undefined): void => {
@@ -48,9 +60,9 @@ function fromCondition(condition: Condition | undefined, out: Set<string>): void
   operand(shape['value'] as Operand | undefined)
 
   if (Array.isArray(shape['conditions'])) {
-    for (const inner of shape['conditions'] as Condition[]) fromCondition(inner, out)
+    for (const inner of shape['conditions'] as Condition[]) fromCondition(inner, out, depth + 1)
   }
-  fromCondition(shape['condition'] as Condition | undefined, out)
+  fromCondition(shape['condition'] as Condition | undefined, out, depth + 1)
 }
 
 function fromPropValue(value: PropValue | undefined, out: Set<string>): void {
@@ -215,7 +227,13 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
 
   const add = (value: JsonValue | undefined): void => {
     if (value === undefined || seen.length >= MAX_CONTEXT_VALUES) return
-    if (!seen.some((held) => held === value)) seen.push(value)
+    /*
+     * Structural, the same comparison a condition itself uses. With `===` two
+     * literals spelling the same object each counted as a step, so a host asking
+     * for a form's steps got duplicates -- and the reference server runs a full
+     * validation pass per step it is given.
+     */
+    if (!seen.some((held) => same(held, value))) seen.push(value)
   }
 
   const reads = (operand: unknown): boolean =>
@@ -229,8 +247,10 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
       ? (operand as { value: JsonValue }).value
       : undefined
 
-  const visit = (condition: Condition | undefined): void => {
-    if (!condition || typeof condition !== 'object') return
+  const visit = (condition: Condition | undefined, depth = 0): void => {
+    // Bounded like every other walk over a document, because a document is data
+    // and `and: [{ and: [...] }]` can nest as deeply as somebody types.
+    if (!condition || typeof condition !== 'object' || depth > MAX_CONDITION_DEPTH) return
     const shape = condition as Partial<Record<string, unknown>>
 
     // Either side may be the one reading the context.
@@ -242,9 +262,9 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
     }
 
     if (Array.isArray(shape['conditions'])) {
-      for (const inner of shape['conditions'] as Condition[]) visit(inner)
+      for (const inner of shape['conditions'] as Condition[]) visit(inner, depth + 1)
     }
-    visit(shape['condition'] as Condition | undefined)
+    visit(shape['condition'] as Condition | undefined, depth + 1)
   }
 
   /*
