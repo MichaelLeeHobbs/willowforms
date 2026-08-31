@@ -9,7 +9,8 @@
 import { expect, test as base } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
-const STORAGE_KEY = 'formsmith.playground.document'
+/** Where the playground persists its draft. Exported so a test can plant one. */
+export const STORAGE_KEY = 'formsmith.playground.document'
 
 export interface Designer {
   page: Page
@@ -35,6 +36,7 @@ export interface Designer {
 /** Only the parts these tests read. */
 interface FormDocumentShape {
   name: string
+  languages: { code: string; region?: string; name: string }[]
   defaultLanguage: string
   translations: Record<string, Record<string, string>>
   root: { key: string; type: string; children?: NodeShape[] }

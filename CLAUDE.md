@@ -62,7 +62,7 @@ pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
 pnpm build         # tsc --build, then copies designer.css
-pnpm e2e           # playwright, 67 tests in a real browser
+pnpm e2e           # playwright, 68 tests in a real browser
 ```
 
 CI runs exactly these, in that order, plus a check that every package emitted `dist/index.js` and

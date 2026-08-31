@@ -6,7 +6,7 @@
  * architecture's central claim, exercised on one document.
  */
 
-import { expect, test } from './harness.js'
+import { STORAGE_KEY, expect, test } from './harness.js'
 
 test('the dialog opens showing the current document', async ({ designer }) => {
   await designer.page.getByRole('button', { name: 'JSON' }).click()
@@ -82,6 +82,38 @@ test('a duplicate key is caught even though the JSON is well formed', async ({ d
   await designer.page.getByRole('button', { name: 'Apply' }).click()
 
   await expect(designer.page.getByRole('alert')).toContainText('Duplicate key: same')
+})
+
+test('a stored draft that is not a document loads the sample instead', async ({ designer }) => {
+  /*
+   * Valid JSON, invalid document. The playground guarded the parse and nothing
+   * else, so a draft like this one came back out of localStorage as a
+   * `FormDocument` on the strength of a type assertion and took the app down on
+   * first render, with no way out from inside a page that failed to start. The
+   * JSON dialog refuses exactly this input; the path that runs before anyone can
+   * open the dialog did not.
+   *
+   * The init script the fixture uses to clear the key runs first, so this plants
+   * a draft rather than racing one.
+   */
+  await designer.page.addInitScript((key: string) => {
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        version: 1,
+        id: 'broken',
+        name: 'Broken draft',
+        languages: [{ code: 'en', region: 'US', name: 'English' }],
+        defaultLanguage: 'en-US',
+        translations: {},
+        root: 'not a node',
+      }),
+    )
+  }, STORAGE_KEY)
+  await designer.page.reload()
+
+  await expect(designer.page.locator('.fs-toolbar__title')).toHaveText('Contact request')
+  await expect(designer.page.locator('[data-fs-key="email"]')).toBeVisible()
 })
 
 test('a cancelled edit is forgotten', async ({ designer }) => {

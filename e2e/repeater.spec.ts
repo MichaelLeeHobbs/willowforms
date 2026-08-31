@@ -52,7 +52,24 @@ test('a field dropped into a repeater lands in the authored row, once', async ({
   await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'repeater[0]')
 })
 
-test('preview draws a row per answer and keeps them apart', async ({ designer }) => {
+/**
+ * Preview, with a repeater in it and no way to add a row to it.
+ *
+ * This was called "preview draws a row per answer and keeps them apart" and its
+ * only assertion was a count of zero, which a blank page also satisfies. It
+ * could not have been more than that: nothing in the designer can add a row.
+ * No kit renders an add-row control, edit mode swallows keystrokes so the canvas
+ * cannot be filled in, and preview starts with empty data — so a repeater's
+ * subtree is unreachable in the browser, which is `found.md`'s entry on it.
+ *
+ * So this proves the honest thing instead: preview renders the form, renders the
+ * repeater, and draws no rows because there are no answers. The count of zero
+ * now means "the projection produced none" rather than "nothing rendered".
+ * A row per answer is proved in `renderer.test.tsx`, against supplied data.
+ */
+test('preview renders the repeater and draws no rows until there are answers', async ({
+  designer,
+}) => {
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
@@ -73,8 +90,16 @@ test('preview draws a row per answer and keeps them apart', async ({ designer })
 
   await designer.page.getByRole('button', { name: 'Preview' }).click()
 
-  // No rows in the data yet, so a person filling it in sees none.
+  // The form is on screen, and so is the repeater. Without these two the count
+  // below is a count of an empty page.
+  await expect(designer.page.locator('[data-fs-key="email"]')).toBeVisible()
+  await expect(designer.node('repeater')).toBeVisible()
+
+  // No rows in the data yet, so a person filling it in sees none of the subtree.
   await expect(designer.page.locator('[data-fs-key="textField"]')).toHaveCount(0)
+
+  // And the data panel agrees about why: the repeater has no answers.
+  await expect(designer.page.locator('.fs-canvas__data pre').first()).not.toContainText('repeater')
 })
 
 /**

@@ -20,7 +20,16 @@ test('typing a label is one undo step, not one per keystroke', async ({ designer
   await designer.select('message')
   const before = await designer.node('message').locator('label').first().textContent()
 
-  await designer.page.locator('#fs-prop-label').fill('Tell us more')
+  /*
+   * Typed one character at a time, because a run of keystrokes is the thing
+   * under test. This used `fill()`, which sets the whole value in a single
+   * event: the label changed once, so one undo took it back whether or not
+   * anything coalesced, and a build that pushed an entry per character passed.
+   */
+  const label = designer.page.locator('#fs-prop-label')
+  await label.click()
+  await label.press('ControlOrMeta+a')
+  await label.pressSequentially('Tell us more')
   await expect(designer.node('message').locator('label').first()).toHaveText(/Tell us more/)
 
   await designer.undo()
@@ -117,7 +126,16 @@ test('adding a language leaves the document valid', async ({ designer }) => {
   await designer.page.getByRole('button', { name: 'Add language' }).click()
 
   const doc = await designer.document()
-  // Comparing a tag against a bare code used to rewrite this silently.
+  /*
+   * The language landed, under the name that was typed. The only assertion here
+   * was the one below, on a value the sample already ships: the button could
+   * have done nothing at all and this test would have said so approvingly.
+   */
+  expect(doc.languages.map((language) => language.code)).toContain('fr')
+  expect(doc.languages.find((language) => language.code === 'fr')?.name).toBe('French')
+
+  // And it did not become the default. Comparing a tag against a bare code used
+  // to rewrite this silently.
   expect(doc.defaultLanguage).toBe('en-US')
 
   // And the document it produced still passes its own import gate.
