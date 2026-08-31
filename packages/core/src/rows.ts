@@ -106,9 +106,17 @@ export function decodeRow(text: string): RowPath | undefined {
     const match = SEGMENT.exec(part)
     if (!match) return undefined
 
-    const key = match[1] as string
+    /*
+     * Read, not asserted. `match[1] as string` and `Number(match[2])` are true
+     * of this regex today and they are the shape `noUncheckedIndexedAccess`
+     * exists to stop: `Number(undefined)` is `NaN`, and a frame with a `NaN`
+     * index re-encodes as `addresses[NaN]`, an address nothing can resolve.
+     */
+    const key = match[1]
+    const index = match[2]
+    if (key === undefined || index === undefined) return undefined
     if (keyProblem(key)) return undefined
-    frames.push({ key, index: Number(match[2]) })
+    frames.push({ key, index: Number(index) })
   }
   return frames
 }
@@ -172,31 +180,52 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
   /** The answers one row of this repeater holds, not counting the list itself. */
   const rowKeysOf = (repeater: ComponentNode): string[] => {
     const names: string[] = []
-    const gather = (node: ComponentNode, isRepeater: boolean): void => {
-      if (!node || typeof node !== 'object') return
+    const gather = (node: ComponentNode, isRepeater: boolean, depth: number): void => {
+      if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
       if (!isRepeater) {
         if (node.schema) names.push(dataKeyOf(node))
         // Its children are answers in *its* rows, not in this one.
         if (isRowScopeNode(node)) return
       }
-      for (const child of kids(node)) gather(child, false)
+      for (const child of kids(node)) gather(child, false, depth + 1)
     }
-    gather(repeater, true)
+    gather(repeater, true, 0)
     return names
   }
 
   const form: string[] = []
   let row: string[] | undefined
 
-  const visit = (node: ComponentNode, enclosing: ComponentNode | undefined): void => {
-    if (!node || typeof node !== 'object') return
+  /*
+   * Bounded, and the first match.
+   *
+   * The bound is the one `rowScopeProblems` below already carries, and this
+   * function is the one that runs during render -- the Properties panel and the
+   * Style tab both call it in their component bodies, and a `RangeError` thrown
+   * from a React render in React 19 unmounts the whole designer rather than one
+   * panel. `store.ts` gates on `validateDocument`'s cap, so this was a hazard
+   * behind a guard; a walk with no bound of its own is still a walk that only
+   * works because something else remembered.
+   *
+   * The first match, because `findNode`, `findParent` and `pathTo` all take the
+   * first and say why. This took the last -- an unconditional assignment inside
+   * a walk that keeps going -- so with duplicate keys, which `validateDocument`
+   * reports but cannot prevent, the panel offered the row keys of one node
+   * while every other lookup in the session resolved to another.
+   */
+  const visit = (
+    node: ComponentNode,
+    enclosing: ComponentNode | undefined,
+    depth: number,
+  ): void => {
+    if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     if (!enclosing && node.schema) form.push(dataKeyOf(node))
-    if (node.key === nodeKey && enclosing) row = rowKeysOf(enclosing)
+    if (node.key === nodeKey && enclosing && row === undefined) row = rowKeysOf(enclosing)
     // The innermost repeater wins, which is what `scope: 'row'` names.
     const deeper = isRowScopeNode(node) ? node : enclosing
-    for (const child of kids(node)) visit(child, deeper)
+    for (const child of kids(node)) visit(child, deeper, depth + 1)
   }
-  visit(root, undefined)
+  visit(root, undefined, 0)
 
   // Deduplicated, because data keys may legally repeat: two fields behind
   // opposite guards can write one answer, and as names to test they are one.

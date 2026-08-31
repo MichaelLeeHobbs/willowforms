@@ -161,6 +161,29 @@ function baseOf(key: string): string {
 }
 
 /**
+ * The first free key at or after the source's own number.
+ *
+ * `freeKey(taken, baseOf('website2'))` is `'website'` whenever nothing has
+ * taken it -- so in a document where `website` was renamed away and `website2`
+ * remains, duplicating `website2` produced `website`: a copy named *below* its
+ * source, which contradicts the rule the comment above states and reads as the
+ * duplicate having replaced the original.
+ *
+ * A copy is named after its source and never before it.
+ */
+function copyKey(taken: Set<string>, key: string): string {
+  const base = baseOf(key)
+  const digits = /(\d+)$/.exec(key)?.[1]
+  const from = digits === undefined ? 2 : Number(digits) + 1
+
+  if (base === key && !taken.has(base)) return base
+
+  let n = from
+  while (taken.has(base + String(n))) n += 1
+  return base + String(n)
+}
+
+/**
  * A copy of the subtree at `key`, with every key in it replaced by a free one.
  *
  * Keys are unique within a document, so a copy cannot keep the originals. Each
@@ -178,7 +201,14 @@ function baseOf(key: string): string {
  * Property values and rules are shared by reference, not cloned. Tree operations
  * are immutable, so an edit to either copy replaces the value rather than
  * writing through to the other.
+ *
+ * (This block documents `duplicateNode`, which is further down the file: three
+ * JSDoc comments used to stack here and only the last attached to anything, so
+ * neither `duplicateNode` nor `repointBinding` had documentation in an IDE or
+ * in the generated `.d.ts`. It stays here, where the reasoning was written,
+ * with the function's own one-line summary at its declaration.)
  */
+
 /**
  * A binding with every literal naming `from` changed to name `to`.
  *
@@ -270,6 +300,7 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
   return { kind: 'condition', condition: inCondition(value.condition) }
 }
 
+/** A copy of the subtree at `key`, re-keyed. See the block above `repointBinding`. */
 export function duplicateNode(root: ComponentNode, key: string): ComponentNode | undefined {
   const source = findNode(root, key)
   if (!source) return undefined
@@ -277,7 +308,7 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
   const taken = new Set(collectKeys(root))
 
   const copy = (node: ComponentNode): ComponentNode => {
-    const nextKey = freeKey(taken, baseOf(node.key))
+    const nextKey = copyKey(taken, node.key)
     taken.add(nextKey)
 
     const next: ComponentNode = { ...node, key: nextKey, props: { ...node.props } }
@@ -335,9 +366,9 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
   return copy(source)
 }
 
-/** Replace the node matching key, returning a new tree. */
 /**
- * Replace one node, sharing structure with everything that did not change.
+ * Replace the node matching key, returning a new tree, sharing structure with
+ * everything that did not change.
  *
  * The identity checks matter as much as the result. `.map` over the children
  * allocated a new object for every node on every edit, so an untouched sibling
@@ -402,7 +433,17 @@ export function insertNode(
 ): ComponentNode {
   return updateNode(root, parentKey, (parent) => {
     const children = [...(parent.children ?? [])]
-    const at = index ?? children.length
+
+    /*
+     * A clamp that also handles what a clamp cannot.
+     *
+     * `Math.max(0, Math.min(NaN, len))` is `NaN`, and `splice(NaN, …)` coerces
+     * to 0 -- so a caller handing over a computed-but-broken index silently
+     * prepended, while the two `Math` calls read as though every non-number was
+     * covered. An index nobody can place is the end of the list, which is what
+     * an absent index already means.
+     */
+    const at = Number.isFinite(index) ? (index as number) : children.length
     children.splice(Math.max(0, Math.min(at, children.length)), 0, node)
     return { ...parent, children }
   })
@@ -873,8 +914,21 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       }
 
       visitEvents(value['events'], key, path)
-      visitShape(value, key, path)
     }
+
+    /*
+     * Outside the key chain, because a bad key is not a reason to stop looking.
+     *
+     * These two used to sit inside the final `else`, so a node with an empty or
+     * non-string key had its props, conditions, css and rules go unchecked
+     * entirely: fixing the key produced a *second* round of errors about a
+     * document the first report had called broken for one reason. The children
+     * recursion was already outside for the same reason.
+     *
+     * `key` is what the messages name, so a node without a usable one is
+     * described by its path instead.
+     */
+    visitShape(value, typeof key === 'string' && key.trim() ? key : path, path)
 
     const children = value['children']
     if (children === undefined) return
@@ -959,8 +1013,22 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
         case 'i18n':
           text(value['key'], what + "'s key")
           return
-        default:
+        case 'condition':
           condition(value['condition'], what + "'s condition")
+          return
+        /*
+         * Named rather than left to `default`, which is not tidiness.
+         *
+         * The `Covers` assertion below forces a fifth `PropValue['kind']` into
+         * `BINDING_KIND_LIST` the day one is added -- so it would pass `oneOf`
+         * above and land here, and a `default` that reads a condition would
+         * validate the new binding as one. Falling through to nothing is the
+         * honest answer for a tag this version does not know: the tag itself is
+         * already accepted by `oneOf`, so saying nothing more is saying "this
+         * gate has no opinion", not "this is fine".
+         */
+        default:
+          return
       }
     }
 
@@ -1263,7 +1331,16 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
 
   if (tags.some((tag) => tag === undefined)) malformed('every language needs a string code.')
 
-  if (!tags.includes(candidate['defaultLanguage'] as string)) {
+  /*
+   * The tags that are tags. A language that is not a record, or whose `code` is
+   * not a string, pushes `undefined` into this list -- and a document with no
+   * `defaultLanguage` at all then matched it, so `languages: [{}]` reported the
+   * language link as sound. The document is malformed for a different reason,
+   * but a caller filtering by `code` was told the wrong thing.
+   */
+  const named = tags.filter((tag): tag is string => tag !== undefined)
+
+  if (!named.includes(candidate['defaultLanguage'] as string)) {
     errors.push({
       code: 'unknown-language',
       message: 'defaultLanguage ' + String(candidate['defaultLanguage']) + ' is not in languages.',

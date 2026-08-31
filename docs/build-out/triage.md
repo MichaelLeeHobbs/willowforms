@@ -468,3 +468,27 @@ added and removed, the re-addressing that follows, and the row coordinate surviv
 component's fallback. The identity half, `rowFromEventTarget` and `keyFromEventTarget`, is now tested
 directly in `geometry.test.ts`, which needs no layout engine. What is left needs an add-row control to
 exist, and that is a feature rather than a test.
+
+## Three findings in `rows.ts` left as they are — area 2
+
+**LOW, and each is a real observation with a fix worse than the gap.**
+
+`encodeRow` interpolates a frame's key with no grammar check (`rows.ts:66`), so a data key holding `.`,
+`[` or `]` produces an address `decodeAddress` refuses and `applyChange` drops silently. The key grammar
+excludes those characters, `validateDocument` reports one that does not, and the panel refuses one on the
+way in -- so reaching this needs a document that was never gated. What a check here could do is nothing
+useful: the function returns a string and has no channel to report on, so it would either throw from the
+render path or return an address that is wrong in a different way. The place to hold this is the gate,
+which already does.
+
+`mark` excludes a repeater's own data key from `formKeys` while `keyScopesFor` includes it in `form`
+(`rows.ts:264` against `:192`), so a row-scoped ref naming a top-level repeater's data key is not
+reported even though the panel lists that name under `form`. The direction is conservative -- a false
+negative in a reporting function -- and aligning the two means deciding whether a repeater's list is an
+answer at form scope, which is a design question rather than a defect.
+
+The three condition-scanning blocks at `:272-307`, `:316-339` and `:355-380` are near-identical, and two
+of them share a guard, so `props` and `guards` are built twice per node inside a repeater. Merging them
+is a rewrite of the function that reports row-scope problems, on a document-sized walk that runs at boot
+rather than per keystroke. It is worth doing when that function is next opened for a reason, and not
+worth doing as a refactor with no test that can tell the two versions apart.

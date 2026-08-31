@@ -107,6 +107,24 @@ describe('mutations are immutable', () => {
     expect(findNode(after, 'stack')?.children?.map((c) => c.key)).toEqual(['a', 'b', 'd'])
   })
 
+  it('appends for an index that is not a position at all', () => {
+    /*
+     * `Math.max(0, Math.min(NaN, len))` is `NaN`, and `splice(NaN, ...)`
+     * coerces to 0 -- so a caller handing over a computed-but-broken index
+     * silently *prepended*, while the two `Math` calls read as though every
+     * non-number was covered. An index nobody can place is the end of the
+     * list, which is what an absent index already means.
+     */
+    for (const index of [NaN, Infinity, -Infinity]) {
+      expect(
+        findNode(insertNode(fixture(), 'stack', leaf('d'), index), 'stack')?.children?.map(
+          (c) => c.key,
+        ),
+        String(index),
+      ).toEqual(['a', 'b', 'd'])
+    }
+  })
+
   it('removes a nested node', () => {
     expect(collectKeys(removeNode(fixture(), 'a'))).toEqual(['root', 'stack', 'b', 'c'])
   })
@@ -1612,8 +1630,13 @@ describe('the tree and keys that repeat or are quoted', () => {
     }
 
     const copy = duplicateNode(stepped, 'step1')
-    // `baseOf` strips the trailing digits, so the copy of `step1` is `step`.
-    expect(copy?.key).toBe('step')
+    /*
+     * `step2`, not `step`. The name is taken from the source's own number
+     * upwards, so a copy is never named below the thing it was copied from --
+     * duplicating `step1` used to produce `step` whenever `step` happened to be
+     * free, which reads as the original coming back rather than as a copy.
+     */
+    expect(copy?.key).toBe('step2')
 
     const when = copy?.renderWhen
     const right =
@@ -1938,5 +1961,84 @@ describe('a field whose schema has no validations', () => {
     expect(() => validateForm(doc.root, {})).not.toThrow()
     expect(() => toJsonSchema(doc)).not.toThrow()
     expect(() => duplicateNode(doc.root, 'email')).not.toThrow()
+  })
+})
+
+/**
+ * What a copy is called when the source already carries a number.
+ *
+ * `baseOf` strips the trailing digits and `freeKey` returned the bare base
+ * whenever nothing had taken it -- so in a document where `website` was renamed
+ * away and `website2` remains, duplicating `website2` produced `website`. A
+ * copy named below its source contradicts the rule `duplicateNode`'s own
+ * docstring states, and reads as the original having been restored.
+ */
+describe('naming a copy of a copy', () => {
+  const withKeys = (...keys: string[]): ComponentNode =>
+    container(
+      'root',
+      keys.map((key) => leaf(key)),
+    )
+
+  it('never names a copy below its source', () => {
+    expect(duplicateNode(withKeys('website2'), 'website2')?.key).toBe('website3')
+    expect(duplicateNode(withKeys('step1'), 'step1')?.key).toBe('step2')
+  })
+
+  it('skips the numbers already taken', () => {
+    expect(duplicateNode(withKeys('website2', 'website3'), 'website2')?.key).toBe('website4')
+  })
+
+  it('still numbers a copy of an unnumbered key from two', () => {
+    // The ordinary case, unchanged: `website` copies to `website2`.
+    expect(duplicateNode(withKeys('website'), 'website')?.key).toBe('website2')
+    expect(duplicateNode(withKeys('website', 'website2'), 'website')?.key).toBe('website3')
+  })
+})
+
+/**
+ * A node whose key is unusable is still a node worth reading.
+ *
+ * `visitShape` and `visitEvents` sat inside the final `else` of the key chain,
+ * so a component with an empty or non-string key had its props, conditions,
+ * css and rules go unchecked. Fixing the key then produced a second round of
+ * errors about a document the first report had already called broken -- and a
+ * host gating on `validateDocument` sees one problem at a time.
+ */
+describe('validateDocument and a node with no usable key', () => {
+  const broken = (key: unknown): FormDocument => ({
+    ...createDocument('Broken', 'broken'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key, type: 'Field', props: { label: { kind: 'conditon' } } } as never],
+    },
+  })
+
+  it.each([
+    ['an empty key', ''],
+    ['a key that is not text', 42],
+  ])('reports the misspelled binding as well as %s', (_what, key) => {
+    const codes = validateDocument(broken(key)).map((problem) => problem.code)
+
+    // Both, in one pass. The key problem was the only one reported.
+    expect(codes.length).toBeGreaterThan(1)
+    expect(codes.some((code) => code === 'malformed')).toBe(true)
+  })
+
+  it('still reports nothing for a node that is fine', () => {
+    // The control: reading the shape of every node must not invent problems.
+    const fine: FormDocument = {
+      ...createDocument('Fine', 'fine'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'email', type: 'Field', props: { label: prop('Email') } }],
+      },
+    }
+
+    expect(validateDocument(fine)).toEqual([])
   })
 })
