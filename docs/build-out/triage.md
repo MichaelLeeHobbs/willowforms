@@ -492,3 +492,20 @@ of them share a guard, so `props` and `guards` are built twice per node inside a
 is a rewrite of the function that reports row-scope problems, on a document-sized walk that runs at boot
 rather than per keystroke. It is worth doing when that function is next opened for a reason, and not
 worth doing as a refactor with no test that can tell the two versions apart.
+
+## Two findings in core's evaluation left as they are — area 3
+
+**NOTE, and one of them is a suggestion worth refusing.**
+
+`and` and `or` evaluate every branch before inspecting any result, so neither short-circuits
+(`condition.ts:280`). That is load-bearing rather than an oversight: an unreadable branch anywhere makes
+the whole condition unreadable, and short-circuiting would skip it -- `or(true, <broken>)` would answer
+`true` and _show_ a component whose rule nobody can read, which is the permissive direction this module
+is organised against. The cost is walking branches whose answer cannot change the result, on a structure
+an author nests by hand in a 288px panel. The reasoning is now a comment at the site.
+
+The same six-line "props, if props is a non-array object" guard is written out three times in `context.ts`
+and twice in `rows.ts`. Extracting it means a shared narrowing helper crossing five call sites in two
+modules, each of which reads slightly differently -- one wants the record, one wants to skip, one wants to
+continue a loop -- and no test can tell the extracted version from the copies. Worth doing when one of
+those functions is next opened for a reason.

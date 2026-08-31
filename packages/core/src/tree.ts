@@ -27,11 +27,25 @@ export function walk(
   node: ComponentNode,
   fn: (node: ComponentNode, parent?: ComponentNode) => void,
 ): void {
-  const visit = (n: ComponentNode, parent?: ComponentNode): void => {
+  /*
+   * Total and bounded, because a document is data and this is the walk every
+   * other module borrows.
+   *
+   * `for (const child of n.children ?? [])` throws "is not iterable" for a
+   * `children` that is an object or a string, and recurses without a bound for
+   * one nested past the stack -- and `styleSheetFor` walks with this on the
+   * render path, where the renderer hardened its own layer for exactly that
+   * ("one node missing `props` used to take the whole form with it") and this
+   * one was left. A node that is not a node contributes nothing; a subtree past
+   * the bound contributes nothing. Both are what `validateDocument` reports.
+   */
+  const visit = (n: ComponentNode, parent: ComponentNode | undefined, depth: number): void => {
+    if (!n || typeof n !== 'object' || depth > MAX_TREE_DEPTH) return
     fn(n, parent)
-    for (const child of n.children ?? []) visit(child, n)
+    if (!Array.isArray(n.children)) return
+    for (const child of n.children) visit(child, n, depth + 1)
   }
-  visit(node)
+  visit(node, undefined, 0)
 }
 
 /*

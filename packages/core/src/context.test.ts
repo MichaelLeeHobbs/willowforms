@@ -609,3 +609,51 @@ describe('contextValues and a document that asks for too much', () => {
     expect(contextValues(many(40), 'step')).toHaveLength(40)
   })
 })
+
+/**
+ * A node that needs an evaluator and has no key to be named by.
+ *
+ * `evaluatorKeys` computed "this node holds an expression" and then discarded
+ * it when the key was not a string -- so a document with `"key": 42` and a
+ * computed `renderWhen` answered "no expressions here", a host wired no
+ * evaluator, and every such node read as hidden. What this function is asked is
+ * whether a sandbox is needed; that does not depend on the key being readable.
+ */
+describe('evaluatorKeys on a node with no usable key', () => {
+  const withExpression = (key: unknown): ComponentNode =>
+    ({
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        { key, type: 'Field', props: {}, renderWhen: { kind: 'computed', expression: 'x' } },
+      ],
+    }) as ComponentNode
+
+  it.each([
+    ['a number', 42],
+    ['missing', undefined],
+    ['an object', {}],
+  ])('still reports that an evaluator is needed for a key that is %s', (_what, key) => {
+    expect(evaluatorKeys(withExpression(key))).toHaveLength(1)
+  })
+
+  it('names the node when it can', () => {
+    // The control: the key is what a host goes and looks at, so it is still the
+    // answer wherever there is one.
+    expect(evaluatorKeys(withExpression('vat'))).toEqual(['vat'])
+  })
+
+  it('still reports nothing for a document with no expressions', () => {
+    // The other control. Reporting every node would make the boot-time check
+    // demand a sandbox for a form that needs none.
+    const plain: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'vat', type: 'Field', props: {} }],
+    }
+
+    expect(evaluatorKeys(plain)).toEqual([])
+  })
+})

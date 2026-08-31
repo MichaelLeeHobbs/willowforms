@@ -356,3 +356,61 @@ describe('an evaluator that throws', () => {
     expect(isVisible(computed(), {}, { evaluate })).toBe(true)
   })
 })
+
+/**
+ * A computed condition on a field inside a repeater.
+ *
+ * `runs` handed the top-level data to the evaluator, so an expression reading a
+ * per-row answer read the (usually absent) form-level key instead, came back
+ * falsy, and hid that field in every row -- taking it out of `validateForm`
+ * with it, which is a required answer quietly becoming optional. The
+ * `condition` branch beside it has always passed the row.
+ */
+describe('a computed renderWhen inside a row', () => {
+  const evaluate: Evaluator = (expression, data) => data[expression] === 'yes'
+
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          {
+            key: 'reason',
+            dataKey: 'why',
+            type: 'Field',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'required' }] },
+            renderWhen: { kind: 'computed', expression: 'other' },
+          },
+        ],
+      },
+    ],
+  }
+
+  it('reads the row it is drawn in', () => {
+    // Row 0 says yes and row 1 does not, so exactly one row asks the question.
+    const data = { addresses: [{ other: 'yes' }, { other: 'no' }] }
+
+    expect(validateForm(root, data, { evaluate })).toEqual({
+      'addresses[0].reason': 'This field is required.',
+    })
+  })
+
+  it('still reads a form-level answer the row does not shadow', () => {
+    // The other half of the same scoping rule the `custom` rule follows: the
+    // row's answers first, the form's underneath.
+    const data = { other: 'yes', addresses: [{}, {}] }
+
+    expect(Object.keys(validateForm(root, data, { evaluate }))).toEqual([
+      'addresses[0].reason',
+      'addresses[1].reason',
+    ])
+  })
+})

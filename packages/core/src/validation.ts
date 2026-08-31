@@ -15,7 +15,7 @@ import { evaluateCondition } from './condition.js'
 import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
-import { dataKeyOf, flatten, validationsOf } from './tree.js'
+import { MAX_TREE_DEPTH, dataKeyOf, flatten, validationsOf } from './tree.js'
 import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -83,7 +83,12 @@ export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
  * the code cannot apply has not been satisfied, and a submit that goes through
  * because a tag was mistyped is the silent permissive failure this project is
  * organised against. Wrong and loud beats wrong and quiet.
+ *
+ * (That paragraph is about `UNREADABLE_RULE`, above. It used to sit in a block
+ * of its own, stacked on this one, so it documented a comment rather than a
+ * declaration and no editor ever showed it.)
  */
+
 /**
  * How many rows of one repeater will be validated.
  *
@@ -131,6 +136,7 @@ const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
  * server. An unfinished pattern matches nothing, which is the same answer the
  * rule would give once the author closes the bracket.
  */
+
 /**
  * The longest answer a pattern is ever run against.
  *
@@ -285,6 +291,7 @@ function nestedUnbounded(source: string): boolean {
  * server validates against disagree about the same document, silently. The spec
  * says so where an author reads it, and `^...$` is two characters to type.
  */
+
 /**
  * Why this pattern will not be run, or nothing if it will.
  *
@@ -378,7 +385,12 @@ function asNumber(value: JsonValue | undefined): number {
  * A number field's value legitimately arrives as a string from an `<input>`, so
  * this coerces; what it will not do is treat "cannot be compared" as "compares
  * fine".
+ *
+ * (That paragraph is about `comparableNumber`, further down. It used to sit
+ * stacked on this block, so it documented a comment and `isUrl` appeared to
+ * carry it.)
  */
+
 /**
  * A URL a `url` rule should accept: parseable, and a scheme this project allows.
  *
@@ -603,9 +615,8 @@ export function validateField(
   return undefined
 }
 
-/** Validate every data-bound node in the tree. Empty object means the form is valid. */
 /**
- * Validate every visible field.
+ * Validate every visible field. An empty object means the form is valid.
  *
  * Hidden components are skipped, and so is everything beneath them: hiding a
  * container hides its children, and a required field the user cannot see must
@@ -671,7 +682,16 @@ export function validateForm(
        * not one.
        */
       if (all.length > MAX_ROWS) {
-        errors[addressOf(path, node.key)] = TOO_MANY_ROWS
+        /*
+         * Reported without overwriting the repeater's own failure.
+         *
+         * The rules on the repeater itself are checked a few lines up and write
+         * to this same address, so a list that is both `required` and over the
+         * cap reported only the cap -- losing the message a person can act on
+         * for one about the size of a body they did not choose.
+         */
+        const at = addressOf(path, node.key)
+        if (!Object.hasOwn(errors, at)) errors[at] = TOO_MANY_ROWS
         return
       }
 
@@ -771,7 +791,17 @@ export function submittedData(
    * key on a plain object, and a host does not receive something surprising
    * back from a function it will hand straight to `JSON.stringify`.
    */
-  const collect = (node: ComponentNode, scope: EvalOptions, into: FormData): void => {
+  const collect = (node: ComponentNode, scope: EvalOptions, into: FormData, depth = 0): void => {
+    /*
+     * The same bounds `validateForm` carries, because this is exported
+     * separately and its docblock offers it as the submit-time projection.
+     *
+     * A host that projects before it validates -- which the signature invites,
+     * since neither function needs the other -- did unbounded work on a body
+     * somebody else chose the size of. The row cap and the tree bound are the
+     * two `validateForm` already refuses on.
+     */
+    if (depth > MAX_TREE_DEPTH) return
     if (!isVisible(node, data, scope)) return
 
     const held = scope.row?.values ?? data
@@ -797,13 +827,17 @@ export function submittedData(
        */
       if (!Array.isArray(stored)) return
 
+      // Over the cap, the list is not projected at all -- the same answer
+      // `validateForm` gives, and for the same reason.
+      if (rows.length > MAX_ROWS) return
+
       into[key] = rows.map((row, index) => {
         const inner: EvalOptions = {
           ...scope,
           row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
         const kept: FormData = Object.create(null) as FormData
-        for (const child of node.children ?? []) collect(child, inner, kept)
+        for (const child of node.children ?? []) collect(child, inner, kept, depth + 1)
         return { ...kept }
       })
       return
@@ -814,7 +848,7 @@ export function submittedData(
       const value = valueOf(held, key)
       if (value !== undefined) into[key] = value
     }
-    for (const child of node.children ?? []) collect(child, scope, into)
+    for (const child of node.children ?? []) collect(child, scope, into, depth + 1)
   }
 
   const kept: FormData = Object.create(null) as FormData

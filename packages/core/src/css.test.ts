@@ -574,3 +574,53 @@ describe('setDeclaration and the order of a block', () => {
     )
   })
 })
+
+/**
+ * A stylesheet built from a document nobody gated.
+ *
+ * `styleSheetFor` walks the tree with `walk`, which was neither total nor
+ * bounded: a `children` that is an object threw "is not iterable", and a tree
+ * nested past the stack threw `RangeError`. The renderer hardened its own layer
+ * for exactly this -- "one node missing `props` used to take the whole form
+ * with it" -- and this path, which also runs during render, was left.
+ */
+describe('styleSheetFor on a malformed tree', () => {
+  it.each([
+    ['an object', { nope: true }],
+    ['a string', 'children'],
+    ['a number', 7],
+  ])('answers rather than throwing for children that are %s', (_what, children) => {
+    const broken = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      css: { any: 'color: red' },
+      children,
+    } as never
+
+    expect(() => styleSheetFor(broken)).not.toThrow()
+    // And it still emits what it could read, which is the root's own rule.
+    expect(styleSheetFor(broken)).toContain('color: red')
+  })
+
+  it('answers rather than overflowing on a tree nested past any bound', () => {
+    let deep: ComponentNode = { key: 'leaf', type: 'Field', props: {}, css: { any: 'color: red' } }
+    for (let i = 0; i < 5000; i += 1) {
+      deep = { key: 'stack' + String(i), type: 'Stack', props: {}, children: [deep] }
+    }
+
+    expect(() => styleSheetFor(deep)).not.toThrow()
+  })
+
+  it('still emits a rule for a node a person would author', () => {
+    // The control: a walk that gave up on everything would pass all four above.
+    const fine: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'card', type: 'Box', props: {}, css: { any: 'padding: 8px' } }],
+    }
+
+    expect(styleSheetFor(fine)).toContain('padding: 8px')
+  })
+})

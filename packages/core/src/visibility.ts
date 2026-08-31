@@ -38,7 +38,19 @@ function runs(
   options: EvalOptions,
 ): boolean {
   try {
-    return Boolean(evaluate(expression, data, options.context))
+    /*
+     * The row's answers first, the form's underneath, exactly as the `custom`
+     * rule scopes its own expression.
+     *
+     * A `computed` `renderWhen` on a field inside a repeater was evaluated
+     * against the top-level data, so an expression reading a per-row answer
+     * read the (usually absent) form-level key instead, came back falsy, and
+     * hid that field in *every* row -- taking it out of `validateForm` with it,
+     * which is a required answer quietly becoming optional. The `condition`
+     * case one branch down has always passed `options.row`.
+     */
+    const scoped = options.row ? { ...data, ...options.row.values } : data
+    return Boolean(evaluate(expression, scoped, options.context))
   } catch {
     return false
   }
