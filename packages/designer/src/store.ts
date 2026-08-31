@@ -222,6 +222,21 @@ function containerFor(root: ComponentNode, key: string | undefined): string {
  * documents would have been simpler and would have put the same cost on every
  * keystroke.
  */
+/**
+ * How a visibility rule is *shaped*, for the undo label.
+ *
+ * The operator and how many clauses hang off it. Two edits that leave both alone
+ * are somebody typing; one that changes either is a different decision, and the
+ * two must not share a history entry.
+ */
+function conditionShape(value: PropValue | undefined): string {
+  if (!value || value.kind !== 'condition') return ''
+  const condition = value.condition as { op?: unknown; conditions?: unknown } | undefined
+  const op = typeof condition?.op === 'string' ? condition.op : '?'
+  const count = Array.isArray(condition?.conditions) ? condition.conditions.length : 0
+  return op + ':' + String(count)
+}
+
 function writeNode(
   doc: FormDocument,
   key: string,
@@ -407,7 +422,26 @@ export function useDesigner(initial: FormDocument): DesignerApi {
          * coalesces. Adding or removing one changes it, which is what starts a
          * new entry.
          */
-        'schema:' + key + ':' + (schema?.validations ?? []).map((rule) => rule.key).join(','),
+        /*
+         * The data type and the auto-validate flag are part of the label too.
+         *
+         * Item 13 put the rule *keys* in it, so adding or removing a rule breaks
+         * the run. Changing the field's type -- string to number, which rewrites
+         * what every rule means -- and toggling "Validate while typing" still
+         * folded into whatever typing came before them, so one undo took a
+         * structural change and an unrelated edit together.
+         *
+         * A label names what makes an edit a continuation. Typing a rule's
+         * value is one; changing the shape of the field is not.
+         */
+        'schema:' +
+          key +
+          ':' +
+          String(schema?.type) +
+          ':' +
+          String(schema?.autoValidate) +
+          ':' +
+          (schema?.validations ?? []).map((rule) => rule.key).join(','),
       )
     },
     [apply],
@@ -606,7 +640,19 @@ export function useDesigner(initial: FormDocument): DesignerApi {
          * A label has to name what makes an edit a continuation. Same kind is a
          * continuation; a different kind is a new decision.
          */
-        'renderWhen:' + key + ':' + (value?.kind ?? 'none'),
+        /*
+         * The shape of the condition too, not only its kind.
+         *
+         * Item 13 put the kind in the label, so switching to "Always" no longer
+         * destroys a condition. Within one kind the run still coalesced
+         * everything, so removing a clause from a group folded into the typing
+         * that preceded it -- and one undo took the clause and the text back
+         * together, which is the same defect one level down.
+         *
+         * The operator and the clause count are what change structurally; a
+         * literal being typed does not move either.
+         */
+        'renderWhen:' + key + ':' + (value?.kind ?? 'none') + ':' + conditionShape(value),
       )
     },
     [apply],

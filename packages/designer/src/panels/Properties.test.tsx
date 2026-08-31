@@ -1864,3 +1864,59 @@ describe('a data key that breaks the key grammar', () => {
     expect(latest()?.dataKey).toBeUndefined()
   })
 })
+
+/**
+ * Editing on the canvas, and what the panel does around it.
+ */
+describe('the Rules tab and a pattern nobody can run', () => {
+  const withPattern = (): ComponentNode => ({
+    key: 'field',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'pattern', value: '' }] },
+  })
+
+  it('says so under the field, where it can still be fixed', async () => {
+    /*
+     * The engine refuses a pattern with an unbounded repeat inside another, and
+     * refusing means the rule *fails* -- so an author who typed one saw an
+     * ordinary rule here and every answer rejected on the server.
+     */
+    const { user, select } = setup(withPattern())
+    await select()
+    await user.click(screen.getByRole('tab', { name: 'Rules' }))
+
+    /*
+     * By id suffix, not by label text. The row's label is the rule's own hint,
+     * which differs per rule key, and a loose pattern matches the `<label>`
+     * element as well as the input it names.
+     */
+    const field = document.querySelector('input[id$="-value"]')
+    if (!(field instanceof HTMLInputElement)) throw new Error('no pattern field')
+    await user.clear(field)
+    await user.type(field, '(a+)+$')
+
+    expect(screen.getByRole('alert').textContent).toMatch(/unbounded repeat/i)
+  })
+
+  it('says nothing about a pattern the engine will run', async () => {
+    // The control, and it includes a half-typed one: an error under the field
+    // before the first character is finished would be worse than none.
+    const { user, select } = setup(withPattern())
+    await select()
+    await user.click(screen.getByRole('tab', { name: 'Rules' }))
+
+    /*
+     * By id suffix, not by label text. The row's label is the rule's own hint,
+     * which differs per rule key, and a loose pattern matches the `<label>`
+     * element as well as the input it names.
+     */
+    const field = document.querySelector('input[id$="-value"]')
+    if (!(field instanceof HTMLInputElement)) throw new Error('no pattern field')
+    await user.clear(field)
+    // No brackets or braces: `userEvent.type` reads those as its own key syntax.
+    await user.type(field, '^abc')
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})

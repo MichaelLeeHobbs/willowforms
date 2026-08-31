@@ -8,6 +8,7 @@ import {
   UNREADABLE_RULE,
   applyRule,
   autoValidateKeys,
+  patternProblem,
   submittedData,
   validateAcross,
   validateField,
@@ -1541,5 +1542,49 @@ describe('rules that a document can malform or misplace', () => {
     expect(
       validateForm(root, { country: 'GB', addresses: [{ line1: 'a' }] }, { evaluate }),
     ).toEqual({})
+  })
+})
+
+/**
+ * The reason a pattern will not be run, said once.
+ *
+ * A refused pattern makes the rule *fail*, so an author who typed one saw a
+ * perfectly ordinary rule in the panel and every answer rejected on the server.
+ * `patternProblem` is what the Rules tab shows while it can still be fixed, and
+ * it is the same function `matchesPattern` decides with -- two sentences about
+ * one rule is how the two come to disagree.
+ */
+describe('patternProblem', () => {
+  it.each([
+    ['(a+)+$', 'an unbounded repeat inside another'],
+    ['(a+){10}b', 'and a bounded one wrapping an unbounded one'],
+    ['(', 'a pattern that does not compile'],
+    ['[a-', 'an unterminated class'],
+  ])('reports %s — %s', (pattern) => {
+    expect(patternProblem(pattern)).toBeDefined()
+  })
+
+  it.each(['^\\d{5}$', '(\\d{3}-){4}x', '(\\d{1,3}\\.){3}\\d{1,3}', '', '^[A-Z]{2}$'])(
+    'says nothing about %s',
+    (pattern) => {
+      // The controls, including the empty one: it compiles, it matches
+      // everything, and it is what a half-typed rule looks like. Reporting it
+      // would put an error under the field before the first character.
+      expect(patternProblem(pattern)).toBeUndefined()
+    },
+  )
+
+  it('agrees with the rule, which is the point of it being one function', () => {
+    /*
+     * Every pattern this reports has to be one the engine refuses, and refusing
+     * means the rule fails. If these two ever answered differently, the panel
+     * would be describing a rule the server does not run.
+     */
+    for (const pattern of ['(a+)+$', '(a+){10}b', '(']) {
+      expect(patternProblem(pattern)).toBeDefined()
+      expect(check({ key: 'pattern', value: pattern }, 'aaaaaaaaaab')).toBe(
+        DEFAULT_MESSAGES.pattern,
+      )
+    }
   })
 })

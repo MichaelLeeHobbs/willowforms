@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 21, the designer shell and panel MEDIUMs. Item 22 is next.
+- **Last completed:** item 22, the designer drag and editor MEDIUMs. Item 23 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/21-designer-mediums`
+- **Last pushed item branch:** `build-out/b/22-drag-editor-mediums`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -275,7 +275,7 @@ slice either fixed or in `triage.md` with a one-line reason.
       20 findings. Includes `designer.css:855`'s `revert` where `initial` was meant, which needs
       `getComputedStyle` in a real browser to settle, and the duplicate `.fs-tree__row` blocks the file's own
       comment says were eliminated.
-- [ ] **22. designer drag, canvas, selection, tree and editors, MEDIUMs.** Areas 7 and 8, 15 findings.
+- [x] **22. designer drag, canvas, selection, tree and editors, MEDIUMs.** Areas 7 and 8, 15 findings.
 - [ ] **23. apps, build, lint config and CI, MEDIUMs.** Area 10, 13 findings. Includes nothing in CI ever
       loading a `dist`, and `copy-assets.mjs`'s hand-maintained asset list tied to nothing.
 - [ ] **24. core and cross-cutting test suites, MEDIUMs.** Areas 11, 12 and 15, 30 findings.

@@ -53,11 +53,20 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
     <section className="fs-properties">
       <h2 className="fs-panel__heading">{def?.label ?? node.type}</h2>
 
-      <KeyField
-        key={node.key}
-        value={node.key}
-        onRename={(next) => api.renameKey(node.key, next)}
-      />
+      {/*
+       * Not keyed on `node.key`, which is the value this field edits.
+       *
+       * A successful rename changes the key, so React unmounted the field and
+       * mounted a new one -- taking the focus with it, mid-edit, and discarding
+       * the error state that a *refused* rename had just set. The one gesture
+       * this control exists for was the one that threw it away.
+       *
+       * It re-syncs on a changed value already, the way every other editor here
+       * does, so the remount was doing nothing the component could not do
+       * itself. Selecting a different component is what should replace it, and
+       * the panel above already remounts on that.
+       */}
+      <KeyField value={node.key} onRename={(next) => api.renameKey(node.key, next)} />
 
       {/*
        * Only where there is a value to name. A layout component submits

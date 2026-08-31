@@ -23,7 +23,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FieldSchema, ValidationKey, ValidationRule } from '@formsmith/core'
-import { DEFAULT_MESSAGES } from '@formsmith/core'
+import { DEFAULT_MESSAGES, patternProblem } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
 
@@ -350,8 +350,27 @@ function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
             id={id + '-value'}
             type="text"
             value={rule.value}
+            aria-invalid={rule.key === 'pattern' && patternProblem(rule.value) ? true : undefined}
+            aria-describedby={
+              rule.key === 'pattern' && patternProblem(rule.value) ? id + '-value-error' : undefined
+            }
             onChange={(e) => onChange({ ...rule, value: e.target.value })}
           />
+          {/*
+           * The pattern is compiled here, where an author can see the answer.
+           *
+           * The engine refuses two shapes at validation time -- a pattern that
+           * does not compile, and one with an unbounded quantifier inside
+           * another -- and refusing means the rule *fails*. So a pattern this
+           * panel accepted silently made every answer invalid, on the server,
+           * with the panel showing a perfectly ordinary rule. `matchesPattern`
+           * decides; this says the same thing where it can still be fixed.
+           */}
+          {rule.key === 'pattern' && patternProblem(rule.value) ? (
+            <p id={id + '-value-error'} className="fs-prop-row__error" role="alert">
+              {patternProblem(rule.value)}
+            </p>
+          ) : null}
         </div>
       )}
 

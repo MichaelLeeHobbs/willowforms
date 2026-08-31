@@ -569,3 +569,75 @@ describe('a drag abandoned by losing the window', () => {
     expect(result.current.consumeClick()).toBe(false)
   })
 })
+
+/**
+ * A drop zone that throws.
+ *
+ * `cancel()` is at the bottom of the release handler, so a resolver throwing
+ * skipped it: the drag state stayed set, the label stayed glued to the cursor,
+ * and every later `pointerup` re-entered the same resolver and threw again. The
+ * controller was permanently dragging and the only way out was a reload.
+ *
+ * A zone is code this file does not own -- the canvas and the tree each register
+ * one, and a third-party surface could -- so "it will not throw" is not a
+ * property this can rely on.
+ */
+describe('a zone that throws on release', () => {
+  it('ends the gesture rather than staying stuck', async () => {
+    const { result } = renderHook(() => useDrag(() => undefined))
+
+    act(() => {
+      result.current.registerZone('hostile', () => {
+        throw new Error('this zone blew up')
+      })
+    })
+
+    await drag(() =>
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
+    )
+
+    expect(result.current.state, 'the drag never ended').toBeUndefined()
+  })
+
+  it('asks the other zones, which is what a zone declining already means', async () => {
+    const commits: DropCommit[] = []
+    const { result } = renderHook(() =>
+      useDrag((_source, target) => {
+        commits.push(target)
+      }),
+    )
+
+    act(() => {
+      result.current.registerZone('hostile', () => {
+        throw new Error('this zone blew up')
+      })
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await drag(() =>
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
+    )
+
+    expect(commits).toEqual([{ parentKey: 'root', index: 0 }])
+  })
+
+  it('ends the gesture when the commit itself throws', async () => {
+    // The other half. The document is the host's to change, and this cannot know
+    // what that costs -- but it must not leave the pointer holding a label.
+    const { result } = renderHook(() =>
+      useDrag(() => {
+        throw new Error('the host refused')
+      }),
+    )
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await drag(() =>
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
+    )
+
+    expect(result.current.state).toBeUndefined()
+  })
+})

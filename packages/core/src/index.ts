@@ -117,6 +117,7 @@ export {
   validateField,
   isRequired,
   isRowScope,
+  patternProblem,
   submittedAcross,
   validateAcross,
   validateForm,

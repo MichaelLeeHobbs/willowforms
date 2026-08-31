@@ -285,15 +285,41 @@ function nestedUnbounded(source: string): boolean {
  * server validates against disagree about the same document, silently. The spec
  * says so where an author reads it, and `^...$` is two characters to type.
  */
+/**
+ * Why this pattern will not be run, or nothing if it will.
+ *
+ * Exported because the Rules tab has to say the same thing, and saying it twice
+ * is how the two come to disagree. A refused pattern makes the rule *fail*, so
+ * an author who typed one saw a perfectly ordinary rule in the panel and every
+ * answer rejected on the server. This is the sentence the panel shows while it
+ * can still be fixed, and it is the same sentence because it is the same
+ * function.
+ *
+ * An empty pattern is not a problem here. It compiles, it matches everything,
+ * and it is what a half-typed rule looks like -- reporting it would put an error
+ * under the field before anybody had finished the first character.
+ */
+export function patternProblem(pattern: string): string | undefined {
+  if (nestedUnbounded(pattern)) {
+    return (
+      'This pattern has an unbounded repeat inside another one, which can take ' +
+      'exponential time to match. Bound the inner one, or rewrite it without the nesting.'
+    )
+  }
+  try {
+    new RegExp(pattern)
+  } catch {
+    return 'This is not a valid regular expression.'
+  }
+  return undefined
+}
+
 function matchesPattern(pattern: string, value: string): boolean {
   if (value.length > PATTERN_INPUT_LIMIT) return false
-  if (nestedUnbounded(pattern)) return false
+  // One decision, shared with the panel. See `patternProblem`.
+  if (patternProblem(pattern)) return false
 
-  try {
-    return new RegExp(pattern).test(value)
-  } catch {
-    return false
-  }
+  return new RegExp(pattern).test(value)
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

@@ -17,6 +17,53 @@ Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`; first-pass en
 
 ## Second pass (from 2026-08-31)
 
+## Drop-zone precedence is registration order, and registration order is not stable — `Canvas.tsx:439` + `Tree.tsx:287`, area 7, item 22
+
+**MEDIUM.** `registerZone` keeps a `Map`, and the comment says the first zone to claim a release wins, so
+precedence is whichever of the canvas and the tree registered first -- which depends on effect order and
+flips when a pane is collapsed and reopened.
+
+Left because it does not currently decide anything: both zones check their own bounds and answer "not
+mine" for a point outside themselves, which the canvas's own comment says is exactly why order need not
+be relied on. Order matters only if two zones ever claim the same point, and today they cannot -- the
+canvas and the tree occupy disjoint rectangles.
+
+Making it explicit means giving a zone a priority, which is a small API with a real question behind it
+(what does a nested drop surface mean?), and doing it while nothing depends on it is a guess about the
+answer. Worth doing when a third zone arrives, which is when the question becomes concrete.
+
+## The tree re-renders on every pointer move of a drag — `Tree.tsx:294-295,343-440`, area 7, item 22
+
+**MEDIUM.** Every move re-renders the whole tree and re-walks the document to rebuild the flattened rows.
+
+Left as a perf observation with no measurement, alongside the five the first pass triaged for the same
+reason. The tree is a form's component list -- dozens of rows, not thousands -- and the walk is
+`flatten`, which is one pass with no allocation per node beyond the row. The fix is memoising on the
+document's identity, which `commit` already provides, and it has to stay correct across an edit. Worth
+doing on a profile of a form somebody says is slow.
+
+## The scroll-into-view effect has no notion of why the selection moved — `SelectionLayer.tsx:160-183`, area 7, item 22
+
+**MEDIUM.** It keys on `selectedKey` and `selectedRow`, so it scrolls whenever either changes -- including
+when the change came from a click on the canvas, where the component is already under the pointer and
+scrolling moves it out from under the cursor.
+
+Left because the fix needs the selection to carry _why_ it moved -- keyboard, tree click, canvas click --
+and that is a change to the shape of the selection state that every panel reads. It is the right change
+and it is not a MEDIUM sweep's to make. The visible cost today is small: a click on a component already
+in view scrolls by nothing, because it is already in view.
+
+## The Rules tab performs no cross-rule consistency check — `Rules.tsx:329-338,41-57`, area 8, item 22
+
+**MEDIUM.** A rule set can contradict itself -- `minLength: 10` beside `maxLength: 5` -- and the panel
+accepts it, so every answer fails and nothing says why.
+
+Left because it is a feature rather than a repair, and a small one with a long tail: the pairs are
+`min`/`max`, `minLength`/`maxLength`, and then it stops being obvious -- a `pattern` that cannot match
+anything a `minLength` allows is the same class and is undecidable. Picking the two easy pairs and
+stopping is defensible, and it is a design decision about what the panel promises rather than a defect to
+fix in a sweep. `unexportableRules` is the precedent for how such a report would be shaped.
+
 ## `renameKey` leaves every other reference dangling — `store.ts:437-493`, area 6, item 21
 
 **MEDIUM, already open.** Renaming a component repoints only that node's own `renderWhen`, so a sibling
