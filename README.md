@@ -94,7 +94,7 @@ import { FormRenderer } from '@formsmith/renderer'
 import { validateForm } from '@formsmith/core'
 
 const errors = validateForm(doc.root, data)
-<FormRenderer document={doc} kit={muiRendererKit} data={data} errors={errors} onChange={set} />
+;<FormRenderer document={doc} kit={muiRendererKit} data={data} errors={errors} onChange={set} />
 ```
 
 The same `validateForm` runs in Node, so the server enforces the form's own rules without a second
@@ -122,10 +122,15 @@ lint rule fails the build if anyone imports one.
 JavaScript. Core deliberately ships no evaluator, so the host injects one and owns the sandbox. With
 none injected, those rules degrade to permissive rather than throwing.
 
-**Accessibility is not a later milestone.** The prior-art study that seeded this project measured its subject at
-30 buttons with no accessible name, zero `role="tablist"` wrappers, no landmarks, and a primary button at
-3.03:1 contrast. Here every button is named, the tabs are a real tablist, contrast is computed from the
-stylesheets in CI, and axe-core runs over the designer in nine states.
+**Accessibility is not a later milestone.** Every button is named, the tabs are a real tablist, contrast
+is computed from the stylesheets in CI, and axe-core runs over the designer in eleven states -- two of
+them with the MUI kit drawing the form.
+
+The measurements that made this a stated goal are in [docs/prior-art](docs/prior-art/README.md), which is where
+they belong: the table above names the products this project is an alternative to, and publishing a
+figure for a named competitor's accessibility beside that table is a claim about them rather than about
+this repository. What is measured here is measured in CI, and [docs/accessibility.md](docs/accessibility.md)
+says what is not.
 
 ## Contributing
 

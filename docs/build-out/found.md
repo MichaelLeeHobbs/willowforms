@@ -75,7 +75,8 @@ route, and one check tends to read as coverage.
 ## The CI actions still target Node 20
 
 `.github/workflows/ci.yml` — `actions/checkout@v4`, `actions/setup-node@v4` and `pnpm/action-setup@v4`
-all target Node 20, which GitHub deprecated on 2025-09-19. Every run now prints a warning and forces
+all target Node 20, which GitHub deprecated on 2025-09-19 -- as does `actions/upload-artifact@v4`, the
+fourth action in the workflow and the one this entry originally missed. Every run now prints a warning and forces
 them onto Node 24:
 
 > Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on
@@ -87,6 +88,11 @@ workflow stops. The fix is a version bump on three lines, so it is worth doing o
 inside a remediation branch where it would be noise.
 
 ## The end-to-end harness reads persisted state without waiting for the commit
+
+**Fixed in item 25, and kept here with the date rather than deleted.** The nine
+`expect(await designer.rootChildren()).toEqual(before)` assertions now poll, and the five computed-style
+assertions with them. The original entry is below, because this file is read for what is still open and a
+silently vanishing entry is worse than one marked closed.
 
 `e2e/harness.ts` — `rootChildren()` and `document()` read `localStorage` directly, and the playground
 writes it during React's commit. Nothing between a gesture and the read waits for that commit, so all
@@ -118,8 +124,8 @@ check.
 
 ## `gap` means one thing in kit-mui and another in kit-html
 
-`packages/kit-mui/src/renderers.tsx` and `packages/kit-html/src/renderers.tsx` — `Stack`, `Container`
-and `Step` pass `gap` straight to MUI's `gap` prop, which reads it as a multiple of `theme.spacing`
+`packages/kit-mui/src/renderers.tsx` and `packages/kit-html/src/renderers.tsx` — `Stack`, `Grid` and
+`Step` pass `gap` straight to MUI's `gap` prop, which reads it as a multiple of `theme.spacing`
 (default 8), while the HTML kit reads it as pixels. So an authored `gap: 2` is 16px in one kit and 2px
 in the other, and a document authored against one and rendered through the other lays out differently.
 

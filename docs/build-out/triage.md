@@ -847,3 +847,19 @@ tidying with no behavioural question in them.
 does not use and Prettier would reformat if it did; `kit-mui/renderers.test.tsx` matches emitted class
 names by substring. Both are the same shape as the guards this run has already rewritten twice, and both
 are worth the same treatment when the stylesheet or the kit next needs it.
+
+## Documentation findings that describe this run's own record — area 18
+
+**NOTE.** Four findings are about `triage.md` and the first pass's report as documents:
+
+- Several `file:line` anchors in this file have drifted past the fixes made in the same run. True, and
+  fixing them means pinning a line number to a file that is still being edited: the anchors name a
+  function and a file, which is what a reader searches for, and the line is the part that goes stale.
+  New entries in this run name the function rather than the line where the two can differ.
+- The count of entries here does not match the 21 the first pass's queue and report claim. That count was
+  of _findings triaged_, and this file groups several findings under one heading -- which is the right
+  shape for a reader and the wrong one for a count. The second pass's report states both numbers and
+  where each comes from.
+- `docs/prior-art`'s anonymity is nominal, because `README.md` names the products two tables earlier.
+  Correct, and the answer taken in item 32 is the other direction: the measured figures moved out of the
+  README, so the naming and the measurements are no longer in the same document.

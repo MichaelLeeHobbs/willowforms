@@ -176,9 +176,15 @@ whose two names differ silently discarded every keystroke in its rows.
 
 Fixed on 2026-08-30, and how it was fixed is the lesson: the design change was three tokens, and
 the fixture that can see it took longer to write. `rows.test.ts`, `renderer.test.tsx` and
-`repeater.spec.ts` each now carry a repeater named `addressList` holding `addresses`, with a
-`street` field holding `line1`. Keep it that way. A new repeater fixture whose two names match adds
-coverage of everything except the thing that broke.
+`schema.test.ts` each now carry a repeater whose two names differ -- `addressList` holding
+`addresses`, with a `street` field holding `line1`, or `orderList` holding `orders`. Keep it that
+way. A new repeater fixture whose two names match adds coverage of everything except the thing that
+broke.
+
+`e2e/repeater.spec.ts` is the exception and cannot be one of them: it drops a `Repeater` from the
+palette, so its key and data key are whatever `instantiate` produces, and the coordinate it asserts
+is `repeater[0]`. What it proves is that authoring reaches a row at all. The naming distinction is
+proved where a fixture can be written.
 
 This is not Trap 5. The fixture is one the product builds readily — the Data key editor is
 offered on any node with a schema, and a `Repeater` has one. It is producible, it is realistic,
@@ -247,8 +253,10 @@ just buys the same failure twice.
       names the behaviour. This is the only step that distinguishes a test from a comment.
 - [ ] **Run `pnpm e2e` too.** 78 tests in a real browser are the only ones that see layout, real event
       capture, and focus. jsdom will not tell you.
-- [ ] **Check the counts.** `pnpm test` and `pnpm e2e` totals appear in `README.md`,
-      `CLAUDE.md` and `docs/ROADMAP.md`, and `test/docs.test.ts` compares them.
+- [ ] **Check the counts.** `pnpm test`'s total appears in `README.md`, `CLAUDE.md` and
+      `docs/ROADMAP.md`, and `test/count-reporter.ts` compares them against the run rather than
+      against each other -- no test can count the run it belongs to. The `pnpm e2e` total appears in
+      those three and in this file, and `test/docs.test.ts` compares all four against the spec files.
 - [ ] Grep your diff for the tells: an assertion that would hold with the feature removed, a
       `getBy*` with no scope, a fixture literal where a factory exists, a `getBoundingClientRect`
       in a `.test.ts`, a new "must" in the spec with no test behind it, a fixture whose two names

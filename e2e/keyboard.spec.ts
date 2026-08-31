@@ -149,7 +149,7 @@ test('the JSON dialog traps focus and closes on Escape', async ({ designer }) =>
   await expect(dialog).toBeHidden()
 })
 
-test('Control+D duplicates a component in beside itself and focuses the copy', async ({
+test('Control+D duplicates a component beside itself and focuses the copy', async ({
   designer,
 }) => {
   await designer.row('website').focus()

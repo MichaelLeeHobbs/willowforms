@@ -61,7 +61,9 @@ studied, sits at 5.49:1 light and 6.39:1 dark. See `docs/prior-art`.
 
 ## Keyboard
 
-The whole builder is reachable without a pointer.
+Every panel is reachable without a pointer, and the structure tree is how a component is selected,
+moved, duplicated and deleted. The canvas itself is not: a component is selected there by clicking it,
+which is the gap this document lists below and does not claim to have closed.
 
 | Key                                                 | Does                                                      |
 | --------------------------------------------------- | --------------------------------------------------------- |
@@ -73,7 +75,7 @@ The whole builder is reachable without a pointer.
 | Alt + arrow left                                    | Move out one level, landing after the parent              |
 | Enter / Space                                       | Select the focused row                                    |
 | Delete / Backspace                                  | Remove the focused component                              |
-| Ctrl or Cmd + D                                     | Duplicate the focused component in beside itself          |
+| Ctrl or Cmd + D                                     | Duplicate the focused component, beside itself            |
 | Ctrl or Cmd + Z, Shift + Z, Y                       | Undo and redo                                             |
 | Escape                                              | Clear the selection, or abandon a drag                    |
 | Arrow left / right, Home, End on the inspector tabs | Move between tabs                                         |

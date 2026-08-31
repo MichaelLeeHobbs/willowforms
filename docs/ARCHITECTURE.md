@@ -16,7 +16,9 @@ metadata half. It builds the palette from `ComponentDef[]` and the properties pa
 It never imports a component library.
 
 The rendering half carries one obligation. Every renderer spreads `nodeProps` onto its outermost DOM
-element, which puts `data-fs-key` and `data-fs-type` in the output. That is the only thing tying a
+element, which puts `data-fs-key`, `data-fs-type` and `data-fs-scope` in the output -- plus
+`data-fs-row` inside a repeater and `data-fs-hidden` on a node the designer reveals. That is the only
+thing tying a
 rendered element back to a document node, and the canvas selection overlay is built on it: the designer
 hit-tests with `closest('[data-fs-key]')` and measures the element it finds. A kit that drops
 `nodeProps` still renders correctly, but its components cannot be selected on the canvas.
@@ -106,7 +108,7 @@ type ValidationRule =
 The rule set studied for prior art was an untyped `{ key, message? }`, which cannot express `minLength`
 without a side channel.
 
-Two behavioural rules, both learned from the prior-art study in `docs/prior-art`:
+Three behavioural rules, all learned from the prior-art study in `docs/prior-art`:
 
 1. **Every rule except `required` passes on an empty value.** Requiredness is one rule's job. A field
    declaring only `url` must not report "Required" when blank; that was a real bug in the demo we studied

@@ -93,19 +93,21 @@ copy it again rather than editing the copy here.
 
 ## The tests are the point, and this repository knows how they lie
 
-Read `.claude/skills/write-tests/SKILL.md` before writing a test. Twelve traps in it are incidents from
+Read `.claude/skills/write-tests/SKILL.md` before writing a test. Thirteen traps in it are incidents from
 this repository. This review found four more guards that could not fail, and every one of them was green
 the whole time. Three matter most here:
 
 - **A guard whose subject can be replaced by `throw` and stay green.** Two kit-contract rules read
   attributes that the error boundary's fallback also emits. Any test that reads a DOM attribute to prove
   something rendered has this shape. Check it.
-- **Trap 11, a fixture that collapses the distinction under test.** Repeater fixtures still set
-  `key === dataKey`, and the row-identity work in item 11 is not done until one exists that would have
-  caught it.
+- **Trap 11, a fixture that collapses the distinction under test.** Repeater fixtures that set
+  `key === dataKey` make the row-addressing design and its opposite produce identical output. Four have
+  been rescued during this run -- `rows.test.ts` twice, `renderer.test.tsx` and `schema.test.ts` -- and
+  the next one to be written is the one to watch.
 - **Trap 12, a guard that names its DOM scope as a string and cannot notice the scope moved.** The
-  invariant 3 test still checks `.fs-shell` and `.fs-canvas__surface` while the form renders inside
-  `.fs-canvas__frame`.
+  invariant 3 test named `.fs-shell` and `.fs-canvas__surface` while the form rendered inside
+  `.fs-canvas__frame`. It is an allowlist of what is _not_ the form now, so a new wrapper is refused
+  rather than waved through -- which is the shape to copy, not the hole to re-fix.
 
 For every behavioural fix: write the test, run it against the unfixed code, watch it fail, then fix. Say in
 the transcript that you did. A test written after the fix, never seen to fail, proves nothing.

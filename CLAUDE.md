@@ -80,12 +80,16 @@ they stay out of `dist`, which left every test file unchecked until `tsconfig.es
 up. It found a type error in the first test file it ever saw.
 
 `aliases.ts` at the root maps `@formsmith/*` to `src` for vitest and the playground, so in-repo edits
-need no rebuild. Published packages resolve through `dist`. Entries are anchored regexes on purpose: a
+need no rebuild. Published packages resolve through `dist`. The five bare package entries are anchored
+regexes on purpose -- the two stylesheet subpaths are plain strings, because an exact specifier needs no
+anchoring -- and the reason is that a
 plain string alias also rewrites `@formsmith/designer/styles.css` and breaks the build.
 
 ## Conventions
 
-- Node 22+, pnpm 10, React 19, TypeScript strict with `exactOptionalPropertyTypes` and
+- Node 22.6+ to develop -- the demo server runs on `--experimental-strip-types`, which is where that
+  arrived -- and Node 20+ to consume a published package, which is what the five manifests declare.
+  pnpm 10, React 19, TypeScript strict with `exactOptionalPropertyTypes` and
   `noUncheckedIndexedAccess`. Both are on deliberately; do not relax them to make a type fit.
 - Tests live beside the source as `*.test.ts`, or `*.test.tsx` for component tests. Node is the default
   vitest environment, deliberately, so core keeps proving it runs without a DOM; a component test opts

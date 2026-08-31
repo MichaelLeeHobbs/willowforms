@@ -213,7 +213,8 @@ hover frames already work that way.
 
 **Status: built.** The canvas supplies `context.step`, and a bar control chooses which step it names. The
 steps come out of the document — `contextValues(root, 'step')` reads the names its conditions compare
-that path against — so a form with no steps gets no control and an ordinary form is unchanged.
+that path against — so a form with fewer than two steps gets no control and an ordinary form is
+unchanged. One step is a form, not a wizard: a switcher with a single entry is furniture.
 
 Without it, preview showed an empty form for any wizard and an author could not check their own work.
 

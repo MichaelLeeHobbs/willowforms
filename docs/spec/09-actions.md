@@ -92,7 +92,8 @@ removed: undo is a designer feature over documents, and runtime form data has no
 Two better reasons survive.
 
 **The sandbox contract already forbids the thing mutation is good at.** `Evaluator` is
-`(expression: string, data: FormData) => JsonValue`: synchronous, pure, and networkless, sandboxed because
+`(expression: string, data: FormData, context?: FormContext) => JsonValue` -- the same signature this file
+declares above, third argument included: synchronous, pure, and networkless, sandboxed because
 author code is treated as remote code execution. Author code cannot `await`, cannot `fetch`, and has no
 handle on the host. An imperative `setValue` would have to be a message posted back across that boundary,
 which means adopting it is not a choice about action ergonomics. It is a decision to widen the sandbox
