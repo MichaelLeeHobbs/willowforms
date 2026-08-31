@@ -203,7 +203,7 @@ describe('inspector tabs', () => {
     expect(focused()).toBe('Rules')
   })
 
-  it('leaves focus alone when the strip has nowhere to go', async () => {
+  it('leaves focus alone when the strip has nowhere to go', () => {
     /*
      * `preventDefault` used to run before the one-tab check, so on a strip with
      * a single tab the four navigation keys were swallowed and did nothing at

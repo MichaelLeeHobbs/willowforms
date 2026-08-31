@@ -586,3 +586,38 @@ cannot drift silently, which was the concern.
 - The `useCallback` around `Tabs`' key handler saves nothing, because each button gets a fresh inline
   arrow anyway. Removing the memo is right; the inline arrow is what would have to go first, and that is
   a render-shape change to a component three panels depend on.
+
+## Nine drag, geometry and canvas findings left as they are — area 7
+
+**NOTE and LOW.** All nine are accurate readings of code that is doing the right thing for a reason the
+finding does not reach, or that needs a browser to settle:
+
+- `dnd.ts:332`'s `anchor === -1` fallback is unreachable today, because `forbidden` always contains the
+  dragged key and the row was rejected before that line. It is the branch that runs if either of those
+  ever stops being true, and deleting a fallback because the current call graph cannot reach it is how a
+  refactor turns into a crash.
+- A drop on the tree's root row always prepends, because the index is a literal `0`. That is a design
+  answer -- the root row is the whole form, and "into the form" has no position -- and changing it to
+  read the pointer offset is a behaviour change with no finding saying which way it should go.
+- `measureIn` mixes `getBoundingClientRect`, which is post-transform, with `scrollTop`, which is CSS
+  pixels. A host that CSS-scales the designer therefore measures wrong. Real, and settling it means a
+  scaled-designer e2e fixture, because jsdom has no transforms and no scroll.
+- `Candidate.index` is the document index, so two candidates for one node in different rows share it.
+  True, and the row coordinate is what tells them apart; changing the index's meaning would change what
+  every drop resolves against.
+- The `ResizeObserver` in `SelectionLayer` watches the surface and the form root, so a component that
+  grows without changing the root's box does not re-measure the frame. Fixing it means observing every
+  drawn node, which is a per-node observer on a document-sized tree -- a trade worth measuring in a
+  browser rather than assuming.
+- `Tree.tsx`'s `visit` records the previous node's key as a parent even when that node drew no row.
+  Unreachable, because every node draws a row; it is a difference from `measureTree`, which returns early,
+  and the two are worth reconciling when one of them next changes.
+- Escape abandons a drag only while the button is still down, so a drag whose pointer was lost cannot be
+  abandoned from the keyboard. The window-blur path covers the case that actually happens; a keydown
+  handler that fires on `moved` alone would also fire long after the gesture is over.
+- `SelectionLayer`'s `document` prop shadows the global, and `useDesigner`'s local does the same. Nothing
+  in either scope touches the DOM; renaming a prop that three call sites pass by name is churn until
+  something does.
+- Two adjacent comments in `Canvas.tsx` disagree about a bounds check that does not exist. Both describe
+  real history -- one records that adding the check broke a drop -- and untangling which sentence
+  survives needs the person who wrote them, not a sweep.
