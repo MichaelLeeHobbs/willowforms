@@ -170,7 +170,7 @@ partial edit and an undo all survive.
 
 Every repeater fixture in the repository set `key` and `dataKey` to the same string. So the
 row-addressing design and its opposite produced **byte-identical output across all 911 unit tests
-and 65 end-to-end tests** — a patched build of the alternative design was run and the whole suite
+and 77 tests in a real browser** — a patched build of the alternative design was run and the whole suite
 stayed green. The suite could not have caught the defect that prompted the question: a repeater
 whose two names differ silently discarded every keystroke in its rows.
 
@@ -236,7 +236,7 @@ just buys the same failure twice.
 
 - [ ] **Break the fix and watch the right test fail.** Not the suite — the specific test that
       names the behaviour. This is the only step that distinguishes a test from a comment.
-- [ ] **Run `pnpm e2e` too.** 65 of these checks are the only ones that see layout, real event
+- [ ] **Run `pnpm e2e` too.** 77 tests in a real browser are the only ones that see layout, real event
       capture, and focus. jsdom will not tell you.
 - [ ] **Check the counts.** `pnpm test` and `pnpm e2e` totals appear in `README.md`,
       `CLAUDE.md` and `docs/ROADMAP.md`, and `test/docs.test.ts` compares them.

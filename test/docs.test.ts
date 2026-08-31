@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { DOCS, REPORTER_MARK, totals } from './count-reporter.js'
+import { isFixture } from './fixtures.js'
 
 const root = new URL('../', import.meta.url)
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(path, root)), 'utf8')
@@ -72,8 +73,59 @@ function browserTotals(text: string): number[] {
   )
 }
 
+/**
+ * How many end-to-end tests there actually are.
+ *
+ * Counted from the spec files rather than taken from any document, because
+ * "the documents agree with each other" is satisfied by all of them being
+ * equally wrong -- and they were: three said 68 while the suite ran 74.
+ *
+ * `^test(` at the start of a line is every Playwright test in this repository;
+ * none is nested inside a describe or built by a loop, and a `test.skip` or a
+ * `test.each` would not match, which is the conservative direction. The
+ * assertion below that this found something is what keeps a change of style
+ * from turning this into a comparison against zero.
+ */
+function browserTestsThatExist(): number {
+  const dir = fileURLToPath(new URL('e2e/', root))
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.spec.ts'))
+    .reduce((total, name) => total + [...read('e2e/' + name).matchAll(/^test\(/gm)].length, 0)
+}
+
 describe('documented end-to-end counts', () => {
-  const DOCS_WITH_BROWSER_COUNTS = ['README.md', 'CLAUDE.md', 'docs/ROADMAP.md']
+  /*
+   * `SKILL.md` is in this list now. `CLAUDE.md` tells every contributor to read
+   * it before writing a test, and it carried "65 of these checks" while the
+   * three documents this guard did police said 68 -- so the one document a
+   * contributor is sent to was the one nothing checked. Its two figures are
+   * phrased the same way as everybody else's now, so one pattern covers all
+   * four rather than a special case per document.
+   */
+  const DOCS_WITH_BROWSER_COUNTS = [
+    'README.md',
+    'CLAUDE.md',
+    'docs/ROADMAP.md',
+    '.claude/skills/write-tests/SKILL.md',
+  ]
+
+  it('match the number of end-to-end tests there are', () => {
+    const ran = browserTestsThatExist()
+
+    // The control: a walk that found no spec files would compare every document
+    // against zero and report them all wrong, or worse, all right.
+    expect(ran, 'no end-to-end tests were found to count').toBeGreaterThan(50)
+
+    const wrong = DOCS_WITH_BROWSER_COUNTS.map((path) => ({
+      path,
+      counts: browserTotals(read(path)),
+    })).filter((entry) => entry.counts.some((count) => count !== ran))
+
+    expect(
+      wrong.map((entry) => entry.path + ' says ' + entry.counts.join('/')),
+      'a document quotes an end-to-end total that is not ' + String(ran),
+    ).toEqual([])
+  })
 
   it('agree with each other', () => {
     const quoted = DOCS_WITH_BROWSER_COUNTS.map((path) => ({
@@ -528,6 +580,31 @@ function sourceFiles(): { path: string; text: string }[] {
       // Tests are not the product. A fixture may mention a field the product
       // never touches, which is exactly what a "nothing reads it" claim means.
       if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue
+
+      /*
+       * And not the guardrail fixtures either. `eslint.config.test.ts` writes
+       * those into `packages/core/src` and `packages/designer/src`, lints them
+       * and deletes them, and vitest runs test files in parallel -- so this walk
+       * could list one and then find it gone before reading it, and every
+       * DISPROOF case below would fail on a run where nothing changed.
+       *
+       * Skipped by the name they share with the file that writes them, rather
+       * than by catching the `ENOENT`: a file that vanishes mid-walk is a race
+       * worth not having, not an error worth swallowing.
+       */
+      if (isFixture(entry.name)) continue
+
+      /*
+       * And not the guardrail fixtures either. `eslint.config.test.ts` writes
+       * those into `packages/core/src` and `packages/designer/src`, lints them
+       * and deletes them, and vitest runs test files in parallel -- so this walk
+       * could list one and then find it gone before reading it, and every
+       * DISPROOF case below would fail on a run where nothing changed.
+       *
+       * Skipped by the name they share with the file that writes them, rather
+       * than by catching the `ENOENT`: a file that vanishes mid-walk is a race
+       * worth not having, not an error worth swallowing.
+       */
       found.push({ path, text: read(path) })
     }
   }

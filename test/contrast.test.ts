@@ -491,3 +491,59 @@ describe('the contrast figures the documents quote', () => {
     ).toEqual([])
   })
 })
+
+/**
+ * Every colour in both stylesheets is a token this suite can see.
+ *
+ * `tokensFrom` reads custom properties, so a hex literal written straight into
+ * a rule is invisible to every assertion above -- and that is not hypothetical:
+ * the HTML kit's success and warning stripes were exactly that, outside the
+ * theme swap and outside this suite, until the run that added the assertion
+ * fifty lines up. Nothing stopped the next one.
+ *
+ * Only hex is checked, and deliberately. `color-mix` and `rgb(from ...)` build
+ * on tokens, so they stay measurable; a bare `#e8eaed` is the form that leaves
+ * no trace to follow.
+ */
+describe('no colour is written outside the token blocks', () => {
+  const literals = (css: string): string[] => {
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    const found: string[] = []
+
+    for (const block of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      for (const declaration of (block[2] ?? '').split(';')) {
+        const at = declaration.indexOf(':')
+        if (at < 0) continue
+
+        const name = declaration.slice(0, at).trim()
+        // A token declaration is where a colour is supposed to be written.
+        if (name.startsWith('--')) continue
+
+        const hex = declaration.slice(at + 1).match(/#[0-9a-fA-F]{3,8}\b/g)
+        if (hex) found.push((block[1] ?? '').trim() + ' { ' + name + ': ' + hex.join(' ') + ' }')
+      }
+    }
+
+    return found
+  }
+
+  it('the designer stylesheet uses tokens for every colour', () => {
+    expect(literals(designerCss)).toEqual([])
+  })
+
+  it('the HTML kit stylesheet uses tokens for every colour', () => {
+    expect(literals(kitCss)).toEqual([])
+  })
+
+  it('finds a literal when there is one', () => {
+    /*
+     * The control, and the reason it is here: a matcher that found nothing
+     * would pass both tests above for the wrong reason, which is the failure
+     * mode this whole run keeps turning up.
+     */
+    expect(literals('.fs-dialog__actions button { border-color: #e8eaed }')).toEqual([
+      '.fs-dialog__actions button { border-color: #e8eaed }',
+    ])
+    expect(literals(':root { --fs-accent: #1a73e8 }')).toEqual([])
+  })
+})

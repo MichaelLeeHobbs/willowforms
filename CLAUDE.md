@@ -59,12 +59,12 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 1778 tests
+pnpm test          # vitest, 1823 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
 pnpm build         # tsc --build, then copies designer.css
-pnpm e2e           # playwright, 74 tests in a real browser
+pnpm e2e           # playwright, 77 tests in a real browser
 ```
 
 CI runs exactly these, in that order, then `node scripts/check-dist.mjs`, which reads the packages off

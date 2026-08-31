@@ -431,3 +431,21 @@ unchanged. That is the half of the setting that silences a real error.
 lockfile, so flipping it fails `--frozen-lockfile` with `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` until the
 lockfile is regenerated. Regenerating the lockfile to change a default, in the middle of a remediation
 run, would move dependency resolutions no finding asked to move.
+
+## Four area-15 findings that earlier items had already closed
+
+**Refuted, as of this item.** The review is a snapshot of the base, and four of its cross-cutting
+findings name code that has since changed:
+
+- `test/eslint.config.test.ts:44-102`, the guardrail proven only for static imports. Item 5 added
+  `no-restricted-syntax` with a `dynamicImportOf` selector for both invariants, and six CASEs drive it:
+  two for the designer, two for core, and two controls for the imports that stay allowed.
+- `test/docs.test.ts:387-397`, the spec understating what is built. `02-kit-contract.md`'s obligation
+  table now marks `aria-invalid` and `aria-required` enforced, and `docs.test.ts` reads that column and
+  asserts each `yes` is driven and each `no` is not, so it cannot drift in either direction again.
+- `test/docs.test.ts:287-333`, the contrast figures checked only for the existence of the files they
+  name. `contrast.test.ts` records every pair it measures and compares the lowest in each palette against
+  the table, and the wrong row -- 4.83:1 where the warning stripe sat at 4.24:1 -- is corrected.
+- `test/a11y.test.tsx:140-152`, the JSON dialog audited while not modal. Half of this was real and is
+  fixed in this item: three `e2e/document.spec.ts` tests check `:modal`, the focus trap and Escape in a
+  browser, and both documents say where that is checked and why it cannot be checked in jsdom.
