@@ -4,6 +4,26 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The boundary's fallback says it is the fallback
+
+- **Decided:** `NodeBoundary`'s fallback emits `data-fs-failed=""` alongside the three attributes it
+  already carried, and every render in `test/kit-contract.test.tsx` goes through one wrapper that records
+  what the boundary caught, with an `afterEach` that fails the test if anything was.
+- **Why:** the fallback emits `data-fs-key`, `data-fs-type` and `data-fs-scope` so a component that broke
+  stays selectable, which is right and stays. The cost was that three contract rules read exactly those
+  attributes to prove a kit renders, so the boundary answered for the kit. Measured: with one `kit-html`
+  renderer replaced by `throw new Error()`, the contract suite passed 211 of 211.
+- **Why both mechanisms:** the wrapper is what makes a rule added next year inherit the check instead of
+  having to remember it. The attribute is what lets an individual rule fail on its own, so a rule moved to
+  another file does not quietly lose its teeth. Either alone would have been the shape this run is about.
+- **Rejected: dropping the attributes from the fallback.** It would make the contract honest by making a
+  broken component unselectable in the designer, which is the failure the fallback was written to prevent.
+- **Rejected: wiring `onError` per test.** Seventeen call sites, and the rule that needs it most is the
+  one somebody adds in a hurry.
+- **What it costs:** one attribute on a `div` nobody styles, and a wrapper component in one test file.
+- **Reversal:** free.
+- **When:** 2026-08-31.
+
 ### The demo server refuses a body nested deeper than core reads
 
 - **Decided:** `bodyOf` measures the parsed body's depth with an explicit stack and returns nothing past

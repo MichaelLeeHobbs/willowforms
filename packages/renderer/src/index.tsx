@@ -290,6 +290,22 @@ class NodeBoundary extends Component<NodeBoundaryProps, { failed: boolean }> {
         data-fs-key={this.props.node.key}
         data-fs-type={this.props.node.type}
         data-fs-scope={this.props.scope}
+        /*
+         * And a mark saying it is the fallback, which the three attributes above
+         * cannot say.
+         *
+         * They exist so a broken component stays selectable, and that is right.
+         * The cost is that every one of them is also emitted by a component that
+         * did not render: `test/kit-contract.test.tsx` read `data-fs-key`,
+         * `data-fs-type` and `data-fs-scope` to prove a kit spreads `nodeProps`,
+         * and a kit renderer replaced by `throw new Error()` satisfied all three
+         * from here. Two contract rules could not fail, and nobody noticed
+         * because they had been green since before this class existed.
+         *
+         * So the fallback says which one it is. An assertion that a kit rendered
+         * something can now check it is not this.
+         */
+        data-fs-failed=""
         style={{ padding: 8, border: '1px dashed currentColor', opacity: 0.7 }}
       >
         <code>{this.props.node.type}</code> (key <code>{this.props.node.key}</code>) could not be
