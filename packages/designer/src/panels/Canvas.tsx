@@ -108,6 +108,29 @@ interface Snapshot {
 const isOwnChrome = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('.fs-selection') !== null
 
+/**
+ * Does a pointer landing here have its focus cancelled by the canvas?
+ *
+ * Exported because the shell has to ask the same question and was asking a
+ * different one. `onMouseDownCapture` below calls `preventDefault`, which is
+ * what stops a click from focusing a text field on the canvas -- and the shell's
+ * own handler exempted `input, textarea, select, button` from taking focus, on
+ * the theory that anything which takes focus keeps it. Here, nothing does. So
+ * clicking a field selected the component, left the shell unfocused, and Delete,
+ * Ctrl+Z and Escape all silently did nothing.
+ *
+ * Two guards with opposite assumptions about the same click. This is the one
+ * they now share.
+ *
+ * `:not(.is-preview)`, because the capture handlers are attached only while
+ * editing. In preview a click really does focus the field, and the shell must
+ * not steal it.
+ */
+export const canvasSwallowsFocus = (target: EventTarget | null): boolean =>
+  target instanceof Element &&
+  target.closest('.fs-canvas__surface:not(.is-preview)') !== null &&
+  !isOwnChrome(target)
+
 export function Canvas({
   api,
   kit,

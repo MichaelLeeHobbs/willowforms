@@ -7,6 +7,8 @@
  * should and that the tab order is what a user meets.
  */
 
+import type { Page } from '@playwright/test'
+
 import { expect, test } from './harness.js'
 
 test('the whole tree is one tab stop', async ({ designer }) => {
@@ -175,4 +177,131 @@ test('Control+D refuses the root rather than nesting a screen in itself', async 
 
   await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/root cannot be/i)
   expect(await designer.rootChildren()).toEqual(before)
+})
+
+/**
+ * The keyboard after a click on the canvas, which is how a person selects.
+ *
+ * Every test above reaches the keyboard through `.focus()` on a tree row, which
+ * is a method no user has. So the whole file passed while the shortcut model was
+ * broken for the gesture people actually use: on the canvas, the click that
+ * selects a component left focus nowhere at all.
+ *
+ * Two guards disagreed about one click. The canvas cancels mousedown's default
+ * in the capture phase, so clicking a field selects rather than types; the
+ * shell's focus handler exempted `input, textarea, select, button` on the theory
+ * that anything taking focus keeps it. On the canvas nothing does, so the
+ * exemption fired on exactly the elements whose focus had just been cancelled.
+ *
+ * No `.focus()` anywhere below. That is the point of these three.
+ *
+ * Each starts by clicking outside the shell, and that is not decoration. The
+ * shell's key handler is a React `onKeyDown` on the container, so it catches
+ * anything bubbling from a descendant -- and the harness opens the Tree tab
+ * during setup, which parks focus on a button inside the shell. With focus
+ * already in there the shortcuts work whether or not the click moved it, and the
+ * defect is invisible. Measured: after clicking a field on the canvas,
+ * `document.activeElement` was still the Tree tab button.
+ *
+ * A person meets it on the first interaction with the page.
+ */
+
+/** Put focus outside the builder, the way a fresh page load leaves it. */
+async function focusOutsideTheShell(designer: { page: Page }): Promise<void> {
+  await designer.page.locator('body').click({ position: { x: 2, y: 2 } })
+  await expect(
+    designer.page.evaluate(() => document.activeElement?.closest('.fs-shell') !== null),
+  ).resolves.toBe(false)
+}
+test('Delete removes a component selected by clicking a field on the canvas', async ({
+  designer,
+}) => {
+  await focusOutsideTheShell(designer)
+
+  const before = await designer.rootChildren()
+  expect(before).toContain('email')
+
+  await designer.node('email').locator('input').click()
+  await expect(designer.page.locator('.fs-selection--active')).toBeVisible()
+
+  await designer.page.keyboard.press('Delete')
+
+  expect(await designer.rootChildren()).not.toContain('email')
+})
+
+test('Control+Z undoes after a click on the canvas', async ({ designer }) => {
+  await focusOutsideTheShell(designer)
+
+  const before = await designer.rootChildren()
+
+  await designer.node('email').locator('input').click()
+  await designer.page.keyboard.press('Delete')
+  expect(await designer.rootChildren()).not.toContain('email')
+
+  await designer.page.keyboard.press('Control+z')
+
+  expect(await designer.rootChildren()).toEqual(before)
+})
+
+test('Escape clears a selection made by clicking a field on the canvas', async ({ designer }) => {
+  await focusOutsideTheShell(designer)
+
+  await designer.node('email').locator('input').click()
+  await expect(designer.page.locator('.fs-selection--active')).toBeVisible()
+
+  await designer.page.keyboard.press('Escape')
+
+  await expect(designer.page.locator('.fs-selection--active')).toHaveCount(0)
+})
+
+/**
+ * Tab order, which this file's own docblock claimed to check and never did.
+ *
+ * "only a browser can check that focus really lands where it should and that
+ * the tab order is what a user meets" -- and no spec in `e2e/` pressed Tab. The
+ * shell is `tabIndex={-1}` on purpose, so it is reachable by script and not by
+ * Tab, and what a keyboard user actually meets is the toolbar first.
+ */
+test('Tab walks the shell from the top, and the shell itself is not a stop', async ({
+  designer,
+}) => {
+  // From the document, not from an element: this is what a person gets after
+  // clicking into the page and pressing Tab.
+  await designer.page.locator('body').click({ position: { x: 2, y: 2 } })
+
+  const stops: { tag: string; inShell: boolean; isShell: boolean; label: string }[] = []
+  for (let i = 0; i < 12; i += 1) {
+    await designer.page.keyboard.press('Tab')
+    stops.push(
+      await designer.page.evaluate(() => {
+        const active = document.activeElement
+        if (!active) return { tag: 'nothing', inShell: false, isShell: false, label: '' }
+        return {
+          tag: active.tagName.toLowerCase(),
+          inShell: active.closest('.fs-shell') !== null,
+          isShell: active.classList.contains('fs-shell'),
+          label: (active.getAttribute('aria-label') ?? active.textContent ?? '')
+            .trim()
+            .slice(0, 24),
+        }
+      }),
+    )
+  }
+
+  // Something takes focus on every press. A shell that swallowed Tab would
+  // report `body` for the rest of the run.
+  expect(stops.filter((stop) => stop.tag === 'body' || stop.tag === 'nothing')).toEqual([])
+
+  // The container is never itself a stop, which is what `tabIndex={-1}` says and
+  // what nothing in this repository checked.
+  expect(stops.filter((stop) => stop.isShell)).toEqual([])
+
+  /*
+   * Tab reaches the builder rather than stopping at the playground's own chrome
+   * above it -- the first stop on this page is the kit switcher, which belongs
+   * to the demo and not to the designer.
+   */
+  const first = stops.findIndex((stop) => stop.inShell)
+  expect(first, 'Tab never reached the designer').toBeGreaterThanOrEqual(0)
+  expect(stops[first]?.tag).toBe('button')
 })

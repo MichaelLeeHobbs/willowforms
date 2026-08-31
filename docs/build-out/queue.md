@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 9, the renderer HIGHs. Item 10 is next.
+- **Last completed:** item 10, the designer's keyboard model. Item 11 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/09-renderer-highs`
+- **Last pushed item branch:** `build-out/b/10-keyboard-model`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -166,7 +166,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       asserts the fallback rather than a blank tree, seen red first. Coordinate with item 3: the boundary
       must stay able to fail the contract suite.
 
-- [ ] **10. The designer's keyboard model in the state it is actually in.** HIGH plus two e2e HIGHs,
+- [x] **10. The designer's keyboard model in the state it is actually in.** HIGH plus two e2e HIGHs,
       areas 6 and 16. `Designer.tsx:219-232` exempts `input, textarea, select, button` from the focus-steal
       guard on the theory that anything taking focus keeps it, while `Canvas.tsx:321-325` deliberately
       `preventDefault`s exactly that. Clicking a field selects the component, leaves the shell unfocused,
