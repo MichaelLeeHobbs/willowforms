@@ -13,7 +13,7 @@
  */
 
 import { readdirSync, readFileSync } from 'node:fs'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
@@ -595,5 +595,76 @@ describe('the tree rows and the canvas rows are told apart', () => {
     expect(tree).toEqual(['root', 'addressList', 'street'])
     // The names cannot overlap: a coordinate always carries an index.
     expect(tree.filter((key) => canvas.includes(key))).toEqual([])
+  })
+})
+
+/**
+ * The button a tree row's drag is armed by.
+ *
+ * `Canvas.tsx` and `Palette.tsx` both guard `event.button !== 0`, and both carry
+ * a comment saying why: a right-press and a small movement relocated the
+ * component under its own context menu -- the menu opens, the component has
+ * already moved, and nothing about the gesture said it would. The tree armed a
+ * drag for any button at all. Three call sites, two comments, one missing guard.
+ *
+ * Four pixels is all it takes. The threshold that separates a click from a drag
+ * is smaller than the wander of a trackpad right-click.
+ */
+describe('a right-press on a tree row', () => {
+  it('does not arm a drag, so the tree is unchanged', () => {
+    const harness = setup()
+    const before = harness.keys()
+
+    act(() => {
+      fireEvent.pointerDown(harness.row('first'), { button: 2, clientX: 100, clientY: 100 })
+      window.dispatchEvent(
+        new PointerEvent('pointermove', { clientX: 140, clientY: 160, bubbles: true }),
+      )
+    })
+
+    /*
+     * The drag label, not the document. jsdom has no layout engine, so a drop
+     * resolves nowhere and the tree is unchanged whether or not the gesture was
+     * armed -- trap 6, and the first version of this test asserted exactly that
+     * and proved nothing. The label is rendered from `drag.state`, which is what
+     * says the controller took the gesture.
+     */
+    expect(
+      harness.view.container.querySelector('.fs-drag-label'),
+      'a right-press armed a drag',
+    ).toBeNull()
+
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerup', { clientX: 140, clientY: 160, bubbles: true }),
+      )
+    })
+    expect(harness.keys()).toEqual(before)
+  })
+
+  it('still arms one for the primary button', () => {
+    /*
+     * The control. A guard that refused every button would make the tree
+     * undraggable, which is the only thing rows are dragged for -- and jsdom has
+     * no layout, so the drop resolves nowhere and the document is unchanged
+     * either way. What is asserted is that the gesture reached the controller at
+     * all, which the drag label shows.
+     */
+    const harness = setup()
+
+    act(() => {
+      fireEvent.pointerDown(harness.row('first'), { button: 0, clientX: 100, clientY: 100 })
+      window.dispatchEvent(
+        new PointerEvent('pointermove', { clientX: 140, clientY: 160, bubbles: true }),
+      )
+    })
+
+    expect(harness.view.container.querySelector('.fs-drag-label')).not.toBeNull()
+
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerup', { clientX: 140, clientY: 160, bubbles: true }),
+      )
+    })
   })
 })

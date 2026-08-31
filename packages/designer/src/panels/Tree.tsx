@@ -117,6 +117,14 @@ export function Tree({
   const onRowPointerDown = useCallback(
     (node: ComponentNode, event: ReactPointerEvent) => {
       if (node.key === root.key) return
+      /*
+       * The primary button only, which `Canvas.tsx` and `Palette.tsx` both check
+       * and both explain. This was the third `begin` call site and the one
+       * without the guard: a right-press and four pixels reparented the
+       * component under its own context menu -- the menu opens, the component
+       * has already moved, and nothing about the gesture said it would.
+       */
+      if (event.button !== 0) return
       begin({ kind: 'move', key: node.key, label: node.key }, event)
     },
     [begin, root.key],

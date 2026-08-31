@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 11, row identity through the drag pipeline. Item 12 is next.
+- **Last completed:** item 12, the drag lifecycle. Item 13 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/11-row-identity`
+- **Last pushed item branch:** `build-out/b/12-drag-lifecycle`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -187,7 +187,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a fixture where `key !== dataKey` and a repeater draws two rows (trap 11)
       asserting the insertion index in row 1 differs from row 0, seen red first.
 
-- [ ] **12. The drag lifecycle.** Two HIGHs, area 7. `drag.ts:239-243,216` — the `abandoned` flag raised by
+- [x] **12. The drag lifecycle.** Two HIGHs, area 7. `drag.ts:239-243,216` — the `abandoned` flag raised by
       the window-blur path has no matching `pointerup`, so it survives to the next unrelated gesture and eats
       one click. `Tree.tsx:117-123` — `onRowPointerDown` arms a drag for any pointer button, so a right-press
       plus four pixels reparents the component; both other `begin` call sites guard `event.button` and both

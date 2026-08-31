@@ -490,3 +490,82 @@ describe('a drag the browser takes away', () => {
     expect(result.current.state?.source).toEqual({ kind: 'new', def })
   })
 })
+
+/**
+ * A drag the window took away, and the click it went on eating.
+ *
+ * Losing focus or visibility is the closest thing to a release this controller
+ * can observe, so `lost()` marks the gesture abandoned and cancels it. What it
+ * cannot do is wait for the `pointerup` that clears the flag, because the button
+ * came up somewhere the page never saw.
+ *
+ * So `abandoned` stayed raised. The next release anywhere -- a different
+ * component, a toolbar button, a gesture minutes later -- computed
+ * `swallowClick = dragged || abandoned` and swallowed a click nobody connected
+ * to the drag that had been abandoned.
+ *
+ * `swallowClick` already had the answer beside it: `lowerSwallow` lowers it on
+ * the next `click` or `pointerdown`, because "a new press is a new interaction
+ * whatever happened to the last one". That sentence is just as true of the other
+ * flag, and only one of the two was reading it.
+ */
+describe('a drag abandoned by losing the window', () => {
+  const setUp = (): { result: { current: ReturnType<typeof useDrag> } } =>
+    renderHook(() => useDrag(() => undefined))
+
+  it('swallows nothing on the next unrelated release', async () => {
+    const { result } = setUp()
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0))
+      pointer('pointermove', 80, 80)
+      window.dispatchEvent(new Event('blur'))
+      await Promise.resolve()
+    })
+
+    // A separate gesture, with no drag in it at all.
+    await act(async () => {
+      pointer('pointerdown', 5, 5)
+      pointer('pointerup', 5, 5)
+      await Promise.resolve()
+    })
+
+    expect(
+      result.current.consumeClick(),
+      'the click after an abandoned drag was eaten by the drag before it',
+    ).toBe(false)
+  })
+
+  it('still swallows the click belonging to the abandoned gesture itself', async () => {
+    /*
+     * The control, and the reason the flag exists. Escape abandons while the
+     * button is still down, so the `pointerup` that follows is the one release
+     * that really does belong to the drag and really must not select whatever is
+     * under the pointer.
+     */
+    const { result } = setUp()
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0))
+      pointer('pointermove', 80, 80)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      pointer('pointerup', 80, 80)
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(true)
+  })
+
+  it('swallows nothing when a gesture never moved', async () => {
+    // The other control: a press that did not travel is a click, and always was.
+    const { result } = setUp()
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0))
+      pointer('pointerup', 1, 1)
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+})
