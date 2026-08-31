@@ -7,8 +7,10 @@
  * docs/ARCHITECTURE.md.
  *
  * What comes out describes the submitted data: `FormData` is flat, keyed by
- * component key, so the schema is a flat object regardless of how deeply the
- * components nest.
+ * data key -- `dataKeyOf(node)`, which is `node.dataKey ?? node.key` -- so the
+ * schema is a flat object of the names an answer is submitted under, regardless
+ * of how deeply the components nest. A repeater is the one nesting that
+ * survives, because its rows are.
  */
 
 import { MAX_TREE_DEPTH, dataKeyOf, validationsOf, walk } from './tree.js'
@@ -73,6 +75,19 @@ const DRAFT = 'https://json-schema.org/draft/2020-12/schema'
  */
 export function unexportableRules(document: FormDocument): { key: string; rule: string }[] {
   const lossy: { key: string; rule: string }[] = []
+
+  /*
+   * One walk. This was three, each visiting every node to answer a different
+   * question, and the three shared no state that forced the separation -- and
+   * the JSON dialog calls this unmemoized in its component body, so the cost
+   * was paid three times on every render of a document a person is reading.
+   *
+   * The order of the questions is preserved, because the order they are pushed
+   * in is the order the dialog lists them.
+   */
+  const FORMAT_RULES = new Set(['email', 'url', 'uuid'])
+  const claimed = new Set<string>()
+
   walk(document.root, (node) => {
     for (const rule of validationsOf(node)) {
       // Arbitrary JavaScript has no declarative equivalent at all.
@@ -91,33 +106,27 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
         lossy.push({ key: node.key, rule: rule.key })
       }
     }
-  })
 
-  /*
-   * Two components submitting one answer collapse in the export, and the
-   * collapse is silent. Sharing a `dataKey` is deliberate and documented — two
-   * fields behind opposite guards write one answer — but a JSON Schema property
-   * is one property, so the last one visited wins and the first's type, format
-   * and constraints are discarded. Reported rather than resolved: which of two
-   * authored schemas is the real one is not a question this can answer.
-   */
-  /*
-   * Two format rules on one field collapse the same way, one level down.
-   * `email`, `url` and `uuid` each write `format`, and a property has one, so a
-   * field carrying two of them exported only the last -- silently, while the
-   * dialog called the export lossless. Which of two formats an answer really
-   * has is not a question this can answer either.
-   */
-  const FORMAT_RULES = new Set(['email', 'url', 'uuid'])
-  walk(document.root, (node) => {
+    /*
+     * Two format rules on one field collapse, one level down. `email`, `url`
+     * and `uuid` each write `format`, and a property has one, so a field
+     * carrying two of them exported only the last -- silently, while the dialog
+     * called the export lossless. Which of two formats an answer really has is
+     * not a question this can answer.
+     */
     const formats = validationsOf(node).filter((rule) => FORMAT_RULES.has(rule.key))
     for (const rule of formats.slice(0, -1)) {
       lossy.push({ key: node.key, rule: rule.key })
     }
-  })
 
-  const claimed = new Set<string>()
-  walk(document.root, (node) => {
+    /*
+     * Two components submitting one answer collapse in the export, and the
+     * collapse is silent. Sharing a `dataKey` is deliberate and documented --
+     * two fields behind opposite guards write one answer -- but a JSON Schema
+     * property is one property, so the last one visited wins and the first's
+     * type, format and constraints are discarded. Reported rather than
+     * resolved, for the same reason.
+     */
     if (!node.schema) return
     const name = dataKeyOf(node)
     if (claimed.has(name)) lossy.push({ key: node.key, rule: 'a schema for ' + name })
@@ -158,7 +167,7 @@ function baseType(type: FieldSchema['type']): JsonSchemaProperty {
  * `array` is ignored by every JSON Schema validator, which drops a constraint
  * the form does enforce. The keyword for a list is `minItems`.
  */
-function applyRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchemaProperty {
+function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchemaProperty {
   const counting = property.type === 'array'
   /*
    * `minLength` on a number or a boolean is not a length at all.
@@ -219,13 +228,53 @@ function titleOf(node: ComponentNode): string | undefined {
   const props: unknown = node.props
   if (!props || typeof props !== 'object' || Array.isArray(props)) return undefined
 
+  /*
+   * Own properties only, the way `valueOf` and `readPath` read a document.
+   *
+   * A plain lookup finds the prototype: `props` arriving with a non-null
+   * prototype that carries `label`, or an application that has polluted
+   * `Object.prototype.label`, gave every untitled field the same inherited
+   * title in the export. This function's whole job is hardening against a
+   * `props` that is not what it claims.
+   */
   const held = props as Record<string, PropValue | undefined>
-  const label = held['label'] ?? held['text']
+  const own = (name: string): PropValue | undefined =>
+    Object.hasOwn(held, name) ? held[name] : undefined
+  const label = own('label') ?? own('text')
   if (label?.kind === 'static' && typeof label.value === 'string' && label.value) return label.value
   return undefined
 }
 
 export function toJsonSchema(document: FormDocument): JsonSchema {
+  /*
+   * A root that is itself a repeater keeps its rows.
+   *
+   * `objectFor` skips the node it is given -- it exists to describe that node's
+   * *children* -- which is right for a screen and wrong for a repeater: the
+   * root's rows were flattened to the top level and the array disappeared, so
+   * the export named a row's fields as the document's own. That is the exact
+   * failure `objectFor`'s comment says is silent and was already fixed once,
+   * one level up from where it was fixed.
+   *
+   * The root is always a container and a repeater is a container, so this is
+   * reachable from any imported document.
+   */
+  if (isRowScope(document.root)) {
+    const row = objectFor(document.root)
+    const items: JsonSchemaProperty = { type: 'object', properties: row.properties }
+    if (row.required.length > 0) items.required = row.required
+
+    const rows: JsonSchemaProperty = { type: 'array', items }
+    const name = dataKeyOf(document.root)
+    const schema: JsonSchema = {
+      $schema: DRAFT,
+      type: 'object',
+      properties: { ...{ [name]: rows } },
+    }
+    if (document.name) schema.title = document.name
+    return schema
+  }
+
   const shape = objectFor(document.root)
 
   const schema: JsonSchema = { $schema: DRAFT, type: 'object', properties: shape.properties }
@@ -307,7 +356,7 @@ function objectFor(root: ComponentNode): {
     const conditional = node.renderWhen !== undefined
 
     for (const rule of validationsOf(node)) {
-      property = applyRule(property, rule)
+      property = withRule(property, rule)
       /*
        * Only an unguarded `required` becomes a schema requirement. A guarded one
        * applies sometimes, and JSON Schema's `required` is unconditional, so

@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
-import { languageTag } from '@formsmith/core'
+import { findLanguage, languageTag } from '@formsmith/core'
 import type { Device, FormDocument, IconName, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -190,7 +190,15 @@ export function Designer({
    * corrected in an effect, so there is no frame where that is on screen.
    */
   const languages = api.document.languages
-  const stillThere = language !== undefined && languages.some((l) => languageTag(l) === language)
+  /*
+   * `findLanguage`, not a fourth inline re-spelling of the tag rule.
+   *
+   * Core exports it for exactly this question and nothing outside its own test
+   * called it, while three places here compared `languageTag(l)` by hand -- and
+   * the whole reason that function exists is that the two spellings of a
+   * language drifted apart once already.
+   */
+  const stillThere = language !== undefined && findLanguage(languages, language) !== undefined
   const activeLanguage = stillThere ? language : undefined
 
   /*

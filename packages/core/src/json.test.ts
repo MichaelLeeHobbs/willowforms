@@ -435,3 +435,29 @@ describe('an option that is a plain string', () => {
     expect(optionEntry(undefined, 7)).toEqual({ value: '7', label: '7' })
   })
 })
+
+/**
+ * A label that is not a string.
+ *
+ * `optionEntry` kept a label only when it was already a string, so
+ * `{ label: 2024, value: 'y2024' }` -- what an author writing years in the JSON
+ * options editor produces -- drew the value instead of the label. This file has
+ * `jsonToString`, and every other read here uses it.
+ */
+describe('an option whose label is not a string', () => {
+  it('renders a number or a boolean rather than dropping it', () => {
+    expect(optionEntry({ label: 2024, value: 'y2024' }, 0)).toEqual({
+      value: 'y2024',
+      label: '2024',
+    })
+    expect(optionEntry({ label: false, value: 'no' }, 0)).toEqual({ value: 'no', label: 'false' })
+  })
+
+  it('falls back to the value for a label nobody could have written', () => {
+    // The control. `null`, an object or a list is not a label a person typed,
+    // and `[object Object]` under a control is worse than the value.
+    expect(optionEntry({ label: null, value: 'a' }, 0)).toEqual({ value: 'a', label: 'a' })
+    expect(optionEntry({ label: { deep: 1 }, value: 'b' }, 0)).toEqual({ value: 'b', label: 'b' })
+    expect(optionEntry({ label: ['x'], value: 'c' }, 0)).toEqual({ value: 'c', label: 'c' })
+  })
+})
