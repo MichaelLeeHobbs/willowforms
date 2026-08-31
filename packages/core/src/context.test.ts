@@ -488,6 +488,56 @@ describe('the boot-time questions, on a document nobody checked', () => {
     expect(() => contextValues(broken(patch), 'step')).not.toThrow()
   })
 
+  it('answers rather than overflowing on a condition nested past any bound', () => {
+    /*
+     * The malformed fixtures above are all one level deep, so the depth bound
+     * these three walks carry -- `fromCondition` and `contextValues`' `visit`,
+     * both at `MAX_CONDITION_DEPTH` -- was never reached from this file.
+     * `condition.test.ts` has the deep fixture; the functions a host calls at
+     * startup had none.
+     *
+     * Delete both guards and `contextKeys(root)` throws a `RangeError` while an
+     * application is booting, on a document somebody hand-wrote, which is the
+     * one thing a function whose whole job is surviving malformed input
+     * promises not to do. 5000 is well past the bound of 200 and well past what
+     * an author can produce in a 288px panel.
+     */
+    let deep: Condition = isAdmin
+    for (let i = 0; i < 5000; i += 1) deep = { op: 'not', condition: deep }
+
+    const root = tree([
+      {
+        key: 'vat',
+        type: 'TextField',
+        props: {},
+        renderWhen: { kind: 'condition', condition: deep },
+      },
+    ])
+
+    expect(() => contextKeys(root)).not.toThrow()
+    expect(() => missingContext(root, {})).not.toThrow()
+    expect(() => contextValues(root, 'user.role')).not.toThrow()
+  })
+
+  it('reads the keys of a condition nested just inside the bound', () => {
+    // The control. A walk that stopped at the first `not` would pass the test
+    // above by reading nothing at all.
+    let nested: Condition = isAdmin
+    for (let i = 0; i < 20; i += 1) nested = { op: 'not', condition: nested }
+
+    const root = tree([
+      {
+        key: 'vat',
+        type: 'TextField',
+        props: {},
+        renderWhen: { kind: 'condition', condition: nested },
+      },
+    ])
+
+    expect([...contextKeys(root)]).toEqual(['user.role'])
+    expect(contextValues(root, 'user.role')).toEqual(['admin'])
+  })
+
   it('still reads a document that is fine', () => {
     // The control: a guard that answered nothing for everything would pass the
     // whole block above and make the boot-time check useless.

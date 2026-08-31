@@ -199,6 +199,28 @@ describe('styleSheetFor', () => {
     expect(sheet).toContain('\\00003c')
   })
 
+  it('escapes a backslash, which would otherwise escape the quote that follows it', () => {
+    /*
+     * The last member of the escape class with no fixture: the keys used across
+     * this file cover the quote, the `<` and the control range, and never a
+     * backslash. Drop it from the class and a node keyed `a\` emits
+     * `[data-fs-key="a\"]{…}`, where `\"` is an escaped quote rather than the
+     * end of the string -- so the attribute value runs on past the closing
+     * bracket and swallows the next rule's selector and declarations. One
+     * node's styling lands under another's, which is the failure the header of
+     * this module describes.
+     */
+    const sheet = styleSheetFor(
+      root([node('a\\', { any: 'color: red' }), node('b', { any: 'color: blue' })]),
+    )
+
+    expect(sheet).toContain('[data-fs-key="a\\00005c "]{color: red}')
+    expect(sheet).toContain('[data-fs-key="b"]{color: blue}')
+    // And nowhere is there a backslash sitting immediately before the quote
+    // that is supposed to close the attribute value.
+    expect(sheet).not.toContain('\\"')
+  })
+
   it('escapes a newline in a key, which would end the string on its own', () => {
     const sheet = styleSheetFor(root([node('a\n{}', { any: 'color: red' })]))
     expect(sheet).not.toContain('\n')

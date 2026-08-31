@@ -126,6 +126,38 @@ describe('ordering', () => {
     expect(check({ op: 'gt', left: ref('age'), right: lit(30) })).toBe(false)
   })
 
+  it('compares two infinities rather than subtracting them', () => {
+    /*
+     * Every operand in this describe is a finite integer, so `a - b` and a pair
+     * of comparisons answer identically and the fix here was undefended.
+     * `Infinity - Infinity` is `NaN`, `NaN >= 0` is false, and a `gte` between
+     * two equal values then hid the component -- and its whole subtree left
+     * `validateForm` with it, so a required answer became optional. A host can
+     * hand an infinity over as a context value, which is how it arrives.
+     */
+    const inf: FormData = { limit: Infinity, floor: -Infinity }
+
+    expect(check({ op: 'gte', left: ref('limit'), right: lit(Infinity) }, inf)).toBe(true)
+    expect(check({ op: 'lte', left: ref('limit'), right: lit(Infinity) }, inf)).toBe(true)
+    expect(check({ op: 'gt', left: ref('limit'), right: lit(Infinity) }, inf)).toBe(false)
+    expect(check({ op: 'lte', left: ref('floor'), right: lit(-Infinity) }, inf)).toBe(true)
+
+    // And an infinity still orders against a finite number.
+    expect(check({ op: 'gt', left: ref('limit'), right: lit(0) }, inf)).toBe(true)
+    expect(check({ op: 'lt', left: ref('floor'), right: lit(0) }, inf)).toBe(true)
+  })
+
+  it('answers false for a comparison against NaN, in both directions', () => {
+    // Unordered, like a string against a number: `NaN` compares false to
+    // everything including itself, and guessing an answer would be worse.
+    const nan: FormData = { score: NaN }
+
+    for (const op of ['gt', 'gte', 'lt', 'lte'] as const) {
+      expect(check({ op, left: ref('score'), right: lit(0) }, nan), op).toBe(false)
+      expect(check({ op, left: lit(0), right: ref('score') }, nan), op + ' reversed').toBe(false)
+    }
+  })
+
   it('orders ISO dates as text, which is why the date components store them', () => {
     expect(check({ op: 'gt', left: ref('date'), right: lit('2026-01-01') })).toBe(true)
     expect(check({ op: 'lt', left: ref('date'), right: lit('2026-01-01') })).toBe(false)
@@ -508,6 +540,48 @@ describe('a condition nested beyond any reasonable depth, through not and throug
     // The control. A limit low enough to catch real authoring would be worse
     // than the crash: it would silently hide components.
     expect(evaluateCondition(deep(20), {})).toBe(true)
+  })
+
+  it('does not throw comparing values nested through lists', () => {
+    /*
+     * The object case below was the only one, and it is the branch that always
+     * carried `depth + 1`. The array branch dropped it, so the bound counted
+     * only the levels reached through objects and a list inside a list inside a
+     * list recursed with nothing stopping it. Two equally deep arrays are the
+     * shape that reaches it: `same` returns early on a length mismatch, so both
+     * sides have to nest together.
+     */
+    const nest = (n: number): JsonValue => {
+      let value: JsonValue = [1]
+      for (let i = 0; i < n; i += 1) value = [value]
+      return value
+    }
+
+    expect(() =>
+      evaluateCondition(
+        {
+          op: 'eq',
+          left: { kind: 'literal', value: nest(50_000) },
+          right: { kind: 'literal', value: nest(50_000) },
+        },
+        {},
+      ),
+    ).not.toThrow()
+  })
+
+  it('still compares lists a person would write', () => {
+    // The control, again: a bound low enough to refuse real data would answer
+    // `ne` on two identical lists and show a component that should be hidden.
+    expect(
+      evaluateCondition(
+        {
+          op: 'eq',
+          left: { kind: 'literal', value: [[['a'], ['b']]] },
+          right: { kind: 'literal', value: [[['a'], ['b']]] },
+        },
+        {},
+      ),
+    ).toBe(true)
   })
 
   it('does not throw comparing values nested through objects', () => {

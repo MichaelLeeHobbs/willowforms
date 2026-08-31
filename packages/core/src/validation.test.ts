@@ -5,8 +5,11 @@ import { contextValues } from './context.js'
 import type { EvalOptions, Evaluator } from './validation.js'
 import {
   DEFAULT_MESSAGES,
+  MAX_ROWS,
+  TOO_MANY_ROWS,
   UNREADABLE_RULE,
   applyRule,
+  isRequired,
   autoValidateKeys,
   patternProblem,
   submittedData,
@@ -235,6 +238,93 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
     expect(check({ key: 'required', when: { kind: 'static', value: true } }, '')).toBe(
       DEFAULT_MESSAGES.required,
     )
+  })
+
+  it('hands the host context to the evaluator, for a guard and for a rule', () => {
+    /*
+     * Every evaluator in this file was `(expression) => expression === 'true'`,
+     * so the third argument could be dropped at the call site and nothing would
+     * say so -- and a `computed` guard reading `context.user.role` would then
+     * evaluate against `undefined`, come back falsy, and stop applying a
+     * `required` rule on the server. That is the permissive failure, arrived at
+     * through a parameter list.
+     *
+     * Both call sites pass it and both are checked here: the guard and the
+     * `custom` rule.
+     */
+    const evaluate: Evaluator = (expression, _data, context) =>
+      expression === 'admin' &&
+      (context?.['user'] as { role?: string } | undefined)?.role === 'admin'
+
+    const admin = { context: { user: { role: 'admin' } }, evaluate }
+    const guest = { context: { user: { role: 'guest' } }, evaluate }
+    const guarded: ValidationRule = {
+      key: 'required',
+      when: { kind: 'computed', expression: 'admin' },
+    }
+
+    expect(applyRule(guarded, '', NO_DATA, admin)).toBe(DEFAULT_MESSAGES.required)
+    expect(applyRule(guarded, '', NO_DATA, guest)).toBeUndefined()
+
+    const custom: ValidationRule = { key: 'custom', expression: 'admin' }
+    expect(applyRule(custom, 'x', NO_DATA, admin)).toBeUndefined()
+    expect(applyRule(custom, 'x', NO_DATA, guest)).toBe(DEFAULT_MESSAGES.custom)
+  })
+
+  it('applies a rule guarded by a translation, which says nothing about whether it holds', () => {
+    /*
+     * The fourth guard kind, and the only one with no test. An `i18n` binding
+     * names a translated string; it is not a decision, so there is nothing for
+     * it to say no with, and the rule applies. Flip that to `false` and every
+     * rule carrying an `i18n` guard stops applying, quietly, which is the
+     * direction this whole file leans against.
+     */
+    const rule: ValidationRule = { key: 'required', when: { kind: 'i18n', key: 'when_required' } }
+
+    expect(check(rule, '')).toBe(DEFAULT_MESSAGES.required)
+    expect(check(rule, 'Ada')).toBeUndefined()
+  })
+})
+
+/**
+ * What a kit asks before it writes `aria-required` on a control.
+ *
+ * Exported from core, called from four places across the two kits, and driven
+ * by no test in the repository until now -- `kit-contract.test.tsx` reaches it
+ * only through `[{key:'required'}]` and `[]`, which is the easy half. Drop
+ * `&& !rule.when` and a conditionally-required field is announced to a screen
+ * reader as always mandatory, which is the case the function's own docblock
+ * says it exists to avoid.
+ */
+describe('isRequired', () => {
+  const node = (validations: ValidationRule[]): ComponentNode => ({
+    key: 'email',
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations },
+  })
+
+  it('is true for an unguarded required rule', () => {
+    expect(isRequired(node([{ key: 'required' }]))).toBe(true)
+    expect(isRequired(node([{ key: 'minLength', value: 2 }, { key: 'required' }]))).toBe(true)
+  })
+
+  it('is false when the rule is guarded, however the guard would answer', () => {
+    // Including a guard that is statically true: what a screen reader is told
+    // has to match what the form does now, and `isRequired` is asked without
+    // the data or the evaluator that would settle it.
+    expect(isRequired(node([{ key: 'required', when: { kind: 'static', value: true } }]))).toBe(
+      false,
+    )
+    expect(
+      isRequired(node([{ key: 'required', when: { kind: 'computed', expression: 'x' } }])),
+    ).toBe(false)
+  })
+
+  it('is false without a required rule, and for a component with no schema', () => {
+    expect(isRequired(node([]))).toBe(false)
+    expect(isRequired(node([{ key: 'email' }]))).toBe(false)
+    expect(isRequired({ key: 'stack', type: 'Stack', props: {} })).toBe(false)
   })
 })
 
@@ -1586,5 +1676,72 @@ describe('patternProblem', () => {
         DEFAULT_MESSAGES.pattern,
       )
     }
+  })
+})
+
+/**
+ * The cap on how much work a request body can ask for.
+ *
+ * `MAX_ROWS` and `TOO_MANY_ROWS` appeared in `validation.ts` and in the
+ * re-export from `index.ts` and in no test anywhere in the repository. The row
+ * count comes out of the data on purpose -- asking the browser how many rows
+ * there are would let a client submit one and have the rest go unchecked -- so
+ * the body decides how much work happens, and rows nest multiplicatively.
+ *
+ * Both directions matter. Delete the cap and a couple of hundred kilobytes of
+ * JSON is millions of rule evaluations; flip the comparison and every repeater
+ * refuses instead, which is a form nobody can submit.
+ */
+describe('a repeater with more rows than will be checked', () => {
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          {
+            key: 'street',
+            dataKey: 'line1',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'required' }] },
+          },
+        ],
+      },
+    ],
+  }
+
+  const rows = (count: number): FormData => ({
+    addresses: Array.from({ length: count }, () => ({ line1: 'x' })),
+  })
+
+  it('refuses the list rather than checking a prefix of it', () => {
+    const errors = validateForm(root, rows(MAX_ROWS + 1))
+
+    // At the repeater's own address, and alone: a prefix that validated clean
+    // would answer with the rows nobody looked at reported as fine.
+    expect(errors).toEqual({ addressList: TOO_MANY_ROWS })
+  })
+
+  it('checks a list exactly at the cap', () => {
+    /*
+     * The boundary, and the control for the direction of the comparison. With
+     * `<` in place of `>` this list would report `TOO_MANY_ROWS` too, and the
+     * test above would still pass.
+     */
+    const full = rows(MAX_ROWS)
+    expect(validateForm(root, full)).toEqual({})
+
+    const last = (full['addresses'] as FormData[])[MAX_ROWS - 1]
+    delete last?.['line1']
+    expect(validateForm(root, full)).toEqual({
+      ['addresses[' + String(MAX_ROWS - 1) + '].street']: DEFAULT_MESSAGES.required,
+    })
   })
 })
