@@ -61,9 +61,14 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
        * the error state that a *refused* rename had just set. The one gesture
        * this control exists for was the one that threw it away.
        *
-       * It re-syncs on a changed value already, the way every other editor here
-       * does, so the remount was doing nothing the component could not do
-       * itself. Selecting a different component is what should replace it, and
+       * Nothing replaces the remount, and nothing needs to. A key changing
+       * underneath this field means the key it is showing is gone from the
+       * document, the store refuses to leave the selection on a node that is
+       * gone, and the panel unmounts with it -- so there is no state in which
+       * this field could go stale. That is two components agreeing, so it is
+       * pinned from the test side as well.
+       *
+       * Selecting a different component is what should replace this field, and
        * the panel above already remounts on that.
        */}
       <KeyField value={node.key} onRename={(next) => api.renameKey(node.key, next)} />

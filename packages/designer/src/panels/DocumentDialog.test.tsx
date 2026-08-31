@@ -232,6 +232,106 @@ describe('the JSON dialog', () => {
     expect(latest().name).toBe('Contact request')
   })
 
+  it('takes the errors back with the draft they were about', async () => {
+    /*
+     * The test above reverts a draft that was never applied, so there was
+     * nothing on screen for Revert to leave behind. Apply first and there is:
+     * `setDraft(documentJson)` put the stored document in the editor and left
+     * the `role="alert"` list naming problems with a draft that is no longer
+     * there -- complaints about a document the box no longer holds, and no way
+     * to clear them short of closing the dialog. `onFile` had always cleared
+     * both, which is what made this one look deliberate.
+     */
+    const { user, open, editor } = setup()
+
+    await open()
+    await replaceEditor(user, editor(), '{}')
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(screen.getByRole('alert')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Revert' }))
+
+    expect(JSON.parse(editor().value)).toMatchObject({ name: 'Contact request' })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  /**
+   * Importing a file, which is the half of "import and export" nothing drove.
+   *
+   * Every other test in this file reaches the editor by typing into it. The
+   * file input has its own path -- read the text, load it rather than apply it,
+   * say what happened -- plus a failure branch and a reset whose comment records
+   * a bug that had already been fixed once.
+   */
+  const chooseFile = async (
+    user: ReturnType<typeof userEvent.setup>,
+    file: File,
+  ): Promise<HTMLInputElement> => {
+    const input = screen.getByLabelText('Import file') as HTMLInputElement
+    await user.upload(input, file)
+    return input
+  }
+
+  const asFile = (name: string, text: string): File =>
+    new File([text], name, { type: 'application/json' })
+
+  it('loads a chosen file into the editor rather than applying it', async () => {
+    const { user, open, editor, latest } = setup()
+    await open()
+
+    const renamed = { ...JSON.parse(editor().value), name: 'From a file' } as Record<
+      string,
+      unknown
+    >
+    await chooseFile(user, asFile('form.json', JSON.stringify(renamed)))
+
+    // In the editor, and not in the document: a bad file has to be visible and
+    // fixable rather than replacing the form outright.
+    expect(JSON.parse(editor().value)).toMatchObject({ name: 'From a file' })
+    expect(latest().name).toBe('Contact request')
+    expect(screen.getByText(/Loaded form\.json/)).toBeTruthy()
+  })
+
+  it('clears the file input, so the same file can be imported twice', async () => {
+    /*
+     * A file input fires nothing when the chosen file has not changed, so
+     * re-importing after editing it on disk did nothing at all -- no note, no
+     * error, a button that had stopped working. The reset that fixed it had no
+     * test, which is what this is.
+     */
+    const { user, open, editor } = setup()
+    await open()
+
+    const first = { ...JSON.parse(editor().value), name: 'First read' } as Record<string, unknown>
+    const input = await chooseFile(user, asFile('form.json', JSON.stringify(first)))
+    expect(input.value).toBe('')
+
+    // The same file name again, with different content, which is what editing
+    // it on disk looks like from here.
+    const second = { ...first, name: 'Second read' }
+    await chooseFile(user, asFile('form.json', JSON.stringify(second)))
+
+    expect(JSON.parse(editor().value)).toMatchObject({ name: 'Second read' })
+  })
+
+  it('says so when the file cannot be read', async () => {
+    const { user, open, editor } = setup()
+    await open()
+
+    const unreadable = asFile('form.json', '{}')
+    // A file whose bytes are gone: the picker holds a handle, and the file can
+    // be moved or a permission withdrawn between choosing it and reading it.
+    Object.defineProperty(unreadable, 'text', {
+      value: () => Promise.reject(new Error('gone')),
+    })
+
+    const before = editor().value
+    await chooseFile(user, unreadable)
+
+    expect(within(await screen.findByRole('alert')).getByText(/could not be read/)).toBeTruthy()
+    expect(editor().value, 'a failed read replaced the draft').toBe(before)
+  })
+
   it('starts from the document again after a cancelled edit', async () => {
     const { user, open, editor } = setup()
 
@@ -316,22 +416,110 @@ describe('the JSON dialog', () => {
     )
   })
 
+  /**
+   * A clipboard for one test, put back afterwards.
+   *
+   * `Object.defineProperty(navigator, 'clipboard', ...)` with no restore is a
+   * change to the environment every later test in the file inherits. It was
+   * harmless only because nothing after it clicked Copy -- and the day
+   * something does, it reads as a product bug in whatever test happens to run
+   * next. There are three Copy tests now, each needing a different clipboard.
+   */
+  const clipboard = (
+    writeText: (text: string) => Promise<void>,
+  ): { calls: string[]; restore: () => void } => {
+    const calls: string[] = []
+    const before = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          calls.push(text)
+          return writeText(text)
+        },
+      },
+    })
+
+    return {
+      calls,
+      restore: () => {
+        if (before) Object.defineProperty(navigator, 'clipboard', before)
+        else delete (navigator as { clipboard?: unknown }).clipboard
+      },
+    }
+  }
+
   it('says so when the clipboard is refused instead of appearing to work', async () => {
     const { user, open } = setup()
-    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const denied = clipboard(() => Promise.reject(new Error('denied')))
 
-    await open()
-    await user.click(screen.getByRole('button', { name: 'Copy' }))
+    try {
+      await open()
+      await user.click(screen.getByRole('button', { name: 'Copy' }))
 
-    // Scoped to the dialog: the designer shell also has a live region with
-    // role="status", which is a different thing entirely.
-    const dialog = document.querySelector('dialog')
-    if (!dialog) throw new Error('no dialog')
-    expect(await within(dialog).findByRole('status')).toHaveProperty(
-      'textContent',
-      expect.stringContaining('refused clipboard access'),
-    )
+      // Scoped to the dialog: the designer shell also has a live region with
+      // role="status", which is a different thing entirely.
+      const dialog = document.querySelector('dialog')
+      if (!dialog) throw new Error('no dialog')
+      expect(await within(dialog).findByRole('status')).toHaveProperty(
+        'textContent',
+        expect.stringContaining('refused clipboard access'),
+      )
+    } finally {
+      denied.restore()
+    }
+  })
+
+  it('copies the draft and says it did', async () => {
+    // The other branch, which nothing drove: a Copy that works has to say so,
+    // or a user cannot tell it from a Copy that silently did nothing.
+    const { user, open, editor } = setup()
+    const allowed = clipboard(() => Promise.resolve())
+
+    try {
+      await open()
+      const text = editor().value
+      await user.click(screen.getByRole('button', { name: 'Copy' }))
+
+      expect(allowed.calls).toEqual([text])
+
+      const dialog = document.querySelector('dialog')
+      if (!dialog) throw new Error('no dialog')
+      expect(await within(dialog).findByRole('status')).toHaveProperty(
+        'textContent',
+        expect.stringContaining('copied to the clipboard'),
+      )
+    } finally {
+      allowed.restore()
+    }
+  })
+
+  it('says so when the browser offers no clipboard at all', async () => {
+    /*
+     * Any page not on a secure origin, which includes a plain-HTTP host and
+     * some embedded webviews. The optional chain that used to be here made the
+     * button do nothing at all in that case, which is the one outcome the
+     * comment beside it ruled out.
+     */
+    const { user, open } = setup()
+    const before = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
+
+    try {
+      await open()
+      await user.click(screen.getByRole('button', { name: 'Copy' }))
+
+      const dialog = document.querySelector('dialog')
+      if (!dialog) throw new Error('no dialog')
+      expect(await within(dialog).findByRole('status')).toHaveProperty(
+        'textContent',
+        expect.stringContaining('offers no clipboard'),
+      )
+    } finally {
+      if (before) Object.defineProperty(navigator, 'clipboard', before)
+      else delete (navigator as { clipboard?: unknown }).clipboard
+    }
   })
 })
 

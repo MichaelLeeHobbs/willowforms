@@ -244,7 +244,24 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
                   }}
                 />
               </label>
-              <button type="button" onClick={() => setDraft(documentJson)}>
+              {/*
+               * The errors and the note go back with the draft.
+               *
+               * Revert put the stored document into the editor and left
+               * everything else alone, so the `role="alert"` list went on
+               * naming problems with a draft that is no longer on screen --
+               * four complaints about a document the box no longer holds, and
+               * nothing to click to clear them. `onFile` clears both for the
+               * same reason.
+               */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(documentJson)
+                  setErrors([])
+                  setNote('')
+                }}
+              >
                 Revert
               </button>
             </div>

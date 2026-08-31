@@ -210,6 +210,57 @@ describe('the key field', () => {
     expect(node('emailField')).toBeUndefined()
   })
 
+  it('keeps focus in the field it renamed from', async () => {
+    /*
+     * `<KeyField key={node.key}>` made a successful rename change the key this
+     * field is keyed on, so React unmounted it and mounted a new one -- taking
+     * the focus with it. `document.body` is also outside `.fs-shell`, so the
+     * shell's keyboard shortcuts stopped firing as well: one rename and the
+     * keyboard was gone until something was clicked.
+     *
+     * Nothing in this file looked at focus, so the fix that removed the `key`
+     * had nothing holding it in place. Focus is checkable in jsdom.
+     */
+    const { user, select } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email{Enter}')
+
+    expect(document.activeElement).toBe(keyBox())
+  })
+
+  it('is gone rather than stale after the rename is undone', async () => {
+    /*
+     * The other half of removing that `key`, and it is not the half it looks
+     * like. This field holds a draft and has no re-sync, so a key changing
+     * underneath it would leave the box showing text the document does not
+     * have -- and the next blur would commit that text, silently redoing the
+     * rename the undo had just taken back. That is the failure `DataKeyField`
+     * has its own describe for, further down this file.
+     *
+     * It cannot happen here, and this is why: undo restores a document in which
+     * `email` does not exist, the store refuses to leave the selection on a node
+     * that is gone, and the whole panel unmounts with it. Written down as a test
+     * because the safety comes from two components agreeing, and the agreement
+     * is invisible from either one.
+     */
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email{Enter}')
+    expect(node('email')).toBeDefined()
+
+    // The toolbar button, not the shortcut: the shortcut deliberately does not
+    // fire while a text field has focus, and focus is in this one.
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(node('emailField'), 'the undo did not take the rename back').toBeDefined()
+    expect(node('email')).toBeUndefined()
+    expect(screen.queryByRole('textbox', { name: /^Key/ })).toBeNull()
+  })
+
   it('renames on blur as well, since leaving the field is a commit', async () => {
     const { user, select, node } = setup(dataField())
     await select()
