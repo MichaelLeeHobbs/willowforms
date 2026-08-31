@@ -94,6 +94,28 @@ const kit: Kit = {
       props: [{ name: 'label', label: 'Label', editor: 'string' }],
       events: [],
     },
+    /*
+     * The root's own type, and it was missing.
+     *
+     * `measureNow` asks the palette index whether a candidate is a container,
+     * so with no `Screen` entry `defs.get('Screen')?.container` was `undefined`
+     * and the canvas had nowhere a drop could land -- under a real layout
+     * engine as much as under jsdom. Every drop test here was therefore passing
+     * for a second reason nobody had noticed, on top of the zero rectangles.
+     *
+     * `root: true` keeps it out of the palette, which is what the kit contract
+     * asks of the component that is already on the canvas.
+     */
+    {
+      type: 'Screen',
+      label: 'Screen',
+      group: 'layout',
+      container: true,
+      root: true,
+      defaultProps: {},
+      props: [],
+      events: [],
+    },
   ],
 }
 
@@ -309,6 +331,20 @@ describe('drag and drop wiring', () => {
   })
 
   it('leaves the document alone when a drag lands nowhere', async () => {
+    /*
+     * What this can and cannot say.
+     *
+     * jsdom gives every element a zero rectangle, so no point is inside
+     * anything and no drop resolves -- which means an unchanged document is
+     * also what a canvas with its whole release path deleted would produce.
+     * The document assertion alone proves nothing, and used to be all there
+     * was.
+     *
+     * So what is asserted here is the wiring jsdom can see: the drag armed (a
+     * label appeared), and it was let go of afterwards. A palette drag released
+     * off the canvas adding nothing is checked in `e2e/authoring.spec.ts`,
+     * where rectangles are real.
+     */
     const { user, view, keys } = setup()
     // Back to the palette: setup() opens the Tree tab, which most tests want.
     await user.click(screen.getByRole('tab', { name: 'Components' }))
@@ -317,9 +353,18 @@ describe('drag and drop wiring', () => {
     await user.pointer([
       { target: paletteItem, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } },
       { target: view.container, coords: { clientX: 500, clientY: 500 } },
+    ])
+
+    expect(
+      view.container.querySelector('.fs-drag-label'),
+      'the drag never armed, so the release below lands nowhere for the wrong reason',
+    ).not.toBeNull()
+
+    await user.pointer([
       { target: view.container, keys: '[/MouseLeft]', coords: { clientX: 500, clientY: 500 } },
     ])
 
+    expect(view.container.querySelector('.fs-drag-label')).toBeNull()
     expect(keys()).toEqual(['first', 'second', 'quiet'])
   })
 
@@ -616,6 +661,21 @@ describe('a drag over the canvas', () => {
     fireEvent.pointerMove(window, { clientX: 40, clientY: 40 })
     fireEvent.pointerMove(window, { clientX: 60, clientY: 60 })
     fireEvent.pointerMove(window, { clientX: 80, clientY: 80 })
+
+    /*
+     * A drag is actually in flight, which was assumed rather than asserted.
+     *
+     * The canvas re-renders during this test only because `useDrag` puts the
+     * pointer position in state. If `begin` ever stopped arming -- the
+     * pointerdown arrives through `onPointerDownCapture`, which has three early
+     * returns -- the canvas would not re-render at all, `renders() === before`
+     * would hold, and this would go green with the memo it exists to defend
+     * deleted.
+     */
+    expect(
+      view.container.querySelector('.fs-drag-label'),
+      'no drag armed, so this counted the renders of a canvas doing nothing',
+    ).not.toBeNull()
 
     expect(renders()).toBe(before)
 

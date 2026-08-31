@@ -11,7 +11,7 @@
  * phone, so the test that matters most here is that the document does not move.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -195,6 +195,102 @@ describe('the canvas language control', () => {
     expect(screen.getByText('Email')).toBeTruthy()
     expect(screen.queryByText('Courriel')).toBeNull()
     expect(screen.queryByText('email_label')).toBeNull()
+  })
+
+  it('forgets the removed language rather than waiting for it to come back', async () => {
+    /*
+     * The test above does not reach the line the source says is the point.
+     * `activeLanguage` is already `undefined` through `stillThere`, so deleting
+     * `if (language !== undefined && !stillThere) setLanguage(undefined)` keeps
+     * that test and the four before it green -- the canvas looks right for as
+     * long as the language is gone.
+     *
+     * What the line is for is what happens when it comes back. A choice nobody
+     * remembers making is still sitting in state, so adding French again an hour
+     * later makes the canvas jump to French on its own. No test in the
+     * repository re-added a removed language.
+     */
+    const { user } = setup()
+    await user.selectOptions(screen.getByLabelText('Canvas language'), 'fr')
+    expect(screen.getByText('Courriel')).toBeTruthy()
+
+    await user.click(screen.getByRole('tab', { name: 'Settings' }))
+    await user.click(screen.getByRole('button', { name: 'Remove French' }))
+
+    await user.type(screen.getByLabelText('Code'), 'fr')
+    await user.type(screen.getByLabelText('Name'), 'French')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    // Back in the list, and not the one the canvas is showing.
+    expect(screen.getByRole('button', { name: 'Remove French' })).toBeTruthy()
+    expect(screen.getByLabelText<HTMLSelectElement>('Canvas language').value).toBe('')
+    expect(screen.getByText('Email')).toBeTruthy()
+  })
+})
+
+/**
+ * What the host is told, and how often.
+ *
+ * `onChange` is deliberately out of the effect's dependency list and held in a
+ * ref, because a host passes an inline arrow and re-emitting on every one of its
+ * own renders is a render loop if the host stores what it is given. The harness
+ * above kept only the last document it was handed and never a call count, so the
+ * repair was unpinned: putting `onChange` back in the list keeps every test in
+ * this file green.
+ */
+describe('emitting the document to the host', () => {
+  const mounted = (): { emit: ReturnType<typeof vi.fn>; rerender: () => void } => {
+    const emit = vi.fn<(doc: FormDocument) => void>()
+    const document = documentOf([ENGLISH])
+
+    const view = render(
+      <Designer initialDocument={document} kit={kit} rendererKit={rendererKit} onChange={emit} />,
+    )
+
+    return {
+      emit,
+      // A host render with nothing changed, which is what an inline arrow makes
+      // a new function on. Every prop is the same value it already had.
+      rerender: () => {
+        view.rerender(
+          <Designer
+            initialDocument={document}
+            kit={kit}
+            rendererKit={rendererKit}
+            onChange={emit}
+          />,
+        )
+      },
+    }
+  }
+
+  it('emits once on mount', () => {
+    expect(mounted().emit).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not emit again when the host re-renders with a new arrow', () => {
+    const { emit, rerender } = mounted()
+    emit.mockClear()
+
+    act(() => {
+      rerender()
+      rerender()
+    })
+
+    expect(emit).not.toHaveBeenCalled()
+  })
+
+  it('still emits when the document actually changes', async () => {
+    // The control. Never emitting would pass the test above and leave the host
+    // with nothing to save.
+    const user = userEvent.setup()
+    const { emit } = mounted()
+    emit.mockClear()
+
+    await user.click(screen.getByRole('tab', { name: 'Components' }))
+    await user.click(screen.getByTitle('Add Field, or drag it onto the canvas'))
+
+    expect(emit).toHaveBeenCalledTimes(1)
   })
 })
 

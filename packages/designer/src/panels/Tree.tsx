@@ -228,12 +228,19 @@ export function Tree({
          * dropped focus onto `document.body` — every subsequent arrow key went
          * nowhere and the tree had to be tabbed back into.
          *
-         * The next row, or the previous one when the deleted row was last. The
-         * row is measured before the removal, because afterwards it is gone.
+         * The next row *outside the subtree being removed*, or the previous one
+         * when there is none. The row is measured before the removal, because
+         * afterwards it is gone -- and `rows[position + 1]` is a child of the
+         * node being deleted whenever the node has children, so deleting a
+         * container focused something that went with it and left focus on the
+         * body after all. `flatten` is depth-first, so the subtree is the
+         * contiguous run of deeper rows that follows.
          */
         const rows = flatten(root)
         const position = rows.findIndex((r) => r.node.key === node.key)
-        const after = rows[position + 1] ?? rows[position - 1]
+        const depth = rows[position]?.depth ?? 0
+        const beyond = rows.findIndex((r, i) => i > position && r.depth <= depth)
+        const after = (beyond === -1 ? undefined : rows[beyond]) ?? rows[position - 1]
 
         onRemove(node.key)
         announce(node.key + ' removed.')

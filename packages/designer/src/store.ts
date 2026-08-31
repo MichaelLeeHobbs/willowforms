@@ -590,28 +590,42 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply],
   )
 
-  const duplicateComponent = useCallback(
-    (key: string): string | undefined => {
-      const parent = findParent(history.present.root, key)
-      if (!parent) return undefined
+  const duplicateComponent = useCallback((key: string): string | undefined => {
+    /*
+     * `latest.current`, and committed against it, the way `addComponent` does.
+     *
+     * This read `history.present` out of the render closure, which is a render
+     * behind whenever two edits land in one tick -- and `duplicateNode` derives
+     * the copy's key from the root it is handed. Two duplications resolved
+     * against the same stale root produce two nodes with the same generated key,
+     * which is the duplicate-key state that makes every later tree operation
+     * edit the first match, silently. The whole point of this callback is to
+     * hand back a key nothing else is using.
+     */
+    const doc = latest.current
 
-      const copy = duplicateNode(history.present.root, key)
-      if (!copy) return undefined
+    const parent = findParent(doc.root, key)
+    if (!parent) return undefined
 
-      const index = parent.children?.findIndex((child) => child.key === key) ?? -1
-      if (index === -1) return undefined
+    const copy = duplicateNode(doc.root, key)
+    if (!copy) return undefined
 
-      // Directly after the original, which is where a duplicate belongs and
-      // where the eye is already looking.
-      apply((doc) => ({
-        ...doc,
-        root: insertNode(doc.root, parent.key, copy, index + 1),
-      }))
-      setSelectedKey(copy.key)
-      return copy.key
-    },
-    [apply, history],
-  )
+    const index = parent.children?.findIndex((child) => child.key === key) ?? -1
+    if (index === -1) return undefined
+
+    // Directly after the original, which is where a duplicate belongs and
+    // where the eye is already looking.
+    const root = insertNode(doc.root, parent.key, copy, index + 1)
+
+    /*
+     * Refused rather than merged if the document has moved underneath, for the
+     * reason `addComponent` gives: the copy's key was chosen against a tree that
+     * no longer exists, so writing it is how the collision happens.
+     */
+    setHistory((h) => (h.present === doc ? commit(h, { ...doc, root }) : h))
+    setSelectedKey(copy.key)
+    return copy.key
+  }, [])
 
   const setRenderWhen = useCallback(
     (key: string, value: PropValue | undefined) => {

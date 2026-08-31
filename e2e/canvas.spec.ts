@@ -266,3 +266,37 @@ test('the toolbar removes the selected component', async ({ designer }) => {
 
   expect(await designer.rootChildren()).not.toContain('website')
 })
+
+test('a palette drag released off the canvas adds nothing', async ({ designer }) => {
+  /*
+   * The half jsdom cannot check. `Canvas.test.tsx` drives this gesture and can
+   * only assert that the label appeared and went away again: every rectangle
+   * there is zero, so no point is inside anything and an unchanged document is
+   * also what a canvas with its whole release path deleted would produce.
+   *
+   * Here the rectangles are real, so a release over the left pane is genuinely
+   * outside every drop zone the canvas offers -- and the document being
+   * unchanged means the drop was refused rather than unreachable.
+   */
+  await designer.openTab('Components')
+  const before = await designer.rootChildren()
+
+  const item = designer.page.getByRole('button', { name: 'Checkbox', exact: true })
+  const pane = designer.page.locator('.fs-panel').first()
+
+  const start = await stableBox(item)
+  const away = await stableBox(pane)
+
+  await designer.page.mouse.move(start.x + 20, start.y + start.height / 2)
+  await designer.page.mouse.down()
+  await designer.page.mouse.move(start.x + 40, start.y + start.height / 2 + 20, { steps: 4 })
+  await designer.page.mouse.move(away.x + 10, away.y + away.height - 4, { steps: 8 })
+
+  // Armed, so the release below is a release from a real drag.
+  await expect(designer.page.locator('.fs-drag-label')).toBeVisible()
+
+  await designer.page.mouse.up()
+
+  await expect(designer.page.locator('.fs-drag-label')).toHaveCount(0)
+  expect(await designer.rootChildren()).toEqual(before)
+})
