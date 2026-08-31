@@ -63,7 +63,19 @@ test('every missing field is named at once, not one at a time', async ({ designe
   await designer.page.getByLabel('Form document JSON').fill('{}')
   await designer.page.getByRole('button', { name: 'Apply' }).click()
 
+  /*
+   * Named, not counted. `toHaveCount(4)` passes for any four messages, so a
+   * change that reported the same problem twice and dropped another one kept it
+   * green -- and the point of this test is that an empty document is refused for
+   * every reason at once rather than one at a time.
+   */
   const problems = designer.page.getByRole('alert').getByRole('listitem')
+  const text = (await problems.allTextContents()).join(' ')
+
+  expect(text).toContain('version')
+  expect(text).toContain('id')
+  expect(text).toContain('name')
+  expect(text).toContain('root')
   await expect(problems).toHaveCount(4)
 })
 
@@ -165,7 +177,21 @@ test('the same document renders through either kit', async ({ designer }) => {
   // The architecture's central claim, on one document, at runtime.
   await expect(designer.node('email').locator('.MuiInputBase-root')).toHaveCount(1)
 
+  /*
+   * With an edit first, because the switch remounts the designer and the
+   * document it remounts from is a choice this spec is the only one to make.
+   * Switching an unedited document proves the kit swap and nothing about
+   * whether the edit survives it -- and the version that read the boot document
+   * discarded every change since page load, silently, with no way back.
+   */
+  await designer.select('email')
+  await designer.openTab('Properties')
+  await designer.page.locator('#fs-prop-label').fill('Work email')
+
   await designer.page.locator('#pg-kit').selectOption('html')
+
+  await expect(designer.node('email').locator('label').first()).toHaveText(/Work email/)
+  expect((await designer.document()).root.children?.some((c) => c.key === 'email')).toBe(true)
 
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
   await expect(designer.page.locator('.fs-canvas__surface .MuiInputBase-root')).toHaveCount(0)

@@ -8,7 +8,7 @@
  * drop actually happens rather than asserted in a unit test.
  */
 
-import { expect, stableBox, test } from './harness.js'
+import { dragOnto, expect, test } from './harness.js'
 
 test('a repeater is authorable even though it has no rows', async ({ designer }) => {
   await designer.openTab('Components')
@@ -24,19 +24,13 @@ test('a field dropped into a repeater lands in the authored row, once', async ({
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
-  const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
-  // Only the source is scrolled, for the reason dragOnto explains.
-  await palette.scrollIntoViewIfNeeded()
-  const target = await stableBox(designer.node('repeater'))
-  const start = await stableBox(palette)
-
-  await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
-  await designer.page.mouse.down()
-  await designer.page.mouse.move(start.x + 50, start.y + 12, { steps: 4 })
-  await designer.page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, {
-    steps: 12,
-  })
-  await designer.page.mouse.up()
+  // `dragOnto` from the harness: this gesture was written out twice, verbatim,
+  // and it is the helper every other spec drags with.
+  await dragOnto(
+    designer.page,
+    designer.page.getByRole('button', { name: 'Text field', exact: true }),
+    designer.node('repeater'),
+  )
 
   /*
    * One node in the document, not one per row. The subtree is authored once and
@@ -73,20 +67,11 @@ test('preview renders the repeater and draws no rows until there are answers', a
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
-  const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
-  // Both scrolled before either is measured, for the reason dragOnto explains.
-  await palette.scrollIntoViewIfNeeded()
-  await designer.node('repeater').scrollIntoViewIfNeeded()
-  const target = await stableBox(designer.node('repeater'))
-  const start = await stableBox(palette)
-
-  await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
-  await designer.page.mouse.down()
-  await designer.page.mouse.move(start.x + 50, start.y + 12, { steps: 4 })
-  await designer.page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, {
-    steps: 12,
-  })
-  await designer.page.mouse.up()
+  await dragOnto(
+    designer.page,
+    designer.page.getByRole('button', { name: 'Text field', exact: true }),
+    designer.node('repeater'),
+  )
 
   await designer.page.getByRole('button', { name: 'Preview' }).click()
 

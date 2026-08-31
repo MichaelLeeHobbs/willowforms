@@ -25,8 +25,13 @@ function doc(children: ComponentNode[], name = 'Contact request'): FormDocument 
     name,
     root: { key: 'root', type: 'Screen', props: {}, children },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -165,6 +170,22 @@ describe('toJsonSchema', () => {
     expect(schema.properties['email']?.title).toBe('Email address')
   })
 
+  it('titles a button from its text, since that is the label it has', () => {
+    // `titleOf` reads `label` and falls back to `props.text`, and the fallback
+    // had no fixture: a Button carries `text`, not `label`.
+    const node = field('agree', 'boolean')
+    node.props['text'] = { kind: 'static', value: 'I agree' }
+    const schema = toJsonSchema(doc([node]))
+
+    expect(schema.properties['agree']?.title).toBe('I agree')
+  })
+
+  it('prefers the label when a component has both', () => {
+    const node = field('agree', 'boolean', [], 'Terms')
+    node.props['text'] = { kind: 'static', value: 'I agree' }
+    expect(toJsonSchema(doc([node])).properties['agree']?.title).toBe('Terms')
+  })
+
   it('leaves the title off when the label is a binding rather than static text', () => {
     const node = field('email', 'string')
     node.props['label'] = { kind: 'i18n', key: 'email_label' }
@@ -191,6 +212,78 @@ describe('unexportableRules', () => {
       field('b', 'string', [{ key: 'required' }]),
     ])
     expect(unexportableRules(document)).toEqual([{ key: 'a', rule: 'custom' }])
+  })
+})
+
+describe('a repeater inside a repeater, and a root that is a field', () => {
+  const nested = (): FormDocument => {
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'orderList',
+          dataKey: 'orders',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [
+            field('reference', 'string', [{ key: 'required' }]),
+            {
+              key: 'lineList',
+              dataKey: 'lines',
+              type: 'Repeater',
+              props: {},
+              schema: { type: 'array', validations: [] },
+              children: [field('sku', 'string', [{ key: 'required' }])],
+            },
+          ],
+        },
+      ],
+    }
+    return { ...createDocument('Nested', 'nested'), root }
+  }
+
+  it('nests items inside items, all the way down', () => {
+    /*
+     * One level of repeater was the deepest fixture here, so the recursion --
+     * `objectFor` calling itself for a row scope -- was never exercised, and a
+     * version that flattened the inner list would have exported a schema a
+     * server accepts every submission against.
+     */
+    const schema = toJsonSchema(nested())
+    const orders = schema.properties['orders']
+
+    expect(orders?.type).toBe('array')
+    expect(orders?.items?.required).toEqual(['reference'])
+
+    const lines = orders?.items?.properties?.['lines']
+    expect(lines?.type).toBe('array')
+    expect(lines?.items?.required).toEqual(['sku'])
+  })
+
+  it('names the inner list by its data key, not its component key', () => {
+    const schema = toJsonSchema(nested())
+    const orders = schema.properties['orders']
+    expect(Object.keys(orders?.items?.properties ?? {})).toEqual(['reference', 'lines'])
+  })
+
+  it('exports a root that carries its own schema as a property of itself', () => {
+    /*
+     * `validateForm(stepNode, data)` hands core a subtree, and that subtree can
+     * be a field. The branch that visits the root itself had no fixture, and
+     * visiting it twice -- once directly, once through its children -- was the
+     * defect it was hiding.
+     */
+    const root: ComponentNode = {
+      ...field('note', 'string', [{ key: 'required' }]),
+      children: [field('ignored', 'string')],
+    }
+    const schema = toJsonSchema({ ...createDocument('One', 'one'), root })
+
+    expect(Object.keys(schema.properties)).toEqual(['note', 'ignored'])
+    expect(schema.required).toEqual(['note'])
   })
 })
 

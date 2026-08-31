@@ -127,6 +127,71 @@ describe('validateForm and visibility', () => {
   })
 })
 
+describe('what validateForm hands down to a condition', () => {
+  it('forwards the context, so a condition can read what the host knows', () => {
+    /*
+     * Verified only through outcomes before: `options.context` reaching a
+     * `renderWhen` is what makes a per-role field validate or not, and a walk
+     * that dropped it would hide every context-gated field and report nothing.
+     */
+    const gated: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'salary',
+          type: 'TextField',
+          props: {},
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'user.role' },
+              right: { kind: 'literal', value: 'admin' },
+            },
+          },
+        },
+      ],
+    }
+
+    expect(validateForm(gated, {})).toEqual({})
+    expect(validateForm(gated, {}, { context: { user: { role: 'guest' } } })).toEqual({})
+    expect(validateForm(gated, {}, { context: { user: { role: 'admin' } } })).toEqual({
+      salary: 'This field is required.',
+    })
+  })
+
+  it('hides a container by a condition, not only by a static false', () => {
+    /*
+     * The hidden-container case used a `static` false, which is the one shape
+     * that needs no evaluation at all -- so the walk could have skipped reading
+     * a container's condition entirely and every test here stayed green.
+     */
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'group',
+          type: 'Stack',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'wanted' } },
+          },
+          children: [field('buried')],
+        },
+      ],
+    }
+
+    expect(validateForm(root, {})).toEqual({})
+    expect(validateForm(root, { wanted: true })).toEqual({ buried: 'This field is required.' })
+  })
+})
+
 describe('a structured condition needs no sandbox', () => {
   const node = (condition: Condition): ComponentNode => ({
     key: 'extra',

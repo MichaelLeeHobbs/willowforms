@@ -280,6 +280,22 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
      */
     if (node.renderWhen) next.renderWhen = repointBinding(node.renderWhen, node.key, nextKey)
     if (node.schema) next.schema = { ...node.schema, validations: [...node.schema.validations] }
+    /*
+     * `css` and `events` too. Both are records a panel writes into, and the copy
+     * shared them by reference: styling the duplicate restyled the original,
+     * and every event handler wired on one appeared on the other. Tree
+     * operations are immutable, so the panels replace rather than mutate and
+     * nothing has gone wrong yet -- which is exactly when this is cheap.
+     */
+    if (node.css) next.css = { ...node.css }
+    if (node.events) {
+      next.events = Object.fromEntries(
+        Object.entries(node.events).map(([event, actions]) => [
+          event,
+          Array.isArray(actions) ? [...actions] : actions,
+        ]),
+      )
+    }
     if (node.children) next.children = node.children.map(copy)
     return next
   }
@@ -383,7 +399,25 @@ export function moveNode(
   if (key === root.key) return root
   const node = findNode(root, key)
   if (!node) return root
-  if (!findNode(root, newParentKey)) return root
+
+  const parent = findNode(root, newParentKey)
+  if (!parent) return root
+
+  /*
+   * And the target has to be able to hold children.
+   *
+   * `insertNode` will happily give a leaf a `children` array, which produces a
+   * subtree no renderer draws -- a text field with a field inside it -- while
+   * `validateForm` and `toJsonSchema` keep walking it, so the document asks for
+   * an answer nobody can give. The designer's own drop paths refuse this, so it
+   * was unreachable from the UI and reachable from the API, which is the worse
+   * of the two places to leave it.
+   *
+   * Asked of the node, the way `isRowScope` asks: a container is instantiated
+   * with a `children` array and a leaf is not, so no kit is needed here.
+   */
+  if (!Array.isArray(parent.children)) return root
+
   // Dropping a subtree into its own descendant would detach the tree.
   if (pathTo(node, newParentKey).length > 0) return root
   return insertNode(removeNode(root, key), newParentKey, node, index)

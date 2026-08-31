@@ -101,7 +101,9 @@ Each language gets a field beside the property, so translating does not mean nav
 being translated. The field carries the language's `dir`, so right-to-left copy is authored the right way
 round.
 
-Languages themselves are managed on the Form tab: add, remove, set the default, set writing direction.
+Languages themselves are managed on the Settings tab in the left pane: add, remove, set the default, set
+writing direction. It moved there when form settings stopped being a tab of the inspector, because they
+belong to the document rather than to whatever is selected.
 The last language cannot be removed, and removing the current default moves it — a document naming a
 language it does not have renders every translation as a raw key.
 

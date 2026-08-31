@@ -69,6 +69,48 @@ describe('optionValue', () => {
   })
 })
 
+describe('optionValue, where a declared value and a position collide', () => {
+  it('prefers a declared value to a position that spells the same string', () => {
+    /*
+     * A list mixing declared values with bare ones: `'Yes'` has no value of its
+     * own so it falls back to its index, `0`, and the second option declares the
+     * string `'0'`. One submitted `"0"`, two options that answer to it, and a
+     * single pass returned whichever came first in the list.
+     *
+     * An author who wrote a value meant that value; a position is what an option
+     * falls back to when nobody wrote one.
+     */
+    const options = ['Yes', { label: 'No', value: '0' }]
+    expect(optionValue(options, '0')).toBe('0')
+  })
+
+  it('still falls back to the position for an option with no declared value', () => {
+    expect(optionValue(['Yes', 'No'], '1')).toBe('1')
+  })
+
+  it('takes the first of two options declaring one value', () => {
+    // Two options cannot be told apart by a submitted string, so the first wins
+    // and it is stated rather than left to iteration order.
+    const options = [
+      { label: 'One', value: 'x' },
+      { label: 'Two', value: 'x' },
+    ]
+    expect(optionValue(options, 'x')).toBe('x')
+  })
+
+  it('returns a string matching nothing as itself', () => {
+    // The empty placeholder, and anything a stale document offers: inventing a
+    // value for it would be worse than handing back what was submitted.
+    expect(optionValue([{ label: 'One', value: 1 }], '')).toBe('')
+    expect(optionValue([{ label: 'One', value: 1 }], 'nope')).toBe('nope')
+  })
+
+  it('gives back the declared type, not the submitted string', () => {
+    expect(optionValue([{ label: 'Two', value: 2 }], '2')).toBe(2)
+    expect(optionValue([{ label: 'Yes', value: true }], 'true')).toBe(true)
+  })
+})
+
 describe('safeHref', () => {
   /*
    * A document is data, and the person authoring a form is not always the

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   NO_ROWS,
   addressOf,
+  innermost,
   applyChange,
   decodeAddress,
   decodeRow,
@@ -25,6 +26,17 @@ describe('the row coordinate', () => {
 
   it('reads outermost first', () => {
     expect(encodeRow(path)).toBe('addresses[1].contacts[0]')
+  })
+
+  it('names the innermost repeater, or nothing at the top level', () => {
+    /*
+     * Exported and untested. It is what `scope: 'row'` means -- the row you are
+     * standing in, not the outermost one -- so a version that answered `path[0]`
+     * would read the wrong row's answers in every nested repeater and nothing
+     * would have said so.
+     */
+    expect(innermost(path)).toEqual({ key: 'contacts', index: 0 })
+    expect(innermost(NO_ROWS)).toBeUndefined()
   })
 
   it('is empty outside a repeater, so nothing else changes', () => {

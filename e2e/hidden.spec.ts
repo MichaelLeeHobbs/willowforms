@@ -30,8 +30,20 @@ test('a hidden container stays on the canvas and says it is hidden', async ({ de
 })
 
 test('a component that is shown carries no marker', async ({ designer }) => {
-  // Without this the attribute would say "hidden" for everything, and the
-  // canvas could not tell the two apart.
+  /*
+   * Without this the attribute would say "hidden" for everything, and the canvas
+   * could not tell the two apart. The count beside it is what makes this a
+   * control rather than a second way of passing: an attribute nothing emits
+   * anywhere satisfies "not hidden" perfectly, and the test above is where the
+   * one hidden component comes from.
+   */
+  await expect(designer.node('email')).not.toHaveAttribute('data-fs-hidden', 'true')
+
+  await designer.select('name')
+  await designer.openTab('Properties')
+  await designer.page.getByLabel('Show when').selectOption('never')
+
+  await expect(designer.page.locator('[data-fs-hidden="true"]')).not.toHaveCount(0)
   await expect(designer.node('email')).not.toHaveAttribute('data-fs-hidden', 'true')
 })
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   parseDeclarations,
+  printDeclarations,
   safeStyleValue,
   readDeclaration,
   safeDeclarations,
@@ -74,6 +75,37 @@ describe('styleSheetFor', () => {
 
     expect(sheet).toContain('[data-fs-key="card"]{padding: 8px}')
     expect(sheet).toContain('@media (max-width: 767px){[data-fs-key="card"]{padding: 4px}}')
+  })
+
+  it.each([
+    ['mobile', '(max-width: 767px)'],
+    ['tablet', '(min-width: 768px) and (max-width: 1023px)'],
+    ['desktop', '(min-width: 1024px)'],
+  ])('turns %s into its own query', (device, query) => {
+    /*
+     * All three breakpoints, not just mobile. The other two could have moved --
+     * a tablet rule that starts at 640px, a desktop one that overlaps it -- and
+     * the only test here asserted the mobile query, so the two that decide
+     * whether a rule reaches the screen at all were unpinned.
+     */
+    const sheet = styleSheetFor(root([node('card', { [device]: 'padding: 4px' })]))
+    expect(sheet).toBe('@media ' + query + '{[data-fs-key="card"]{padding: 4px}}')
+  })
+
+  it('escapes the scope, not only the key', () => {
+    /*
+     * `escapeKey` is applied to both and only one was ever given anything to
+     * escape. A scope is a `useId` value today, so nothing in it needs escaping
+     * -- and it is a string this library accepts from a caller, which is the
+     * definition of a value not to trust: a scope holding a quote would close
+     * the attribute selector and start a different one.
+     */
+    const sheet = styleSheetFor(root([node('card', { any: 'padding: 4px' })]), {
+      scope: 'a"] , body [x="',
+    })
+
+    expect(sheet).not.toContain('"] , body')
+    expect(sheet).toContain('000022')
   })
 
   it('puts the base layer before the queries, so a device overrides it', () => {
@@ -171,6 +203,27 @@ describe('styleSheetFor', () => {
     const inner = node('inner', { any: 'color: red' })
     const outer: ComponentNode = { key: 'outer', type: 'Box', props: {}, children: [inner] }
     expect(styleSheetFor(root([outer]))).toContain('[data-fs-key="inner"]')
+  })
+})
+
+describe('printDeclarations', () => {
+  it('writes one declaration per line, so the raw field stays readable', () => {
+    // Its own contract, which was only ever checked through `setDeclaration`.
+    expect(
+      printDeclarations([
+        ['padding', '8px'],
+        ['color', 'red'],
+      ]),
+    ).toBe('padding: 8px;' + String.fromCharCode(10) + 'color: red')
+  })
+
+  it('answers nothing for nothing', () => {
+    expect(printDeclarations([])).toBe('')
+  })
+
+  it('round-trips what parseDeclarations produced', () => {
+    const text = 'padding: 8px;' + String.fromCharCode(10) + 'color: red'
+    expect(printDeclarations(parseDeclarations(text))).toBe(text)
   })
 })
 

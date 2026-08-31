@@ -446,3 +446,47 @@ describe('a drag that does not finish normally', () => {
     expect(onCommit).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('a drag the browser takes away', () => {
+  it('ends on pointercancel without committing anything', () => {
+    /*
+     * A `pointercancel` is the browser deciding the gesture is no longer a
+     * drag -- a touch becoming a scroll, a pen leaving the digitiser, a system
+     * dialog. The controller listens for it and no test pressed it, so a drag
+     * that ended this way could have left the label glued to the cursor and the
+     * next click committing a drop nobody asked for.
+     */
+    const onCommit = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone(
+        'canvas',
+        vi.fn<DropResolver>(() => ({ parentKey: 'r', index: 0 })),
+      )
+    })
+
+    act(() => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }))
+    })
+
+    expect(result.current.state, 'the drag label is still on screen').toBeUndefined()
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('carries the source through the state, so the label can name it', () => {
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    const def = { type: 'Field', label: 'Field' } as never
+
+    act(() => {
+      result.current.begin({ kind: 'new', def }, press(10, 10))
+      pointer('pointermove', 200, 200)
+    })
+
+    // What the shell draws beside the cursor comes from here: a palette drag
+    // shows the component's label, a move shows the key.
+    expect(result.current.state?.source).toEqual({ kind: 'new', def })
+  })
+})

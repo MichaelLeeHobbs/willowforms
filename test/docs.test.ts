@@ -226,7 +226,7 @@ describe('the specification index', () => {
 })
 
 /** How many obligations the kit contract states. See the assertion that uses it. */
-const CONTRACT_RULES = 20
+const CONTRACT_RULES = 19
 
 describe('the kit contract table', () => {
   it('has one row for every rule the contract suite runs', () => {
@@ -237,7 +237,15 @@ describe('the kit contract table', () => {
      */
     const spec = read('docs/spec/02-kit-contract.md')
     const table = spec.slice(spec.indexOf('| Rule'))
-    const rows = [...table.matchAll(/^\| [A-Z][^|]*\|/gm)].length - 1
+    /*
+     * Any first character, not a capital letter. A row beginning with a
+     * backtick -- `nodeProps`, which is how half the obligations in this table
+     * would naturally be written -- was silently uncounted, so adding one made
+     * the two numbers disagree for a reason nobody would guess from the message.
+     * The separator row is dropped by matching the dashes rather than by
+     * subtracting one.
+     */
+    const rows = [...table.matchAll(/^\|(?! *-)[^|\n]+\|/gm)].length - 1
 
     /*
      * Only the rules, meaning the tests inside the per-kit block. The file also
@@ -246,7 +254,17 @@ describe('the kit contract table', () => {
      * would demand rows for rules that do not exist.
      */
     const suite = read('test/kit-contract.test.tsx')
-    const rules = suite.slice(suite.indexOf('describe.each(KITS)'))
+    /*
+     * From the per-kit block to the next top-level `describe`, not to the end of
+     * the file. Everything written after that block was counted too -- the
+     * "a default copied between kits" case is about these two kits agreeing with
+     * each other, not an obligation any third-party kit has -- so the table
+     * needed a row for a rule that does not exist. The counts matched today by
+     * the coincidence of such a row having been added.
+     */
+    const fromKits = suite.slice(suite.indexOf('describe.each(KITS)'))
+    const nextBlock = fromKits.indexOf('\ndescribe(')
+    const rules = nextBlock === -1 ? fromKits : fromKits.slice(0, nextBlock)
     const cases = [...rules.matchAll(/^\s+it(?:\.each)?\(/gm)].length
 
     expect(rows, 'the rule table and the contract suite disagree').toBe(cases)
@@ -336,7 +354,15 @@ describe('documentation links', () => {
     const base = file.includes('/') ? file.slice(0, file.lastIndexOf('/') + 1) : ''
     const broken: string[] = []
 
-    for (const match of text.matchAll(/\]\((?![a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)([^)\s]+)\)/g)) {
+    /*
+     * `](target)` and `](target "title")` both. The pattern refused anything
+     * with a space in it, so a link carrying a title was skipped in silence --
+     * and a check that quietly declines to look is worse than no check, because
+     * the file reads as covered.
+     */
+    for (const match of text.matchAll(
+      /\]\((?![a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)([^)\s]+)(?:\s+"[^"]*")?\)/g,
+    )) {
       const target = (match[1] ?? '').trim()
       const [file_, anchor] = target.split('#')
 
@@ -513,9 +539,9 @@ describe('a section that calls itself planned is still planned', () => {
       needle: 'setEvents',
       because: 'the Actions tab is the surface for that same store action',
     },
-    '06-inspector.md: Additional properties': {
+    '06-inspector.md: a passthrough for id,': {
       needle: null,
-      because: 'an author-defined property has no store action and no element id yet',
+      because: 'an author-defined attribute has no store action and no element id yet',
     },
     '07-bindings.md: try an expression': {
       needle: null,

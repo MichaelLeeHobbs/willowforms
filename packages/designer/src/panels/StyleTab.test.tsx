@@ -75,8 +75,13 @@ function setup(node: ComponentNode): Harness {
     name: 'Styling',
     root: { key: 'root', type: 'Screen', props: {}, children: [node] },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -166,6 +171,25 @@ describe('the Style tab', () => {
 
     expect(harness.latest()?.css?.any).toContain('8px')
     expect(harness.latest()?.css?.mobile).toContain('4px')
+  })
+
+  it('shows a structured edit in the raw box, which is the direction never tested', async () => {
+    /*
+     * The two editors are one string and this file only ever checked the raw
+     * box feeding the controls. The other direction is the one that breaks
+     * quietly: a control that writes without re-syncing leaves the raw field
+     * showing the old CSS, and the author trusts whichever one they looked at
+     * last.
+     */
+    const harness = setup({ ...field(), css: { any: 'color: red' } })
+    await harness.openStyle()
+
+    await harness.user.type(screen.getByLabelText('Padding'), '12px')
+    await harness.user.tab()
+
+    const raw = screen.getByLabelText('CSS')
+    expect(raw).toHaveProperty('value', expect.stringContaining('padding: 12px'))
+    expect(raw).toHaveProperty('value', expect.stringContaining('color: red'))
   })
 
   it('says so rather than silently dropping CSS that would escape the component', async () => {

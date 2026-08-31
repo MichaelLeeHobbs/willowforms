@@ -27,7 +27,9 @@ import globals from 'globals'
 /** Packages that must never reach a component library. */
 const COMPONENT_LIBRARIES = [
   { group: ['@mui/*', '@emotion/*'], message: '' },
-  { group: ['antd', 'antd/*', '@chakra-ui/*', '@radix-ui/*'], message: '' },
+  // `antd` covers `antd/es/button` too: these patterns use gitignore semantics,
+  // where a bare name matches the path and everything under it.
+  { group: ['antd', '@chakra-ui/*', '@radix-ui/*'], message: '' },
 ]
 
 const noComponentLibrary = (why) => COMPONENT_LIBRARIES.map((entry) => ({ ...entry, message: why }))
@@ -197,10 +199,14 @@ export default tseslint.config(
     },
   },
 
-  // Tests.
+  /*
+   * Tests. No `ignores` for `e2e/**`: the specs there are `*.spec.ts`, so the
+   * `files` above never matched them and the exclusion had nothing to exclude --
+   * configuration that reads as a decision and is a no-op, which is worse than
+   * either having it or not.
+   */
   {
     files: ['**/*.test.ts', '**/*.test.tsx', 'test/**/*.ts'],
-    ignores: ['e2e/**'],
     plugins: { vitest },
     rules: {
       ...vitest.configs.recommended.rules,

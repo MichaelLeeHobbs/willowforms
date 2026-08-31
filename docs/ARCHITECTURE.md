@@ -42,10 +42,12 @@ written against concrete components, and every one of those call sites becomes a
 second kit is wanted. The abstraction is not speculative: the competitor this project studied ships
 three kits, and the registry is where its extensibility lives.
 
-`@formsmith/kit-html` is the evidence rather than the argument. Adding it touched four files outside its
-own package, all of them build plumbing: a project reference, a source alias, a stylesheet copy, and the
-lockfile. Nothing in `core`, `renderer`, or `designer` changed. The playground switches between the two
-kits at runtime on the same document.
+`@formsmith/kit-html` is the evidence rather than the argument. Adding it changed nothing in `core`,
+`renderer` or `designer`. It did touch build configuration -- a project reference, a source alias, a
+stylesheet copy, the lockfile -- along with the playground, which had to offer the choice, and one bug in
+the other kit that the new contract test exposed. "Four files, all build plumbing" is a figure an earlier
+draft of `00-product.md` retracted: it counted the build files and not the files. The playground switches
+between the two kits at runtime on the same document.
 
 `test/kit-contract.test.tsx` turns the contract into an executable spec that runs against every kit in
 the repo: a renderer for every palette entry and no orphans, `nodeProps` reaching the DOM, containers

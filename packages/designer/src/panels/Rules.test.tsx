@@ -71,8 +71,13 @@ function makeDocument(validations: ValidationRule[] = []): FormDocument {
       ],
     },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -303,6 +308,44 @@ describe('rules editor', () => {
 
     expect(screen.getByLabelText('Value')).toHaveProperty('value', '3')
     expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 3 }])
+  })
+
+  it('edits a pattern, which is text rather than a number', async () => {
+    // The `pattern` editor had no test: it is the one parameter that is a
+    // string, so a row that reused the numeric input would have stored
+    // `Number('^a')` -- `NaN` -- and refused every value silently.
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Add a rule'), 'pattern')
+    const box = screen.getByLabelText(/regular expression|Value/i)
+    await user.clear(box)
+    // `fill`-style typing: userEvent reads `[` and `{` as keyboard descriptors,
+    // and a regular expression is mostly those.
+    fireEvent.change(box, { target: { value: '^[A-Z]{3}$' } })
+
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'pattern', value: '^[A-Z]{3}$' }])
+  })
+
+  it('edits a custom rule expression, and says it needs an evaluator', async () => {
+    /*
+     * The other untested editor, and the one whose failure is quietest: with no
+     * evaluator injected a `custom` rule passes, so a form that looks guarded is
+     * not. The panel says so beside the box, which is why the text matters as
+     * much as the write.
+     */
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Add a rule'), 'custom')
+    // The box, not the hint beside it that also says "expression".
+    const box = screen.getByRole('textbox', { name: /expression/i })
+    await user.type(box, 'value.length > 2')
+
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'custom', expression: 'value.length > 2' }])
+    expect(screen.getByText(/evaluator/i)).toBeTruthy()
   })
 
   it('drops the message key rather than storing an empty string', async () => {

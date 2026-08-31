@@ -71,9 +71,11 @@ export function ratio(a: string, b: string): number {
 export function tokensFrom(css: string, selector: string): Record<string, string> {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
   const tokens: Record<string, string> = {}
+  let found = false
 
   for (const match of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if ((match[1]?.trim() ?? '') !== selector) continue
+    found = true
 
     for (const declaration of (match[2] ?? '').split(';')) {
       const [name, value] = declaration.split(':')
@@ -82,6 +84,17 @@ export function tokensFrom(css: string, selector: string): Record<string, string
       if (trimmed.startsWith('--')) tokens[trimmed] = value.trim()
     }
   }
+
+  /*
+   * A selector nobody wrote is a mistake here, not an empty palette.
+   *
+   * This answered `{}` and left the loudness to one caller's own check, so any
+   * other caller -- a new suite, a one-off script -- silently measured nothing
+   * and reported that everything passed. A misspelled selector is the likeliest
+   * way to reach this, and it is exactly the case a contrast suite must not
+   * shrug at.
+   */
+  if (!found) throw new Error('No rule with the selector ' + selector)
 
   return tokens
 }

@@ -99,6 +99,13 @@ export function App(): ReactNode {
   }, [])
 
   const active = KITS[kitId] ?? KITS['mui']
+  /*
+   * Unreachable, and it stays. `KITS` is a non-empty literal in this file and
+   * `kitId` only ever holds one of its ids, so the lookup cannot miss --
+   * `noUncheckedIndexedAccess` cannot know that, and the alternative is a
+   * non-null assertion, which is the same claim with nothing behind it. A throw
+   * that cannot happen is cheaper than a lie that can.
+   */
   if (!active) throw new Error('No kit registered')
 
   return (

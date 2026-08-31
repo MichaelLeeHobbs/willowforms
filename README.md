@@ -2,7 +2,7 @@
 
 An MIT-licensed visual form designer for React. The **designer**, not just the renderer.
 
-> Status: beta. The builder works end to end and is covered by 1450 tests, but nothing is published to
+> Status: beta. The builder works end to end and is covered by 1500 tests, but nothing is published to
 > npm yet and no release has been cut. [docs/ROADMAP.md](docs/ROADMAP.md) is the honest status,
 > including what is still missing.
 
@@ -67,7 +67,7 @@ Hono server so the demo can persist a document and prove server-side validation 
 ```bash
 pnpm install
 pnpm dev          # playground at http://localhost:5180
-pnpm test         # 1450 tests
+pnpm test         # 1500 tests
 pnpm e2e          # 68 more, in a real browser
 pnpm build        # tsc --build across all packages
 ```
@@ -108,8 +108,9 @@ check rather than a promise.
 **The designer stays MIT.** No open-core split, no "enterprise" directory. The moment the designer goes
 behind a license, this project has become the thing it was built to replace.
 
-**Kits are pluggable, and that is demonstrated.** Adding `@formsmith/kit-html` touched four files outside
-its own package, all of them build plumbing. Nothing in core, the renderer, or the designer changed.
+**Kits are pluggable, and that is demonstrated.** Adding `@formsmith/kit-html` changed nothing in core,
+the renderer, or the designer. It touched build configuration, the playground, and one bug in the other
+kit that the new contract test exposed.
 `test/kit-contract.test.tsx` runs the contract against every kit in the repo, so a third one is added to
 a list and nothing else. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -124,7 +125,7 @@ none injected, those rules degrade to permissive rather than throwing.
 **Accessibility is not a later milestone.** The prior-art study that seeded this project measured its subject at
 30 buttons with no accessible name, zero `role="tablist"` wrappers, no landmarks, and a primary button at
 3.03:1 contrast. Here every button is named, the tabs are a real tablist, contrast is computed from the
-stylesheets in CI, and axe-core runs over the designer in six states.
+stylesheets in CI, and axe-core runs over the designer in nine states.
 
 ## Contributing
 

@@ -27,10 +27,13 @@ test('the selection frame sits on the component it selected', async ({ designer 
   const node = await designer.node('email').boundingBox()
   if (!frame || !node) throw new Error('nothing to measure')
 
-  // The whole point of the overlay is that it lands on the target.
+  // The whole point of the overlay is that it lands on the target. All four
+  // sides: a frame with the right position and the wrong height is the shape a
+  // measurement that forgets the scroll offset produces.
   expect(Math.abs(frame.x - node.x)).toBeLessThanOrEqual(1)
   expect(Math.abs(frame.y - node.y)).toBeLessThanOrEqual(1)
   expect(Math.abs(frame.width - node.width)).toBeLessThanOrEqual(1)
+  expect(Math.abs(frame.height - node.height)).toBeLessThanOrEqual(1)
 })
 
 test('the frame follows the component when the canvas scrolls', async ({ designer }) => {

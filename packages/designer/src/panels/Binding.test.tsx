@@ -133,6 +133,22 @@ describe('modesFor', () => {
       'i18n',
     ])
   })
+
+  it('offers a condition only where the schema opts in', () => {
+    /*
+     * `conditional` is opt-in rather than inferred from the editor, because
+     * `boolean` covers both "is this disabled" and "did the user tick it" and
+     * only the first is worth making conditional. The arm had no test, so a
+     * `modesFor` that offered a condition everywhere -- or nowhere -- read the
+     * same to this file.
+     */
+    expect(modesFor({ name: 'disabled', label: 'Disabled', editor: 'boolean' })).not.toContain(
+      'condition',
+    )
+    expect(
+      modesFor({ name: 'disabled', label: 'Disabled', editor: 'boolean', conditional: true }),
+    ).toContain('condition')
+  })
 })
 
 describe('translationKey', () => {

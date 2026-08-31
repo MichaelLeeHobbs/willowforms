@@ -38,8 +38,13 @@ function documentOf(root: ComponentNode): FormDocument {
     name: 'Contract',
     root,
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -931,18 +936,30 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
           />,
         )
 
+        /*
+         * Every element that describes itself, not the first one found. A
+         * component can hold more than one control -- a radio group is a list of
+         * inputs, a file upload is an input beside a summary -- and checking the
+         * first meant the rest could point anywhere at all.
+         */
         const host = dom.querySelector('[data-fs-key="field"]')
-        const described = host?.matches('[aria-describedby]')
-          ? host
-          : (host?.querySelector('[aria-describedby]') ?? null)
+        const describers = [
+          ...(host?.matches('[aria-describedby]') ? [host] : []),
+          ...(host?.querySelectorAll('[aria-describedby]') ?? []),
+        ]
 
-        expect(described, `${def.type} has no control carrying aria-describedby`).not.toBeNull()
+        expect(
+          describers.length,
+          `${def.type} has no control carrying aria-describedby`,
+        ).toBeGreaterThan(0)
 
-        for (const id of (described?.getAttribute('aria-describedby') ?? '').split(/\s+/)) {
-          expect(
-            dom.querySelector('[id="' + id + '"]'),
-            `${def.type} points aria-describedby at #${id}, which is not in the DOM`,
-          ).not.toBeNull()
+        for (const described of describers) {
+          for (const id of (described.getAttribute('aria-describedby') ?? '').split(/\s+/)) {
+            expect(
+              dom.querySelector('[id="' + id + '"]'),
+              `${def.type} points aria-describedby at #${id}, which is not in the DOM`,
+            ).not.toBeNull()
+          }
         }
       }
     })

@@ -75,9 +75,14 @@ the file and counts every `it(` in it, then requires one row per case in the tab
 has: it is about these two kits agreeing with each other.
 
 Found while adding the cross-kit length test for item 6, which the guard also miscounted until it was
-moved above the per-kit block. Out of scope because the queue is frozen and nothing is wrong today.
-Cheap to fix: end the slice at the closing of the per-kit describe rather than at the end of the file,
-and drop the row that then has no rule.
+moved above the per-kit block. Out of scope at the time because the queue was frozen and nothing was
+wrong that day.
+
+**Fixed in item 27**, which carried a review finding saying the same thing from the other end. The slice
+now ends at the next top-level `describe` rather than at the end of the file, and the row that then had
+no rule -- "A Step's gap default matches the Stack it renders as", which is these two kits agreeing with
+each other rather than an obligation on anybody's kit -- came out of the table. `CONTRACT_RULES` is 19.
+Nothing is left to hand over here.
 
 ## A repeater's rows cannot be reached in the designer
 

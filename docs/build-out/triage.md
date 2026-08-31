@@ -140,3 +140,53 @@ this file, so it means either drawing the two glyphs differently or moving icon 
 `designer.css` and giving every glyph a class -- a change to how icons are drawn, made for a mode
 neither kit has been tested in. It is worth doing as part of a forced-colors pass, with something to
 check the result against.
+
+## The ResizeObserver stub counts; no test consumes it yet — `setup.ts:22`, area 10
+
+**NOTE, half fixed.** The stub records constructions, observations and disconnects now, and holds the
+tally on `globalThis` because the setup file runs once per test file while the stub it installs is
+global -- counters in module scope would be incremented by whichever file ran first and read as zero
+everywhere else, which is the silent pass the counting was added to prevent.
+
+I could not make the leak test itself trustworthy in the time it deserved. The counters are cross-file
+state, testing-library's `cleanup` disconnects observers between tests, and the reading a test gets
+therefore depends on what ran before it in the same worker -- I had a version passing at the end of one
+file and failing at the top of it, which is a test that reports the order of the suite rather than the
+behaviour of the code. The instrument is in place for a test written against a mounted-and-unmounted
+component in isolation.
+
+## `scrollIntoView` is stubbed and nothing asserts it — `setup.ts:32`, area 10
+
+**LOW, no longer applicable.** The selection layer does not call it any more: it scrolls the canvas by
+its own offsets, because `scrollIntoView` walks every scrollable ancestor and dragged the host's page
+around whenever somebody clicked a tree row. The stub stays because `userEvent` calls it while typing
+and a kit is free to; the docblock says so now.
+
+## axe's `target-size` and `scrollable-region-focusable` are covered nowhere — `a11y.test.tsx:34`, area 10
+
+**NOTE.** Both are disabled for want of layout, like `color-contrast`, and only contrast has a
+compensating check. Covering them means measuring hit areas and scroll containers in a real browser --
+a Playwright axe pass, which is a piece of infrastructure rather than a test, and worth adding as one
+deliberate step rather than as a corner of a stage-5 sweep.
+
+## Two documented checks that were already true — areas 8 and 10
+
+**NOTE, no longer applicable.** `vite.config.ts:9` (no `strictPort`) was fixed in item 22, when the same
+hazard turned up from the Playwright side. `designer.css.test.ts:36` (`declarationsFor` locating a block
+by substring) was fixed in item 26, where a duplicated selector made the substring reader lose half a
+rule; it now walks every block a selector has and checks the prelude is the whole selector rather than
+part of one.
+
+## The remaining tail of designer test gaps — area 10
+
+**LOW.** The review's last finding lists a dozen small coverage gaps. Seven are covered now: `modesFor`'s
+conditional arm, `describeMove`'s four arms, the `pattern` and `custom` rule editors, the raw box
+following a structured control, `pointercancel`, the drag label's source, an unknown icon name and the
+icon's height.
+
+The rest are left: the one-step viewport switcher case in `Canvas.test.tsx`, `aria-labelledby` as an
+accepted label in `Tree.test.tsx`'s sweep, `download` and `onFile` in `DocumentDialog.test.tsx`, and
+hook-level tests for five `DesignerApi` writers that are covered through the panels that call them.
+Each is a real gap and none of them is a defect: they are tests to write when something touches those
+paths, which is when a test written for them will be checked against a change rather than against the
+code it was copied from.

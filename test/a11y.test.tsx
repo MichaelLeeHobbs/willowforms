@@ -82,8 +82,21 @@ function makeDocument(): FormDocument {
       ],
     },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    /*
+     * Two languages, because the toolbar hides its language select below two --
+     * so with one the audited states never contained it, and the control most
+     * likely to be a bare unlabelled `<select>` was the one axe never saw.
+     */
+    languages: [
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'fr', name: 'French', bidi: 'ltr' },
+    ],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }

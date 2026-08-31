@@ -200,8 +200,11 @@ describe('validateDocument against malformed input', () => {
     name: 'Doc',
     root: { key: 'root', type: 'Screen', props: {} },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, the tag `createDocument` produces. A dialect-free fixture makes a
+    // bundle keyed by tag and one keyed by bare code the same string, which is
+    // the distinction half this file's language checks are about.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   })
@@ -380,6 +383,16 @@ describe('structural sharing', () => {
     expect(after.children?.[0]?.children?.[1]).toBe(before.children?.[0]?.children?.[1])
   })
 
+  it('updates the root itself', () => {
+    // The one node with no parent to rewrite through, and the branch every
+    // other case in this describe walks past.
+    const before = tree()
+    const after = updateNode(before, 'root', (node) => ({ ...node, type: 'Wizard' }))
+
+    expect(after.type).toBe('Wizard')
+    expect(after.children).toBe(before.children)
+  })
+
   it('returns the same tree when an update matches nothing', () => {
     const before = tree()
     expect(updateNode(before, 'missing', (n) => n)).toBe(before)
@@ -398,6 +411,18 @@ describe('structural sharing', () => {
     // A remove that finds nothing must not read as an edit, or the undo stack
     // grows with a version identical to the one before it.
     expect(removeNode(before, 'missing')).toBe(before)
+  })
+
+  it('refuses to move a node into a leaf', () => {
+    /*
+     * `insertNode` will give a leaf a `children` array, which produces a subtree
+     * no renderer draws while `validateForm` and `toJsonSchema` keep walking it
+     * -- a required field nobody can fill in. The designer's drop paths refused
+     * this and the API did not, which is the worse of the two places to leave a
+     * hole.
+     */
+    const before = tree()
+    expect(moveNode(before, 'b', 'a'), 'a leaf is not a parent').toBe(before)
   })
 
   it('returns the same tree for an illegal move', () => {
@@ -538,6 +563,38 @@ describe('duplicateNode', () => {
     const copy = duplicateNode(original, 'panel')
     expect(copy?.key).toBe('panel2')
     expect(copy?.renderWhen).toEqual(original.children?.[0]?.renderWhen)
+  })
+
+  it('copies css and events without sharing the records that hold them', () => {
+    /*
+     * The other two records a panel writes into. They were shared by reference,
+     * so styling the duplicate restyled the original and an event wired on one
+     * appeared on the other -- invisible today because every writer replaces
+     * rather than mutates, which is what makes it cheap to close now.
+     */
+    const original: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'card',
+          type: 'Box',
+          props: {},
+          css: { any: 'padding: 8px' },
+          events: { onClick: [{ name: 'save', type: 'code' }] },
+        },
+      ],
+    }
+
+    const source = original.children?.[0]
+    const copy = duplicateNode(original, 'card')
+
+    expect(copy?.css).toEqual({ any: 'padding: 8px' })
+    expect(copy?.css).not.toBe(source?.css)
+    expect(copy?.events).toEqual({ onClick: [{ name: 'save', type: 'code' }] })
+    expect(copy?.events).not.toBe(source?.events)
+    expect(copy?.events?.['onClick']).not.toBe(source?.events?.['onClick'])
   })
 
   it('copies props and rules without sharing the records that hold them', () => {

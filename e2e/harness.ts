@@ -74,12 +74,26 @@ export const test = base.extend<{ designer: Designer }>({
     const designer: Designer = {
       page,
       row: (key) => page.locator(`[data-fs-tree-row="${key}"]`),
-      node: (key) => page.locator(`[data-fs-key="${key}"]`),
+      /*
+       * The first element drawing this node. A repeater draws its subtree once
+       * per row, so a key names any number of elements and an unscoped locator
+       * becomes a strict-mode violation the moment a spec previews two rows --
+       * in every test that uses it, not only the one that added the rows.
+       */
+      node: (key) => page.locator(`[data-fs-key="${key}"]`).first(),
 
+      /*
+       * Throws when nothing has been persisted, rather than answering `[]`.
+       *
+       * Five specs assert `expect(after).toEqual(before)` to show a gesture
+       * changed nothing, and with an empty answer on both sides that is
+       * `[] === []` -- an assertion that passes hardest when the app has not
+       * saved anything at all, which is the state a broken designer is in.
+       */
       rootChildren: async () =>
         page.evaluate((storageKey: string) => {
           const raw = window.localStorage.getItem(storageKey)
-          if (!raw) return []
+          if (!raw) throw new Error('The playground has not persisted a document yet.')
           const doc = JSON.parse(raw) as FormDocumentShape
           return (doc.root.children ?? []).map((child) => child.key)
         }, STORAGE_KEY),

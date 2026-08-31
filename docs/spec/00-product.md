@@ -82,13 +82,13 @@ that the new contract test exposed. An earlier draft of this paragraph said "fou
 plumbing", which was the number of build files and not the number of files.
 
 **The designer has no UI-library dependency.** Its chrome is plain CSS driven by custom properties.
-A lint rule fails CI if anyone imports one of the named component libraries into it. The list is an
-allowlist in `eslint.config.js`, so it catches the libraries this project has heard of and not the
-category, and it fails `pnpm lint` rather than `pnpm build`.
+A lint rule fails CI if anyone imports one of the named component libraries into it. The list is a deny
+list in `eslint.config.js` -- named libraries, not a category -- so it catches the ones this project has
+heard of and would not stop a kit nobody thought of, and it fails `pnpm lint` rather than `pnpm build`.
 
 **Accessibility is not a later milestone.** Every button is named, the tabs are a real tablist, the tree
 is fully keyboard-operable including moving components, contrast is computed from the stylesheets in CI,
-and axe runs over the designer in six states. See [../accessibility.md](../accessibility.md).
+and axe runs over the designer in nine states. See [../accessibility.md](../accessibility.md).
 
 **Nothing degrades silently.** A missing sandbox makes rules pass rather than throw. A refused rename
 says which component holds the name. A malformed import lists every problem at once. A rule that cannot

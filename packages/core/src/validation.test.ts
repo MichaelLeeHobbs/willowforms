@@ -572,7 +572,10 @@ describe('validateAcross, and the submit it exists to stop', () => {
   })
 
   const step = (name: string, children: ComponentNode[]): ComponentNode => ({
-    key: 'step-' + name,
+    // `stepWho`, not `step-who`: a hyphen is not in the key grammar, so the
+    // fixture was a document `validateDocument` refuses -- a wizard nobody
+    // could have authored, standing in for the one people do.
+    key: 'step' + name.charAt(0).toUpperCase() + name.slice(1),
     type: 'Box',
     props: {},
     renderWhen: {
@@ -642,6 +645,50 @@ describe('validateAcross, and the submit it exists to stop', () => {
   it('is empty when every step is satisfied', () => {
     const scopes = stepScopes(wizard)
     expect(validateAcross(wizard, { ...answered, city: 'Ely' }, scopes)).toEqual({})
+  })
+
+  it('keeps the first message when two steps report the same field', () => {
+    /*
+     * A field can be visible in more than one step -- a summary step that shows
+     * what an earlier one collected -- and the merge takes the first message
+     * rather than the last. Which one is arbitrary; that it is decided is not,
+     * because a caller showing "Too short" where the earlier step said
+     * "Required" is a form arguing with itself.
+     */
+    const shared: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        step('who', [
+          {
+            key: 'nickname',
+            type: 'TextField',
+            props: {},
+            schema: {
+              type: 'string',
+              validations: [{ key: 'required', message: 'The first step says so.' }],
+            },
+          },
+        ]),
+        step('where', [
+          {
+            key: 'nickname2',
+            dataKey: 'nickname',
+            type: 'TextField',
+            props: {},
+            schema: {
+              type: 'string',
+              validations: [{ key: 'required', message: 'The second step says so.' }],
+            },
+          },
+        ]),
+      ],
+    }
+
+    const merged = validateAcross(shared, {}, ['who', 'where'].map(onStep))
+    expect(merged['nickname']).toBe('The first step says so.')
+    expect(merged['nickname2']).toBe('The second step says so.')
   })
 
   it('merges nothing into an empty scope list, rather than validating everything', () => {

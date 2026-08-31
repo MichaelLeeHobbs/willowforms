@@ -223,6 +223,15 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
 const MAX_CONTEXT_VALUES = 1000
 
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
+  /*
+   * An empty path reads nothing, so it names no flow. `contextKeys` already
+   * skips one for that reason, and answering here anyway told a host that a
+   * document declares steps under a path `readPath` refuses to walk -- steps it
+   * would then run a validation pass for, each of them against a condition that
+   * can never be true.
+   */
+  if (path === '') return []
+
   const seen: JsonValue[] = []
 
   const add = (value: JsonValue | undefined): void => {

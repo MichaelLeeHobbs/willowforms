@@ -159,6 +159,38 @@ describe('the failure missingContext exists to catch', () => {
   })
 })
 
+describe('what counts as supplied', () => {
+  const root = tree([
+    {
+      key: 'secret',
+      type: 'Field',
+      props: {},
+      renderWhen: { kind: 'condition', condition: isAdmin },
+      schema: required,
+    },
+  ])
+
+  it.each([
+    ['null', null],
+    ['false', false],
+    ['zero', 0],
+    ['empty text', ''],
+  ])('treats %s as supplied, because a host meant to send it', (_label, value) => {
+    /*
+     * `null` is the one a real host produces: a lookup that found nothing, a
+     * column with no value, a session field that is not set. Reporting it as
+     * missing would have every host learn to ignore this report, which is the
+     * only way a boot-time check fails.
+     */
+    expect(missingContext(root, { user: { role: value } })).toEqual([])
+  })
+
+  it('reports a path the context does not hold at all', () => {
+    expect(missingContext(root, { user: {} })).toEqual(['user.role'])
+    expect(missingContext(root, {})).toEqual(['user.role'])
+  })
+})
+
 describe('contextValues, which is how a document declares its flow', () => {
   const step = (name: string): Condition => ({
     op: 'eq',
@@ -203,6 +235,40 @@ describe('contextValues, which is how a document declares its flow', () => {
       options: ['a', 'b'],
     }
     expect(contextValues(wizard([shared]), 'step')).toEqual(['a', 'b'])
+  })
+
+  it('does not repeat a value two steps spell the same way', () => {
+    /*
+     * The dedupe compares structurally, so two conditions naming the same list
+     * are one step. Only strings were ever tested, which is the one type where
+     * reference equality and structural equality agree, so a `===` dedupe passed
+     * -- and a host running one validation pass per step would have run two for
+     * the same one.
+     */
+    const shared: Condition = {
+      op: 'in',
+      value: ctx('step'),
+      options: [['a', 'b']],
+    }
+    const other: Condition = {
+      op: 'in',
+      value: ctx('step'),
+      options: [['a', 'b']],
+    }
+
+    expect(contextValues(wizard([shared, other]), 'step')).toEqual([['a', 'b']])
+  })
+
+  it('skips a context operand with an empty path', () => {
+    // An empty path reads nothing, so collecting it would offer a host a step
+    // called "" and `readPath` refuses it anyway.
+    const empty: Condition = {
+      op: 'eq',
+      left: { kind: 'context', path: '' },
+      right: lit('one'),
+    }
+    expect(contextValues(wizard([empty]), '')).toEqual([])
+    expect([...contextKeys(wizard([empty]))]).toEqual([])
   })
 
   it('does not repeat a value two steps share', () => {

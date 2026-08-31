@@ -49,3 +49,26 @@ describe('Icon', () => {
     expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24')
   })
 })
+
+describe('an icon the vocabulary does not have', () => {
+  it('draws nothing rather than an empty square', () => {
+    /*
+     * The type says this cannot happen and a kit is third-party code, so it
+     * can. An unknown name used to render an empty `<svg>`: the space an icon
+     * would take, reserved beside the label, which reads as a glyph that failed
+     * to load rather than as a kit that ships without one.
+     */
+    const { container } = render(<Icon name={'nonsense' as never} />)
+    expect(container.querySelector('svg')).toBeNull()
+  })
+
+  it('is square, and both sides follow the size', () => {
+    // `height` was never asserted, so an icon that took its width from the prop
+    // and its height from a default would have drawn a rectangle.
+    const { container } = render(<Icon name="text" size={24} />)
+    const svg = container.querySelector('svg')
+
+    expect(svg?.getAttribute('width')).toBe('24')
+    expect(svg?.getAttribute('height')).toBe('24')
+  })
+})

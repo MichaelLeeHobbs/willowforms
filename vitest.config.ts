@@ -16,6 +16,13 @@ export default defineConfig({
       // Cross-package contract tests belong to no single package.
       'test/**/*.test.ts',
       'test/**/*.test.tsx',
+      /*
+       * And the apps. A test written beside `apps/demo-server/src/index.ts`
+       * would have linted and typechecked clean and never run -- the worst of
+       * the three, because the file looks like a suite and reports nothing.
+       */
+      'apps/*/src/**/*.test.ts',
+      'apps/*/src/**/*.test.tsx',
     ],
     // Playwright owns e2e/. Vitest would load those specs and fail on an import
     // it cannot resolve, which reads as a broken suite rather than a mistake.
@@ -32,6 +39,16 @@ export default defineConfig({
      * filtered run, saying which it did.
      */
     reporters: ['default', new DocumentedCountReporter()],
-    coverage: { reporter: ['text', 'html'], include: ['packages/*/src/**'] },
+    coverage: {
+      reporter: ['text', 'html'],
+      include: ['packages/*/src/**'],
+      /*
+       * Not the tests themselves. A `*.test.ts` file is 100% covered by
+       * definition -- it is the thing doing the covering -- so counting them
+       * inflated the number by the size of the suite, which here is larger than
+       * the source.
+       */
+      exclude: ['**/*.test.ts', '**/*.test.tsx'],
+    },
   },
 })

@@ -231,7 +231,9 @@ A component that holds no form data says so instead of showing an empty rule lis
 
 ## Additional properties
 
-**Status: planned.** Two things a kit cannot anticipate:
+**Status: partial.** Two things a kit cannot anticipate. The first is built and has been for a while --
+a section reading Planned above a bullet reading Built is the kind of status a reader stops trusting the
+rest of the file over -- and the second is not started.
 
 - **`renderWhen`.** **Built.** A Show when row offering Always, Never, a condition, or an expression.
   `renderWhen` is a `PropValue`, so a document can hold any of its kinds: a static falsy reads as
@@ -242,9 +244,9 @@ A component that holds no form data says so instead of showing an empty rule lis
   control that could fill it. The field list comes from the document, so a condition cannot name a key
   that does not exist, and a hand-edited one that does is shown rather than silently reassigned.
   See [01-document-model.md](01-document-model.md#conditions).
-- **HTML attributes.** A passthrough for `id`, `data-*`, `aria-*`. Needs an allowlist rather than an open
-  door: letting an author set arbitrary attributes on a kit's root element includes `style` and
-  `onclick`, and this project already draws the code-execution boundary elsewhere.
+- **HTML attributes.** **Planned:** a passthrough for `id`, `data-*`, `aria-*`. Needs an allowlist rather
+  than an open door: letting an author set arbitrary attributes on a kit's root element includes `style`
+  and `onclick`, and this project already draws the code-execution boundary elsewhere.
 
 ## Editing granularity
 

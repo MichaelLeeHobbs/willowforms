@@ -206,7 +206,7 @@ flows, the blockers sort into four groups, and the action model touches none of 
 - **Repeated scope.** Built. A row coordinate is formed at the boundary, `Operand.ref` carries a scope
   discriminant, and `applyChange` places a write into the right row. What is still missing for actions is
   narrower than it was: a Remove button inside row three needs to _name_ row three, and a row is
-  addressed rather than identified. See [01-document-model.md](01-document-model.md#datakey).
+  addressed rather than identified. See [03-components.md](03-components.md#repeated-scope).
 - **Timers.** No scheduled trigger, so no cooldown, no autosave, no session warning.
 
 **The argument that used to close this section has been answered, and it is worth saying how.** It read:

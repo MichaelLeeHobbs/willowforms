@@ -81,6 +81,43 @@ describe('equality', () => {
   })
 })
 
+describe('an operand nobody designed', () => {
+  it('reads a ref whose data key is not a string as unreadable', () => {
+    /*
+     * The junk list this file carries had every malformed shape except this one,
+     * and it is the one a hand-edited document reaches by accident: `dataKey`
+     * typed as a number. Unreadable rather than "the field named 42", which
+     * would be a lookup that can never match and a condition that is quietly
+     * false forever.
+     */
+    const junkRef = { kind: 'ref', dataKey: 42 } as unknown as Operand
+
+    expect(check({ op: 'truthy', value: junkRef })).toBe(false)
+    expect(check({ op: 'eq', left: junkRef, right: lit('GB') })).toBe(false)
+    // Unreadable, not false: `not` passes it through rather than inverting it
+    // into a reason to show the component.
+    expect(check({ op: 'not', condition: { op: 'truthy', value: junkRef } })).toBe(false)
+  })
+
+  it('reads a row-scoped ref outside a row as nothing rather than as the form value', () => {
+    /*
+     * The `row` argument, which this file never passed. `scope: 'row'` reads the
+     * enclosing row and deliberately does not fall back to the form, so outside
+     * a repeater it answers nothing -- and passing a row makes it answer that
+     * row.
+     */
+    const rowScoped = { kind: 'ref', dataKey: 'country', scope: 'row' } as const
+
+    expect(check({ op: 'eq', left: rowScoped, right: lit('GB') })).toBe(false)
+    expect(
+      evaluateCondition({ op: 'eq', left: rowScoped, right: lit('FR') }, data, undefined, {
+        path: [{ key: 'addresses', index: 0 }],
+        values: { country: 'FR' },
+      }),
+    ).toBe(true)
+  })
+})
+
 describe('ordering', () => {
   it('compares numbers numerically', () => {
     expect(check({ op: 'gte', left: ref('age'), right: lit(18) })).toBe(true)

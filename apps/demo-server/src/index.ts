@@ -1,8 +1,15 @@
 /**
  * Demo persistence.
  *
- * Formsmith is a frontend library; this exists so the playground can show that a
- * document survives a reload and that the same validation rules run server-side.
+ * Formsmith is a frontend library; this exists to show that the same document and
+ * the same validation rules work on a server -- `validateDocument` on a request
+ * body, `validateAcross` over a wizard's steps, `submittedData` before anything
+ * is stored, and a host context the browser cannot forge.
+ *
+ * The playground does not call it. It persists to `localStorage`, deliberately:
+ * a demo that needs a server running is a demo most people never see. This one
+ * is read, and run by anyone who wants to watch the server half work.
+ *
  * Storage is a JSON file. There is no auth, no database, and no multi-user story,
  * and none of that is an oversight: shipping a real backend would invite people
  * to deploy this, and it is not built for that.
@@ -23,7 +30,23 @@ import {
 } from '@formsmith/core'
 
 const STORE = new URL('../forms.json', import.meta.url)
-const PORT = Number(process.env['PORT'] ?? 5181)
+/*
+ * A port, or a refusal to start.
+ *
+ * `Number('http://…')` is `NaN`, and `listen(NaN)` binds an ephemeral port: the
+ * server comes up on a number nobody knows, the playground's requests fail, and
+ * the log line says it is listening. Typing the variable wrong should stop the
+ * process, not relocate it.
+ */
+const PORT = (() => {
+  const raw = process.env['PORT']
+  if (raw === undefined) return 5181
+  const port = Number(raw)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('PORT is ' + JSON.stringify(raw) + ', which is not a port number.')
+  }
+  return port
+})()
 
 type Store = Record<string, FormDocument>
 
@@ -145,7 +168,18 @@ async function bodyOf(c: { req: { text: () => Promise<string> } }): Promise<unkn
 
 app.get('/api/forms', async (c) => {
   const store = await readStore()
-  return c.json(Object.values(store).map(({ id, name }) => ({ id, name })))
+
+  /*
+   * Guarded, because the file is on disk and a person can edit it. Destructuring
+   * every value made `{"a": null}` a 500 on the one route the playground calls
+   * first -- so a single bad entry took the whole listing down instead of
+   * appearing as one missing row.
+   */
+  const rows = Object.values(store)
+    .filter((doc): doc is FormDocument => Boolean(doc) && typeof doc === 'object')
+    .map((doc) => ({ id: String(doc.id ?? ''), name: String(doc.name ?? '') }))
+
+  return c.json(rows)
 })
 
 app.get('/api/forms/:id', async (c) => {
@@ -185,8 +219,18 @@ app.put('/api/forms/:id', async (c) => {
 
 app.delete('/api/forms/:id', async (c) => {
   const store = await readStore()
+  const id = c.req.param('id')
+
+  /*
+   * 404 for an id the store does not hold, rather than `{ok: true}` and a
+   * rewritten file. A client deleting the wrong id -- a typo, a stale list, a
+   * double submit against a document somebody else removed -- was told it had
+   * worked, and the only way to find out otherwise was to look.
+   */
+  if (!held(store, id)) return c.json({ error: 'Not found' }, 404)
+
   const next: Store = Object.assign(Object.create(null) as Store, store)
-  delete next[c.req.param('id')]
+  delete next[id]
   await writeStore(next)
   return c.json({ ok: true })
 })
