@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 32, the spec, guide and working-note LOW/NOTEs. Stage 5 is done; item 33 closes the run.
+- **Last completed:** item 33, the close-out. Every item in the queue is ticked; the run is finished.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/32-docs-low`
+- **Last pushed item branch:** `build-out/b/33-close`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -301,7 +301,7 @@ handling one. It is the only honest way to close out three hundred findings.
 
 ## Stage 6 — close out
 
-- [ ] **33. Close the run.** Remove the resume block from `CLAUDE.md`. Write the digest to
+- [x] **33. Close the run.** Remove the resume block from `CLAUDE.md`. Write the digest to
       `docs/reports/2026-08-31-second-pass-remediation.md`: what the findings turned out to be, what a user
       of the designer would notice, which guards can now fail that could not, what was refused and why, and
       what is left. Open the final PR for stage 6 and hand over `found.md`.
