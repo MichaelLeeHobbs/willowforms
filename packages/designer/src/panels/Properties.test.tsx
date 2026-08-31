@@ -1081,6 +1081,36 @@ describe('removing a nested condition', () => {
     },
   })
 
+  it('adds a row when Add condition is clicked', async () => {
+    /*
+     * The `ConditionEditor`'s only suite never pressed this button, so the one
+     * gesture that grows a condition group -- the reason the group exists -- was
+     * covered by nothing. Everything else here starts from a group somebody else
+     * built.
+     *
+     * Counted by the remove buttons rather than by the options boxes: a new row
+     * is an `eq` comparison, which has no options list, so counting textareas
+     * counts the rows that happen to be membership tests.
+     */
+    const harness = setup(twoLists())
+    await harness.select()
+
+    expect(screen.getAllByRole('button', { name: /^Remove condition/ })).toHaveLength(2)
+
+    await harness.user.click(screen.getByRole('button', { name: 'Add condition' }))
+
+    expect(screen.getAllByRole('button', { name: /^Remove condition/ })).toHaveLength(3)
+
+    // The document has it too, not only the panel.
+    const held = harness.latest()?.renderWhen
+    const condition = held?.kind === 'condition' ? held.condition : undefined
+    expect(
+      condition && 'conditions' in condition && Array.isArray(condition.conditions)
+        ? condition.conditions.length
+        : 0,
+    ).toBe(3)
+  })
+
   it('leaves the surviving row showing its own options', async () => {
     const harness = setup(twoLists())
     await harness.select()
@@ -1103,6 +1133,14 @@ describe('removing a nested condition', () => {
     const boxes = screen.getAllByLabelText('Options, one per line')
     await harness.user.clear(boxes[0] as HTMLElement)
     await harness.user.type(boxes[0] as HTMLElement, 'typed-but-not-committed')
+
+    /*
+     * The draft exists. Without this the test's name was a claim about a state
+     * it never reached: `clear` plus `type` with no blur is what makes an
+     * uncommitted draft, and if either had stopped working the row below would
+     * still have read `second` and the test would still have passed.
+     */
+    expect(boxes[0]).toHaveProperty('value', 'typed-but-not-committed')
 
     await harness.user.click(screen.getByRole('button', { name: 'Remove condition 1' }))
 

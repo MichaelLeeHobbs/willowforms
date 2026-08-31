@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 17, the specification's HIGHs. Item 18 is next.
+- **Last completed:** item 18, the test suites' HIGHs. Stage 3 is done; item 19 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/17-spec-highs`
+- **Last pushed item branch:** `build-out/b/18-test-highs`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -246,7 +246,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus `docs.test.ts` extended so that a spec claim about what a test enforces is
       itself checked, at least for the `aria-invalid` and `required` obligations.
 
-- [ ] **18. The test suites' remaining HIGHs.** Areas 11, 12, 14 and 16.
+- [x] **18. The test suites' remaining HIGHs.** Areas 11, 12, 14 and 16.
       `tree.test.ts:401` (nothing asserts `removeNode` leaves its input unchanged, so invariant 4 is
       undefended for the one operation that deletes), `tree.test.ts:57` (`generateKey` covers only
       `TextField`, so the sanitising branch that exists because of a named incident is untested),

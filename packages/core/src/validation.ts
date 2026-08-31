@@ -94,6 +94,24 @@ export const MAX_ROWS = 5000
 /** What a repeater reports when the submitted body asks for more rows than that. */
 export const TOO_MANY_ROWS = 'This list has too many rows to check.'
 
+/**
+ * What a repeater reports when its answer is not a list at all.
+ *
+ * `rowsOf` reads anything that is not an array as no rows, which is right for
+ * the *projection* -- `submittedData` submits only what was asked and given --
+ * and was quietly wrong here. No rows means the rules inside the repeater do not
+ * run, so a body sending `"addresses": "nope"` turned every required field
+ * inside that repeater optional, on the server, with nothing to see. A test
+ * asserted that as correct behaviour.
+ *
+ * Absent stays absent: `undefined` and `null` are a repeater nobody has filled
+ * in, and there is nothing to check inside one. A string, a number or an object
+ * is an answer of the wrong shape, and refusing it is the same call
+ * `matchesPattern` and `TOO_MANY_ROWS` already make -- what cannot be checked
+ * has not been satisfied.
+ */
+export const NOT_A_LIST = 'This list was not sent as a list.'
+
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 
 /*
@@ -580,7 +598,19 @@ export function validateForm(
      * rest go unchecked.
      */
     if (isRowScope(node)) {
-      const all = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+      const stored = valueOf(rowData(data, scope), dataKeyOf(node))
+
+      /*
+       * An answer of the wrong shape is reported rather than read as no rows.
+       * See `NOT_A_LIST`: reading it as empty turned every required field inside
+       * the repeater optional.
+       */
+      if (stored !== undefined && stored !== null && !Array.isArray(stored)) {
+        errors[addressOf(path, node.key)] = NOT_A_LIST
+        return
+      }
+
+      const all = rowsOf(stored)
 
       /*
        * The row count comes out of the data, which is right: asking the browser

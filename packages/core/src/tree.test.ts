@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createDocument, emptyRoot, instantiate, prop } from './factory.js'
 import { toJsonSchema, unexportableRules } from './schema.js'
+import { keyProblem } from './keys.js'
 import { validateForm } from './validation.js'
 import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument } from './types.js'
@@ -64,6 +65,28 @@ describe('generateKey', () => {
     const root = container('root', [leaf('textField'), leaf('textField2')])
     expect(generateKey(root, 'TextField')).toBe('textField3')
   })
+
+  /*
+   * The sanitising branch, which exists because of a named incident and had no
+   * test at all: only `TextField` was ever passed, and `TextField` needs no
+   * sanitising. A kit is free to type a component `Date-Picker` or `2FA`, and
+   * the key minted from it went straight into a document `validateDocument`
+   * then refused -- a component the palette adds and the JSON dialog will not
+   * accept back.
+   */
+  it.each([
+    ['Date-Picker', 'datePicker', 'a hyphen, which an expression would read as a subtraction'],
+    ['2FA', 'field', 'a leading digit, which no key may start with'],
+    ['Field Set', 'fieldSet', 'a space'],
+    ['!!!', 'field', 'nothing usable at all'],
+    ['__proto__', 'field', 'a name that is reserved rather than merely malformed'],
+  ])('mints a legal key from %s', (type, expected) => {
+    const key = generateKey(emptyRoot(), type)
+
+    expect(key).toBe(expected)
+    // The claim underneath: whatever it mints, the gate accepts it.
+    expect(keyProblem(key)).toBeUndefined()
+  })
 })
 
 describe('mutations are immutable', () => {
@@ -86,6 +109,26 @@ describe('mutations are immutable', () => {
 
   it('removes a nested node', () => {
     expect(collectKeys(removeNode(fixture(), 'a'))).toEqual(['root', 'stack', 'b', 'c'])
+  })
+
+  it('removeNode leaves the original tree untouched', () => {
+    /*
+     * Invariant 4, for the one operation that deletes. `insertNode` and
+     * `updateNode` are both pinned here and `removeNode` was not, so the
+     * operation with the most to destroy was the one nothing watched -- and undo
+     * holds references to prior documents, so a mutation here is a previous
+     * version of the form silently losing a component.
+     */
+    const before = fixture()
+    const keysBefore = collectKeys(before)
+    const stackBefore = findNode(before, 'stack')
+
+    removeNode(before, 'a')
+
+    expect(collectKeys(before)).toEqual(keysBefore)
+    expect(findNode(before, 'a')).toBeDefined()
+    expect(findNode(before, 'stack')).toBe(stackBefore)
+    expect(stackBefore?.children?.map((child) => child.key)).toEqual(['a', 'b'])
   })
 
   it('refuses to remove the root', () => {

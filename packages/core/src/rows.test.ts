@@ -13,10 +13,16 @@ import {
   rowContext,
   rowsOf,
 } from './rows.js'
-import { DEFAULT_MESSAGES, isRowScope, submittedData, validateForm } from './validation.js'
+import {
+  DEFAULT_MESSAGES,
+  NOT_A_LIST,
+  isRowScope,
+  submittedData,
+  validateForm,
+} from './validation.js'
 import { createDocument } from './factory.js'
 import { validateDocument } from './tree.js'
-import type { ComponentNode, FormData, FormDocument } from './types.js'
+import type { ComponentNode, FormData, FormDocument, JsonValue } from './types.js'
 
 describe('the row coordinate', () => {
   const path = pushRow(pushRow(NO_ROWS, { key: 'addresses', index: 1 }), {
@@ -101,6 +107,26 @@ describe('validating a repeater', () => {
     schema: { type: 'string', validations: [{ key: 'required' }] },
   })
 
+  /** A field whose two names differ, so which one is used is visible. */
+  const named = (key: string, dataKey: string): ComponentNode => ({
+    ...field(key),
+    dataKey,
+  })
+
+  /*
+   * `addressList` holding `addresses`, and `street` holding `line1`.
+   *
+   * Trap 11: this fixture set `key` and `dataKey` to the same string on the
+   * repeater and on both of its fields, so the row addressing design and its
+   * opposite produced identical output and nothing here could tell them apart.
+   * The skill names this file as one of three that were fixed on 2026-08-30;
+   * this describe was missed, which is exactly how a collapsed fixture survives.
+   *
+   * The row is addressed by the repeater's *data* key and the field by its
+   * *node* key, which is only observable when they differ. `postcode` keeps one
+   * name deliberately: a real document mixes the two, and a fixture where every
+   * field is renamed tests a form nobody builds.
+   */
   const form: ComponentNode = {
     key: 'root',
     type: 'Screen',
@@ -108,11 +134,12 @@ describe('validating a repeater', () => {
     children: [
       field('email'),
       {
-        key: 'addresses',
+        key: 'addressList',
+        dataKey: 'addresses',
         type: 'Repeater',
         props: {},
         schema: { type: 'array', validations: [] },
-        children: [field('line1'), field('postcode')],
+        children: [named('street', 'line1'), field('postcode')],
       },
     ],
   }
@@ -145,9 +172,9 @@ describe('validating a repeater', () => {
     // rest go unchecked, the discipline validateAcross already follows.
     expect(Object.keys(validateForm(form, { email: 'a@b.co', addresses: [] }))).toEqual([])
     expect(Object.keys(validateForm(form, { email: 'a@b.co', addresses: [{}, {}] }))).toEqual([
-      'addresses[0].line1',
+      'addresses[0].street',
       'addresses[0].postcode',
-      'addresses[1].line1',
+      'addresses[1].street',
       'addresses[1].postcode',
     ])
   })
@@ -156,23 +183,64 @@ describe('validating a repeater', () => {
     ['a string', 'nope'],
     ['a number', 7],
     ['an object', { line1: 'a' }],
-    ['null', null],
-  ])('reads %s in a repeater as no rows rather than throwing', (_label, stored) => {
+  ])('reports %s in a repeater rather than reading it as no rows', (_label, stored) => {
     /*
      * A repeater's value arrives from a request body, so it can be anything.
-     * Nothing drove one of these through `validateForm` before, and the
-     * function walks it to decide how many rows to check.
      *
-     * No rows means the rules inside the repeater do not run, which is the
-     * permissive answer this codebase takes deliberately over a crash. The
-     * repeater's own rules still apply, and `email` outside it still reports,
-     * so a broken list does not take the rest of the form down with it.
+     * This used to assert the opposite, and the opposite was the defect: no rows
+     * means the rules inside the repeater do not run, so a body sending
+     * `"addresses": "nope"` turned every required field inside that repeater
+     * optional -- on the server, with nothing to see. The test called that "the
+     * permissive answer this codebase takes deliberately", which is exactly the
+     * silent permissive failure this project is organised against, defended in a
+     * comment.
+     *
+     * `rowsOf` still reads a non-list as no rows, and that is still right for
+     * `submittedData`: a projection submits what was asked and given. Validation
+     * is the side that has to refuse.
      */
     let errors: Record<string, string> = {}
     expect(() => {
       errors = validateForm(form, { addresses: stored })
     }).not.toThrow()
-    expect(errors).toEqual({ email: DEFAULT_MESSAGES.required })
+
+    /*
+     * The keys first, then the message. `toEqual` treats a property whose value
+     * is `undefined` as a missing one, so asserting the whole object against a
+     * constant that had been deleted passed -- measured, by stashing the fix and
+     * watching this stay green.
+     */
+    expect(Object.keys(errors).sort()).toEqual(['addressList', 'email'])
+    expect(errors['addressList']).toBe('This list was not sent as a list.')
+    expect(errors['addressList']).toBe(NOT_A_LIST)
+  })
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+  ] as [string, JsonValue | undefined][])(
+    'reads %s in a repeater as a list nobody has filled in',
+    (_label, stored) => {
+      /*
+       * The other half, and the reason this is not simply "refuse anything that is
+       * not an array". An absent repeater is a form nobody has got to yet, and
+       * there is nothing inside it to check. Only an answer of the wrong *shape*
+       * is a problem.
+       */
+      expect(validateForm(form, { addresses: stored } as FormData)).toEqual({
+        email: DEFAULT_MESSAGES.required,
+      })
+    },
+  )
+
+  it('still checks the rows of a list that is one', () => {
+    // The control. A repeater that refused every value would pass every row
+    // above and validate nothing.
+    expect(validateForm(form, { addresses: [{}] })).toEqual({
+      'addresses[0].street': DEFAULT_MESSAGES.required,
+      'addresses[0].postcode': DEFAULT_MESSAGES.required,
+      email: DEFAULT_MESSAGES.required,
+    })
   })
 
   it('reports a field outside the repeater under its bare key', () => {

@@ -111,6 +111,7 @@ export {
   submittedData,
   DEFAULT_MESSAGES,
   MAX_ROWS,
+  NOT_A_LIST,
   TOO_MANY_ROWS,
   UNREADABLE_RULE,
   validateField,

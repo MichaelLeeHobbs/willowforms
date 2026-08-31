@@ -675,21 +675,56 @@ describe('a document whose translations are not a bundle', () => {
     expect(screen.getByLabelText('greeting')).toBeTruthy()
   })
 
+  /*
+   * A kit that draws the label, which the one above does not.
+   *
+   * The test below asserted `textContent` did *not* contain `not-a-bundle`, and
+   * could not fail for two independent reasons: a negative assertion passes when
+   * an element renders nothing at all, and the `Field` renderer in this file
+   * draws an `<input aria-label>` and an error span, never the label prop. So
+   * the string it looked for could not have been there whatever `resolveProp`
+   * did.
+   *
+   * The claim is positive now: the label falls back to the translation key.
+   */
+  function Labelled({ nodeProps, props }: NodeRendererProps): ReactNode {
+    return (
+      <div {...nodeProps}>
+        <span data-testid="label">{typeof props['label'] === 'string' ? props['label'] : ''}</span>
+      </div>
+    )
+  }
+
+  const labelKit: RendererKit = { id: 'labelled', renderers: { Screen: Screen_, Field: Labelled } }
+
   it('falls back to the key when the bundle for the language is not one', () => {
-    // `resolveProp` returns the key when there is no translation for it, and a
-    // bundle that is not an object holds no translation for anything.
-    render(
+    const { container } = render(
       <FormRenderer
         document={brokenDocument({ en: 'not-a-bundle' })}
-        kit={kit}
+        kit={labelKit}
         data={{}}
         onChange={() => undefined}
       />,
     )
 
-    expect(screen.getByLabelText('greeting').closest('[data-fs-key]')?.textContent).not.toContain(
-      'not-a-bundle',
+    // `hello` is the i18n key the document asks for. An unresolvable bundle
+    // resolves to the key, which is the readable answer and the documented one.
+    expect(container.querySelector('[data-testid="label"]')?.textContent).toBe('hello')
+  })
+
+  it('uses the translation when the bundle is one', () => {
+    // The control. A renderer that always drew the key would pass the row above
+    // and never translate anything.
+    const { container } = render(
+      <FormRenderer
+        document={brokenDocument({ 'en-US': { hello: 'Hello there' } })}
+        kit={labelKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
     )
+
+    expect(container.querySelector('[data-testid="label"]')?.textContent).toBe('Hello there')
   })
 })
 
