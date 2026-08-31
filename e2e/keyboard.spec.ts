@@ -10,9 +10,9 @@
 import { expect, test } from './harness.js'
 
 test('the whole tree is one tab stop', async ({ designer }) => {
-  const stops = designer.page.locator('[data-fs-row][tabindex="0"]')
+  const stops = designer.page.locator('[data-fs-tree-row][tabindex="0"]')
   await expect(stops).toHaveCount(1)
-  await expect(stops).toHaveAttribute('data-fs-row', 'root')
+  await expect(stops).toHaveAttribute('data-fs-tree-row', 'root')
 })
 
 test('arrows walk the tree and step into containers', async ({ designer }) => {
@@ -162,8 +162,8 @@ test('Control+D duplicates a component in beside itself and focuses the copy', a
   expect(children[original + 1]).toMatch(/^website\d$/)
 
   await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/website duplicated as/)
-  await expect(designer.page.locator('[data-fs-row][tabindex="0"]')).toHaveAttribute(
-    'data-fs-row',
+  await expect(designer.page.locator('[data-fs-tree-row][tabindex="0"]')).toHaveAttribute(
+    'data-fs-tree-row',
     children[original + 1] as string,
   )
 })

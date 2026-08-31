@@ -54,10 +54,21 @@ export const DEVICE_QUERY: Record<Exclude<Device, 'any'>, string> = {
  * since this text is placed inside a `<style>` element and `</style>` closes
  * it. `@` opens an at-rule, and `@import` fetches from wherever it likes.
  *
- * Refused as a set rather than escaped, because escaping invites an argument
- * about which escape is sufficient and this needs none.
+ * A comment belongs here too, and it does not end the block so much as swallow
+ * it. One node opens a comment at the end of its declarations and another
+ * closes one at the start of its own; the two are concatenated into a single
+ * stylesheet, and everything between them disappears inside it. A third node's
+ * rule is deleted, and one node's declaration lands under another's selector.
+ *
+ * That cannot reach outside the form, so it is not the injection
+ * `safeStyleValue` is for. What it breaks is the sentence this file opens with:
+ * a component's styling affects that component.
+ *
+ * Refused as a set rather than escaped, and both halves of the pair rather than
+ * only the opener, because deciding which comment is safe invites an argument
+ * this does not need.
  */
-const FORBIDDEN = /[{}<@]/
+const FORBIDDEN = /[{}<@]|\/\*|\*\//
 
 /**
  * The declarations, or nothing if the text is not only declarations.
@@ -74,6 +85,60 @@ export function safeDeclarations(text: string | undefined): string | undefined {
 }
 
 /**
+ * Characters that would let a single value stop being a single value.
+ *
+ * A superset of `FORBIDDEN`, and deliberately not the same regex. That one
+ * judges a declaration *list*, where `;` separates and a `data:` URI needs one
+ * in the middle of it. This one judges one value on one prop, where `;` starts a
+ * second declaration the author did not write and nothing legitimate needs it.
+ * Two sinks, two grammars.
+ *
+ * `!` goes with them because `!important` on a value the author did not mark is
+ * a document overriding the page, and `/*` because a comment can swallow the
+ * rest of the block. Control characters end a CSS string, and a backslash is how
+ * `url(` is written as `\75 rl(` without the letters ever appearing.
+ */
+// eslint-disable-next-line no-control-regex
+const FORBIDDEN_VALUE = /[{}<@;!\\]|\/\*|[\u0000-\u001f\u007f]/
+
+/**
+ * Value functions that fetch, or that paint something the author did not author.
+ *
+ * Refused on top of the character set, because a fetch is not an injection and
+ * the character set does not catch one. `url(https://…)` is well-formed CSS that
+ * both sinks accept, and on a page whose whole purpose is collecting answers,
+ * `[data-fs-key="ssn"]{background:url(…)}` is an exfiltration channel rather
+ * than a broken rule.
+ *
+ * These are refused rather than escaped for the same reason the declaration
+ * list refuses braces, and the domain agrees: the only string-typed style value
+ * either kit exposes is `background`, whose declared editor is `color`, and a
+ * URL is not a colour. The Style tab remains the channel for real CSS.
+ *
+ * Written as substrings so a vendor prefix is covered by the unprefixed name.
+ */
+const FETCHING = /(url|image-set|element|cross-fade)\s*\(/i
+
+/**
+ * One style value, or nothing if it could be more than one.
+ *
+ * Called at the sink rather than at document load, because `resolveProp`
+ * evaluates a `computed` binding through the host's evaluator at render time, so
+ * the string a kit is handed need not appear in the document at all.
+ *
+ * Nothing rather than a cleaned-up value, for the reason `safeDeclarations`
+ * gives: an author who wrote something refusable is better served by the
+ * property being absent than by a value they did not write.
+ */
+export function safeStyleValue(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (FORBIDDEN_VALUE.test(trimmed) || FETCHING.test(trimmed)) return undefined
+  return trimmed
+}
+
+/**
  * A key, as a CSS string, safe to place inside a `<style>` element.
  *
  * Keys are validated as non-empty and nothing else, and a document is data, so
@@ -82,9 +147,13 @@ export function safeDeclarations(text: string | undefined): string | undefined {
  * out of the style element itself, which is script injection rather than a
  * broken rule. `<` is escaped for that reason rather than for CSS's.
  *
- * Six-digit hex escapes, because CSS stops consuming after the sixth digit and
- * a shorter one needs a trailing space that the next character could swallow.
- * Control characters go the same way: a raw newline ends a CSS string.
+ * Six-digit hex escapes with a space after them, which is what the grammar
+ * wants: a CSS parser reads at most six hex digits and then swallows one
+ * following whitespace character as the terminator. Without a space of our own
+ * it swallowed the author's -- a key of `" b` produced an escape followed by
+ * the real space, which parses as `"b`, so the selector named a string the
+ * attribute does not hold and the rule matched nothing. Control characters go
+ * the same way: a raw newline ends a CSS string.
  */
 function escapeKey(key: string): string {
   return key.replace(
@@ -92,7 +161,7 @@ function escapeKey(key: string): string {
     // inside a CSS string ends it, and a key can hold either.
     // eslint-disable-next-line no-control-regex
     /["\\<]|[\u0000-\u001f\u007f]/g,
-    (ch) => '\\' + (ch.codePointAt(0) ?? 0).toString(16).padStart(6, '0'),
+    (ch) => '\\' + (ch.codePointAt(0) ?? 0).toString(16).padStart(6, '0') + ' ',
   )
 }
 
@@ -188,10 +257,25 @@ export function parseDeclarations(text: string | undefined): [string, string][] 
   const out: [string, string][] = []
   for (const part of splitTop(text, ';')) {
     const [name, value] = splitTop(part, ':', 1)
-    const trimmed = name?.trim().toLowerCase()
+    const trimmed = normaliseName(name)
     if (trimmed && value?.trim()) out.push([trimmed, value.trim()])
   }
   return out
+}
+
+/**
+ * A property name, folded to lower case unless it is a custom property.
+ *
+ * CSS property names are case-insensitive, so a control looking for `padding`
+ * has to find `PADDING` — which is why this folded everything. Custom property
+ * names are **not**: `--brandColor` and `--brandcolor` are two different
+ * properties. Folding them meant that touching any structured control rewrote
+ * the name, and the `var()` that read it stopped matching. Silently, because the
+ * declaration is still there and still valid CSS.
+ */
+function normaliseName(name: string | undefined): string {
+  const trimmed = name?.trim() ?? ''
+  return trimmed.startsWith('--') ? trimmed : trimmed.toLowerCase()
 }
 
 /**
@@ -216,7 +300,13 @@ function splitTop(text: string, separator: string, limit = Infinity): string[] {
       else if (ch === quote) quote = undefined
       continue
     }
-    if (ch === '"' || ch === "'") quote = ch
+    /*
+     * Outside a string as well. A backslash escapes the next character wherever
+     * it appears in CSS, and this honoured one only inside quotes -- so an
+     * escaped separator split a declaration that CSS reads as a single one.
+     */
+    if (ch === '\\') i += 1
+    else if (ch === '"' || ch === "'") quote = ch
     else if (ch === '(') depth += 1
     else if (ch === ')') depth = Math.max(0, depth - 1)
     else if (ch === separator && depth === 0 && splits < limit) {
@@ -248,7 +338,7 @@ export function setDeclaration(
   name: string,
   value: string | undefined,
 ): string {
-  const wanted = name.trim().toLowerCase()
+  const wanted = normaliseName(name)
   const declarations = parseDeclarations(text).filter(([key]) => key !== wanted)
   const trimmed = value?.trim()
   if (trimmed) declarations.push([wanted, trimmed])
@@ -257,6 +347,6 @@ export function setDeclaration(
 
 /** What a property is set to in this text, if anything. */
 export function readDeclaration(text: string | undefined, name: string): string {
-  const wanted = name.trim().toLowerCase()
+  const wanted = normaliseName(name)
   return parseDeclarations(text).find(([key]) => key === wanted)?.[1] ?? ''
 }

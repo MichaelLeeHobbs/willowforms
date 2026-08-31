@@ -13,15 +13,31 @@
  * user-facing copy, so a colour or a gap never offers a translation key.
  */
 
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { languageTag } from '@formsmith/core'
 import type { Language, PropSchema, PropValue } from '@formsmith/core'
+
+import { unreadableTag } from '@formsmith/core'
 
 import { emptyCondition } from './ConditionEditor.js'
 
 export type BindingKind = PropValue['kind']
 
-/** The conventional key for a translated property, per ARCHITECTURE.md. */
+/**
+ * The conventional key for a translated property, per ARCHITECTURE.md.
+ *
+ * Baked in when the binding is made, and never rewritten afterwards: renaming
+ * the component leaves `email_label` on a component now keyed `contact`, and the
+ * translation still resolves, because the key is a string in the document and
+ * the bundle is keyed by that string.
+ *
+ * So the convention holds until the first rename, and it is a convention rather
+ * than a rule for that reason -- a translation key belongs to the text, not to
+ * the component that happens to show it, and rewriting bundles on a rename would
+ * be a migration with two ways to go wrong (a key two components share, a key a
+ * host also uses) to keep a naming habit tidy.
+ */
 export function translationKey(componentKey: string, propName: string): string {
   return componentKey + '_' + propName
 }
@@ -48,6 +64,11 @@ export interface BindingModeProps {
   componentKey: string
   /** A field the condition mode can start by testing. Empty means it cannot. */
   firstDataKey?: string
+  /**
+   * Which scope that field lives in. `row` inside a repeater, where a seed at
+   * form scope names a key the top level does not hold and is false on arrival.
+   */
+  firstDataKeyScope?: 'form' | 'row'
   onChange: (value: PropValue | undefined) => void
 }
 
@@ -58,6 +79,7 @@ export function BindingMode({
   value,
   componentKey,
   firstDataKey,
+  firstDataKeyScope,
   onChange,
 }: BindingModeProps): ReactNode {
   const modes = modesFor(schema)
@@ -77,21 +99,39 @@ export function BindingMode({
         onChange={(e) => {
           const kind = e.target.value as BindingKind
           if (kind === current) return
-          // Switching mode starts that mode empty rather than trying to carry a
-          // value across: an expression is not a label, and a translation key is
-          // not either.
-          if (kind === 'static') onChange(undefined)
-          if (kind === 'computed') onChange({ kind: 'computed', expression: '' })
-          if (kind === 'i18n') {
-            onChange({ kind: 'i18n', key: translationKey(componentKey, schema.name) })
-          }
+
           /*
-           * Without this the option was in the list and selecting it did
-           * nothing, which is the dead-control failure this project treats as
-           * worst. It is reachable only for a property whose schema opts in.
+           * A switch, so a fifth `PropValue` kind is a compile error here rather
+           * than an option in the list that does nothing when chosen. This was
+           * four independent `if`s, which is exactly the shape the comment
+           * beneath them warns about: the `condition` arm had been added late
+           * because nothing made its absence visible.
+           *
+           * Switching mode starts that mode empty rather than carrying a value
+           * across: an expression is not a label, and a translation key is not
+           * either.
            */
-          if (kind === 'condition' && firstDataKey) {
-            onChange({ kind: 'condition', condition: emptyCondition(firstDataKey) })
+          switch (kind) {
+            case 'static':
+              onChange(undefined)
+              return
+            case 'computed':
+              onChange({ kind: 'computed', expression: '' })
+              return
+            case 'i18n':
+              onChange({ kind: 'i18n', key: translationKey(componentKey, schema.name) })
+              return
+            case 'condition':
+              // Only with a field to test; the option is disabled without one.
+              if (firstDataKey) {
+                onChange({
+                  kind: 'condition',
+                  condition: emptyCondition(firstDataKey, firstDataKeyScope),
+                })
+              }
+              return
+            default:
+              return unreadableTag(kind, undefined)
           }
         }}
       >
@@ -113,16 +153,25 @@ export function BindingMode({
 
 export interface ComputedEditorProps {
   id: string
+  /** What this expression is for, so the box can name itself. */
+  label?: string
   value: Extract<PropValue, { kind: 'computed' }>
   onChange: (value: PropValue) => void
 }
 
-export function ComputedEditor({ id, value, onChange }: ComputedEditorProps): ReactNode {
+export function ComputedEditor({ id, value, label, onChange }: ComputedEditorProps): ReactNode {
   return (
     <>
       <textarea
         id={id}
         className="fs-binding__expression"
+        /*
+         * Named. The only label on this row points at the mode select, so this
+         * box announced itself as nothing — and the accessibility suite audits a
+         * selected component at rest, which is a state in which this box is not
+         * on screen, so axe never saw it.
+         */
+        aria-label={(label ? label + ' ' : '') + 'expression'}
         rows={2}
         spellCheck={false}
         placeholder="data.firstName + ' ' + data.lastName"
@@ -147,6 +196,98 @@ export interface TranslationEditorProps {
   onTranslate: (language: string, key: string, text: string) => void
 }
 
+/**
+ * One language's bundle, whatever the document holds in its place.
+ *
+ * `translations[tag]?.[key]` guards the bundle and not the record, so a
+ * document missing `translations` altogether crashed this panel — and the panel
+ * is where somebody goes to repair such a document. `validateDocument` refuses
+ * it now; nothing on the path from a host's storage to here runs that.
+ */
+function bundleFor(
+  translations: Record<string, Record<string, string>>,
+  tag: string,
+): Record<string, string> {
+  if (!translations || typeof translations !== 'object') return {}
+  const bundle = translations[tag]
+  return bundle && typeof bundle === 'object' ? bundle : {}
+}
+
+/**
+ * The translation key, committed on blur, carrying its text with it.
+ *
+ * It was a controlled input writing a new binding on every keystroke, so typing
+ * a new name walked through every prefix of it. None of those prefixes has a
+ * bundle entry, so both language boxes blanked as you typed — and the text
+ * already written stayed under the old key, orphaned, with no way back to it
+ * from the panel.
+ *
+ * The same draft-and-commit shape as every other editor here that parses or
+ * renames. What is different is that the commit has to move the translations
+ * too: a key is the name of something, and renaming it without the thing it
+ * names is what made this destructive rather than merely awkward.
+ */
+function TranslationKeyField({
+  id,
+  value,
+  languages,
+  translations,
+  onRename,
+}: {
+  id: string
+  value: string
+  languages: Language[]
+  translations: Record<string, Record<string, string>>
+  onRename: (next: string, carried: [string, string][]) => void
+}): ReactNode {
+  const [draft, setDraft] = useState(value)
+  const [committed, setCommitted] = useState(value)
+
+  if (value !== committed) {
+    setCommitted(value)
+    setDraft(value)
+  }
+
+  const commit = (): void => {
+    const trimmed = draft.trim()
+    if (!trimmed || trimmed === value) {
+      setDraft(value)
+      return
+    }
+
+    const carried = languages
+      .map((language): [string, string] => {
+        const tag = languageTag(language)
+        return [tag, bundleFor(translations, tag)[value] ?? '']
+      })
+      .filter(([, text]) => text !== '')
+
+    setCommitted(trimmed)
+    setDraft(trimmed)
+    onRename(trimmed, carried)
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      className="fs-binding__key"
+      // Named, because the only label on this row points at the mode select.
+      aria-label="Translation key"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commit()
+        }
+        if (e.key === 'Escape') setDraft(value)
+      }}
+    />
+  )
+}
+
 export function TranslationEditor({
   id,
   value,
@@ -158,12 +299,25 @@ export function TranslationEditor({
 }: TranslationEditorProps): ReactNode {
   return (
     <>
-      <input
+      {/*
+       * A draft, committed on blur, and the rename carries the translations
+       * with it.
+       *
+       * It wrote a new binding on every keystroke, so typing a new name walked
+       * through every prefix of it — and none of those prefixes had a bundle
+       * entry, so both language boxes blanked as you typed and the text already
+       * written was orphaned under the old key, permanently. There is no way
+       * back to it from the panel.
+       */}
+      <TranslationKeyField
         id={id}
-        type="text"
-        className="fs-binding__key"
         value={value.key}
-        onChange={(e) => onChange({ kind: 'i18n', key: e.target.value })}
+        languages={languages}
+        translations={translations}
+        onRename={(next, carried) => {
+          onChange({ kind: 'i18n', key: next })
+          for (const [language, text] of carried) onTranslate(language, next, text)
+        }}
       />
 
       <ul className="fs-binding__languages">
@@ -174,7 +328,7 @@ export function TranslationEditor({
            * bundle nothing read, so the canvas kept showing the raw key.
            */
           const tag = languageTag(language)
-          const text = translations[tag]?.[value.key] ?? ''
+          const text = bundleFor(translations, tag)[value.key] ?? ''
           const fieldId = id + '-' + tag
           return (
             <li key={tag}>

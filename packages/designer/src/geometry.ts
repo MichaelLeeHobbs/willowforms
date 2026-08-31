@@ -2,9 +2,16 @@
  * Measuring rendered nodes against the canvas.
  *
  * Every rendered node carries `data-fs-key`, because each kit renderer spreads
- * `nodeProps` onto its root element. That attribute is the only thing tying a
- * DOM element back to a document node, and both the selection overlay and the
- * drop indicator are built on looking elements up by it.
+ * `nodeProps` onto its root element. That attribute is what ties a DOM element
+ * back to a document node, and both the selection overlay and the drop indicator
+ * are built on looking elements up by it.
+ *
+ * It is not unique. A repeater draws its subtree once per row, so a key names
+ * one authored node and any number of elements, and `data-fs-row` says which
+ * row each of them is in -- the two attributes together identify an element, and
+ * the key alone identifies the node. Every function below that takes a `row` is
+ * making that distinction; every `querySelector` without one is deliberately
+ * answering "any of them will do".
  *
  * This module touches the DOM. The arithmetic that decides where a drop lands
  * lives in `dnd.ts` and touches nothing, so it can be tested without a browser.
@@ -39,8 +46,48 @@ export function keyFromEventTarget(target: EventTarget | null): string | undefin
   return target.closest<HTMLElement>('[data-fs-key]')?.dataset['fsKey']
 }
 
-export function nodeElement(surface: HTMLElement, key: string): HTMLElement | null {
-  return surface.querySelector<HTMLElement>(`[data-fs-key="${CSS.escape(key)}"]`)
+/**
+ * The row a click landed in, if it landed in one.
+ *
+ * The click knew — the element it hit carries `data-fs-row` — and the answer
+ * was thrown away, so with more than one row the outline, the label and the
+ * toolbar all appeared around row 0 whichever row was clicked.
+ *
+ * It is geometry, not identity. The *node* selected is the authored one, which
+ * is the only thing a document has and the only thing the panel can edit; this
+ * says which of its drawn copies the author was pointing at.
+ */
+export function rowFromEventTarget(target: EventTarget | null): string | undefined {
+  if (!(target instanceof Element)) return undefined
+  return target.closest<HTMLElement>('[data-fs-key]')?.dataset['fsRow']
+}
+
+/**
+ * The element drawing this node, in this row if one is named.
+ *
+ * A key was unique in the DOM until a repeater drew its subtree once per row,
+ * and every caller here took the first match — so the selection frame, its
+ * toolbar, `scrollIntoView` and the drop measurements all silently resolved to
+ * row 0 whichever row the author was working in.
+ *
+ * The row falls back to the first match rather than to nothing: a row can be
+ * removed while it is selected, and a frame around the wrong row is bad, but a
+ * frame around nothing is worse.
+ */
+export function nodeElement(surface: HTMLElement, key: string, row?: string): HTMLElement | null {
+  const selector = `[data-fs-key="${CSS.escape(key)}"]`
+  if (row !== undefined) {
+    const inRow = surface.querySelector<HTMLElement>(
+      `${selector}[data-fs-row="${CSS.escape(row)}"]`,
+    )
+    if (inRow) return inRow
+  }
+  return surface.querySelector<HTMLElement>(selector)
+}
+
+/** Every element drawing this node — one per row of every repeater above it. */
+export function nodeElements(surface: HTMLElement, key: string): HTMLElement[] {
+  return [...surface.querySelectorAll<HTMLElement>(`[data-fs-key="${CSS.escape(key)}"]`)]
 }
 
 /**
@@ -92,11 +139,15 @@ export function toLocal(origin: Origin, clientX: number, clientY: number): [numb
 /**
  * Walk the document and measure every node that actually rendered.
  *
- * Nodes hidden by `renderWhen` are absent from the DOM and are skipped, along
- * with their subtrees: nothing can be dropped into a container that is not on
- * screen. Measured once when a drag begins rather than on every pointer move,
- * because the layout cannot change mid-drag and per-move measurement would force
- * a layout pass for every node on every frame.
+ * A node with no element is skipped, along with its subtree. On the canvas that
+ * is rarer than it used to be: `revealHidden` draws what `renderWhen` hides, so
+ * a conditional container can be dropped into while it is arranged. What is
+ * still absent is a node whose kit renderer drew nothing at all, and nothing can
+ * be dropped into a container that is not on screen.
+ *
+ * Measured once when a drag begins rather than on every pointer move, because
+ * nothing edits the document mid-drag and per-move measurement would force a
+ * layout pass for every node on every frame.
  */
 export function measureTree(
   surface: HTMLElement,
@@ -111,17 +162,31 @@ export function measureTree(
     index: number,
     depth: number,
   ): void => {
-    const element = nodeElement(surface, node.key)
-    if (!element) return
+    /*
+     * One candidate per drawn *element*, not per authored node.
+     *
+     * This measured `nodeElement`, which is the first match, so rows 1..N
+     * produced no candidates at all: hovering row 1 resolved against row 0's
+     * children, and a container inside a row was invisible to the drop
+     * resolver for every row but the first.
+     *
+     * The key is the same across rows and that is right — a drop names the
+     * authored node, which is the only thing a document has. What differs per
+     * row is the rectangle, and the rectangle is the whole question here.
+     */
+    const elements = nodeElements(surface, node.key)
+    if (elements.length === 0) return
 
-    out.push({
-      key: node.key,
-      parentKey,
-      index,
-      container: isContainer(node.type),
-      depth,
-      rect: measureIn(surface, element),
-    })
+    for (const element of elements) {
+      out.push({
+        key: node.key,
+        parentKey,
+        index,
+        container: isContainer(node.type),
+        depth,
+        rect: measureIn(surface, element),
+      })
+    }
 
     node.children?.forEach((child, i) => visit(child, node.key, i, depth + 1))
   }

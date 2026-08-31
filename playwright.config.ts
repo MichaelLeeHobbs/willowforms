@@ -41,7 +41,17 @@ export default defineConfig({
     // else and leaving every test to time out against the wrong address.
     command: 'pnpm --filter playground exec vite --port ' + String(PORT) + ' --strictPort',
     url: baseURL,
-    reuseExistingServer: !process.env['CI'],
+    /*
+     * Never reuse. This was `!CI`, which cancels the `--strictPort` reasoning
+     * two lines above it: when something already answers on this port,
+     * Playwright does not run the command at all — so a sibling worktree's dev
+     * server meant the whole suite ran green against another branch's code, and
+     * the strict port never got a chance to say so.
+     *
+     * The cost is a few seconds of startup per local run. The thing it buys is
+     * knowing which code the green came from.
+     */
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 })

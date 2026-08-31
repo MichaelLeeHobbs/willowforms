@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import type { ComponentNode, Condition, FormData, ValidationRule } from './types.js'
 import { contextValues } from './context.js'
-import type { EvalOptions } from './validation.js'
+import type { EvalOptions, Evaluator } from './validation.js'
 import {
   DEFAULT_MESSAGES,
+  UNREADABLE_RULE,
   applyRule,
   autoValidateKeys,
   submittedData,
@@ -75,6 +76,29 @@ describe('format rules', () => {
     expect(check({ key: 'url' }, 'not a url')).toBe(DEFAULT_MESSAGES.url)
   })
 
+  it.each([
+    ['javascript:alert(1)'],
+    ['JavaScript:alert(1)'],
+    ['data:text/html,<script>alert(1)</script>'],
+    ['vbscript:msgbox(1)'],
+    ['//evil.example.com'],
+  ])('refuses %s, which parses as a URL and is not one anybody should follow', (value) => {
+    /*
+     * The rule was tested against `not a url` only, so what it did with a
+     * scheme was unmeasured — and this rule is what a host trusts before it
+     * writes an answer into an `href`. `javascript:` parses perfectly well.
+     * `isUrl` asks `safeHref` for exactly this reason and nothing said so.
+     */
+    expect(check({ key: 'url' }, value)).toBe(DEFAULT_MESSAGES.url)
+  })
+
+  it('accepts the schemes a link can safely carry', () => {
+    // The control. A rule that refused everything would pass the rows above.
+    expect(check({ key: 'url' }, 'http://example.com/x?y=1')).toBeUndefined()
+    expect(check({ key: 'url' }, 'mailto:someone@example.com')).toBeUndefined()
+    expect(check({ key: 'url' }, 'tel:+441234567890')).toBeUndefined()
+  })
+
   it('validates uuid case-insensitively', () => {
     expect(check({ key: 'uuid' }, '3f2504e0-4f89-11d3-9a0c-0305e82c3301')).toBeUndefined()
     expect(check({ key: 'uuid' }, '3F2504E0-4F89-11D3-9A0C-0305E82C3301')).toBeUndefined()
@@ -121,6 +145,23 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
   it('skips a computed guard when no evaluator is injected', () => {
     const rule: ValidationRule = { key: 'required', when: { kind: 'computed', expression: 'true' } }
     expect(check(rule, '')).toBeUndefined()
+  })
+
+  it('runs a computed guard in both directions once one is', () => {
+    /*
+     * Only the no-evaluator direction was tested, so a guard that answered
+     * "skip" whatever the expression said would have passed: the permissive
+     * half was pinned and the half that makes a rule apply was not. This is
+     * `required` on an empty value, so the guard alone decides the outcome.
+     */
+    const evaluate: Evaluator = (expression) => expression === 'true'
+    const guarded = (expression: string): ValidationRule => ({
+      key: 'required',
+      when: { kind: 'computed', expression },
+    })
+
+    expect(applyRule(guarded('true'), '', NO_DATA, { evaluate })).toBe(DEFAULT_MESSAGES.required)
+    expect(applyRule(guarded('false'), '', NO_DATA, { evaluate })).toBeUndefined()
   })
 
   it('honours a static guard', () => {
@@ -225,9 +266,24 @@ describe('required on a boolean', () => {
   })
 
   it('does not make false empty for every other rule', () => {
-    // Requiredness is one rule's job; nothing else changes meaning.
-    const node = box([{ key: 'minLength', value: 3 }])
-    expect(validateField(node, { terms: false })).toBeUndefined()
+    /*
+     * Requiredness is one rule's job; nothing else changes meaning.
+     *
+     * `minLength` on a boolean used to be the fixture here, and it passes under
+     * either reading: a rule that skipped `false` as empty and a rule that ran
+     * and found nothing to measure both answer "fine". A custom rule tells them
+     * apart, because every rule but `required` short-circuits on an empty value
+     * — so if `false` were empty this expression would never run and the
+     * assertion would flip.
+     */
+    const evaluate: Evaluator = () => false
+    const node = box([{ key: 'custom', expression: 'never' }])
+
+    expect(validateField(node, { terms: false }, { evaluate })).toBe(DEFAULT_MESSAGES.custom)
+    // And the empty answer really is skipped, which is what makes that a test.
+    expect(
+      validateField(box([{ key: 'custom', expression: 'never' }]), {}, { evaluate }),
+    ).toBeUndefined()
   })
 })
 
@@ -516,7 +572,10 @@ describe('validateAcross, and the submit it exists to stop', () => {
   })
 
   const step = (name: string, children: ComponentNode[]): ComponentNode => ({
-    key: 'step-' + name,
+    // `stepWho`, not `step-who`: a hyphen is not in the key grammar, so the
+    // fixture was a document `validateDocument` refuses -- a wizard nobody
+    // could have authored, standing in for the one people do.
+    key: 'step' + name.charAt(0).toUpperCase() + name.slice(1),
     type: 'Box',
     props: {},
     renderWhen: {
@@ -588,6 +647,50 @@ describe('validateAcross, and the submit it exists to stop', () => {
     expect(validateAcross(wizard, { ...answered, city: 'Ely' }, scopes)).toEqual({})
   })
 
+  it('keeps the first message when two steps report the same field', () => {
+    /*
+     * A field can be visible in more than one step -- a summary step that shows
+     * what an earlier one collected -- and the merge takes the first message
+     * rather than the last. Which one is arbitrary; that it is decided is not,
+     * because a caller showing "Too short" where the earlier step said
+     * "Required" is a form arguing with itself.
+     */
+    const shared: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        step('who', [
+          {
+            key: 'nickname',
+            type: 'TextField',
+            props: {},
+            schema: {
+              type: 'string',
+              validations: [{ key: 'required', message: 'The first step says so.' }],
+            },
+          },
+        ]),
+        step('where', [
+          {
+            key: 'nickname2',
+            dataKey: 'nickname',
+            type: 'TextField',
+            props: {},
+            schema: {
+              type: 'string',
+              validations: [{ key: 'required', message: 'The second step says so.' }],
+            },
+          },
+        ]),
+      ],
+    }
+
+    const merged = validateAcross(shared, {}, ['who', 'where'].map(onStep))
+    expect(merged['nickname']).toBe('The first step says so.')
+    expect(merged['nickname2']).toBe('The second step says so.')
+  })
+
   it('merges nothing into an empty scope list, rather than validating everything', () => {
     // A document that declares no steps yields no scopes, and the honest answer
     // to "validate across nothing" is nothing. A host that means the whole form
@@ -622,5 +725,383 @@ describe('length rules on a value that is not text', () => {
     // report before the user has touched it.
     expect(check({ key: 'minLength', value: 1 }, [])).toBeUndefined()
     expect(check({ key: 'required' }, [])).toBe(DEFAULT_MESSAGES.required)
+  })
+})
+
+/**
+ * A rule tag this code does not recognise.
+ *
+ * The same shape as the `renderWhen` typo, one function over. Both switches are
+ * exhaustive over a closed union and neither had a tail, so an unrecognised tag
+ * returned `undefined` — read as *guard not satisfied* in one and as *the value
+ * passed* in the other. Either way the rule silently stopped applying, which on
+ * the server is a required answer becoming optional with nothing logged.
+ */
+describe('a validation tag this code cannot read', () => {
+  it('applies a rule whose guard is unreadable, rather than skipping it', () => {
+    const rule = {
+      key: 'required',
+      when: { kind: 'conditon', condition: { op: 'truthy', value: { kind: 'literal', value: 1 } } },
+    }
+
+    // A guard that cannot be read has not said no. Skipping the rule is the
+    // permissive answer, and permissive is the direction that fails silently.
+    expect(check(rule as unknown as ValidationRule, '')).toBe(DEFAULT_MESSAGES.required)
+  })
+
+  it('still honours a guard it can read', () => {
+    // The control. If an unreadable guard passing were achieved by ignoring
+    // guards altogether, this would fail.
+    const rule: ValidationRule = { key: 'required', when: { kind: 'static', value: false } }
+    expect(check(rule, '')).toBeUndefined()
+  })
+
+  it('fails a rule whose key is unreadable, rather than passing the value', () => {
+    // `{ key: 'requird' }` used to fall off the second switch and read as "the
+    // value is fine", so a mistyped rule was a rule that never ran.
+    expect(check({ key: 'requird', value: 3 } as unknown as ValidationRule, '')).toBe(
+      UNREADABLE_RULE,
+    )
+  })
+
+  it('says which rule it could not read is not the point; blocking the submit is', () => {
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'a',
+          type: 'Field',
+          props: {},
+          schema: {
+            type: 'string',
+            validations: [{ key: 'requird' } as unknown as ValidationRule],
+          },
+        },
+      ],
+    }
+
+    expect(validateForm(root, { a: 'anything' })).toEqual({ a: UNREADABLE_RULE })
+  })
+})
+
+/**
+ * Two ways a required answer stopped being required, both silent, both on the
+ * server.
+ *
+ * The first is an empty object: `isEmpty` fell through to `false` for anything
+ * that was not a string or an array, so `{"consent": {}}` satisfied `required`.
+ * The second is a key named `__proto__`: the error message was computed
+ * correctly and then assigned into a plain object literal, where `__proto__` is
+ * a setter rather than a slot, so the assignment evaporated and `validateForm`
+ * returned an empty object — a valid form.
+ *
+ * `validateDocument` refuses that key. Nothing on the render or validate path
+ * calls `validateDocument`, which is what makes it reachable.
+ */
+describe('a required answer that was not required', () => {
+  const field = (key: string): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'required' }] },
+  })
+
+  const root = (children: ComponentNode[]): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children,
+  })
+
+  it('is not satisfied by an empty object', () => {
+    expect(validateForm(root([field('consent')]), { consent: {} })).toEqual({
+      consent: DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('is satisfied by an object that holds something', () => {
+    // The control. Reading every object as empty would be its own bug: an
+    // object-typed field with an answer in it is answered.
+    expect(validateForm(root([field('consent')]), { consent: { agreed: true } })).toEqual({})
+  })
+
+  it('reports a field whose key is __proto__', () => {
+    /*
+     * The message was always computed. It was the *assignment* that vanished:
+     * `errors['__proto__'] = message` on an object literal runs the inherited
+     * setter and creates no own property, so the result had zero keys and read
+     * as a valid form.
+     */
+    const errors = validateForm(root([field('__proto__')]), {})
+
+    expect(Object.keys(errors)).toEqual(['__proto__'])
+    expect(Object.hasOwn(errors, '__proto__')).toBe(true)
+  })
+
+  it('does not let a hostile key reshape the errors it returns', () => {
+    const errors = validateForm(root([field('__proto__'), field('email')]), {})
+
+    // The other field still reports, and nothing has been written onto a
+    // prototype that a later `errors[key]` read could pick up.
+    expect(Object.keys(errors).sort()).toEqual(['__proto__', 'email'])
+    expect(({} as Record<string, unknown>)['email']).toBeUndefined()
+  })
+})
+
+/**
+ * A pattern is authored in a document and run on the server against text an
+ * attacker chose.
+ *
+ * `new RegExp(pattern).test(value)` with no cap on either side. The classic
+ * shape is an unbounded quantifier wrapped in another one — `^(a+)+$` against
+ * forty non-matching characters pins a thread, and a form runs one of these per
+ * field per row of every repeater.
+ *
+ * Nothing here can make a backtracking engine linear, so the answer is narrower
+ * and it is stated rather than implied: the shapes that go exponential are
+ * refused when the rule is applied, and the text a pattern is run against is
+ * bounded. `docs/build-out/triage.md` records what that still leaves.
+ */
+describe('a pattern rule', () => {
+  const pattern = (value: string, against: string): string | undefined =>
+    check({ key: 'pattern', value }, against)
+
+  it('still does what a pattern is for', () => {
+    expect(pattern('^[A-Z]{2}\\d{4}$', 'AB1234')).toBeUndefined()
+    expect(pattern('^[A-Z]{2}\\d{4}$', 'nope')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it.each([
+    ['a quantified group that is itself quantified', '^(a+)+$'],
+    ['the same shape with a star', '^(a*)*$'],
+    ['a nested group', '^((a+)*)+$'],
+  ])('refuses %s rather than running it', (_what, source) => {
+    /*
+     * Refused means the rule fails, not that it passes. A pattern the engine
+     * cannot be trusted with has not been satisfied, and a silent pass is how a
+     * constraint stops applying on the server.
+     */
+    expect(pattern(source, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it('does not catch every blowup, and says so', () => {
+    /*
+     * `(a|a)*` is exponential too and is not refused: no cheap syntactic rule
+     * separates a dangerous alternation from `(ab|cd)+`. It is here so the
+     * limit is written down in the suite rather than only in a comment — if a
+     * later change does start catching it, this test says so.
+     */
+    expect(pattern('^(ab|cd)+$', 'abcd')).toBeUndefined()
+  })
+
+  it('allows a bounded inner quantifier, which is what real patterns look like', () => {
+    // `(\d{3}-)+` is a phone number, not an attack: the inner repetition has a
+    // fixed length, so there is nothing for the engine to try two ways.
+    expect(pattern('^(\\d{3}-)+\\d{4}$', '123-456-7890')).toBeUndefined()
+    expect(pattern('^(\\d{3}-)+\\d{4}$', 'nope')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it('does not run a pattern against unbounded text', () => {
+    // An answer to a form field is not a megabyte. Bounding the input does not
+    // make an exponential pattern safe, but it does cap every polynomial one.
+    const long = 'a'.repeat(20_000)
+    expect(pattern('^a*$', long)).toBe(DEFAULT_MESSAGES.pattern)
+    expect(pattern('^a*$', 'a'.repeat(100))).toBeUndefined()
+  })
+
+  it('still refuses a pattern that is not a pattern', () => {
+    // The existing behaviour, kept: an unfinished pattern matches nothing,
+    // which is the same answer it gives once the author closes the bracket.
+    expect(pattern('^(a', 'a')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+})
+
+/**
+ * Three holes in this file, each one a branch nothing executed.
+ *
+ * Every case here was written by mutating the source and watching the suite
+ * stay green. That is the only evidence a test is doing anything, and it is how
+ * these were found: `guardPasses`' whole condition branch could be replaced with
+ * `return false` and nothing went red.
+ */
+describe('branches this file used to leave unexecuted', () => {
+  const field = (key: string, validations: ValidationRule[]): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations },
+  })
+
+  const root = (children: ComponentNode[]): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children,
+  })
+
+  describe('a rule whose message is empty', () => {
+    it('still fails, with the default message', () => {
+      /*
+       * `rule.message ?? DEFAULT` keeps `''`, because `''` is not nullish — and
+       * `validateForm` records an error only `if (error)`, so an empty string
+       * made the rule stop failing. A pasted `"message": ""` turned a required
+       * field optional on the server with nothing to see.
+       */
+      expect(check({ key: 'required', message: '' }, '')).toBe(DEFAULT_MESSAGES.required)
+    })
+
+    it('reaches validateForm, which is where it mattered', () => {
+      const errors = validateForm(root([field('email', [{ key: 'required', message: '' }])]), {})
+
+      expect(errors).toEqual({ email: DEFAULT_MESSAGES.required })
+    })
+
+    it('still prefers a message the author wrote', () => {
+      // The control. Ignoring `message` entirely would pass both tests above.
+      expect(check({ key: 'required', message: 'We need this.' }, '')).toBe('We need this.')
+    })
+  })
+
+  describe('a rule guarded by a structured condition', () => {
+    /*
+     * The whole no-sandbox story, and no test executed it. `guardPasses`'
+     * `condition` branch could be replaced with `return false` and the entire
+     * repository suite stayed green — which would have made every guarded rule
+     * silently stop applying.
+     */
+    const guarded = (): ComponentNode =>
+      field('vat', [
+        {
+          key: 'required',
+          when: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'business' } },
+          },
+        },
+      ])
+
+    it('applies when the condition holds, with no evaluator anywhere', () => {
+      const errors = validateForm(root([guarded()]), { business: true })
+
+      expect(errors).toEqual({ vat: DEFAULT_MESSAGES.required })
+    })
+
+    it('does not apply when the condition does not hold', () => {
+      expect(validateForm(root([guarded()]), { business: false })).toEqual({})
+    })
+
+    it('reads the condition rather than merely noticing there is one', () => {
+      // Both directions above, on one fixture, which is what makes this a test
+      // of the branch and not of its presence.
+      expect(validateForm(root([guarded()]), {})).toEqual({})
+    })
+  })
+
+  describe('submittedData over a repeater', () => {
+    /*
+     * The row branch had no fixture at all: deleting the `isRowScope` case left
+     * every test green. Named so the two names differ, because a fixture that
+     * spells them the same cannot see the branch that tells them apart.
+     */
+    const withRows = (): ComponentNode =>
+      root([
+        {
+          key: 'addressList',
+          dataKey: 'addresses',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [field('street', []), field('postal', [])].map((node, i) => ({
+            ...node,
+            dataKey: i === 0 ? 'line1' : 'postcode',
+          })),
+        },
+        field('email', []),
+      ])
+
+    it('keeps one object per row, under the answer name', () => {
+      const data = {
+        addresses: [{ line1: '1 High Street', postcode: 'SW1A 1AA' }, { line1: '2 Low Street' }],
+        email: 'a@b.co',
+      }
+
+      expect(submittedData(withRows(), data)).toEqual(data)
+    })
+
+    it('drops what a row no longer asks for', () => {
+      // The point of `submittedData`: it projects the document over the data,
+      // so an answer to a question that has been deleted does not survive.
+      const data = { addresses: [{ line1: 'kept', removed: 'gone' }], email: '' }
+
+      expect(submittedData(withRows(), data)).toEqual({ addresses: [{ line1: 'kept' }], email: '' })
+    })
+
+    it('reads a repeater whose stored value is not a list as no answer at all', () => {
+      /*
+       * Not `addresses: []`, which is what this used to expect. An empty list is
+       * an answer -- "I have no addresses" -- and inventing one for a value the
+       * form never collected is the thing `submittedData` exists to stop: it
+       * submits what was asked and given, and nothing else.
+       */
+      const out = submittedData(withRows(), { addresses: 'nonsense', email: '' })
+      expect(out).toEqual({ email: '' })
+      expect(Object.hasOwn(out, 'addresses')).toBe(false)
+    })
+
+    it('keeps a real empty list, which is an answer somebody gave', () => {
+      expect(submittedData(withRows(), { addresses: [], email: '' })).toEqual({
+        addresses: [],
+        email: '',
+      })
+    })
+  })
+})
+
+/**
+ * Two rules that let through exactly what they exist to stop.
+ */
+describe('bounds and schemes', () => {
+  it('fails min and max on a value that is not a number', () => {
+    /*
+     * `Number('not telling')` is `NaN`, and every comparison with `NaN` is
+     * false — so `min` and `max` both passed. The exported schema says
+     * `{"type":"number","minimum":18}` while the form accepts a sentence.
+     */
+    expect(check({ key: 'min', value: 18 }, 'not telling')).toBe(DEFAULT_MESSAGES.min)
+    expect(check({ key: 'max', value: 65 }, 'not telling')).toBe(DEFAULT_MESSAGES.max)
+  })
+
+  it('still compares numbers, however they were typed', () => {
+    // The control. A number field's value can arrive as a string from an input.
+    expect(check({ key: 'min', value: 18 }, 21)).toBeUndefined()
+    expect(check({ key: 'min', value: 18 }, '21')).toBeUndefined()
+    expect(check({ key: 'min', value: 18 }, 3)).toBe(DEFAULT_MESSAGES.min)
+    expect(check({ key: 'max', value: 65 }, '70')).toBe(DEFAULT_MESSAGES.max)
+  })
+
+  it.each(['javascript:alert(1)', 'data:text/html,<script>', 'vbscript:x', 'file:///etc/passwd'])(
+    'refuses %s as a URL',
+    (value) => {
+      /*
+       * `URL.canParse` answers yes to any well-formed URL, scheme included —
+       * and `safeHref` in the same package keeps an allowlist precisely because
+       * these schemes are the ones that matter. A `url` rule that accepts
+       * `javascript:` tells an author their field holds a link.
+       */
+      expect(check({ key: 'url' }, value)).toBe(DEFAULT_MESSAGES.url)
+    },
+  )
+
+  it.each(['https://example.com', 'http://example.com/a?b=1', 'mailto:a@b.co', 'tel:+441234'])(
+    'accepts %s',
+    (value) => {
+      expect(check({ key: 'url' }, value)).toBeUndefined()
+    },
+  )
+
+  it('still refuses something that is not a URL at all', () => {
+    expect(check({ key: 'url' }, 'not a url')).toBe(DEFAULT_MESSAGES.url)
   })
 })

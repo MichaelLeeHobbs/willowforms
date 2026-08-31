@@ -24,8 +24,15 @@ test('a structured control styles the component on the canvas', async ({ designe
   await designer.select('website')
   await designer.openTab('Style')
 
+  /*
+   * Enter commits, and so does moving focus away. The control holds a draft
+   * rather than writing through on every keystroke, because parsing what is
+   * half-typed removed the space from `8px auto` as it was being typed.
+   */
   await designer.page.getByLabel('Padding').fill('24px')
+  await designer.page.getByLabel('Padding').press('Enter')
   await designer.page.getByLabel('Radius').fill('9px')
+  await designer.page.getByLabel('Radius').press('Enter')
 
   expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
   expect(await styleOf(designer, 'website', 'border-top-left-radius')).toBe('9px')
@@ -36,9 +43,11 @@ test('a device rule overrides the base layer when that device is shown', async (
   await designer.openTab('Style')
 
   await designer.page.getByLabel('Padding').fill('24px')
+  await designer.page.getByLabel('Padding').press('Enter')
 
   await designer.page.getByLabel('Applies to').selectOption('mobile')
   await designer.page.getByLabel('Padding').fill('4px')
+  await designer.page.getByLabel('Padding').press('Enter')
 
   // Choosing a device in the Style tab moves the canvas to it, so what is on
   // screen is the rule being edited.
@@ -57,6 +66,11 @@ test('CSS that would escape the component is not applied', async ({ designer }) 
   await designer.select('website')
   await designer.openTab('Style')
 
+  // A real declaration first, so there is a stylesheet on the page to inspect
+  // and the refusal below can be told apart from "no styling at all".
+  await designer.page.getByLabel('Padding').fill('24px')
+  await designer.page.getByLabel('Padding').press('Enter')
+
   await designer.page.getByLabel('CSS', { exact: true }).fill('color: red } body { display: none')
   await designer.page.getByLabel('Padding').click()
 
@@ -64,4 +78,30 @@ test('CSS that would escape the component is not applied', async ({ designer }) 
   expect(await designer.page.evaluate(() => getComputedStyle(document.body).display)).not.toBe(
     'none',
   )
+
+  /*
+   * And the stylesheet is on the page at all. `display` is not `none` on a page
+   * with no formsmith styles either, so on its own that assertion holds for a
+   * build that never emitted a rule -- it carries weight only next to something
+   * that says the mechanism works. The earlier tests in this file set real
+   * padding, so a `[data-fs-key]` rule is there to find.
+   */
+  const rules = await designer.page.evaluate(() =>
+    [...document.querySelectorAll('style')]
+      .map((element) => element.textContent ?? '')
+      /*
+       * The sheet the renderer emitted for this document, which is the one that
+       * names the styled component. Filtering on `data-fs-key` alone also
+       * catches `designer.css`, whose own comments mention `body`, and MUI's
+       * has `body` rules of its own -- so the question would be answered by a
+       * stylesheet the test is not about.
+       */
+      .filter((text) => text.includes('[data-fs-key="website"]'))
+      .join(' '),
+  )
+  expect(rules, 'the per-component stylesheet never reached the page').not.toBe('')
+  expect(rules).toContain('padding')
+  expect(rules).not.toContain('body')
+  // And the component still has the styling that was accepted.
+  expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
 })

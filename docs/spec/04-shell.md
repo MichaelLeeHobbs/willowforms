@@ -111,7 +111,9 @@ here: `e2e/viewport.spec.ts` selects and drags at 390px wide.
 
 ## Toolbar
 
-**Status: partial.**
+**Status: built.** Every control in the table is, and the two notes under it are about how they behave
+rather than about anything outstanding. It read Partial over a table of eight Built rows, which is the
+kind of status a reader cannot act on.
 
 | Control     | Status | Does                                                             |
 | ----------- | ------ | ---------------------------------------------------------------- |

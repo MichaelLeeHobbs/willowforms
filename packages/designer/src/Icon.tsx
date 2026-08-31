@@ -220,6 +220,17 @@ export interface IconProps {
  * so naming it would make a screen reader read the label twice.
  */
 export function Icon({ name, size = 16 }: IconProps): ReactNode {
+  /*
+   * A name outside the vocabulary draws nothing at all, rather than an empty
+   * 16px square. The type says this cannot happen and a kit is third-party
+   * code, so it can: an unknown name used to reserve the space an icon would
+   * take and leave a hole beside the label, which looks like a glyph that
+   * failed to load. Drawing nothing lets the label stand on its own, which is
+   * what a kit shipping without icons already gets.
+   */
+  const glyph = GLYPHS[name]
+  if (!glyph) return null
+
   return (
     <svg
       className="fs-icon"
@@ -234,10 +245,17 @@ export function Icon({ name, size = 16 }: IconProps): ReactNode {
       aria-hidden="true"
       focusable="false"
     >
-      {GLYPHS[name]}
+      {glyph}
     </svg>
   )
 }
 
-/** Every name the vocabulary declares, for tests and for a future icon picker. */
-export const ICON_NAMES = Object.keys(GLYPHS) as IconName[]
+/**
+ * Every name the vocabulary declares, for tests and for a future icon picker.
+ *
+ * `Object.keys` types as `string[]` and the cast said otherwise. It is sound
+ * here only because `GLYPHS` is a total record, which is a fact about the
+ * declaration above rather than about `Object.keys` -- so the cast is replaced
+ * by asking the type for its own keys.
+ */
+export const ICON_NAMES: IconName[] = (Object.keys(GLYPHS) as (keyof typeof GLYPHS)[]).slice()

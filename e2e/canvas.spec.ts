@@ -7,7 +7,7 @@
  * the real thing lands where the user aimed.
  */
 
-import { dragOnto, expect, test } from './harness.js'
+import { dragOnto, expect, stableBox, test } from './harness.js'
 
 test('clicking a component on the canvas selects it and shows its properties', async ({
   designer,
@@ -27,23 +27,53 @@ test('the selection frame sits on the component it selected', async ({ designer 
   const node = await designer.node('email').boundingBox()
   if (!frame || !node) throw new Error('nothing to measure')
 
-  // The whole point of the overlay is that it lands on the target.
+  // The whole point of the overlay is that it lands on the target. All four
+  // sides: a frame with the right position and the wrong height is the shape a
+  // measurement that forgets the scroll offset produces.
   expect(Math.abs(frame.x - node.x)).toBeLessThanOrEqual(1)
   expect(Math.abs(frame.y - node.y)).toBeLessThanOrEqual(1)
   expect(Math.abs(frame.width - node.width)).toBeLessThanOrEqual(1)
+  expect(Math.abs(frame.height - node.height)).toBeLessThanOrEqual(1)
 })
 
 test('the frame follows the component when the canvas scrolls', async ({ designer }) => {
-  await designer.node('email').click()
+  /*
+   * Short enough that the canvas has to overflow.
+   *
+   * The test set `scrollTop` and then measured, without ever checking that the
+   * scroll moved anything. On a viewport where the whole form fits, assigning
+   * `scrollTop` does nothing, the component stays exactly where it was, and the
+   * frame passes for standing still. It was a test of the overlay's ability to
+   * not move, which no version of this code has ever failed.
+   */
+  await designer.page.setViewportSize({ width: 1280, height: 420 })
 
-  await designer.page.locator('.fs-canvas__surface').evaluate((surface) => {
-    surface.scrollTop = 120
-    surface.dispatchEvent(new Event('scroll'))
+  const surface = designer.page.locator('.fs-canvas__surface')
+  const overflow = await surface.evaluate((element) => element.scrollHeight - element.clientHeight)
+  expect(overflow, 'the canvas has to overflow or there is no scroll to follow').toBeGreaterThan(
+    120,
+  )
+
+  await designer.node('message').click()
+  const before = await stableBox(designer.node('message'))
+
+  await surface.evaluate((element) => {
+    element.scrollTop = 120
+    element.dispatchEvent(new Event('scroll'))
   })
 
+  /*
+   * The component moved, so what follows is a claim about following. Distance
+   * rather than direction: clicking scrolls the target into view first, so the
+   * canvas is already somewhere below 120 by the time this sets it, and the
+   * component travels back down the screen rather than up.
+   */
+  expect(await surface.evaluate((element) => element.scrollTop)).toBe(120)
+  const node = await stableBox(designer.node('message'))
+  expect(Math.abs(before.y - node.y)).toBeGreaterThan(100)
+
   const frame = await designer.page.locator('.fs-selection--active').boundingBox()
-  const node = await designer.node('email').boundingBox()
-  if (!frame || !node) throw new Error('nothing to measure')
+  if (!frame) throw new Error('nothing to measure')
   expect(Math.abs(frame.y - node.y)).toBeLessThanOrEqual(1)
 })
 

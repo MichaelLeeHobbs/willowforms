@@ -78,3 +78,39 @@ describe('the key grammar', () => {
     expect(keyProblem('   ')).toContain('empty')
   })
 })
+
+describe('the names that are refused by name', () => {
+  /*
+   * Written out rather than read from `RESERVED_KEYS`. The loop that iterates
+   * the list is vacuous if the list is emptied -- zero iterations, zero
+   * assertions, green -- so the three names are also stated here, where
+   * deleting one from the source makes a test that names it go red.
+   */
+  it.each(['__proto__', 'constructor', 'prototype'])('refuses %s', (key) => {
+    expect(keyProblem(key)).toBeTruthy()
+  })
+
+  it('says why, in words a panel can show', () => {
+    expect(keyProblem('__proto__')).toMatch(/reserved/i)
+  })
+
+  it('accepts a name that merely contains one of them', () => {
+    // The control: the rule is the whole key, not a substring, or `constructorName`
+    // would be refused for no reason.
+    expect(keyProblem('constructorName')).toBeUndefined()
+    expect(keyProblem('myPrototype')).toBeUndefined()
+  })
+
+  it('refuses a padded reserved name as reserved, not as a spacing mistake', () => {
+    /*
+     * Both rules apply to ` __proto__ ` and which message a caller shows was
+     * unpinned. The reserved check reads the trimmed key and comes first, which
+     * is the right way round: "that name is reserved" tells the author to pick
+     * another one, where "remove the spaces" invites them to try again with a
+     * key that will be refused for a second reason.
+     */
+    expect(keyProblem(' __proto__ ')).toMatch(/reserved/i)
+    // And a padded ordinary name is still refused, for the spacing.
+    expect(keyProblem(' email ')).toMatch(/letters, numbers and underscores/)
+  })
+})

@@ -48,9 +48,29 @@ export function LeftPane({
 }: LeftPaneProps): ReactNode {
   const [active, setActive] = useState<TabId>('components')
 
+  /*
+   * The palette's search lives here, not in the palette.
+   *
+   * Only the active tab's panel is mounted, so switching to the Tree and back
+   * threw away whatever had been typed into the search box -- which is exactly
+   * what somebody does when they search for a component, look at the tree to
+   * decide where to put it, and come back. State that has to outlive a panel
+   * belongs to the thing that outlives it.
+   */
+  const [query, setQuery] = useState('')
+
   return (
     <Tabs label="Left pane" tabs={TABS} active={active} onSelect={setActive}>
-      {active === 'components' && <Palette kit={kit} onAdd={onAdd} onDragStart={onDragStart} />}
+      {active === 'components' && (
+        <Palette
+          kit={kit}
+          query={query}
+          onQuery={setQuery}
+          onAdd={onAdd}
+          onDragStart={onDragStart}
+          consumeClick={drag.consumeClick}
+        />
+      )}
       {active === 'tree' && (
         <Tree
           root={api.document.root}

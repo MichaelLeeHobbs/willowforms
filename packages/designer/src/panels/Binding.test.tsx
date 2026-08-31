@@ -100,7 +100,7 @@ function setup(languages?: Language[]): Harness {
     user,
     latest: () => current,
     select: async () => {
-      const row = view.container.querySelector<HTMLElement>('[data-fs-row="email"]')
+      const row = view.container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
       if (!row) throw new Error('no tree row for email')
       await user.click(row)
     },
@@ -132,6 +132,22 @@ describe('modesFor', () => {
       'computed',
       'i18n',
     ])
+  })
+
+  it('offers a condition only where the schema opts in', () => {
+    /*
+     * `conditional` is opt-in rather than inferred from the editor, because
+     * `boolean` covers both "is this disabled" and "did the user tick it" and
+     * only the first is worth making conditional. The arm had no test, so a
+     * `modesFor` that offered a condition everywhere -- or nowhere -- read the
+     * same to this file.
+     */
+    expect(modesFor({ name: 'disabled', label: 'Disabled', editor: 'boolean' })).not.toContain(
+      'condition',
+    )
+    expect(
+      modesFor({ name: 'disabled', label: 'Disabled', editor: 'boolean', conditional: true }),
+    ).toContain('condition')
   })
 })
 
@@ -202,9 +218,17 @@ describe('binding editors', () => {
     expect(propOf(latest(), 'label')).toBeUndefined()
   })
 
-  it('writes a translation per language', async () => {
+  it('writes a translation per language, under the tag rather than the code', async () => {
+    /*
+     * `en-US`, not `en`. Every fixture in this describe was dialect-free, so a
+     * bundle keyed by BCP 47 tag and one keyed by bare code were the same
+     * string and the mistake this whole area exists to prevent -- writing to a
+     * bundle the renderer never reads, which shows the raw key on the canvas --
+     * could not be told apart. `createDocument` ships `en-US`, so the fixture
+     * that cannot see it is also the unrealistic one.
+     */
     const { user, select, latest } = setup([
-      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
     ])
     await select()
@@ -213,8 +237,27 @@ describe('binding editors', () => {
     await user.type(screen.getByLabelText('English'), 'Email')
     await user.type(screen.getByLabelText('French'), 'Courriel')
 
-    expect(latest().translations['en']).toEqual({ email_label: 'Email' })
+    expect(latest().translations['en-US']).toEqual({ email_label: 'Email' })
+    expect(
+      latest().translations['en'],
+      'written under the code, which nothing reads',
+    ).toBeUndefined()
     expect(latest().translations['fr']).toEqual({ email_label: 'Courriel' })
+  })
+
+  it('shows the translation the document already holds for a dialect tag', async () => {
+    // The reading half of the same distinction: a bundle under `en-US` has to
+    // reach the box for English, or an author retypes a translation that exists.
+    const { user, select, latest } = setup([
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+    ])
+    await select()
+
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+    await user.type(screen.getByLabelText('English'), 'Email')
+
+    expect(latest().translations['en-US']).toEqual({ email_label: 'Email' })
+    expect(screen.getByLabelText('English')).toHaveProperty('value', 'Email')
   })
 
   it('drops a translation rather than storing an empty string', async () => {
@@ -227,6 +270,53 @@ describe('binding editors', () => {
 
     // An absent key renders as the key itself, which shows the gap.
     expect(latest().translations['en']).toEqual({})
+  })
+
+  it('turns a language right to left, and the boxes follow', async () => {
+    /*
+     * The toggle rebuilds the whole language list -- it maps every language,
+     * comparing tags -- and no test had ever clicked it. Comparing the wrong
+     * pair of names there sets `bidi` on the wrong language, or on none.
+     */
+    const { user, select, openTab, latest } = setup([
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'ar', name: 'Arabic', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    const pane = document.querySelector<HTMLElement>('.fs-panel--left')
+    if (!pane) throw new Error('no left pane')
+    const arabic = within(pane).getByText('Arabic').closest('li')
+    if (!arabic) throw new Error('no row for Arabic')
+    await user.click(within(arabic).getByLabelText('Right to left'))
+
+    expect(latest().languages).toEqual([
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'ar', name: 'Arabic', bidi: 'rtl' },
+    ])
+
+    // And the translation box for it is now right to left, which is the only
+    // thing the flag is for.
+    await openTab('Tree')
+    await select()
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+    expect(screen.getByLabelText('Arabic').getAttribute('dir')).toBe('rtl')
+  })
+
+  it('turns it back again', async () => {
+    const { user, openTab, latest } = setup([
+      { code: 'ar', name: 'Arabic', bidi: 'rtl' },
+      { code: 'en', name: 'English', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    const pane = document.querySelector<HTMLElement>('.fs-panel--left')
+    if (!pane) throw new Error('no left pane')
+    const arabic = within(pane).getByText('Arabic').closest('li')
+    if (!arabic) throw new Error('no row for Arabic')
+    await user.click(within(arabic).getByLabelText('Right to left'))
+
+    expect(latest().languages[0]).toEqual({ code: 'ar', name: 'Arabic', bidi: 'ltr' })
   })
 
   it('marks a right-to-left language on its input', async () => {
@@ -265,6 +355,41 @@ describe('form settings', () => {
       { code: 'en', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
     ])
+  })
+
+  it('adds a language with no name rather than inventing one from the code', async () => {
+    /*
+     * It used to fall back to the raw code, so the row read "pt-BR pt-BR" --
+     * the same string twice, which reads as a bug rather than as a language
+     * nobody has named. The list draws the tag alone when there is no name.
+     */
+    const { user, openTab, latest } = setup()
+    await openTab('Settings')
+
+    await user.type(screen.getByLabelText('Code'), 'pt-BR')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    expect(latest().languages[1]).toEqual({ code: 'pt', dialect: 'BR', name: '', bidi: 'ltr' })
+    const pane = document.querySelector<HTMLElement>('.fs-panel--left')
+    if (!pane) throw new Error('no left pane')
+    expect(within(pane).getByText('pt-BR')).toBeTruthy()
+  })
+
+  it('removes the language that was clicked when two share a tag', async () => {
+    /*
+     * Nothing stops a hand-edited document holding one tag twice, and removal
+     * filtered by tag: one click deleted both rows, with a bundle keyed by that
+     * tag and no way to tell which of the two had gone.
+     */
+    const { user, openTab, latest } = setup([
+      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'en', name: 'English again', bidi: 'ltr' },
+    ])
+    await openTab('Settings')
+
+    await user.click(screen.getByRole('button', { name: 'Remove English again' }))
+
+    expect(latest().languages).toEqual([{ code: 'en', name: 'English', bidi: 'ltr' }])
   })
 
   it('refuses a duplicate language code', async () => {
@@ -382,5 +507,52 @@ describe('form settings', () => {
 
     expect(screen.getByRole('button', { name: 'Remove English' })).toHaveProperty('disabled', true)
     expect(latest().languages).toHaveLength(1)
+  })
+})
+
+/**
+ * Renaming a translation key, and opening a document that has no bundles.
+ */
+describe('the translation key field', () => {
+  it('carries the text with the key', async () => {
+    /*
+     * It wrote a new binding on every keystroke, so typing a new name walked
+     * through every prefix of it — and no prefix has a bundle entry, so both
+     * language boxes blanked as they were typed while the text already written
+     * stayed under the old key. Orphaned, with no way back to it from the panel.
+     */
+    const { user, select, latest } = setup([
+      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'fr', name: 'French', bidi: 'ltr' },
+    ])
+    await select()
+
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+    await user.type(screen.getByLabelText('English'), 'Email')
+    await user.type(screen.getByLabelText('French'), 'Courriel')
+
+    const key = latest().root.children?.[0]?.props['label']
+    const before = key?.kind === 'i18n' ? key.key : ''
+    expect(latest().translations['en']?.[before]).toBe('Email')
+
+    const box = screen.getByRole('textbox', { name: 'Translation key' })
+    await user.clear(box)
+    await user.type(box, 'emailLabel')
+    await user.tab()
+
+    expect(latest().translations['en']?.['emailLabel']).toBe('Email')
+    expect(latest().translations['fr']?.['emailLabel']).toBe('Courriel')
+  })
+
+  it('shows what is being typed rather than re-deriving it', async () => {
+    const { user, select } = setup()
+    await select()
+    await user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+
+    const box = screen.getByRole('textbox', { name: 'Translation key' })
+    await user.clear(box)
+    await user.type(box, 'gree')
+
+    expect(box).toHaveProperty('value', 'gree')
   })
 })

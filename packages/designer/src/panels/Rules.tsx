@@ -9,12 +9,18 @@
  *
  * - Only `required` fails on an empty value. A field carrying just a `url` rule
  *   stays valid while blank. The panel says so, next to the rule.
- * - `custom` rules and `when` guards run author-supplied JavaScript through an
- *   evaluator the host injects. With no evaluator, they pass rather than throw.
- *   The panel says that too, because a rule that silently never fires is worse
- *   than one that visibly cannot run.
+ * - A `custom` rule runs author-supplied JavaScript through an evaluator the
+ *   host injects. With no evaluator it passes rather than throws, and the panel
+ *   says so, because a rule that silently never fires is worse than one that
+ *   visibly cannot run.
+ *
+ * A rule's `when` guard is in the model and has no UI here at all -- the spec
+ * records it as the outstanding part of this panel -- so a guarded rule can only
+ * be authored in the JSON dialog. Until it has one, nothing on this tab can warn
+ * about a guard, and this comment used to say it did.
  */
 
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FieldSchema, ValidationKey, ValidationRule } from '@formsmith/core'
 import { DEFAULT_MESSAGES } from '@formsmith/core'
@@ -103,9 +109,27 @@ export function Rules({ api }: RulesProps): ReactNode {
     )
   }
 
-  const rules = schema.validations
+  /*
+   * Guarded, because a document is data. `validateDocument` refuses a schema
+   * with non-array validations now, and nothing on the path from a paste to
+   * this panel runs it — a pasted `"schema": {"type":"string"}` rendered fine
+   * on the canvas and took the whole designer down the moment this tab opened.
+   * The panel is where somebody goes to repair such a document.
+   */
+  const rules = Array.isArray(schema.validations) ? schema.validations : []
   const write = (next: Partial<FieldSchema>): void =>
     api.setFieldSchema(node.key, { ...schema, ...next })
+
+  /*
+   * Whether changing the data type would stop this component repeating.
+   *
+   * Core recognises a repeater from the node — `schema.type === 'array'` plus
+   * children — so this select quietly decides whether a container draws its
+   * subtree once or once per row. Changing it away from `array` stops the rows
+   * being drawn and makes every row-scoped condition inside read nothing, and
+   * the control gives no sign that it does anything but name a type.
+   */
+  const repeats = schema.type === 'array' && Array.isArray(node.children)
 
   const used = new Set(rules.map((r) => r.key))
   // Every rule but `custom` is idempotent, so offering a second one is noise.
@@ -119,6 +143,7 @@ export function Rules({ api }: RulesProps): ReactNode {
           id="fs-field-type"
           value={schema.type}
           onChange={(e) => write({ type: e.target.value as FieldSchema['type'] })}
+          aria-describedby={repeats ? 'fs-field-type-note' : undefined}
         >
           {FIELD_TYPES.map((type) => (
             <option key={type} value={type}>
@@ -126,6 +151,13 @@ export function Rules({ api }: RulesProps): ReactNode {
             </option>
           ))}
         </select>
+        {repeats && (
+          <p id="fs-field-type-note" className="fs-prop-row__hint">
+            This component repeats its contents once per row because it holds a list. Changing the
+            type away from <code>array</code> stops that, and any condition inside that reads
+            &ldquo;this row&rdquo; will read nothing.
+          </p>
+        )}
       </div>
 
       <div className="fs-prop-row">
@@ -207,6 +239,68 @@ interface RuleRowProps {
   onRemove: () => void
 }
 
+/**
+ * A rule's numeric parameter, held as a draft and committed on blur.
+ *
+ * Written straight through, `Number('')` is `0`: backspacing the last digit of a
+ * `minLength` set the rule to 0 -- a rule that passes everything, written by
+ * somebody halfway through typing a different number. Refusing the empty string
+ * instead is no better, because the input is controlled: the old value snaps
+ * back and the box cannot be cleared to retype at all, which is the same trap
+ * `KeyField` documents.
+ *
+ * So: type freely, commit on blur or Enter, revert on Escape, and an empty box
+ * or an unreadable one commits nothing. The fourth editor in this repository
+ * with this shape, and the last of them.
+ */
+function NumberField({
+  id,
+  value,
+  onCommit,
+}: {
+  id: string
+  value: number
+  onCommit: (next: number) => void
+}): ReactNode {
+  const text = String(value)
+  const [draft, setDraft] = useState(text)
+  const [committed, setCommitted] = useState(text)
+
+  // Re-sync when the document changes underneath: undo, redo, or a document
+  // swapped in from the JSON dialog.
+  if (text !== committed) {
+    setCommitted(text)
+    setDraft(text)
+  }
+
+  const commit = (): void => {
+    const next = Number(draft)
+    if (draft.trim() === '' || !Number.isFinite(next)) {
+      setDraft(text)
+      return
+    }
+    setCommitted(String(next))
+    onCommit(next)
+  }
+
+  return (
+    <input
+      id={id}
+      type="number"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commit()
+        }
+        if (e.key === 'Escape') setDraft(text)
+      }}
+    />
+  )
+}
+
 function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
   const def = BY_KEY.get(rule.key)
   const id = 'fs-rule-' + String(index)
@@ -235,17 +329,22 @@ function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
       {isNumeric(rule) && (
         <div className="fs-prop-row">
           <label htmlFor={id + '-value'}>Value</label>
-          <input
+          <NumberField
             id={id + '-value'}
-            type="number"
             value={rule.value}
-            onChange={(e) => onChange({ ...rule, value: Number(e.target.value) })}
+            onCommit={(next) => onChange({ ...rule, value: next })}
           />
         </div>
       )}
 
       {rule.key === 'pattern' && (
         <div className="fs-prop-row">
+          {/*
+           * `def?.hint ?? 'Value'` -- the descriptor comes from a table this
+           * panel owns and a document can hold a rule key it does not know, in
+           * which case every other part of this row falls back to something
+           * readable and the label used to fall back to `undefined`.
+           */}
           <label htmlFor={id + '-value'}>{def?.hint ?? 'Value'}</label>
           <input
             id={id + '-value'}

@@ -30,9 +30,19 @@ export type {
 } from './kit.js'
 export { groupKit, indexKit } from './kit.js'
 
-export { isEmpty, jsonToString, optionValue, readPath, safeHref, valueOf } from './json.js'
+export {
+  isEmpty,
+  jsonToString,
+  optionEntry,
+  optionValue,
+  readPath,
+  safeHref,
+  valueOf,
+} from './json.js'
 
 export { evaluateCondition } from './condition.js'
+
+export { unreadableTag } from './exhaustive.js'
 
 export {
   DEVICE_QUERY,
@@ -40,15 +50,19 @@ export {
   printDeclarations,
   readDeclaration,
   safeDeclarations,
+  safeStyleValue,
   setDeclaration,
   styleSheetFor,
 } from './css.js'
+// The options bag `styleSheetFor` takes. Exporting the function and not the
+// shape of its argument leaves a consumer unable to name what it is passing.
+export type { StyleSheetOptions } from './css.js'
 
-export { contextKeys, contextValues, missingContext } from './context.js'
+export { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
 
 export { KEY_PATTERN, RESERVED_KEYS, keyProblem } from './keys.js'
 
-export type { RowContext, RowFrame, RowPath } from './rows.js'
+export type { KeyScopes, RowContext, RowFrame, RowPath } from './rows.js'
 export type { ParsedAddress } from './rows.js'
 export {
   NO_ROWS,
@@ -58,6 +72,7 @@ export {
   decodeRow,
   encodeRow,
   innermost,
+  keyScopesFor,
   pushRow,
   rowContext,
   rowsOf,
@@ -83,6 +98,7 @@ export {
   moveNode,
   pathTo,
   removeNode,
+  repointBinding,
   updateNode,
   validateDocument,
   walk,
@@ -94,7 +110,11 @@ export {
   autoValidateKeys,
   submittedData,
   DEFAULT_MESSAGES,
+  MAX_ROWS,
+  TOO_MANY_ROWS,
+  UNREADABLE_RULE,
   validateField,
+  isRequired,
   isRowScope,
   validateAcross,
   validateForm,

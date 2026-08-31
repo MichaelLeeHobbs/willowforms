@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createDocument, emptyRoot, instantiate, prop } from './factory.js'
+import { unexportableRules } from './schema.js'
 import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument } from './types.js'
 import {
@@ -199,8 +200,11 @@ describe('validateDocument against malformed input', () => {
     name: 'Doc',
     root: { key: 'root', type: 'Screen', props: {} },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, the tag `createDocument` produces. A dialect-free fixture makes a
+    // bundle keyed by tag and one keyed by bare code the same string, which is
+    // the distinction half this file's language checks are about.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   })
@@ -212,52 +216,105 @@ describe('validateDocument against malformed input', () => {
     return validateDocument(doc as unknown as FormDocument)
   }
 
+  /*
+   * The control. Every row below mutates this fixture and asserts an error, so
+   * a fixture that was already invalid would make the whole table pass without
+   * the mutations doing anything. That is not hypothetical: the language row
+   * did exactly this on its own, reported below.
+   */
+  it('accepts the fixture the table mutates', () => {
+    expect(judge(() => undefined)).toEqual([])
+  })
+
+  /*
+   * Each row names the message it expects, not just that something was
+   * reported.
+   *
+   * "A language with no code" already produced two errors: the missing code and
+   * `defaultLanguage en is not in languages`, which follows from it. Deleting
+   * the code check left the row green on the consequence — a check with no test
+   * behind it, in the function that stands between a pasted document and the
+   * builder. The other twelve rows were sound and are pinned so they stay that
+   * way.
+   */
   it.each([
     [
       'a number for children',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['children'] = 5),
+      'root.children must be an array.',
     ],
     [
       'a string for children',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['children'] = 'abc'),
+      'root.children must be an array.',
     ],
-    ['a null root', (d: Record<string, unknown>) => (d['root'] = null)],
-    ['a missing root', (d: Record<string, unknown>) => delete d['root']],
+    [
+      'a null root',
+      (d: Record<string, unknown>) => (d['root'] = null),
+      'root is not a component node.',
+    ],
+    [
+      'a missing root',
+      (d: Record<string, unknown>) => delete d['root'],
+      'root is not a component node.',
+    ],
     [
       'a number for a key',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['key'] = 7),
+      'root needs a string key.',
     ],
     [
       'a missing type',
       (d: Record<string, unknown>) => delete (d['root'] as Record<string, unknown>)['type'],
+      'root needs a string type.',
     ],
     [
       'a string for events',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['events'] = 'go'),
+      'root.events must be an object.',
     ],
     [
       'a non-array event list',
       (d: Record<string, unknown>) =>
         ((d['root'] as Record<string, unknown>)['events'] = { onClick: 1 }),
+      'root.events must map each event to an array.',
     ],
     [
       'a null in an event list',
       (d: Record<string, unknown>) =>
         ((d['root'] as Record<string, unknown>)['events'] = { onClick: [null] }),
+      'root.events contains an entry that is not an action reference.',
     ],
-    ['a number for languages', (d: Record<string, unknown>) => (d['languages'] = 3)],
-    ['a language with no code', (d: Record<string, unknown>) => (d['languages'] = [{ name: 'X' }])],
-    ['a null for actions', (d: Record<string, unknown>) => (d['actions'] = null)],
+    [
+      'a number for languages',
+      (d: Record<string, unknown>) => (d['languages'] = 3),
+      'languages must be an array.',
+    ],
+    [
+      'a language with no code',
+      (d: Record<string, unknown>) => (d['languages'] = [{ name: 'X' }]),
+      'every language needs a string code.',
+    ],
+    [
+      'a null for actions',
+      (d: Record<string, unknown>) => (d['actions'] = null),
+      'actions must be an object.',
+    ],
     [
       'a nested non-node child',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['children'] = [42]),
+      'root.children[0] is not a component node.',
     ],
-  ])('reports rather than throws on %s', (_label, mutate) => {
+  ])('reports rather than throws on %s', (_label, mutate, expected) => {
     let errors: StructuralError[] = []
     expect(() => {
       errors = judge(mutate)
     }).not.toThrow()
     expect(errors.length, 'malformed input was accepted silently').toBeGreaterThan(0)
+    expect(
+      errors.map((error) => error.message),
+      'reported, but not for the reason this row is about',
+    ).toContain(expected)
   })
 
   it('survives values that are not objects at all', () => {
@@ -326,6 +383,16 @@ describe('structural sharing', () => {
     expect(after.children?.[0]?.children?.[1]).toBe(before.children?.[0]?.children?.[1])
   })
 
+  it('updates the root itself', () => {
+    // The one node with no parent to rewrite through, and the branch every
+    // other case in this describe walks past.
+    const before = tree()
+    const after = updateNode(before, 'root', (node) => ({ ...node, type: 'Wizard' }))
+
+    expect(after.type).toBe('Wizard')
+    expect(after.children).toBe(before.children)
+  })
+
   it('returns the same tree when an update matches nothing', () => {
     const before = tree()
     expect(updateNode(before, 'missing', (n) => n)).toBe(before)
@@ -344,6 +411,18 @@ describe('structural sharing', () => {
     // A remove that finds nothing must not read as an edit, or the undo stack
     // grows with a version identical to the one before it.
     expect(removeNode(before, 'missing')).toBe(before)
+  })
+
+  it('refuses to move a node into a leaf', () => {
+    /*
+     * `insertNode` will give a leaf a `children` array, which produces a subtree
+     * no renderer draws while `validateForm` and `toJsonSchema` keep walking it
+     * -- a required field nobody can fill in. The designer's drop paths refused
+     * this and the API did not, which is the worse of the two places to leave a
+     * hole.
+     */
+    const before = tree()
+    expect(moveNode(before, 'b', 'a'), 'a leaf is not a parent').toBe(before)
   })
 
   it('returns the same tree for an illegal move', () => {
@@ -410,6 +489,112 @@ describe('duplicateNode', () => {
     // Duplicate keys are the failure this whole function exists to avoid, and
     // validateDocument is what would report them.
     expect(validateDocument(document)).toEqual([])
+  })
+
+  it('re-points a condition that named the copied node at the copy', () => {
+    /*
+     * A Step is a Step because its `renderWhen` compares `context.step` against
+     * its own key. Copied by reference, the duplicate was shown by the
+     * original's name: both steps render at once, and the copy can never be
+     * reached by asking for it. Nothing tested this, and the run that found it
+     * confirmed it by execution.
+     */
+    const original: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'step',
+          type: 'Step',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'step' },
+              right: { kind: 'literal', value: 'step' },
+            },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(original, 'step')
+    expect(copy?.key).toBe('step2')
+    expect(copy?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: 'step2' },
+      },
+    })
+  })
+
+  it('leaves a literal that merely matches the copied key alone', () => {
+    /*
+     * The other half of the rule, and the reason this is not a blanket rewrite:
+     * a condition on an answer whose value happens to equal the copied key is
+     * about that answer, not about the node. Rewriting it would change what the
+     * copy is asking.
+     */
+    const original: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'panel',
+          type: 'Stack',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'ref', dataKey: 'chosen' },
+              right: { kind: 'literal', value: 'panel' },
+            },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(original, 'panel')
+    expect(copy?.key).toBe('panel2')
+    expect(copy?.renderWhen).toEqual(original.children?.[0]?.renderWhen)
+  })
+
+  it('copies css and events without sharing the records that hold them', () => {
+    /*
+     * The other two records a panel writes into. They were shared by reference,
+     * so styling the duplicate restyled the original and an event wired on one
+     * appeared on the other -- invisible today because every writer replaces
+     * rather than mutates, which is what makes it cheap to close now.
+     */
+    const original: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'card',
+          type: 'Box',
+          props: {},
+          css: { any: 'padding: 8px' },
+          events: { onClick: [{ name: 'save', type: 'code' }] },
+        },
+      ],
+    }
+
+    const source = original.children?.[0]
+    const copy = duplicateNode(original, 'card')
+
+    expect(copy?.css).toEqual({ any: 'padding: 8px' })
+    expect(copy?.css).not.toBe(source?.css)
+    expect(copy?.events).toEqual({ onClick: [{ name: 'save', type: 'code' }] })
+    expect(copy?.events).not.toBe(source?.events)
+    expect(copy?.events?.['onClick']).not.toBe(source?.events?.['onClick'])
   })
 
   it('copies props and rules without sharing the records that hold them', () => {
@@ -525,8 +710,17 @@ describe('validateDocument and data keys', () => {
     expect(errors.map((e) => e.code)).toEqual(['empty-data-key'])
   })
 
-  it('rejects a data key that is not a string', () => {
-    expect(validateDocument(withDataKey(7)).map((e) => e.code)).toEqual(['empty-data-key'])
+  it('rejects a data key that is not a string, and says that is what is wrong', () => {
+    // It used to be reported as `empty-data-key`, "has an empty data key",
+    // which is not what is wrong with `dataKey: 7` and sends the reader looking
+    // for a blank field. The message is the whole product of this function.
+    const errors = validateDocument(withDataKey(7))
+    expect(errors.map((e) => e.code)).toEqual(['invalid-data-key'])
+    expect(errors[0]?.message).toContain('not text')
+  })
+
+  it('still calls an all-whitespace data key empty', () => {
+    expect(validateDocument(withDataKey('   ')).map((e) => e.code)).toEqual(['empty-data-key'])
   })
 
   it('accepts an absent data key', () => {
@@ -685,5 +879,739 @@ describe('a key that only looks unique', () => {
     }
 
     expect(validateDocument(document).map((e) => e.code)).toContain('invalid-key')
+  })
+})
+
+/**
+ * The gate's opinion about `translations`.
+ *
+ * `validateDocument` checked the tree, the actions and the languages, and said
+ * nothing about the bundle those languages are looked up in. So a document could
+ * pass the gate and still take the React root down on the first render, because
+ * the renderer reads `document.translations[tag]` with nothing in front of it.
+ *
+ * A document is data — hand-edited JSON, a paste, a row out of a database — so
+ * "the type says it is a record" is not a check.
+ */
+describe('validateDocument and translations', () => {
+  const withTranslations = (translations: unknown): FormDocument =>
+    ({ ...createDocument('Contact', 'doc'), translations }) as unknown as FormDocument
+
+  const codes = (translations: unknown): string[] =>
+    validateDocument(withTranslations(translations)).map((e) => e.code)
+
+  it('accepts the shape the factory produces', () => {
+    expect(validateDocument(createDocument('Contact', 'doc'))).toEqual([])
+    expect(codes({ 'en-US': { greeting: 'Hello' } })).toEqual([])
+    // An empty bundle for a language is a language nobody has translated yet.
+    expect(codes({ 'en-US': {} })).toEqual([])
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['a string', 'nope'],
+    ['an array', []],
+    ['a number', 7],
+  ])('rejects translations that are %s', (_what, translations) => {
+    expect(codes(translations)).toContain('malformed')
+  })
+
+  it.each([
+    ['a string', { 'en-US': 'nope' }],
+    ['null', { 'en-US': null }],
+    ['an array', { 'en-US': [] }],
+  ])('rejects a language bundle that is %s', (_what, translations) => {
+    expect(codes(translations)).toContain('malformed')
+  })
+
+  it('rejects a translation that is not text', () => {
+    // `resolveProp` returns this straight to a kit as a label. A number renders;
+    // an object renders as [object Object], and a React element would throw.
+    expect(codes({ 'en-US': { greeting: 7 } })).toContain('malformed')
+    expect(codes({ 'en-US': { greeting: { nested: 'x' } } })).toContain('malformed')
+  })
+
+  it('does not care which languages the bundle names', () => {
+    /*
+     * A bundle for a language the document does not declare is dead weight, not
+     * a fault: it is what a half-finished translation looks like, and deleting
+     * a language should not make the document invalid.
+     */
+    expect(codes({ fr: { greeting: 'Bonjour' } })).toEqual([])
+  })
+})
+
+/**
+ * The gate rejects a tag nothing can read.
+ *
+ * The runtime readings are the second answer, not the first. A document holding
+ * `kind: 'conditon'` is malformed, and the point of a boot-time check is that
+ * nobody has to reason about what a malformed document does at render time.
+ */
+describe('validateDocument and unrecognised tags', () => {
+  const documentWith = (node: Partial<ComponentNode>): FormDocument => ({
+    ...createDocument('Contact', 'doc'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'field', type: 'TextField', props: {}, ...node }],
+    },
+  })
+
+  const codes = (node: Partial<ComponentNode>): string[] =>
+    validateDocument(documentWith(node)).map((e) => e.code)
+
+  it('accepts every kind the union actually has', () => {
+    expect(codes({ renderWhen: { kind: 'static', value: true } })).toEqual([])
+    expect(codes({ renderWhen: { kind: 'computed', expression: 'x' } })).toEqual([])
+    expect(codes({ renderWhen: { kind: 'i18n', key: 'x' } })).toEqual([])
+    expect(
+      codes({
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'literal', value: 1 } },
+        },
+      }),
+    ).toEqual([])
+  })
+
+  it('rejects a renderWhen whose kind is not one of them', () => {
+    expect(
+      codes({ renderWhen: { kind: 'conditon' } } as unknown as Partial<ComponentNode>),
+    ).toContain('malformed')
+  })
+
+  it('rejects a rule guard whose kind is not one of them', () => {
+    expect(
+      codes({
+        schema: {
+          type: 'string',
+          validations: [{ key: 'required', when: { kind: 'conditon' } }],
+        },
+      } as unknown as Partial<ComponentNode>),
+    ).toContain('malformed')
+  })
+
+  it('rejects a validation whose key is not a rule', () => {
+    expect(
+      codes({
+        schema: { type: 'string', validations: [{ key: 'requird' }] },
+      } as unknown as Partial<ComponentNode>),
+    ).toContain('malformed')
+  })
+
+  it('accepts the rules that do exist', () => {
+    expect(
+      codes({
+        schema: {
+          type: 'string',
+          validations: [{ key: 'required' }, { key: 'minLength', value: 2 }, { key: 'email' }],
+        },
+      } as unknown as Partial<ComponentNode>),
+    ).toEqual([])
+  })
+})
+
+/**
+ * The gate looks at the whole document, not at the parts that were easy.
+ *
+ * `validateDocument` checked keys, actions and languages, and said nothing about
+ * `props`, `renderWhen`'s payload, `schema.validations`' payloads, `version`,
+ * `settings` or `css`. Every one of those is read at render time without a
+ * guard in front of it, and a document is data: it is authored by one person,
+ * stored by another, and hand-editable in between.
+ *
+ * The rule these tests hold the gate to is narrow and worth stating. It refuses
+ * what is **malformed**, meaning a shape no version of this library ever wrote.
+ * It does not refuse what is merely unusual, because a gate that rejects a
+ * document somebody is holding is worse than the render it was protecting.
+ */
+describe('validateDocument over the whole document', () => {
+  const docWith = (patch: Record<string, unknown>): FormDocument => ({
+    ...createDocument('Contact', 'doc'),
+    ...patch,
+  })
+
+  const nodeWith = (patch: Record<string, unknown>): FormDocument =>
+    docWith({
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [{ key: 'field', type: 'TextField', props: {}, ...patch }],
+      },
+    })
+
+  const codes = (doc: FormDocument): string[] => validateDocument(doc).map((e) => e.code)
+
+  it('accepts what the factory builds, which is the floor for all of this', () => {
+    expect(validateDocument(createDocument('Contact', 'doc'))).toEqual([])
+  })
+
+  describe('the document envelope', () => {
+    it('rejects a version this library did not write', () => {
+      expect(codes(docWith({ version: '2' }))).toContain('malformed')
+      expect(codes(docWith({ version: undefined }))).toContain('malformed')
+    })
+
+    it('rejects an id or a name that is not text', () => {
+      expect(codes(docWith({ id: 7 }))).toContain('malformed')
+      expect(codes(docWith({ name: null }))).toContain('malformed')
+    })
+
+    it('accepts an empty name, which is a form nobody has titled yet', () => {
+      expect(codes(docWith({ name: '' }))).toEqual([])
+    })
+
+    it('rejects settings that are not an object, or hold a type that is not a name', () => {
+      expect(codes(docWith({ settings: 'nope' }))).toContain('malformed')
+      expect(codes(docWith({ settings: { errorType: 7 } }))).toContain('malformed')
+    })
+
+    it('accepts settings it has no opinion about', () => {
+      expect(codes(docWith({ settings: {} }))).toEqual([])
+      expect(codes(docWith({ settings: { errorType: 'Alert' } }))).toEqual([])
+    })
+
+    it('rejects a language entry missing the parts the renderer reads', () => {
+      const languages = [{ code: 'en', name: 'English', bidi: 'sideways' }]
+      expect(codes(docWith({ languages, defaultLanguage: 'en' }))).toContain('malformed')
+      expect(
+        codes(docWith({ languages: [{ code: 'en', bidi: 'ltr' }], defaultLanguage: 'en' })),
+      ).toContain('malformed')
+    })
+
+    it('rejects an action that is not one', () => {
+      expect(codes(docWith({ actions: { go: 'nope' } }))).toContain('malformed')
+      expect(codes(docWith({ actions: { go: { name: 'go' } } }))).toContain('malformed')
+    })
+
+    it('accepts a well-formed action', () => {
+      expect(
+        codes(docWith({ actions: { go: { name: 'go', body: 'return 1', params: {} } } })),
+      ).toEqual([])
+    })
+  })
+
+  describe('a component property', () => {
+    it('rejects props that are not an object', () => {
+      expect(codes(nodeWith({ props: 'nope' }))).toContain('malformed')
+      expect(codes(nodeWith({ props: [] }))).toContain('malformed')
+    })
+
+    it('rejects a binding whose payload does not match its kind', () => {
+      // Each kind promises exactly one field. `resolveProp` reads it without
+      // asking, so `{ kind: 'i18n' }` with no key returns undefined as a label.
+      expect(codes(nodeWith({ props: { label: { kind: 'i18n' } } }))).toContain('malformed')
+      expect(codes(nodeWith({ props: { label: { kind: 'computed' } } }))).toContain('malformed')
+      expect(codes(nodeWith({ props: { label: { kind: 'computed', expression: 7 } } }))).toContain(
+        'malformed',
+      )
+      expect(codes(nodeWith({ props: { label: { kind: 'condition' } } }))).toContain('malformed')
+    })
+
+    it('accepts a static binding holding any JSON at all', () => {
+      // `static` is the one kind whose payload is unconstrained, deliberately: a
+      // prop can be a list of options or a nested object, and the kit decides.
+      for (const value of ['x', 7, true, null, [1, 2], { a: { b: 'c' } }]) {
+        expect(codes(nodeWith({ props: { label: { kind: 'static', value } } }))).toEqual([])
+      }
+    })
+
+    it('rejects a static binding with no value field at all', () => {
+      // Distinct from `value: undefined`, which JSON cannot express anyway.
+      expect(codes(nodeWith({ props: { label: { kind: 'static' } } }))).toContain('malformed')
+    })
+  })
+
+  describe('a condition', () => {
+    const renderWhen = (condition: unknown): FormDocument =>
+      nodeWith({ renderWhen: { kind: 'condition', condition } })
+
+    it('accepts the operators it has', () => {
+      expect(codes(renderWhen({ op: 'truthy', value: { kind: 'literal', value: 1 } }))).toEqual([])
+      expect(
+        codes(
+          renderWhen({
+            op: 'eq',
+            left: { kind: 'ref', dataKey: 'a' },
+            right: { kind: 'context', path: 'user.role' },
+          }),
+        ),
+      ).toEqual([])
+      expect(codes(renderWhen({ op: 'and', conditions: [] }))).toEqual([])
+    })
+
+    it('rejects an operator it does not have', () => {
+      expect(codes(renderWhen({ op: 'equals', left: {}, right: {} }))).toContain('malformed')
+    })
+
+    it('rejects an operand that is not one', () => {
+      expect(codes(renderWhen({ op: 'truthy', value: { kind: 'field', dataKey: 'a' } }))).toContain(
+        'malformed',
+      )
+      expect(codes(renderWhen({ op: 'truthy', value: { kind: 'ref' } }))).toContain('malformed')
+      expect(codes(renderWhen({ op: 'truthy', value: 'a' }))).toContain('malformed')
+    })
+
+    it('rejects a scope that is not a scope', () => {
+      expect(
+        codes(
+          renderWhen({ op: 'truthy', value: { kind: 'ref', dataKey: 'a', scope: 'sideways' } }),
+        ),
+      ).toContain('malformed')
+    })
+
+    it('rejects a membership test whose options are not a list', () => {
+      expect(
+        codes(renderWhen({ op: 'in', value: { kind: 'ref', dataKey: 'a' }, options: 'ab' })),
+      ).toContain('malformed')
+    })
+
+    it('reaches a condition nested inside a group', () => {
+      // The recursion is the point. A malformed condition three levels down is
+      // exactly as reachable at render time as one at the top.
+      expect(
+        codes(
+          renderWhen({
+            op: 'and',
+            conditions: [{ op: 'not', condition: { op: 'equals', left: {}, right: {} } }],
+          }),
+        ),
+      ).toContain('malformed')
+    })
+  })
+
+  describe('a field schema', () => {
+    it('rejects a data type this library does not have', () => {
+      expect(codes(nodeWith({ schema: { type: 'integer', validations: [] } }))).toContain(
+        'malformed',
+      )
+    })
+
+    it('accepts every data type it does have', () => {
+      for (const type of ['string', 'number', 'boolean', 'date', 'array', 'object', 'file']) {
+        expect(codes(nodeWith({ schema: { type, validations: [] } })), type).toEqual([])
+      }
+    })
+
+    it('rejects a rule whose parameter is the wrong kind of thing', () => {
+      // `minLength` compares with `<`, so a string bound silently compares
+      // lexicographically; `pattern` is handed to RegExp.
+      const rule = (r: unknown): FormDocument =>
+        nodeWith({ schema: { type: 'string', validations: [r] } })
+
+      expect(codes(rule({ key: 'minLength' }))).toContain('malformed')
+      expect(codes(rule({ key: 'minLength', value: '3' }))).toContain('malformed')
+      expect(codes(rule({ key: 'pattern', value: 3 }))).toContain('malformed')
+      expect(codes(rule({ key: 'custom' }))).toContain('malformed')
+      expect(codes(rule({ key: 'required', message: 7 }))).toContain('malformed')
+    })
+
+    it('accepts the rules as they are actually written', () => {
+      expect(
+        codes(
+          nodeWith({
+            schema: {
+              type: 'string',
+              autoValidate: true,
+              validations: [
+                { key: 'required', message: 'Needed.' },
+                { key: 'minLength', value: 3 },
+                { key: 'pattern', value: '^a' },
+                { key: 'custom', expression: 'value.length > 0' },
+              ],
+            },
+          }),
+        ),
+      ).toEqual([])
+    })
+
+    it('rejects an autoValidate that is not a yes or a no', () => {
+      expect(
+        codes(nodeWith({ schema: { type: 'string', validations: [], autoValidate: 'yes' } })),
+      ).toContain('malformed')
+    })
+  })
+
+  describe('per-component CSS', () => {
+    it('rejects css that is not an object of text', () => {
+      expect(codes(nodeWith({ css: 'color: red' }))).toContain('malformed')
+      expect(codes(nodeWith({ css: { any: 7 } }))).toContain('malformed')
+    })
+
+    it('rejects a breakpoint this library does not have', () => {
+      expect(codes(nodeWith({ css: { widescreen: 'color: red' } }))).toContain('malformed')
+    })
+
+    it('accepts the breakpoints it does have', () => {
+      expect(
+        codes(nodeWith({ css: { any: 'color: red', mobile: '', tablet: 'x', desktop: 'y' } })),
+      ).toEqual([])
+    })
+
+    it('does not refuse CSS that `safeDeclarations` will drop', () => {
+      /*
+       * A separate judgement on purpose. Text holding a brace is refused at
+       * render time and reported in the Style tab, and a document carrying it
+       * still opens and can be fixed. Refusing it here would make the panel that
+       * exists to repair such a document the one place you cannot load it.
+       */
+      expect(codes(nodeWith({ css: { any: 'color: red}html{display:none}' } }))).toEqual([])
+    })
+  })
+
+  describe('events', () => {
+    it('rejects an action reference whose type is neither kind', () => {
+      expect(codes(nodeWith({ events: { onChange: [{ name: 'go', type: 'magic' }] } }))).toContain(
+        'malformed',
+      )
+    })
+
+    it('rejects an event this library does not raise', () => {
+      expect(
+        codes(nodeWith({ events: { onTelepathy: [{ name: 'go', type: 'builtin' }] } })),
+      ).toContain('malformed')
+    })
+
+    it('accepts a builtin reference, which names no action on the document', () => {
+      expect(
+        codes(nodeWith({ events: { onChange: [{ name: 'submit', type: 'builtin' }] } })),
+      ).toEqual([])
+    })
+  })
+})
+
+/**
+ * Four ways the tree treated a duplicate key, or a key literal, as somebody
+ * else's problem.
+ */
+describe('the tree and keys that repeat or are quoted', () => {
+  const node = (key: string, children?: ComponentNode[]): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    ...(children ? { children } : {}),
+  })
+
+  const twice = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [node('same'), node('other'), node('same')],
+  })
+
+  it('updates the first match only, like every read path', () => {
+    /*
+     * `findNode`, `findParent` and `pathTo` all deliberately take the first
+     * match, with a comment saying why: two functions disagreeing about which
+     * node a key means is a bug whichever answer is right. The three mutators
+     * acted on *every* match, so with duplicate keys an edit landed twice —
+     * and `moveNode` composes remove and insert, so one node ended up at two
+     * places in the tree.
+     */
+    const next = updateNode(twice(), 'same', (n) => ({ ...n, type: 'Changed' }))
+    const kinds = (next.children ?? []).map((c) => c.type)
+
+    expect(kinds).toEqual(['Changed', 'Field', 'Field'])
+  })
+
+  it('removes the first match only', () => {
+    const next = removeNode(twice(), 'same')
+
+    expect((next.children ?? []).map((c) => c.key)).toEqual(['other', 'same'])
+  })
+
+  it('inserts into the first match only', () => {
+    const holder: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [node('box', []), node('box', [])],
+    }
+
+    const next = insertNode(holder, 'box', node('added'))
+
+    expect((next.children ?? []).map((c) => c.children?.length ?? 0)).toEqual([1, 0])
+  })
+
+  it('still edits a unique key wherever it is', () => {
+    // The control. Stopping at the first match must not mean stopping at the
+    // first child: the node may be anywhere in the tree.
+    const deep: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [node('a'), node('wrapper', [node('target')])],
+    }
+
+    const next = updateNode(deep, 'target', (n) => ({ ...n, type: 'Changed' }))
+    expect(next.children?.[1]?.children?.[0]?.type).toBe('Changed')
+  })
+
+  it('re-points a duplicated node at its own key', () => {
+    /*
+     * `Step` ships with a `renderWhen` naming its own key, which is what makes
+     * it a step. Duplicating one copied the condition by reference, so the copy
+     * was shown by the *original's* name: two steps render at once and the copy
+     * can never be reached. `factory.ts` applies `defaultRenderWhen(node.key)`
+     * after the key for exactly this reason.
+     */
+    const stepped: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'step1',
+          type: 'Step',
+          props: {},
+          children: [],
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'step' },
+              right: { kind: 'literal', value: 'step1' },
+            },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(stepped, 'step1')
+    // `baseOf` strips the trailing digits, so the copy of `step1` is `step`.
+    expect(copy?.key).toBe('step')
+
+    const when = copy?.renderWhen
+    const right =
+      when?.kind === 'condition' && 'right' in when.condition ? when.condition.right : undefined
+    expect(right).toEqual({ kind: 'literal', value: copy?.key })
+  })
+
+  it('leaves a condition that names something else alone', () => {
+    // The control. Rewriting every literal that happens to match would corrupt
+    // a condition testing an unrelated field whose value is the copied key.
+    const guarded: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'spouse',
+          type: 'Field',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(guarded, 'spouse')
+    expect(copy?.renderWhen).toEqual(guarded.children?.[0]?.renderWhen)
+  })
+})
+
+/**
+ * Two lookups in `validateDocument` that read through the prototype.
+ */
+describe('validateDocument and inherited properties', () => {
+  it('reports an action reference naming something only Object has', () => {
+    /*
+     * `actions[name] === undefined` finds `Object.prototype.toString`, so an
+     * event referencing `toString` passed the unknown-action check and named an
+     * action the document does not have.
+     */
+    const doc = {
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'field',
+            type: 'TextField',
+            props: {},
+            events: { onChange: [{ name: 'toString', type: 'code' }] },
+          },
+        ],
+      },
+    } as unknown as FormDocument
+
+    expect(validateDocument(doc).map((e) => e.code)).toContain('unknown-action')
+  })
+
+  it('still accepts a reference to an action that is there', () => {
+    const doc = {
+      ...createDocument('Contact', 'doc'),
+      actions: { go: { name: 'go', body: 'return 1', params: {} } },
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'field',
+            type: 'TextField',
+            props: {},
+            events: { onChange: [{ name: 'go', type: 'code' }] },
+          },
+        ],
+      },
+    } as unknown as FormDocument
+
+    expect(validateDocument(doc)).toEqual([])
+  })
+
+  it('reads an empty dialect the way languageTag does', () => {
+    /*
+     * The gate spelled the rule out as `typeof dialect === 'string'`, which is
+     * true for `''`, so it computed `en-` and compared that against
+     * `defaultLanguage`. `languageTag` uses truthiness and answers `en`. A
+     * document with an empty dialect validated clean and then had no resolvable
+     * default language at runtime.
+     */
+    const doc = {
+      ...createDocument('Contact', 'doc'),
+      languages: [{ code: 'en', dialect: '', name: 'English', bidi: 'ltr' }],
+      defaultLanguage: 'en',
+    } as unknown as FormDocument
+
+    expect(validateDocument(doc)).toEqual([])
+  })
+})
+
+/**
+ * A context path that can never resolve.
+ *
+ * `contextKeys` skips an empty path, deliberately — it is not a path, and
+ * `missingContext` returns a list of paths, so an empty entry in it would be a
+ * host's problem rather than an answer. But skipping it meant nothing reported
+ * it at all, and a `context` operand with an empty path reads `undefined`
+ * forever: its condition is permanently false and its component permanently
+ * unvalidated.
+ *
+ * So the gate refuses it, which is where a document that cannot work belongs.
+ */
+describe('validateDocument and an unusable context path', () => {
+  const reading = (path: unknown): FormDocument =>
+    ({
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'secret',
+            type: 'TextField',
+            props: {},
+            renderWhen: {
+              kind: 'condition',
+              condition: { op: 'truthy', value: { kind: 'context', path } },
+            },
+          },
+        ],
+      },
+    }) as unknown as FormDocument
+
+  it('refuses an empty path', () => {
+    expect(validateDocument(reading('')).map((e) => e.code)).toContain('malformed')
+  })
+
+  it('names the component, because an empty path names nothing', () => {
+    expect(
+      validateDocument(reading(''))
+        .map((e) => e.message)
+        .join(' '),
+    ).toContain('secret')
+  })
+
+  it('accepts a path the host may or may not supply', () => {
+    /*
+     * The control, and the line this draws. Whether the *host* holds
+     * `user.role` is `missingContext`'s question, asked at that host's startup
+     * against its own context. Whether the document said anything at all is
+     * this one.
+     */
+    expect(validateDocument(reading('user.role'))).toEqual([])
+  })
+})
+
+/**
+ * A document nested deeper than the stack.
+ *
+ * `validateDocument`'s own walk and `rowScopeProblems` both recurse over
+ * `children` with no bound, in the function whose entire job is to be the thing
+ * that never throws on a document. A `RangeError` here is the gate failing in
+ * the one way it exists to prevent.
+ */
+describe('validateDocument and a document nested too deep', () => {
+  const deep = (n: number): FormDocument => {
+    let node: ComponentNode = { key: 'leaf', type: 'TextField', props: {} }
+    for (let i = 0; i < n; i += 1) {
+      node = { key: 'wrap' + String(i), type: 'Screen', props: {}, children: [node] }
+    }
+    return { ...createDocument('Deep', 'deep'), root: node }
+  }
+
+  it('reports rather than throwing', () => {
+    expect(() => validateDocument(deep(20_000))).not.toThrow()
+  })
+
+  it('says what it refused', () => {
+    expect(validateDocument(deep(20_000)).map((e) => e.code)).toContain('malformed')
+  })
+
+  it('still walks a document anybody would build', () => {
+    // The control. A bound low enough to catch real nesting would refuse
+    // documents that work, which is worse than the crash.
+    expect(validateDocument(deep(30))).toEqual([])
+  })
+})
+
+/**
+ * Two components that submit the same answer, in the exported schema.
+ *
+ * Sharing a `dataKey` is deliberate and documented: two fields behind opposite
+ * guards write one answer. The export visited them in order and let the last
+ * win, so the first component's type, format and constraints were discarded
+ * with nothing reported — and `unexportableRules`, which exists to say what the
+ * export could not carry, said nothing.
+ */
+describe('toJsonSchema and a shared data key', () => {
+  const shared = (): FormDocument =>
+    ({
+      ...createDocument('Contact', 'doc'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'personal',
+            dataKey: 'email',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'email' }] },
+          },
+          {
+            key: 'work',
+            dataKey: 'email',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'minLength', value: 5 }] },
+          },
+        ],
+      },
+    }) as unknown as FormDocument
+
+  it('reports the collapse rather than performing it silently', () => {
+    expect(unexportableRules(shared()).map((entry) => entry.key)).toContain('work')
   })
 })

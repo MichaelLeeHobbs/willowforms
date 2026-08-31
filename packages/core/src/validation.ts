@@ -12,10 +12,11 @@
  */
 
 import { evaluateCondition } from './condition.js'
-import { isEmpty, jsonToString, valueOf } from './json.js'
+import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
 import { dataKeyOf, flatten } from './tree.js'
+import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
   ComponentNode,
@@ -71,6 +72,39 @@ export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
 }
 
 /**
+ * What a rule this code cannot read reports.
+ *
+ * Not in `DEFAULT_MESSAGES`, because it is not a rule's message — it is the
+ * absence of one. A document holding `{ key: 'requird' }` is malformed and
+ * `validateDocument` says so; this is what happens to the document that never
+ * went through the gate.
+ *
+ * It reports rather than passing, and that direction is the whole point. A rule
+ * the code cannot apply has not been satisfied, and a submit that goes through
+ * because a tag was mistyped is the silent permissive failure this project is
+ * organised against. Wrong and loud beats wrong and quiet.
+ */
+/**
+ * How many rows of one repeater will be validated.
+ *
+ * A form asking somebody to fill in more than this many rows is not a form.
+ */
+export const MAX_ROWS = 5000
+
+/** What a repeater reports when the submitted body asks for more rows than that. */
+export const TOO_MANY_ROWS = 'This list has too many rows to check.'
+
+export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
+
+/*
+ * The rule keys that exist, taken from the message table rather than written
+ * out again. `DEFAULT_MESSAGES` is typed as a total record over the union, so
+ * adding a rule without a message does not compile and this set cannot drift
+ * behind it.
+ */
+const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
+
+/**
  * A pattern rule, compiled defensively.
  *
  * The expression is authored one character at a time in the Rules tab, so it is
@@ -79,7 +113,120 @@ export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
  * server. An unfinished pattern matches nothing, which is the same answer the
  * rule would give once the author closes the bracket.
  */
+/**
+ * The longest answer a pattern is ever run against.
+ *
+ * A form field's answer is a name, a postcode, a reference number. Nothing a
+ * pattern is written for is twenty thousand characters, and matching time grows
+ * with the input on every engine — so the input is bounded before the engine
+ * sees it. This does not make an exponential pattern safe; it caps every
+ * polynomial one.
+ */
+const PATTERN_INPUT_LIMIT = 4096
+
+/**
+ * Whether a quantifier at this position permits unboundedly many repetitions.
+ *
+ * `*`, `+` and `{n,}`. A bounded one — `{3}`, `{2,5}` — is what real patterns
+ * are full of and is not the shape that goes exponential, because there is a
+ * fixed amount for the engine to try.
+ */
+function unboundedAt(source: string, at: number): boolean {
+  const ch = source[at]
+  if (ch === '*' || ch === '+') return true
+  if (ch !== '{') return false
+  const close = source.indexOf('}', at)
+  return close !== -1 && /^\{\d+,\s*\}$/.test(source.slice(at, close + 1))
+}
+
+/**
+ * A pattern with an unbounded quantifier inside another one.
+ *
+ * `(a+)+`, `(a*)*`, `((a+)*)+`. This is the shape that makes a backtracking
+ * engine try exponentially many ways to split the same input: matching
+ * `^(a+)+$` against thirty-one `a`s and one `X` does not finish, which was
+ * measured here by hanging the test run for five minutes.
+ *
+ * The scan is deliberately structural and deliberately narrow. It skips escapes
+ * and character classes, so `\(` and `[+*]` are text rather than syntax, and it
+ * asks only whether an unbounded quantifier is applied to a group whose body
+ * holds another one. `(\d{3}-)+` — a phone number — passes, because the inner
+ * repetition has a fixed length.
+ *
+ * It is not a decision procedure. `(a|a)*` blows up too and is not caught here,
+ * and no cheap syntactic rule separates a dangerous alternation from
+ * `(ab|cd)+`. See `docs/build-out/triage.md` for what is left and why closing
+ * it needs a different regex engine rather than a better heuristic.
+ */
+function nestedUnbounded(source: string): boolean {
+  /** Where each open group started, and whether it holds an unbounded quantifier. */
+  const stack: { unbounded: boolean }[] = []
+  let inClass = false
+
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i]
+
+    if (ch === '\\') {
+      i += 1
+      continue
+    }
+    if (inClass) {
+      if (ch === ']') inClass = false
+      continue
+    }
+    if (ch === '[') {
+      inClass = true
+      continue
+    }
+    if (ch === '(') {
+      stack.push({ unbounded: false })
+      continue
+    }
+    if (ch === ')') {
+      const group = stack.pop()
+      if (!group) continue
+
+      // `)` may be followed by a quantifier, optionally made lazy with `?`.
+      const quantified = unboundedAt(source, i + 1)
+      if (quantified && group.unbounded) return true
+
+      // A quantified group is itself an unbounded repetition as far as any
+      // group enclosing it is concerned.
+      if (quantified) {
+        const outer = stack[stack.length - 1]
+        if (outer) outer.unbounded = true
+      }
+      continue
+    }
+    if (unboundedAt(source, i)) {
+      const group = stack[stack.length - 1]
+      if (group) group.unbounded = true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Whether the value matches, or `false` for a pattern this will not run.
+ *
+ * Three reasons not to run one, and all three answer the same way: the rule
+ * fails. A pattern that cannot be trusted has not been satisfied, and passing
+ * silently is how a constraint stops applying on the server, which is the
+ * failure this whole project is organised against.
+ *
+ * Unanchored, like JSON Schema's `pattern` and unlike `<input pattern>`, which
+ * is implicitly wrapped in `^(?:...)$`. That is a trap for an author copying a
+ * pattern out of an HTML tutorial -- `\d{5}` accepts `abc12345` here -- and it
+ * is still the right way round: `pattern` is exported verbatim into JSON
+ * Schema, so anchoring it in the engine would make the form and the schema a
+ * server validates against disagree about the same document, silently. The spec
+ * says so where an author reads it, and `^...$` is two characters to type.
+ */
 function matchesPattern(pattern: string, value: string): boolean {
+  if (value.length > PATTERN_INPUT_LIMIT) return false
+  if (nestedUnbounded(pattern)) return false
+
   try {
     return new RegExp(pattern).test(value)
   } catch {
@@ -131,6 +278,38 @@ function asNumber(value: JsonValue | undefined): number {
   return typeof value === 'number' ? value : Number(value)
 }
 
+/**
+ * A value the bounds rules can actually compare, or nothing.
+ *
+ * `Number('not telling')` is `NaN`, and every comparison with `NaN` is false —
+ * so `min` and `max` both *passed* on a value that is not a number at all. The
+ * exported schema said `{"type":"number","minimum":18}` while the form accepted
+ * a sentence, which is the two validators disagreeing in the permissive
+ * direction, on the server.
+ *
+ * A number field's value legitimately arrives as a string from an `<input>`, so
+ * this coerces; what it will not do is treat "cannot be compared" as "compares
+ * fine".
+ */
+/**
+ * A URL a `url` rule should accept: parseable, and a scheme this project allows.
+ *
+ * Both halves are needed and neither is enough. `URL.canParse` answers yes to
+ * any well-formed URL including `javascript:` and `data:`, which is what the
+ * rule used to accept — telling an author their field holds a link while
+ * accepting one that runs code. `safeHref` refuses those, but it also allows a
+ * *relative* address, because a link may legitimately be one; an answer to a
+ * field labelled "your website" may not.
+ */
+function isUrl(value: string): boolean {
+  return URL.canParse(value) && safeHref(value) !== undefined
+}
+
+function comparableNumber(value: JsonValue | undefined): number | undefined {
+  const asNum = asNumber(value)
+  return Number.isNaN(asNum) ? undefined : asNum
+}
+
 /** Is a rule's `when` guard satisfied? Unguarded rules always apply. */
 function guardPasses(when: PropValue | undefined, data: FormData, options: EvalOptions): boolean {
   if (!when) return true
@@ -142,11 +321,26 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       return options.evaluate
         ? Boolean(options.evaluate(when.expression, data, options.context))
         : false
+    /*
+     * A translation key is not a condition, so this reads as "no guard was
+     * expressed" and the rule applies -- the same answer `isVisible` gives the
+     * same kind, where "no condition expressed" means visible. Both directions
+     * are the permissive one: a rule that still runs, and a component that is
+     * still shown.
+     */
     case 'i18n':
       return true
     // No sandbox needed, so a guarded rule works where an expression would not.
     case 'condition':
       return evaluateCondition(when.condition, data, options.context, options.row)
+
+    /*
+     * A guard this code cannot read has not said no, so the rule applies. The
+     * other direction skips the rule, which is a required answer quietly
+     * becoming optional — on the server, over a mistyped tag.
+     */
+    default:
+      return unreadableTag(when, true)
   }
 }
 
@@ -165,7 +359,25 @@ export function applyRule(
 ): string | undefined {
   if (!guardPasses(rule.when, data, options)) return undefined
 
-  const fail = (): string => rule.message ?? DEFAULT_MESSAGES[rule.key]
+  /*
+   * Before the empty short-circuit below, and that order is the point. "Every
+   * rule but `required` passes on an empty value" is a statement about rules,
+   * and a tag this code cannot read is not one. The case that matters is a
+   * mistyped `required`, and it arrives with an empty value, so checking after
+   * the short-circuit would let exactly that one through.
+   */
+  if (!KNOWN_RULES.has(rule.key)) return UNREADABLE_RULE
+
+  /*
+   * `||`, not `??`. An empty string is not nullish, so `message: ""` was kept
+   * as the message — and `validateForm` records an error only `if (error)`, so
+   * an empty one silently stopped the rule failing. A pasted `"message": ""`
+   * turned a required field optional on the server with nothing to see.
+   *
+   * A message nobody wrote and a message that says nothing are the same thing
+   * to a person filling in the form: the default is what both should give them.
+   */
+  const fail = (): string => rule.message || DEFAULT_MESSAGES[rule.key]
 
   if (rule.key === 'required') return isMissing(value) ? fail() : undefined
   if (isEmpty(value)) return undefined
@@ -175,22 +387,65 @@ export function applyRule(
       return lengthOf(value) < rule.value ? fail() : undefined
     case 'maxLength':
       return lengthOf(value) > rule.value ? fail() : undefined
-    case 'min':
-      return asNumber(value) < rule.value ? fail() : undefined
-    case 'max':
-      return asNumber(value) > rule.value ? fail() : undefined
+    case 'min': {
+      const held = comparableNumber(value)
+      return held === undefined || held < rule.value ? fail() : undefined
+    }
+    case 'max': {
+      const held = comparableNumber(value)
+      return held === undefined || held > rule.value ? fail() : undefined
+    }
     case 'pattern':
       return matchesPattern(rule.value, asString(value)) ? undefined : fail()
     case 'email':
       return EMAIL.test(asString(value)) ? undefined : fail()
     case 'url':
-      return URL.canParse(asString(value)) ? undefined : fail()
+      /*
+       * `safeHref`, not `URL.canParse`. That one answers yes to any well-formed
+       * URL, scheme included, so a `url` rule accepted `javascript:` and
+       * `data:` — and `safeHref` exists in this same package, keeping an
+       * allowlist, precisely because those are the schemes that matter. Telling
+       * an author their field holds a link and then accepting one that runs
+       * code is the two halves of this project disagreeing.
+       */
+      return isUrl(asString(value)) ? undefined : fail()
     case 'uuid':
       return UUID.test(asString(value)) ? undefined : fail()
     case 'custom':
       if (!options.evaluate) return undefined
       return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
+
+    /*
+     * Unreachable: the `KNOWN_RULES` check above has already answered for a key
+     * that is not in the union. It stays because it is what keeps the compiler
+     * checking this switch for exhaustiveness — adding a rule key without a
+     * case here stops compiling, which the missing tail return used to do and
+     * a bare `default` would throw away.
+     */
+    default:
+      return unreadableTag(rule, UNREADABLE_RULE)
   }
+}
+
+/**
+ * Whether this field is required of everybody, always.
+ *
+ * For a kit to put in the accessibility tree. WCAG 3.3.2 asks that a required
+ * field say so, `node` is on `NodeRendererProps`, and no renderer in either kit
+ * read it — so a required field was required in `validateForm` and ordinary to
+ * a screen reader, and the first anybody heard of it was a rejected submit.
+ *
+ * Unguarded only, which is the same rule `toJsonSchema` applies to its
+ * `required` list and for the same reason: a rule that applies sometimes cannot
+ * be stated as one that always does. A guarded field is left unmarked rather
+ * than marked wrongly — announcing a field as mandatory when it is not is its
+ * own failure.
+ *
+ * In core rather than in each kit, so the two cannot answer differently.
+ */
+export function isRequired(node: ComponentNode): boolean {
+  const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+  return rules.some((rule) => rule?.key === 'required' && !rule.when)
 }
 
 /** First failing rule for one field, or undefined when all pass. */
@@ -223,7 +478,14 @@ export function validateForm(
   data: FormData,
   options: EvalOptions = {},
 ): FormErrors {
-  const errors: FormErrors = {}
+  /*
+   * No prototype, for the reason `submittedData` has none. A field keyed
+   * `__proto__` is refused by `validateDocument` and reachable anyway, because
+   * nothing on the render or validate path calls it — and on an object literal
+   * `errors['__proto__'] = message` runs the inherited setter, creates no own
+   * property, and hands back a form that reads as valid.
+   */
+  const errors: FormErrors = Object.create(null) as FormErrors
 
   const visit = (node: ComponentNode, scope: EvalOptions): void => {
     if (!isVisible(node, data, scope)) return
@@ -243,11 +505,30 @@ export function validateForm(
      * rest go unchecked.
      */
     if (isRowScope(node)) {
-      const rows = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+      const all = rowsOf(valueOf(rowData(data, scope), dataKeyOf(node)))
+
+      /*
+       * The row count comes out of the data, which is right: asking the browser
+       * how many rows there are would let a client submit one and have the rest
+       * go unchecked. But that makes the *request body* the thing deciding how
+       * much work happens, with no cap, and rows nest multiplicatively — a
+       * couple of hundred kilobytes of JSON is millions of rule evaluations.
+       *
+       * Over the cap the form fails rather than validating a prefix. A row
+       * nobody checked passing silently is the permissive failure this whole
+       * project is organised against, and refusing is the only answer that is
+       * not one.
+       */
+      if (all.length > MAX_ROWS) {
+        errors[addressOf(path, node.key)] = TOO_MANY_ROWS
+        return
+      }
+
+      const rows = all
       rows.forEach((row, index) => {
         const inner: EvalOptions = {
           ...scope,
-          row: rowContext(pushRow(path, { key: node.key, index }), row),
+          row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
         for (const child of node.children ?? []) visit(child, inner)
       })
@@ -352,13 +633,23 @@ export function submittedData(
      */
     if (isRowScope(node)) {
       const key = dataKeyOf(node)
-      const rows = rowsOf(valueOf(held, key))
+      const stored = valueOf(held, key)
+      const rows = rowsOf(stored)
       const path = scope.row?.path ?? NO_ROWS
+
+      /*
+       * No answer stays no answer. `rowsOf` reads anything that is not a list as
+       * no rows, so a repeater nobody touched -- and one whose value is a string
+       * -- used to leave `key: []` in the payload: an empty list is an answer,
+       * and this function's whole job is to submit only what was asked and
+       * given. A repeater with a real empty list keeps it.
+       */
+      if (!Array.isArray(stored)) return
 
       into[key] = rows.map((row, index) => {
         const inner: EvalOptions = {
           ...scope,
-          row: rowContext(pushRow(path, { key: node.key, index }), row),
+          row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
         const kept: FormData = Object.create(null) as FormData
         for (const child of node.children ?? []) collect(child, inner, kept)

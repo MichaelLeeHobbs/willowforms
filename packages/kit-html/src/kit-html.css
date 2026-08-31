@@ -20,6 +20,21 @@
   --fsh-accent: #0f5c8c;
   --fsh-accent-text: #ffffff;
   --fsh-danger: #a4121a;
+  /*
+   * The other two states. These were hex literals down beside the alert rules,
+   * so a host restyling the kit by overriding tokens could change danger and not
+   * success, the dark swap left them at their light values, and the contrast
+   * suite -- which reads tokens -- never measured them at all.
+   */
+  --fsh-success: #2e7d32;
+  --fsh-warning: #b26a00;
+  /*
+   * The shadow an elevated card casts. Pure black at 16% is invisible against a
+   * dark surface, so "elevated" and "flat" looked identical in dark mode; the
+   * dark swap below lifts the alpha and the size instead of the colour, which is
+   * what a light-on-dark elevation needs.
+   */
+  --fsh-shadow: 0 1px 8px rgb(0 0 0 / 16%);
   --fsh-radius: 6px;
   --fsh-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
@@ -34,7 +49,17 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .fsh-screen:not([data-fsh-theme='light']) {
+  /*
+   * `:where()`, so a host can override these.
+   *
+   * `:not()` takes its argument's specificity, so this rule was (0,2,0) while
+   * the recipe the README gives a host — `.fsh-screen { --fsh-accent: … }` — is
+   * (0,1,0). A host followed the documented instructions and its branding
+   * silently reverted for every viewer whose system is dark. `:where()`
+   * contributes nothing, which puts this at (0,1,0) and lets source order
+   * decide, which is what a host expects.
+   */
+  .fsh-screen:where(:not([data-fsh-theme='light'])) {
     --fsh-text: #eef0f4;
     --fsh-muted: #a9b1bd;
     --fsh-surface: #16181d;
@@ -43,6 +68,9 @@
     --fsh-accent: #5fb3e6;
     --fsh-accent-text: #0a1017;
     --fsh-danger: #ff9a90;
+    --fsh-success: #5cba62;
+    --fsh-warning: #e0a33c;
+    --fsh-shadow: 0 2px 14px rgb(0 0 0 / 55%);
   }
 }
 
@@ -55,8 +83,20 @@
   --fsh-accent: #5fb3e6;
   --fsh-accent-text: #0a1017;
   --fsh-danger: #ff9a90;
+  --fsh-success: #5cba62;
+  --fsh-warning: #e0a33c;
+  --fsh-shadow: 0 2px 14px rgb(0 0 0 / 55%);
 }
 
+/*
+ * `min-width: 0` on every component that can be a flex child.
+ *
+ * A flex item's minimum size is its content, so a long word or a wide table
+ * inside a row `Stack` pushes the row wider than the form instead of shrinking
+ * -- and the page grows a horizontal scrollbar rather than the component
+ * wrapping. Four components carried it and four did not, which is why a card in
+ * a row behaved differently from a field in one.
+ */
 .fsh-stack {
   display: flex;
   min-width: 0;
@@ -172,7 +212,14 @@
  */
 .fsh-input:focus-visible,
 .fsh-checkbox:focus-visible,
-.fsh-button:focus-visible {
+.fsh-button:focus-visible,
+/*
+ * The radios too, which carried no kit class and fell back to whatever ring the
+ * browser draws -- a ring the contrast suite cannot measure and Windows high
+ * contrast renders differently. "Every interactive element" is what the comment
+ * above promised, so it says every one it means.
+ */
+.fsh-radio input:focus-visible {
   outline: 2px solid var(--fsh-accent);
   outline-offset: 2px;
 }
@@ -198,6 +245,7 @@
   padding: 16px;
   border-radius: var(--fsh-radius);
   background: var(--fsh-surface);
+  min-width: 0;
 }
 
 .fsh-card--outlined {
@@ -205,7 +253,7 @@
 }
 
 .fsh-card--elevated {
-  box-shadow: 0 1px 8px rgb(0 0 0 / 16%);
+  box-shadow: var(--fsh-shadow);
 }
 
 .fsh-card__header {
@@ -267,6 +315,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
 .fsh-button-group--vertical {
@@ -277,6 +326,7 @@
 .fsh-radios {
   display: flex;
   gap: 8px;
+  min-width: 0;
 }
 
 .fsh-radios--column {
@@ -381,6 +431,7 @@ fieldset.fsh-field {
   border-radius: var(--fsh-radius);
   color: var(--fsh-text);
   background: var(--fsh-surface);
+  min-width: 0;
 }
 
 .fsh-alert__title {
@@ -392,11 +443,11 @@ fieldset.fsh-field {
 }
 
 .fsh-alert--success {
-  border-inline-start-color: #2e7d32;
+  border-inline-start-color: var(--fsh-success);
 }
 
 .fsh-alert--warning {
-  border-inline-start-color: #b26a00;
+  border-inline-start-color: var(--fsh-warning);
 }
 
 .fsh-alert--error {
@@ -421,7 +472,7 @@ fieldset.fsh-field {
 }
 
 /* Indeterminate: no width was set, so it sweeps instead of filling. */
-.fsh-progress__fill:not([style]) {
+.fsh-progress__fill--sweeping {
   inline-size: 40%;
   animation: fsh-progress-sweep 1.4s ease-in-out infinite;
 }
@@ -437,10 +488,16 @@ fieldset.fsh-field {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fsh-progress__fill:not([style]) {
+  /*
+   * Still 40%, still not moving. This used to stretch the bar to full width at
+   * half opacity, which is what a *finished* bar looks like -- so a viewer who
+   * asked for less motion was told the upload had completed. A short bar that
+   * does not move says "running, length unknown", which is the truth and is what
+   * `aria-valuenow`'s absence says to a screen reader.
+   */
+  .fsh-progress__fill--sweeping {
     animation: none;
-    inline-size: 100%;
-    opacity: 0.5;
+    opacity: 0.7;
   }
 }
 

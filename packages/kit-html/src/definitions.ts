@@ -1,9 +1,12 @@
 /**
  * Palette metadata for the HTML kit.
  *
- * A kit's metadata half is pure data with no React import, which is what lets
- * the designer build a palette and a properties panel without loading any
- * component library. This kit exists to prove that claim: it was added as a new
+ * A kit's metadata half has no React import, which is what lets the designer
+ * build a palette and a properties panel without loading any component library.
+ * Data with one deliberate exception: `defaultRenderWhen` is a function, because
+ * a `Step`'s condition names its own key and the key is not known until the node
+ * is made -- so a `Kit` does not round-trip through JSON, and nothing relies on
+ * it doing so. This kit exists to prove that claim: it was added as a new
  * package, with no change to core, the renderer, or the designer.
  *
  * The component types match `@formsmith/kit-mui` on purpose, so a document
@@ -131,7 +134,14 @@ export const htmlKit: Kit = {
       dataBound: true,
       dataType: 'boolean',
       defaultProps: { label: 'Checkbox label' },
-      props: [label, disabled],
+      /*
+       * `helperText` is declared here because the renderer already draws it. It
+       * was read and never offered, so the one place a checkbox most needs a
+       * sentence -- consent, terms, "you can change this later" -- had nowhere
+       * to put one, and `Switch`, which is the same control with a different
+       * shape, offered it.
+       */
+      props: [label, helperText, disabled],
       events: ['onChange'],
     },
     {
@@ -141,7 +151,7 @@ export const htmlKit: Kit = {
       group: 'selection',
       dataBound: true,
       dataType: 'string',
-      defaultProps: { label: 'Label', options: [] },
+      defaultProps: { label: 'Label', options: [], placeholder: 'Choose…' },
       props: [
         label,
         {
@@ -149,6 +159,22 @@ export const htmlKit: Kit = {
           label: 'Options',
           editor: 'json',
           hint: 'Array of { label, value }. Bind to an expression to load remotely.',
+        },
+        /*
+         * The empty choice, and the reason it is a property.
+         *
+         * One kit hardcoded the English "Choose…" and the other drew no empty
+         * option at all, so a MUI select could not be returned to unanswered
+         * once somebody had picked something -- and neither string could be
+         * translated, on a builder whose whole point is that user-facing copy is
+         * a localizable prop.
+         */
+        {
+          name: 'placeholder',
+          label: 'Placeholder',
+          editor: 'string',
+          localizable: true,
+          hint: 'The empty choice, shown until somebody picks one.',
         },
         helperText,
         disabled,
@@ -229,9 +255,14 @@ export const htmlKit: Kit = {
       group: 'layout',
       container: true,
       /*
-       * The only data-bound container. Its value is the list of rows, and its
-       * children are the shape of one row, drawn once per row. That pairing is
-       * how core recognises it, so it never has to learn the type string.
+       * Data-bound *and* an array, which is the pairing core recognises -- so it
+       * never has to learn the type string `Repeater`.
+       *
+       * Not the only data-bound container: `RadioGroup` is one too, and it stays
+       * out of `isRowScope` because its `dataType` is a string rather than by
+       * anything about the pairing. Read that as the rule it is: a container
+       * whose answer is a list *is* a repeater, whatever it is called, and a kit
+       * adding one has declared repetition whether or not it meant to.
        */
       dataBound: true,
       dataType: 'array',
@@ -342,7 +373,15 @@ export const htmlKit: Kit = {
       group: 'display',
       defaultProps: { src: '', alt: '', fit: 'cover', width: 0 },
       props: [
-        { name: 'src', label: 'Source', editor: 'string' },
+        {
+          name: 'src',
+          label: 'Source',
+          editor: 'string',
+          // The same allowlist `Link.href` documents, and the same sink:
+          // `safeHref`. Saying it on one and not the other made the rule
+          // look like a property of links rather than of addresses.
+          hint: 'http, https, or a path. Anything else is refused.',
+        },
         {
           name: 'alt',
           label: 'Alt text',
@@ -394,7 +433,7 @@ export const htmlKit: Kit = {
       icon: 'button',
       group: 'inputs',
       container: true,
-      defaultProps: { orientation: 'horizontal', variant: 'solid' },
+      defaultProps: { orientation: 'horizontal' },
       props: [
         {
           name: 'orientation',
@@ -404,17 +443,6 @@ export const htmlKit: Kit = {
           options: [
             { label: 'Horizontal', value: 'horizontal' },
             { label: 'Vertical', value: 'vertical' },
-          ],
-        },
-        {
-          name: 'variant',
-          label: 'Variant',
-          editor: 'select',
-          section: 'style',
-          options: [
-            { label: 'Solid', value: 'solid' },
-            { label: 'Outline', value: 'outline' },
-            { label: 'Plain', value: 'plain' },
           ],
         },
       ],
@@ -511,7 +539,7 @@ export const htmlKit: Kit = {
           name: 'maxSize',
           label: 'Max size (KB)',
           editor: 'number',
-          hint: 'Advisory only until the host validates it. Zero means no limit.',
+          hint: 'Files larger than this are refused as they are chosen. Zero means no limit.',
         },
         disabled,
       ],
@@ -545,7 +573,13 @@ export const htmlKit: Kit = {
       label: 'Progress',
       icon: 'progress',
       group: 'feedback',
-      defaultProps: { variant: 'linear', value: 0, label: 'Progress' },
+      /*
+       * No `value`, because the hint on it says to leave it empty for an
+       * indeterminate bar and the default filled it in: every freshly dropped
+       * Progress was a determinate bar sitting at 0%, which reads as a stuck
+       * upload rather than as work in progress.
+       */
+      defaultProps: { variant: 'linear', label: 'Progress' },
       props: [
         label,
         {

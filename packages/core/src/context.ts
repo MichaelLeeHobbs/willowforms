@@ -17,8 +17,8 @@
  * for, and the host decides what to do about it.
  */
 
+import { same } from './condition.js'
 import { readPath } from './json.js'
-import { flatten } from './tree.js'
 import type {
   ComponentNode,
   Condition,
@@ -28,8 +28,19 @@ import type {
   PropValue,
 } from './types.js'
 
+/**
+ * How deep a condition may nest before a walk here stops reading it.
+ *
+ * The same bound `condition.ts` evaluates under, for the same reason: these
+ * walks run over a document nobody has validated yet, and a hand-written
+ * `{ and: [{ and: [ ... ] }] }` is a stack overflow in a function whose whole
+ * job is to survive malformed input.
+ */
+const MAX_CONDITION_DEPTH = 200
+
 /** Every context path a condition anywhere in this condition reads. */
-function fromCondition(condition: Condition | undefined, out: Set<string>): void {
+function fromCondition(condition: Condition | undefined, out: Set<string>, depth = 0): void {
+  if (depth > MAX_CONDITION_DEPTH) return
   if (!condition || typeof condition !== 'object') return
 
   const operand = (value: Operand | undefined): void => {
@@ -49,9 +60,9 @@ function fromCondition(condition: Condition | undefined, out: Set<string>): void
   operand(shape['value'] as Operand | undefined)
 
   if (Array.isArray(shape['conditions'])) {
-    for (const inner of shape['conditions'] as Condition[]) fromCondition(inner, out)
+    for (const inner of shape['conditions'] as Condition[]) fromCondition(inner, out, depth + 1)
   }
-  fromCondition(shape['condition'] as Condition | undefined, out)
+  fromCondition(shape['condition'] as Condition | undefined, out, depth + 1)
 }
 
 function fromPropValue(value: PropValue | undefined, out: Set<string>): void {
@@ -71,13 +82,81 @@ function fromPropValue(value: PropValue | undefined, out: Set<string>): void {
 export function contextKeys(root: ComponentNode): Set<string> {
   const keys = new Set<string>()
 
-  for (const { node } of flatten(root)) {
+  /*
+   * Walked here rather than through `flatten`, which assumes `children` is an
+   * array and throws when a document says otherwise. A host is told to call
+   * this at startup, which is before anything has had a chance to refuse the
+   * document — so throwing is the one thing it must not do.
+   */
+  const visit = (node: ComponentNode): void => {
+    if (!node || typeof node !== 'object') return
+
     fromPropValue(node.renderWhen, keys)
-    for (const value of Object.values(node.props ?? {})) fromPropValue(value, keys)
-    for (const rule of node.schema?.validations ?? []) fromPropValue(rule.when, keys)
+
+    const props =
+      node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+        ? Object.values(node.props)
+        : []
+    for (const value of props) fromPropValue(value, keys)
+
+    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+    for (const rule of rules) fromPropValue(rule?.when, keys)
+
+    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
   }
+  visit(root)
 
   return keys
+}
+
+/**
+ * Every node in this document that cannot be evaluated without a sandbox.
+ *
+ * The sibling of `contextKeys`, and it exists for the same failure. A condition
+ * reading a path the host never supplied hides its component and takes it out of
+ * validation; a `computed` binding with no evaluator does exactly that —
+ * `isVisible` answers false for one, so the node and its whole subtree leave
+ * `validateForm`.
+ *
+ * It is the worse of the two, because a host can inject an evaluator in one
+ * place and not the other. The browser then shows a section, validates it, and
+ * submits; the server validates nothing beneath it and answers that the form is
+ * fine. Nothing at evaluation time can notice, which is why this is a question
+ * asked once at startup.
+ *
+ * Node keys rather than expressions, because the expression is the evaluator's
+ * business and the node is what a host can go and look at.
+ *
+ * Total on a malformed document, like everything else here: a host is told to
+ * call this at startup, which is before anything has refused the document.
+ */
+export function evaluatorKeys(root: ComponentNode): string[] {
+  const keys = new Set<string>()
+
+  const walkNode = (node: ComponentNode): void => {
+    if (!node || typeof node !== 'object') return
+
+    const needs = (value: PropValue | undefined): boolean => value?.kind === 'computed'
+
+    const props =
+      node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+        ? Object.values(node.props)
+        : []
+
+    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+
+    const expression =
+      needs(node.renderWhen) ||
+      props.some(needs) ||
+      rules.some((rule) => needs(rule?.when) || rule?.key === 'custom')
+
+    if (expression && typeof node.key === 'string') keys.add(node.key)
+
+    for (const child of Array.isArray(node.children) ? node.children : []) walkNode(child)
+  }
+  walkNode(root)
+
+  return [...keys]
 }
 
 /**
@@ -128,12 +207,42 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * An operator comparing a context path to a field contributes nothing, because
  * there is no name there to collect.
  */
+/**
+ * How many distinct values this will collect for one path.
+ *
+ * `contextValues(root, 'step')` is how a host discovers a form's steps, and the
+ * reference server runs one full validation pass per value it gets back. A
+ * hundred thousand distinct literals is a few seconds to author in the JSON
+ * editor and a hundred thousand passes to submit against.
+ *
+ * Far past any real flow: a wizard with more than a thousand steps is not a
+ * wizard. The `add` below also compares with `===`, so structurally equal object
+ * literals each count, and a document can reach the cap faster than the number
+ * suggests — which is an argument for the cap rather than against it.
+ */
+const MAX_CONTEXT_VALUES = 1000
+
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
+  /*
+   * An empty path reads nothing, so it names no flow. `contextKeys` already
+   * skips one for that reason, and answering here anyway told a host that a
+   * document declares steps under a path `readPath` refuses to walk -- steps it
+   * would then run a validation pass for, each of them against a condition that
+   * can never be true.
+   */
+  if (path === '') return []
+
   const seen: JsonValue[] = []
 
   const add = (value: JsonValue | undefined): void => {
-    if (value === undefined) return
-    if (!seen.some((held) => held === value)) seen.push(value)
+    if (value === undefined || seen.length >= MAX_CONTEXT_VALUES) return
+    /*
+     * Structural, the same comparison a condition itself uses. With `===` two
+     * literals spelling the same object each counted as a step, so a host asking
+     * for a form's steps got duplicates -- and the reference server runs a full
+     * validation pass per step it is given.
+     */
+    if (!seen.some((held) => same(held, value))) seen.push(value)
   }
 
   const reads = (operand: unknown): boolean =>
@@ -147,8 +256,10 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
       ? (operand as { value: JsonValue }).value
       : undefined
 
-  const visit = (condition: Condition | undefined): void => {
-    if (!condition || typeof condition !== 'object') return
+  const visit = (condition: Condition | undefined, depth = 0): void => {
+    // Bounded like every other walk over a document, because a document is data
+    // and `and: [{ and: [...] }]` can nest as deeply as somebody types.
+    if (!condition || typeof condition !== 'object' || depth > MAX_CONDITION_DEPTH) return
     const shape = condition as Partial<Record<string, unknown>>
 
     // Either side may be the one reading the context.
@@ -160,19 +271,37 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
     }
 
     if (Array.isArray(shape['conditions'])) {
-      for (const inner of shape['conditions'] as Condition[]) visit(inner)
+      for (const inner of shape['conditions'] as Condition[]) visit(inner, depth + 1)
     }
-    visit(shape['condition'] as Condition | undefined)
+    visit(shape['condition'] as Condition | undefined, depth + 1)
   }
 
-  for (const { node } of flatten(root)) {
+  /*
+   * The same defensive walk `contextKeys` does, and for the same reason: this is
+   * called at a host's startup, before anything has refused the document, so
+   * `flatten` assuming `children` is an array is an assumption it cannot make.
+   */
+  const walkNode = (node: ComponentNode): void => {
+    if (!node || typeof node !== 'object') return
+
     const collect = (value: PropValue | undefined): void => {
       if (value && typeof value === 'object' && value.kind === 'condition') visit(value.condition)
     }
+
     collect(node.renderWhen)
-    for (const value of Object.values(node.props ?? {})) collect(value)
-    for (const rule of node.schema?.validations ?? []) collect(rule.when)
+
+    const props =
+      node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+        ? Object.values(node.props)
+        : []
+    for (const value of props) collect(value)
+
+    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+    for (const rule of rules) collect(rule?.when)
+
+    for (const child of Array.isArray(node.children) ? node.children : []) walkNode(child)
   }
+  walkNode(root)
 
   return seen
 }

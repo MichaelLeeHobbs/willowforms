@@ -92,19 +92,66 @@ export function useDrag(
 
   const pending = useRef<{ source: DragSource; x: number; y: number } | undefined>(undefined)
   const zones = useRef(new Map<string, DropResolver>())
+  /*
+   * The last position a move reported, and the press before any move did.
+   *
+   * Only read when a release arrives with a non-finite coordinate, which is a
+   * synthetic or malformed event rather than anything a mouse produces. It used
+   * to start at `{0, 0}`, so in the one case it exists for -- a release with no
+   * usable coordinates and no prior move -- it answered "the top-left corner of
+   * the window", which is a position, and a wrong one. The press is where the
+   * gesture started and is the honest answer.
+   */
   const at = useRef({ x: 0, y: 0 })
   const nextId = useRef(0)
   const moved = useRef(false)
   const swallowClick = useRef(false)
-  // Held in a ref so the window listeners below never need reattaching.
+  /*
+   * Whether the drag now ending was abandoned rather than dropped.
+   *
+   * Escape raised the swallow flag and then `cancel()` cleared the state the
+   * flag was about — so the `pointerup` that inevitably followed found nothing
+   * dragging, lowered the flag again, and the click selected whatever was under
+   * the pointer. Exactly the behaviour the comment beside Escape says it
+   * prevents.
+   */
+  const abandoned = useRef(false)
+  /*
+   * Held in a ref so the window listeners below never need reattaching, and
+   * written in an effect rather than during render.
+   *
+   * Writing it during render is the shape React's own documentation warns
+   * about: a render that is thrown away still mutates the ref, so under
+   * concurrent rendering the ref can end up holding a handler from a render
+   * that never committed. Nothing here read it during render — the listeners
+   * are installed from an effect and fire long afterwards — so this is the same
+   * behaviour, expressed somewhere it is also correct.
+   *
+   * The test below it pins what the ref is for: a release calls the handler the
+   * hook was last given, not the one the listeners were attached with.
+   */
   const commit = useRef(onCommit)
-  commit.current = onCommit
+  useEffect(() => {
+    commit.current = onCommit
+  }, [onCommit])
 
   const begin = useCallback((source: DragSource, event: ReactPointerEvent) => {
     pending.current = { source, x: event.clientX, y: event.clientY }
+    // Seeded from the press, so the fallback above has a real position to give
+    // even for a gesture that never moved.
+    at.current = { x: event.clientX, y: event.clientY }
     moved.current = false
+    abandoned.current = false
   }, [])
 
+  /*
+   * Zones answer in registration order, and that is a decision rather than a
+   * detail: the first to claim a release wins, so a zone has to say "not mine"
+   * for a point outside itself rather than resolving whatever geometry it
+   * happens to have. The canvas checks its own bounds for exactly this reason.
+   * `Map` preserves insertion order, which is what makes the order predictable
+   * at all.
+   */
   const registerZone = useCallback((name: string, resolve: DropResolver) => {
     zones.current.set(name, resolve)
     return () => {
@@ -161,8 +208,13 @@ export function useDrag(
       }
 
       if (dragged && press && landed) commit.current(press.source, landed)
-      // A release that moved is never also a click, whether or not it landed.
-      swallowClick.current = dragged
+      /*
+       * A release that moved is never also a click, whether or not it landed —
+       * and neither is the release after an abandoned drag, which is why the
+       * abandonment has to survive until the button actually comes up.
+       */
+      swallowClick.current = dragged || abandoned.current
+      abandoned.current = false
       cancel()
     }
 
@@ -171,18 +223,65 @@ export function useDrag(
       // Abandoning mid-drag must not then read as a click on whatever is under
       // the pointer when the button finally comes up.
       swallowClick.current = moved.current
+      abandoned.current = moved.current
       cancel()
+    }
+
+    /*
+     * Losing the window ends the drag.
+     *
+     * These are bare window listeners with no `setPointerCapture`, so a release
+     * outside the window is never seen: the drag label stayed glued to the
+     * cursor, and the next click anywhere in the page committed a drop nobody
+     * asked for. Losing focus or visibility is the closest thing to a release
+     * this can observe.
+     */
+    const lost = (): void => {
+      if (!pending.current) return
+      abandoned.current = moved.current
+      cancel()
+    }
+
+    /*
+     * The flag lowers itself once the click it was raised for has been and gone.
+     *
+     * It used to be lowered only by a `consumeClick()` caller, and there are
+     * exactly two of those — the canvas and the tree. A palette drag starts on a
+     * button in the left pane and ends on the canvas, so the `click` the browser
+     * dispatches goes to their nearest common ancestor, above both readers.
+     * Nobody lowered it, it stayed up, and it ate the next unrelated click:
+     * after every drop from the palette, the first click on a component
+     * silently failed to select it.
+     *
+     * On `window` and in the bubble phase, so it runs after every element
+     * handler that might want to read it — lowering it in the capture phase
+     * would take the flag away before the canvas got to ask.
+     *
+     * `pointerdown` as well, for the click whose propagation something stopped
+     * and which therefore never reached the window. A new press is a new
+     * interaction whatever happened to the last one.
+     */
+    const lowerSwallow = (): void => {
+      swallowClick.current = false
     }
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', cancel)
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('click', lowerSwallow)
+    window.addEventListener('pointerdown', lowerSwallow)
+    window.addEventListener('blur', lost)
+    document.addEventListener('visibilitychange', lost)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', cancel)
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('click', lowerSwallow)
+      window.removeEventListener('pointerdown', lowerSwallow)
+      window.removeEventListener('blur', lost)
+      document.removeEventListener('visibilitychange', lost)
     }
   }, [])
 

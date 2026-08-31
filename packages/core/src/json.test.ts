@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { jsonToString, optionValue, readPath, safeHref } from './json.js'
+import { isEmpty, jsonToString, optionValue, readPath, safeHref, valueOf } from './json.js'
 
 describe('jsonToString', () => {
   it('passes strings through and renders primitives', () => {
@@ -66,6 +66,48 @@ describe('optionValue', () => {
 
   it('is unbothered by junk in the options array', () => {
     expect(optionValue([null, 'plain', { label: 'Two', value: 2 }], '2')).toBe(2)
+  })
+})
+
+describe('optionValue, where a declared value and a position collide', () => {
+  it('prefers a declared value to a position that spells the same string', () => {
+    /*
+     * A list mixing declared values with bare ones: `'Yes'` has no value of its
+     * own so it falls back to its index, `0`, and the second option declares the
+     * string `'0'`. One submitted `"0"`, two options that answer to it, and a
+     * single pass returned whichever came first in the list.
+     *
+     * An author who wrote a value meant that value; a position is what an option
+     * falls back to when nobody wrote one.
+     */
+    const options = ['Yes', { label: 'No', value: '0' }]
+    expect(optionValue(options, '0')).toBe('0')
+  })
+
+  it('still falls back to the position for an option with no declared value', () => {
+    expect(optionValue(['Yes', 'No'], '1')).toBe('1')
+  })
+
+  it('takes the first of two options declaring one value', () => {
+    // Two options cannot be told apart by a submitted string, so the first wins
+    // and it is stated rather than left to iteration order.
+    const options = [
+      { label: 'One', value: 'x' },
+      { label: 'Two', value: 'x' },
+    ]
+    expect(optionValue(options, 'x')).toBe('x')
+  })
+
+  it('returns a string matching nothing as itself', () => {
+    // The empty placeholder, and anything a stale document offers: inventing a
+    // value for it would be worse than handing back what was submitted.
+    expect(optionValue([{ label: 'One', value: 1 }], '')).toBe('')
+    expect(optionValue([{ label: 'One', value: 1 }], 'nope')).toBe('nope')
+  })
+
+  it('gives back the declared type, not the submitted string', () => {
+    expect(optionValue([{ label: 'Two', value: 2 }], '2')).toBe(2)
+    expect(optionValue([{ label: 'Yes', value: true }], 'true')).toBe(true)
   })
 })
 
@@ -187,5 +229,113 @@ describe('readPath', () => {
     expect(readPath(context, 'user.')).toBeUndefined()
     expect(readPath(undefined, 'user.role')).toBeUndefined()
     expect(readPath(context, 42 as unknown as string)).toBeUndefined()
+  })
+})
+
+/**
+ * An object with nothing in it is no answer.
+ *
+ * `isEmpty` fell through to `false` for anything that was not a string or an
+ * array, so `{}` counted as an answer and `required` was satisfied by it. A
+ * client posting `{"consent": {}}` had its required consent accepted — the same
+ * class of failure as the unticked-checkbox bug that Trap 2 in this repository's
+ * test skill was written about, arriving by a different value.
+ *
+ * "Empty" has to mean one thing, because validation uses it for the rule that
+ * every rule but `required` passes on an empty value, and conditions use it for
+ * `empty` and `notEmpty`. Two definitions let a field be empty enough to skip a
+ * `minLength` and full enough to satisfy a visibility condition.
+ */
+describe('isEmpty and objects', () => {
+  it('reads an object with no keys as no answer', () => {
+    expect(isEmpty({})).toBe(true)
+  })
+
+  it('reads an object that holds something as an answer', () => {
+    expect(isEmpty({ a: 1 })).toBe(false)
+    expect(isEmpty({ a: null })).toBe(false)
+  })
+
+  it('still reads false and 0 as answers', () => {
+    // The control, and the policy this file already had: an unticked checkbox
+    // is a `false` somebody chose, and `0` is a number somebody typed.
+    expect(isEmpty(false)).toBe(false)
+    expect(isEmpty(0)).toBe(false)
+  })
+})
+
+/**
+ * The rest of "empty", and the read that decides whether there is an answer at
+ * all.
+ *
+ * The describe above covers objects, which is where the defect was. These cover
+ * the other branches, none of which had a test of their own, and `valueOf`,
+ * which had none anywhere: it is the own-property read that stands between a
+ * request body and every rule in the library.
+ */
+describe('isEmpty over the rest of the shapes', () => {
+  it.each([
+    ['nothing at all', undefined],
+    ['a null', null],
+    ['empty text', ''],
+    ['text that is only whitespace', ' ' + String.fromCharCode(9, 10)],
+    ['an empty list', []],
+  ])('reads %s as no answer', (_label, value) => {
+    expect(isEmpty(value as never)).toBe(true)
+  })
+
+  it.each([
+    ['text', 'a'],
+    ['text that is only punctuation', '.'],
+    ['a list with something in it', ['a']],
+    ['a list holding a null', [null]],
+    ['zero', 0],
+    ['false', false],
+  ])('reads %s as an answer', (_label, value) => {
+    expect(isEmpty(value as never)).toBe(false)
+  })
+
+  it('counts own keys only', () => {
+    // An inherited key is not an answer anybody gave, and a request body can
+    // carry one. `Object.keys` is the reason this holds; a `for...in` would not.
+    const inherited = Object.create({ role: 'admin' }) as Record<string, never>
+    expect(isEmpty(inherited)).toBe(true)
+  })
+})
+
+describe('valueOf', () => {
+  it('reads what a field holds, including the falsy answers', () => {
+    expect(valueOf({ a: 'x' }, 'a')).toBe('x')
+    expect(valueOf({ a: false }, 'a')).toBe(false)
+    expect(valueOf({ a: 0 }, 'a')).toBe(0)
+    expect(valueOf({ a: null }, 'a')).toBe(null)
+  })
+
+  it('is nothing for a field the data does not have', () => {
+    expect(valueOf({}, 'missing')).toBeUndefined()
+  })
+
+  it.each(['toString', 'constructor', 'hasOwnProperty', 'valueOf'])(
+    'is nothing for %s, which every object inherits',
+    (dataKey) => {
+      /*
+       * A plain lookup finds the prototype, so a field whose data key is
+       * `toString` came back holding a function: present, truthy, and not an
+       * answer anyone gave. `required` would have been satisfied by it.
+       */
+      expect(valueOf({}, dataKey)).toBeUndefined()
+    },
+  )
+
+  it('reads an own key that shadows an inherited one', () => {
+    expect(valueOf({ toString: 'typed by a person' }, 'toString')).toBe('typed by a person')
+  })
+
+  it('does not walk into a polluted prototype from a request body', () => {
+    // JSON.parse gives `__proto__` as an own key rather than assigning through
+    // it, which is why this is data and not an attack -- but `role` must still
+    // be nothing, because no field was answered.
+    const body = JSON.parse('{"__proto__":{"role":"admin"}}') as Record<string, never>
+    expect(valueOf(body, 'role')).toBeUndefined()
   })
 })

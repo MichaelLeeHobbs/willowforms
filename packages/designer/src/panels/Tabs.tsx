@@ -29,6 +29,17 @@ export interface TabsProps<Id extends string> {
   onSelect: (id: Id) => void
   /** The active panel's contents. Only the active panel is rendered. */
   children: ReactNode
+  /**
+   * Something to sit beside the strip, on the same row.
+   *
+   * The JSON dialog puts its close button there. It cannot go *inside* the
+   * strip, which is the `tablist` and may hold nothing but tabs, and the dialog
+   * having its own tab implementation to get that layout is what left its
+   * second view unreachable from the keyboard.
+   *
+   * Absent for every other caller, and then the markup is exactly what it was.
+   */
+  aside?: ReactNode
 }
 
 export function Tabs<Id extends string>({
@@ -37,6 +48,7 @@ export function Tabs<Id extends string>({
   active,
   onSelect,
   children,
+  aside,
 }: TabsProps<Id>): ReactNode {
   const base = useId()
   const strip = useRef<HTMLDivElement>(null)
@@ -55,6 +67,11 @@ export function Tabs<Id extends string>({
       if (!keys.includes(event.key)) return
       event.preventDefault()
 
+      // With one tab there is nowhere to go, and calling `onSelect` with the
+      // tab that is already active re-renders the panel for a keypress that
+      // did nothing.
+      if (tabs.length < 2) return
+
       const last = tabs.length - 1
       const next =
         event.key === 'Home'
@@ -68,46 +85,75 @@ export function Tabs<Id extends string>({
       const target = tabs[next]
       if (!target) return
       onSelect(target.id)
-      // Focus follows selection, the expected behaviour for tabs whose panels
-      // are cheap to render.
-      strip.current
-        ?.querySelector<HTMLButtonElement>('#' + CSS.escape(base + '-tab-' + target.id))
-        ?.focus()
+
+      /*
+       * Focus follows selection, the expected behaviour for tabs whose panels
+       * are cheap to render.
+       *
+       * By position in the strip rather than by re-querying an id: the id route
+       * depended on `CSS.escape` and on two optional chains, either of which
+       * would leave focus where it was with nothing to say so -- keyboard
+       * navigation that looks like it worked because the panel changed. The
+       * buttons are the strip's element children, in the order they are
+       * rendered, so `next` indexes them directly.
+       */
+      const buttons = strip.current?.children
+      const element = buttons?.[next]
+      if (element instanceof HTMLButtonElement) element.focus()
     },
-    [base, tabs, onSelect],
+    [tabs, onSelect],
+  )
+
+  const tablist = (
+    <div className="fs-tabs" role="tablist" aria-label={label} ref={strip}>
+      {tabs.map((tab, index) => (
+        <button
+          key={tab.id}
+          id={tabId(tab.id)}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.id}
+          /*
+           * Only the selected tab's panel is in the DOM, so only the selected
+           * tab can name one. An unresolved IDREF is not an axe violation,
+           * which is how the inspector shipped two of them for months.
+           */
+          {...(active === tab.id ? { 'aria-controls': panelId(tab.id) } : {})}
+          tabIndex={active === tab.id ? 0 : -1}
+          className={'fs-tabs__tab' + (active === tab.id ? ' is-active' : '')}
+          onClick={() => onSelect(tab.id)}
+          onKeyDown={(event) => onKeyDown(event, index)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
   )
 
   return (
     <>
-      <div className="fs-tabs" role="tablist" aria-label={label} ref={strip}>
-        {tabs.map((tab, index) => (
-          <button
-            key={tab.id}
-            id={tabId(tab.id)}
-            type="button"
-            role="tab"
-            aria-selected={active === tab.id}
-            /*
-             * Only the selected tab's panel is in the DOM, so only the selected
-             * tab can name one. An unresolved IDREF is not an axe violation,
-             * which is how the inspector shipped two of them for months.
-             */
-            {...(active === tab.id ? { 'aria-controls': panelId(tab.id) } : {})}
-            tabIndex={active === tab.id ? 0 : -1}
-            className={'fs-tabs__tab' + (active === tab.id ? ' is-active' : '')}
-            onClick={() => onSelect(tab.id)}
-            onKeyDown={(event) => onKeyDown(event, index)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {aside === undefined ? (
+        tablist
+      ) : (
+        <div className="fs-tabs__row">
+          {tablist}
+          {aside}
+        </div>
+      )}
 
+      {/*
+       * No `tabIndex` on the panel.
+       *
+       * A tabpanel takes focus so a keyboard user can reach content that has
+       * none of its own; every panel here is a palette of buttons, a tree, or a
+       * form. Making it focusable anyway adds a tab stop that announces the
+       * panel's name and does nothing, between the tab strip and the first
+       * control, on every one of the five panels.
+       */}
       <div
         id={panelId(active)}
         role="tabpanel"
         aria-labelledby={tabId(active)}
-        tabIndex={0}
         className="fs-tabs__panel"
       >
         {children}

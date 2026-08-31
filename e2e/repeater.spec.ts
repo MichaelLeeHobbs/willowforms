@@ -8,7 +8,7 @@
  * drop actually happens rather than asserted in a unit test.
  */
 
-import { expect, stableBox, test } from './harness.js'
+import { dragOnto, expect, test } from './harness.js'
 
 test('a repeater is authorable even though it has no rows', async ({ designer }) => {
   await designer.openTab('Components')
@@ -24,19 +24,13 @@ test('a field dropped into a repeater lands in the authored row, once', async ({
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
-  const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
-  // Only the source is scrolled, for the reason dragOnto explains.
-  await palette.scrollIntoViewIfNeeded()
-  const target = await stableBox(designer.node('repeater'))
-  const start = await stableBox(palette)
-
-  await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
-  await designer.page.mouse.down()
-  await designer.page.mouse.move(start.x + 50, start.y + 12, { steps: 4 })
-  await designer.page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, {
-    steps: 12,
-  })
-  await designer.page.mouse.up()
+  // `dragOnto` from the harness: this gesture was written out twice, verbatim,
+  // and it is the helper every other spec drags with.
+  await dragOnto(
+    designer.page,
+    designer.page.getByRole('button', { name: 'Text field', exact: true }),
+    designer.node('repeater'),
+  )
 
   /*
    * One node in the document, not one per row. The subtree is authored once and
@@ -52,27 +46,83 @@ test('a field dropped into a repeater lands in the authored row, once', async ({
   await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'repeater[0]')
 })
 
-test('preview draws a row per answer and keeps them apart', async ({ designer }) => {
+/**
+ * Preview, with a repeater in it and no way to add a row to it.
+ *
+ * This was called "preview draws a row per answer and keeps them apart" and its
+ * only assertion was a count of zero, which a blank page also satisfies. It
+ * could not have been more than that: nothing in the designer can add a row.
+ * No kit renders an add-row control, edit mode swallows keystrokes so the canvas
+ * cannot be filled in, and preview starts with empty data — so a repeater's
+ * subtree is unreachable in the browser, which is `found.md`'s entry on it.
+ *
+ * So this proves the honest thing instead: preview renders the form, renders the
+ * repeater, and draws no rows because there are no answers. The count of zero
+ * now means "the projection produced none" rather than "nothing rendered".
+ * A row per answer is proved in `renderer.test.tsx`, against supplied data.
+ */
+test('preview renders the repeater and draws no rows until there are answers', async ({
+  designer,
+}) => {
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
 
-  const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
-  // Both scrolled before either is measured, for the reason dragOnto explains.
-  await palette.scrollIntoViewIfNeeded()
-  await designer.node('repeater').scrollIntoViewIfNeeded()
-  const target = await stableBox(designer.node('repeater'))
-  const start = await stableBox(palette)
-
-  await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
-  await designer.page.mouse.down()
-  await designer.page.mouse.move(start.x + 50, start.y + 12, { steps: 4 })
-  await designer.page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, {
-    steps: 12,
-  })
-  await designer.page.mouse.up()
+  await dragOnto(
+    designer.page,
+    designer.page.getByRole('button', { name: 'Text field', exact: true }),
+    designer.node('repeater'),
+  )
 
   await designer.page.getByRole('button', { name: 'Preview' }).click()
 
-  // No rows in the data yet, so a person filling it in sees none.
+  // The form is on screen, and so is the repeater. Without these two the count
+  // below is a count of an empty page.
+  await expect(designer.page.locator('[data-fs-key="email"]')).toBeVisible()
+  await expect(designer.node('repeater')).toBeVisible()
+
+  // No rows in the data yet, so a person filling it in sees none of the subtree.
   await expect(designer.page.locator('[data-fs-key="textField"]')).toHaveCount(0)
+
+  // And the data panel agrees about why: the repeater has no answers.
+  await expect(designer.page.locator('.fs-canvas__data pre').first()).not.toContainText('repeater')
+})
+
+/**
+ * The two names kept apart, in a real browser.
+ *
+ * Every repeater fixture in this repository used to set `key` and `dataKey` to
+ * the same string, so the row-addressing design and its opposite produced
+ * byte-identical output across the whole suite — a patched build of the wrong
+ * one stayed green. This is the end-to-end half of the fixture that can tell
+ * them apart: the answer is renamed away from the component, and the row
+ * coordinate has to follow the answer.
+ */
+test('a row is addressed by the repeater data key, not its node key', async ({ designer }) => {
+  await designer.openTab('Components')
+  await designer.page.getByRole('button', { name: 'Repeater', exact: true }).click()
+  // Adding while the repeater is selected puts the field inside it, which is
+  // the same placement the drag test proves the drag achieves.
+  await designer.page.getByRole('button', { name: 'Text field', exact: true }).click()
+
+  // While the two names are still the same string, and this is exactly the
+  // reading that made the defect invisible.
+  await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'repeater[0]')
+
+  await designer.openTab('Tree')
+  await designer.select('repeater')
+  await designer.openTab('Properties')
+
+  const dataKey = designer.page.getByLabel('Data key')
+  await dataKey.fill('contacts')
+  await dataKey.press('Enter')
+
+  // The coordinate names the answer. Under the node key it would still say
+  // `repeater[0]`, naming a list the submitted data does not have.
+  await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'contacts[0]')
+
+  const doc = await designer.document()
+  const repeater = doc.root.children?.find((child) => child.key === 'repeater')
+  // The component is still `repeater`; only its answer was renamed. A fixture
+  // where the rename also moved the key would prove nothing.
+  expect(repeater?.dataKey).toBe('contacts')
 })

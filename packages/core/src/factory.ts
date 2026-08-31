@@ -9,10 +9,32 @@ export function prop(value: JsonValue): PropValue {
   return { kind: 'static', value }
 }
 
+/**
+ * A document's starting tree.
+ *
+ * `Screen` is a component type, and core knowing one is a seam this project
+ * otherwise refuses: `isRowScope` asks whether a node's schema is an array
+ * rather than whether it is called `Repeater`, for exactly that reason.
+ *
+ * The difference is that a root is not a behaviour. Every kit in the contract
+ * declares one component with `root: true`, and a new document has to hold
+ * *some* node before a kit is in the picture at all -- `createDocument` takes no
+ * kit, and a document outlives the kit it was authored against. So the name is a
+ * default that the palette's root replaces, not a rule about how a kit works.
+ */
 export function emptyRoot(): ComponentNode {
   return { key: 'root', type: 'Screen', props: {}, children: [] }
 }
 
+/**
+ * A new, empty document.
+ *
+ * `en-US` is the default language and there is no parameter for it, on purpose:
+ * a document with no language cannot be authored at all -- every translation
+ * bundle is keyed by tag -- and asking every caller to choose one before they
+ * have a form is a question with no useful answer at that moment. The Settings
+ * tab renames, adds and removes languages, including this one.
+ */
 export function createDocument(name: string, id: string): FormDocument {
   return {
     version: '1',
@@ -32,10 +54,19 @@ export function createDocument(name: string, id: string): FormDocument {
  * props from the definition's defaults.
  */
 export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNode {
-  const props: Record<string, PropValue> = {}
+  /*
+   * Built on a null prototype and then copied into a plain object, the way
+   * `submittedData` does it. A kit is third-party code by design, and a
+   * `defaultProps` key of `__proto__` on an object literal runs the setter
+   * rather than adding a property: the prop vanishes and the node inherits
+   * whatever it pointed at. This is the one place in core that was assigning
+   * an outside-supplied name straight onto a literal.
+   */
+  const built = Object.create(null) as Record<string, PropValue>
   for (const [name, value] of Object.entries(def.defaultProps)) {
-    props[name] = prop(value)
+    built[name] = prop(value)
   }
+  const props: Record<string, PropValue> = { ...built }
 
   const node: ComponentNode = {
     key: generateKey(root, def.type),

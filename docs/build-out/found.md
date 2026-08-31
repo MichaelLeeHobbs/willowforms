@@ -48,3 +48,96 @@ Out of scope because the queue was frozen before it happened, and because the fi
 rather than a defect. A check that fails when the palette exceeds the viewport would say it directly.
 Recorded as Trap 13 in the write-tests skill either way, since the reasoning is worth more than the
 check.
+
+## `gap` means one thing in kit-mui and another in kit-html
+
+`packages/kit-mui/src/renderers.tsx` and `packages/kit-html/src/renderers.tsx` — `Stack`, `Container`
+and `Step` pass `gap` straight to MUI's `gap` prop, which reads it as a multiple of `theme.spacing`
+(default 8), while the HTML kit reads it as pixels. So an authored `gap: 2` is 16px in one kit and 2px
+in the other, and a document authored against one and rendered through the other lays out differently.
+
+`test/kit-contract.test.tsx` already names this and treats it as deliberate, and for the _defaults_ it
+is: a kit is entitled to its own `defaultProps`, and 2 and 16 are both right in their own kit. What is
+not deliberate is the **authored** value meaning two different things, which is the same class of
+defect as the corner radius fixed in item 6 — that one was found only because someone measured it.
+
+Out of scope because item 6 is the radius, the queue is frozen, and this needs a decision rather than a
+fix: either `gap` becomes pixels everywhere, which is a breaking change to every MUI document, or the
+prop is documented as kit-relative and the designer stops pretending one number travels. Bad to leave:
+it is invisible until someone switches kits, which is the one thing this project advertises.
+
+## The kit contract table counts a row that is not a kit obligation
+
+`test/docs.test.ts` — the guard slices `kit-contract.test.tsx` from `describe.each(KITS)` to the end of
+the file and counts every `it(` in it, then requires one row per case in the table in
+`docs/spec/02-kit-contract.md`. Anything written after the per-kit block is counted too, so the
+"a default copied between kits" case has a row in the table describing an obligation no third-party kit
+has: it is about these two kits agreeing with each other.
+
+Found while adding the cross-kit length test for item 6, which the guard also miscounted until it was
+moved above the per-kit block. Out of scope at the time because the queue was frozen and nothing was
+wrong that day.
+
+**Fixed in item 27**, which carried a review finding saying the same thing from the other end. The slice
+now ends at the next top-level `describe` rather than at the end of the file, and the row that then had
+no rule -- "A Step's gap default matches the Stack it renders as", which is these two kits agreeing with
+each other rather than an obligation on anybody's kit -- came out of the table. `CONTRACT_RULES` is 19.
+Nothing is left to hand over here.
+
+## A repeater's rows cannot be reached in the designer
+
+No kit renders an "add row" control, and the canvas starts with empty data, so a repeater has no rows in
+preview and exactly one — drawn by `revealHidden` so the authored subtree can be selected — in edit mode,
+where the canvas deliberately swallows keystrokes so a click selects rather than types.
+
+The result is that **no keystroke can reach a repeater row anywhere in this product**. Rows exist for a
+host rendering the form outside the designer with data that already has some.
+
+Found while trying to write an end-to-end test for item 19's canvas fix, which routes `onChange` through
+`applyChange`. The fix is right and the renderer tests prove the address is placed correctly; what could
+not be written is a browser test, because the gesture does not exist. That is also the reason the write
+path could be wrong for as long as it was: nobody could type into a row to notice.
+
+Out of scope because it is a feature — an add/remove-row affordance, which is a kit component, a
+document-model question about who owns the button, and a decision about whether the designer seeds
+preview data. All three are real design work rather than remediation. Bad to leave: `Repeater` is
+described as built in `03-components.md`, and a component whose rows nobody can create is built only in
+the sense that it renders.
+
+## Button.variant is a different vocabulary in each kit
+
+`kit-mui` offers `contained` / `outlined` / `text`; `kit-html` offers `solid` / `outline` / `plain`.
+Every other field of every other property matches. A document authored against one kit therefore carries
+a `variant` the other has never heard of, and the playground's kit switch is the fastest way to see it:
+MUI's Button gets `solid` and ignores it, the HTML kit gets `contained` and drops it into a class name
+nothing styles.
+
+Found while widening the cross-kit comparison for item 23, which previously compared a property's `name`
+and `editor` only. The comparison is strict now with this one pair exempted by name, and the exemption
+has its own test that fails if the two ever agree, so it cannot outlive the divergence.
+
+Out of scope because choosing the surviving vocabulary is a product call: aligning them changes what a
+shipped kit's documents mean, and the alternative — declaring option values kit-local and dropping the
+"a document renders through either kit" claim to "a document renders, with kit-local values reset" — is a
+spec change. This is the same class as the `gap` units entry above: the kits agree on the shape of a
+property and disagree about what its values mean.
+
+## Renaming a component key leaves every condition that named its answer dangling
+
+`renameKey` re-points the renamed node's own `renderWhen` and nothing else. A component with no
+explicit `dataKey` answers under its key, so renaming `emailField` to `email` renames the answer too,
+and a sibling whose `renderWhen` reads `emailField` now reads a key nothing writes. The condition is
+false, the sibling is hidden, its rules never run, and nothing says a word. Dragging the two apart, or
+renaming for tidiness a week later, is all it takes.
+
+Found while writing the Key field's first test in `Properties.test.tsx` for item 23, which had none. I
+wrote the assertion for the behaviour I expected, watched it fail, and did not pin the current one --
+the test now covers what the panel really promises (the node's own condition follows it), and this is
+here instead.
+
+Out of scope because the fix is a product decision, not a repair. Three defensible answers: re-point
+every ref to the old data key when no other node still writes it; set an explicit `dataKey` on rename so
+the answer name never moves at all, which makes a key pure identity; or refuse the rename with a warning
+naming the components that would break. The first is the smallest, the second is the most honest about
+what a key is, and choosing between them changes what renaming means. `validateDocument` reporting a ref
+to a key nothing writes would also have caught it, and that is a fourth decision.

@@ -34,7 +34,11 @@ export const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
  * one. The other two are refused for being confusing rather than dangerous, now
  * that there is a list to put them on.
  */
-export const RESERVED_KEYS: readonly string[] = ['__proto__', 'constructor', 'prototype']
+export const RESERVED_KEYS: readonly string[] = Object.freeze([
+  '__proto__',
+  'constructor',
+  'prototype',
+])
 
 /**
  * Why this key is not allowed, or nothing if it is.

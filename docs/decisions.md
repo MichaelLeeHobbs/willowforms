@@ -4,6 +4,157 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### `data-fs-row` is the canvas coordinate; the tree's rows are `data-fs-tree-row`
+
+- **Decided:** the renderer keeps `data-fs-row`, holding a repeater coordinate like `addresses[1]`. The
+  Tree panel's list rows become `data-fs-tree-row`, holding a node key.
+- **Why that way round:** the renderer's is the published one. It is a field on `NodeAttributes`, which
+  is the type every kit spreads onto its outermost element, so renaming it is a breaking change to the
+  kit contract for the benefit of a panel nobody outside this repository can see. And there "row" means
+  an actual row of data, while the panel's rows are rows of a list — a different word that happens to be
+  spelled the same.
+- **The collision was live, and it fails quietly.** `[data-fs-row][tabindex="0"]` is how the keyboard
+  specs find the focused tree row, and `Canvas.test.tsx` reads `[data-fs-row]` _specifically_ to get the
+  tree's projection rather than the canvas's — the distinction Trap 9 exists for. Both start matching
+  canvas elements the moment a document holds a repeater. Neither would throw; they would silently
+  measure a longer list.
+- **Rejected: renaming the renderer's** to something like `data-fs-row-index` and leaving the panel
+  alone. It is the same rename count and it lands on the public half.
+- **Rejected: one attribute for both,** distinguished by the value's shape. A coordinate always carries
+  an index and a node key never can, so it is _decidable_ — and that is exactly the kind of rule that
+  reads plausibly, works, and then does not, which is the argument this project already accepted against
+  a path grammar in `Operand`.
+- **Reversal:** a rename across nine files, all internal.
+- **When:** 2026-08-30.
+
+### The gate refuses what is malformed, not what is unusual; and the boundary is per node
+
+Two decisions from item 8, which are the same decision seen from both ends: what a document has to be
+before it renders, and what happens when one that is fine renders anyway and throws.
+
+- **Decided: `validateDocument` now reads the whole document** — `version`, `id`, `name`, `settings`,
+  `actions`, every `props` binding and its payload, `renderWhen`, conditions and their operands all the
+  way down, `schema.type`, each rule's parameter, `css`, event names and action-reference types.
+- **The line it draws:** refuse a shape **no version of this library ever wrote**. Do not refuse a shape
+  that is merely unusual. A gate that rejects a document somebody is holding is worse than the render it
+  was protecting, and the panel is where a broken document goes to be repaired.
+- **Three places that line bites, written down because they look like omissions:**
+  `static` bindings hold any JSON at all and only their _presence_ is checked, since a prop can be a
+  list of options or a nested object and the kit decides. An empty `name` is accepted, because a form
+  nobody has titled yet is a real state. And CSS that `safeDeclarations` will drop is accepted, because
+  refusing it here would make the Style tab the one place that document cannot be opened.
+- **The vocabularies are literal strings, checked both ways by the compiler.** They have to be literal:
+  the question is what an _untrusted_ document holds, and by the time a value is typed as `PropValue`
+  the question has been assumed away. `satisfies` refuses a string outside the union and a `Covers`
+  conditional type refuses a union member outside the list, so neither can drift.
+- **Decided: the error boundary is per node, not per form.** A form-level boundary saves the host's page
+  and still throws away every answer already typed into the fields that were fine. On the canvas it is
+  worse: the component that broke becomes unselectable, and selecting it is exactly what an author needs
+  in order to delete it.
+- **The fallback carries `data-fs-key` and `data-fs-type` itself.** The canvas hit-tests with
+  `closest('[data-fs-key]')` and nothing else in the DOM identifies a node, so without them a broken
+  component is unreachable from the canvas and from the tree at once.
+- **Rejected: logging the error.** React has already written its own copy to the console. It goes to an
+  `onError` prop instead, so a host that is watching gets it in its own telemetry and nobody gets it
+  twice.
+- **Reversal:** the boundary is one class and one wrapper. The gate is additive — it reports more, and
+  nothing reads its output as a whitelist — so relaxing any single check is deleting the check.
+- **When:** 2026-08-30.
+
+### An unreadable tag reads as "no rule", not as "skip it"
+
+- **Decided:** every `switch` over a closed union in the evaluation path gets a `default` that routes
+  through `unreadableTag(value, fallback)`. `isVisible` answers **shown**, `guardPasses` answers **the
+  rule applies**, `applyRule` answers **a failure**, `resolveProp` answers **null**. `validateDocument`
+  refuses the tag up front, so none of those readings should ever be reached.
+- **Why shown rather than hidden**, which is the reading this codebase gives elsewhere: `isVisible`
+  already answers `true` for `i18n`, on the ground that a translation key expresses no condition. An
+  unrecognised kind expresses none either. Hidden means unvalidated, and a required answer that stops
+  being required on the server is invisible; a field shown when it should not be is a question the
+  person filling in the form can see.
+- **This does not reverse `evaluateCondition`,** which is false for a condition it cannot read. That
+  function is asked whether a condition _holds_; an unreadable one does not hold. `isVisible` is asked
+  whether a rule was expressed at all.
+- **`applyRule` checks the key before the empty short-circuit,** and the order is the decision. "Every
+  rule but `required` passes on an empty value" is a statement about rules, and an unreadable tag is not
+  one — the case that matters is a mistyped `required`, which arrives with an empty value and would have
+  gone straight through a check placed after it.
+- **Rejected: a bare `default`.** It buys the runtime answer and throws away the compile-time
+  exhaustiveness the missing tail return was providing. The `never` parameter keeps both: adding a union
+  member without a case stops compiling. Verified by adding one and watching four call sites fail.
+- **Rejected: throwing.** A malformed document is the gate's problem to refuse and the panel's to
+  report. Taking the form down in front of the person filling it in is not an improvement on either.
+- **The gate's two vocabularies are written out, and checked both ways by the compiler.** They have to
+  be literal strings, because the question is what an _untrusted_ document holds and a type cannot ask
+  that. `satisfies` refuses a string outside the union and a `Covers` conditional type refuses a union
+  member outside the list.
+- **Reversal:** one helper, four `default` cases, one check in the gate.
+- **When:** 2026-08-30.
+
+### A length in the MUI kit is a CSS string, not a theme multiple
+
+A widening of the entry below, which decided only that `borderRadius` must stop being divided by 8.
+
+- **Decided:** `Box`'s `padding` and `radius` and `Grid`'s `gap` are emitted as `px` strings rather than
+  as bare numbers. `sx` passes a string through untouched, so the number the document authored is the
+  number on the page under every theme.
+- **Why more than the radius:** the radius was wrong under the default theme too, and the other two were
+  wrong under any other one. Dividing by the scale round-trips only under `spacing: 8` and
+  `shape.borderRadius: 4`, and MUI's whole point is that a host replaces them. Measured under
+  `createTheme({ spacing: 3 })`: an authored 8px drew at 3px.
+- **Rejected:** dividing by the theme's own values read from `useTheme`. It is arithmetic to undo
+  arithmetic, it makes every length depend on a hook, and it still cannot express a length the theme has
+  no unit for.
+- **Not changed: `Stack`'s `gap`,** which is a real MUI spacing-scale prop rather than an `sx` length,
+  and which diverges from the HTML kit in a way that needs a decision rather than a fix. Recorded in
+  `docs/build-out/found.md`.
+- **Reversal:** one helper and four call sites.
+- **When:** 2026-08-30.
+
+### The scope is chosen by which group a field is picked from, not by a second control
+
+- **Decided:** inside a repeater the condition picker draws its field list as two `<optgroup>`s, `This
+row` and `This form`, and the group an option came from is what writes `scope`. Outside a repeater
+  nothing changes: one flat list, no scope written. A fresh condition seeded inside a row starts on the
+  row.
+- **Why:** the risk the row-addressing design was signed off with is a ref authored inside a row and left
+  at the default scope. It reads a key the top level does not hold, resolves to `undefined`, hides its
+  component, and `validateForm` then skips every rule beneath it. A separate scope select keeps that
+  default and relies on the boot-time check to catch it afterwards; grouping removes the default
+  entirely, because there is no way to pick a field without also having said where it lives.
+- **The option value carries the scope**, as `row:email` / `form:email`. A data key is a JavaScript
+  identifier and cannot hold a `:`, which `keyProblem` enforces on both a paste and a rename, so the
+  split is unambiguous. Nothing of this encoding is stored; it exists between the `<option>` and the
+  handler.
+- **Rejected: a scope `<select>` beside the field select.** Smaller, and it is the shape the type
+  suggests, but it ships the wrong default in a 288px pane and answers the failure with a warning
+  somewhere else. `rowScopeProblems` stays as the backstop for hand-edited documents; it is not a reason
+  to hand an author the mistake.
+- **Rejected: inferring the scope from the name.** Already rejected once in this file, for leading-dot
+  anchoring. Inference is the same mistake wearing different syntax.
+- **Core owns the split.** `keyScopesFor(root, nodeKey)` returns the top-level keys and, when the node is
+  inside a repeater, the enclosing row's. Row keys stop at a nested repeater: that repeater's own data
+  key is an answer in this row because it holds the inner list, but what is inside it is one row further
+  down and no ref from here can name it.
+- **Reversal:** cheap. One core function, one prop threaded through the panel, and the grouping in one
+  `<select>`. No document changes: `scope` was already in the type and absent already means the form.
+- **When:** 2026-08-30.
+
+### The value refusal also refuses a backslash
+
+A refinement to the entry below rather than a reversal of it, recorded because it widens a refusal set
+that was settled by measurement.
+
+- **Decided:** `safeStyleValue` refuses `\` alongside the decided set.
+- **Why:** the steelman checked backslash escapes against _escaping the class block_, and they did not.
+  It did not check them against the fetch refusal, and `\75 rl(https://…)` is a valid CSS escape for
+  `url(` in which the three letters never appear, so a substring check for `url(` alone does not see it.
+  Nothing legitimate on a prop whose declared editor is `color` needs a backslash.
+- **Rejected:** decoding CSS escapes before testing, which is a second parser to get wrong for a value
+  that has no use for the syntax.
+- **Reversal:** one character in one regex.
+- **When:** 2026-08-30.
+
 ### A document's CSS values are refused in core, not made safe by the rendering shape
 
 Settled by a steelman: two briefs at full strength against a neutral agent that ran the real
@@ -124,7 +275,10 @@ built a patched copy of core and ran both designs.
 ### Row addressing: rows are a projection, not nodes
 
 Designed four ways in parallel under different constraints — minimal interface, maximal flexibility,
-common-case-trivial, ports-and-adapters — then judged. Not yet built; this is the shape the build follows.
+common-case-trivial, ports-and-adapters — then judged, and now built: `rows.ts` in core, the row context
+in the renderer, `applyChange` for writes, and a fixture in three suites that keeps `key` and `dataKey`
+different so this design and its opposite cannot produce the same output. It is also the newest design
+here and the least settled, so the reversal note below is the part to read first.
 
 - **Decided, and unanimous across all four designs:** **rows never mint keys.** The authored subtree
   exists once in the document; rows exist in the DOM, in `FormData` and in `FormErrors`, and never in the
@@ -173,7 +327,8 @@ JSONForms had to bolt on is, here, one optional field on one member.
   nesting is refused, which is a narrowing rather than a rewrite. Everything cut for a first version —
   outward anchors, row offsets, row facts beyond the index — is an additive union member that the
   compiler will point at.
-- **When:** 2026-08-29, designed on `feat/steps`, not yet built.
+- **When:** 2026-08-29, designed on `feat/steps`. Built 2026-08-30, with the row-scope discriminant and
+  its three boot-time checks; what remains unbuilt is any way to _add_ a row, which `found.md` covers.
 
 ### The key grammar is the JavaScript identifier subset
 
@@ -277,3 +432,64 @@ JSONForms had to bolt on is, here, one optional field on one member.
 - **Reversal:** Free today. `setContext` is a sketch in `09-actions.md`, not code. It gets expensive the
   moment an action vocabulary ships against the looser reading.
 - **When:** 2026-08-28, on `feat/context`.
+
+## A condition follows a copy only when it reads the context
+
+`repointBinding` rewrote every literal equal to the old key. `duplicateNode`'s own comment said it did
+not, and gave the reason: a condition testing an answer whose value happens to spell the copied key is
+about the answer, not the node. The function had been doing the opposite since it was written, and the
+designer's rename inherited it, so renaming a component quietly rewrote conditions about answers.
+
+A literal names a node when it is compared against the host context, which is the shape a `Step` ships
+with (`context.step == 'welcome'`). It names a value when it is compared against a `ref`. So the rewrite
+now happens only inside a comparison with a `context` operand in it.
+
+Found by writing the test the review said was missing, which is the second half of the rule failing
+against the code that claimed to implement it.
+
+## A row-scoped ref to a form-level answer is reported at boot
+
+`rowScopeProblems` reported two mismatches: a form-scoped ref to a key that only exists in a row, and a
+row-scoped ref on a node outside every repeater. The third is a row-scoped ref _inside_ a repeater
+naming a key no node in that row writes while a node outside every repeater does -- what you get by
+dragging a conditional field into a repeater. It reads nothing, the condition is false, the component is
+hidden, and its rules never run.
+
+Conservative in the same way as the other two: reported only when the key demonstrably lives at the
+other scope. A row's data can carry keys no component authors, so a ref naming a key nothing in the
+document writes is left alone rather than guessed at.
+
+This closes the loop under `rows.test.ts`'s "does not fall back to the form when the row has no such
+field", which asserted the silent-permissive outcome and stopped there.
+
+## The documented suite size is enforced by a reporter, not a test
+
+Three documents quote how many tests there are and `docs.test.ts` compared them with each other, which
+is three files agreeing on a number that can be wrong in all three. No test can count the run it belongs
+to: the total is not known until every file has finished, and that is where a reporter stands.
+
+`test/count-reporter.ts` runs at the end, counts the tests that reported a result and fails the process
+when a document disagrees. It skips itself on a filtered run -- comparing a figure about the whole
+repository against `vitest run packages/core` would make the fast loop unusable -- and says which of the
+two it did, so a silent skip cannot be mistaken for a pass.
+
+## A control border is not a divider
+
+Measuring the designer's own controls for the first time found them at 1.39:1 light and 1.41:1 dark
+against the surfaces they sit on, where WCAG 1.4.11 asks 3:1. A field's background is 1.08:1 from the
+panel behind it, so the border is the only thing that says a control is there.
+
+`--fs-border` stays what it was, because a panel divider is decoration and 1.4.11 asks nothing of it.
+`--fs-control-border` is the new token, used by inputs, selects, textareas and buttons, clearing 3:1 on
+all three surfaces in both themes. Splitting the token rather than darkening the existing one keeps the
+chrome from turning into a grid of hard lines.
+
+## Refused CSS stays in the box and out of the document
+
+The Style tab's raw editor told the author a value with a brace in it would not be applied, and then
+committed it anyway. So the document carried declarations the renderer drops -- the "worst of both" the
+row's own comment warns about -- and a host reading `node.css` for itself got the unsanitised string.
+
+It now keeps the text in the textarea, flagged, and writes nothing. That is the bargain `KeyField`
+already makes with a name that is already taken: refuse, say why, and let the mistake be corrected in
+place rather than retyped.

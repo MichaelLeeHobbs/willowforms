@@ -14,7 +14,13 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { indexKit, readDeclaration, safeDeclarations, setDeclaration } from '@formsmith/core'
+import {
+  indexKit,
+  keyScopesFor,
+  readDeclaration,
+  safeDeclarations,
+  setDeclaration,
+} from '@formsmith/core'
 import type { Device, Kit } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
@@ -66,6 +72,9 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
   const def = indexKit(kit).get(node.type)
   const styleProps = (def?.props ?? []).filter((prop) => prop.section === 'style')
   const text = node.css?.[device] ?? ''
+  // A style property can be bound to a condition too, and one authored inside a
+  // repeater has to be able to name that row's answers.
+  const scopes = keyScopesFor(api.document.root, node.key)
 
   return (
     <section className="fs-style">
@@ -77,7 +86,7 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
       {styleProps.length > 0 && (
         <>
           <h3 className="fs-style__heading">From this component</h3>
-          <PropRows api={api} node={node} schemas={styleProps} />
+          <PropRows api={api} node={node} schemas={styleProps} scopes={scopes} />
         </>
       )}
 
@@ -106,20 +115,14 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
       </div>
 
       {CONTROLS.map((control) => (
-        <div className="fs-prop-row" key={control.name}>
-          <label htmlFor={'fs-style-' + control.name}>{control.label}</label>
-          <div className="fs-prop-row__control">
-            <input
-              id={'fs-style-' + control.name}
-              type="text"
-              placeholder={control.placeholder}
-              value={readDeclaration(text, control.name)}
-              onChange={(e) =>
-                api.setNodeCss(node.key, device, setDeclaration(text, control.name, e.target.value))
-              }
-            />
-          </div>
-        </div>
+        <DeclarationField
+          key={node.key + ':' + device + ':' + control.name}
+          control={control}
+          value={readDeclaration(text, control.name)}
+          onCommit={(next) =>
+            api.setNodeCss(node.key, device, setDeclaration(text, control.name, next))
+          }
+        />
       ))}
 
       <RawCss
@@ -128,6 +131,72 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
         onCommit={(next) => api.setNodeCss(node.key, device, next)}
       />
     </section>
+  )
+}
+
+/**
+ * One declaration, committed on blur rather than on every keystroke.
+ *
+ * The control used to be `value={readDeclaration(...)}` with an `onChange` that
+ * wrote straight through, which reads as the obvious controlled input and is
+ * the third instance of Trap 10 in this repository. `setDeclaration` parses and
+ * normalises, and the parse trims — so the space in `8px auto` was removed as
+ * it was typed, the next character landed against `8px`, and the field stored
+ * `8pxauto`. Its own placeholder could not be entered into it.
+ *
+ * The same draft-and-resync shape as `RawCss` below, the JSON editor and the
+ * key field. Committing on blur *and* on Enter, because a single-line field is
+ * a place people press Enter.
+ */
+function DeclarationField({
+  control,
+  value,
+  onCommit,
+}: {
+  control: { name: string; label: string; placeholder: string }
+  value: string
+  onCommit: (next: string) => void
+}): ReactNode {
+  const [draft, setDraft] = useState(value)
+  const [committed, setCommitted] = useState(value)
+
+  /*
+   * Re-sync when the document changes underneath, without losing an edit in
+   * progress: only the version this control last saw is replaced. Undo, redo,
+   * and the raw field rewriting this same declaration all reach here.
+   */
+  if (value !== committed) {
+    setCommitted(value)
+    setDraft(value)
+  }
+
+  const commit = (): void => {
+    if (draft === committed) return
+    setCommitted(draft)
+    onCommit(draft)
+  }
+
+  return (
+    <div className="fs-prop-row">
+      <label htmlFor={'fs-style-' + control.name}>{control.label}</label>
+      <div className="fs-prop-row__control">
+        <input
+          id={'fs-style-' + control.name}
+          type="text"
+          placeholder={control.placeholder}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commit()
+            }
+            if (e.key === 'Escape') setDraft(value)
+          }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -172,6 +241,18 @@ function RawCss({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
+            /*
+             * Refused text stays in the box and out of the document.
+             *
+             * It used to be committed anyway, with the message beside it saying
+             * it would not be applied -- so the document carried declarations
+             * the renderer drops, which is the "worst of both" this row's own
+             * comment warns about, and a host reading `node.css` for itself
+             * would have got the unsanitised string. The draft is kept so the
+             * stray brace can be taken out rather than retyped, which is the
+             * same bargain `KeyField` makes with a name that is already used.
+             */
+            if (refused) return
             setCommitted(draft)
             onCommit(draft)
           }}

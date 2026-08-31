@@ -9,7 +9,8 @@
 import { expect, test as base } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
-const STORAGE_KEY = 'formsmith.playground.document'
+/** Where the playground persists its draft. Exported so a test can plant one. */
+export const STORAGE_KEY = 'formsmith.playground.document'
 
 export interface Designer {
   page: Page
@@ -35,6 +36,7 @@ export interface Designer {
 /** Only the parts these tests read. */
 interface FormDocumentShape {
   name: string
+  languages: { code: string; region?: string; name: string }[]
   defaultLanguage: string
   translations: Record<string, Record<string, string>>
   root: { key: string; type: string; children?: NodeShape[] }
@@ -42,6 +44,8 @@ interface FormDocumentShape {
 
 interface NodeShape {
   key: string
+  /** The answer's name, when it has been renamed away from the key. */
+  dataKey?: string
   type: string
   props: Record<string, { kind: string; value?: unknown; key?: string; expression?: string }>
   children?: NodeShape[]
@@ -65,17 +69,31 @@ export const test = base.extend<{ designer: Designer }>({
      * Components tab themselves.
      */
     await page.getByRole('tab', { name: 'Tree' }).click()
-    await expect(page.locator('[data-fs-row="root"]')).toBeVisible()
+    await expect(page.locator('[data-fs-tree-row="root"]')).toBeVisible()
 
     const designer: Designer = {
       page,
-      row: (key) => page.locator(`[data-fs-row="${key}"]`),
-      node: (key) => page.locator(`[data-fs-key="${key}"]`),
+      row: (key) => page.locator(`[data-fs-tree-row="${key}"]`),
+      /*
+       * The first element drawing this node. A repeater draws its subtree once
+       * per row, so a key names any number of elements and an unscoped locator
+       * becomes a strict-mode violation the moment a spec previews two rows --
+       * in every test that uses it, not only the one that added the rows.
+       */
+      node: (key) => page.locator(`[data-fs-key="${key}"]`).first(),
 
+      /*
+       * Throws when nothing has been persisted, rather than answering `[]`.
+       *
+       * Five specs assert `expect(after).toEqual(before)` to show a gesture
+       * changed nothing, and with an empty answer on both sides that is
+       * `[] === []` -- an assertion that passes hardest when the app has not
+       * saved anything at all, which is the state a broken designer is in.
+       */
       rootChildren: async () =>
         page.evaluate((storageKey: string) => {
           const raw = window.localStorage.getItem(storageKey)
-          if (!raw) return []
+          if (!raw) throw new Error('The playground has not persisted a document yet.')
           const doc = JSON.parse(raw) as FormDocumentShape
           return (doc.root.children ?? []).map((child) => child.key)
         }, STORAGE_KEY),

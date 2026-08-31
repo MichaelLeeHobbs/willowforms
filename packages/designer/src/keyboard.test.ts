@@ -157,9 +157,18 @@ describe('moveTarget', () => {
 })
 
 describe('describeMove', () => {
-  it('names the component and what happened to it', () => {
-    expect(describeMove('email', 'up')).toBe('email moved up.')
-    expect(describeMove('email', 'right')).toBe('email moved into the component above it.')
-    expect(describeMove('email', 'left')).toBe('email moved out one level.')
+  /*
+   * The sentence a screen reader reads after a keyboard move, and the `down`
+   * arm had no test: a switch whose arms differ by one word is exactly where a
+   * copied line stays wrong, and the live region is the only feedback a
+   * keyboard user gets that the move happened at all.
+   */
+  it.each([
+    ['up', 'email moved up.'],
+    ['down', 'email moved down.'],
+    ['right', 'email moved into the component above it.'],
+    ['left', 'email moved out one level.'],
+  ] as const)('describes a %s move', (direction, sentence) => {
+    expect(describeMove('email', direction)).toBe(sentence)
   })
 })

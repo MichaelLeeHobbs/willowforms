@@ -16,8 +16,10 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { prop } from '@formsmith/core'
 import { describe, expect, it, vi } from 'vitest'
-import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
+import type { ComponentDef, ComponentNode, FormDocument, Kit } from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
@@ -36,8 +38,13 @@ function documentOf(root: ComponentNode): FormDocument {
     name: 'Contract',
     root,
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -54,9 +61,39 @@ function documentOf(root: ComponentNode): FormDocument {
  * drifted once: kit-mui carried icon names kit-html did not, and no palette
  * drew either, so nobody noticed until the vocabulary was closed.
  */
+/**
+ * Where the two kits deliberately, or at least knowingly, do not agree.
+ *
+ * `Button.variant` offers contained/outlined/text in MUI and solid/outline/plain
+ * in the HTML kit, so a document authored against one carries a variant the
+ * other has never heard of. That is a real gap in the claim that a document
+ * travels between kits, it is bigger than a test, and it is written up in the
+ * run's `found.md` rather than papered over here.
+ *
+ * Named so the comparison stays strict everywhere else, and checked below so an
+ * entry cannot outlive the divergence it excuses.
+ */
+const DIVERGENT_VOCABULARY = new Set(['Button.variant'])
+
 describe('the two kits in this repository agree', () => {
   const html = new Map(htmlKit.components.map((c) => [c.type, c]))
   const mui = new Map(muiKit.components.map((c) => [c.type, c]))
+
+  it.each([...DIVERGENT_VOCABULARY])(
+    '%s still diverges, so the exemption still earns its place',
+    (entry) => {
+      const [type, name] = entry.split('.')
+      const a = html.get(type ?? '')?.props.find((prop) => prop.name === name)
+      const b = mui.get(type ?? '')?.props.find((prop) => prop.name === name)
+
+      expect(a, entry + ' is not a property either kit has').toBeDefined()
+      expect(b, entry + ' is not a property either kit has').toBeDefined()
+      expect(
+        a?.options,
+        entry + ' agrees now: delete the exemption rather than keeping a hole open',
+      ).not.toEqual(b?.options)
+    },
+  )
 
   it('offers the same component types', () => {
     expect([...html.keys()].sort()).toEqual([...mui.keys()].sort())
@@ -80,11 +117,580 @@ describe('the two kits in this repository agree', () => {
       expect(a.root ?? false).toBe(b.root ?? false)
       expect(a.dataBound ?? false).toBe(b.dataBound ?? false)
       expect(a.dataType).toBe(b.dataType)
-      expect(a.props.map((prop) => prop.name)).toEqual(b.props.map((prop) => prop.name))
-      expect(a.props.map((prop) => prop.editor)).toEqual(b.props.map((prop) => prop.editor))
+      /*
+       * Every field of a property, not just its name and editor.
+       *
+       * `localizable` is what decides whether an author can bind a label to a
+       * translation at all, `conditional` whether they can bind it to a
+       * condition, and `section` which tab the row appears on. Two kits could
+       * disagree about all six and this said they were described identically --
+       * a document authored against one kit would then offer bindings the other
+       * refuses, which is the drift the whole describe exists to catch.
+       */
+      const described = (def: ComponentDef): unknown[] =>
+        def.props.map((prop) => ({
+          name: prop.name,
+          label: prop.label,
+          editor: prop.editor,
+          options: DIVERGENT_VOCABULARY.has(type + '.' + prop.name)
+            ? 'a divergence named below'
+            : (prop.options ?? null),
+          hint: prop.hint ?? null,
+          computable: prop.computable ?? true,
+          localizable: prop.localizable ?? false,
+          conditional: prop.conditional ?? false,
+          section: prop.section ?? 'main',
+        }))
+
+      expect(described(a)).toEqual(described(b))
       expect([...a.events].sort()).toEqual([...b.events].sort())
     },
   )
+})
+
+/**
+ * A length authored once means the same number of pixels in every kit.
+ *
+ * This is the divergence the `Grid` comment two functions above `Box` was
+ * written to prevent, sitting undetected below it. `borderRadius` in an MUI `sx`
+ * block is multiplied by `theme.shape.borderRadius`, which defaults to 4, while
+ * the kit divided by 8: an authored `radius: 24` rendered 12px in MUI against
+ * 24px in the HTML kit. Nothing caught it because no test rendered one document
+ * through both kits and compared what came out.
+ *
+ * The declarations are read out of what each kit emitted rather than out of
+ * `getComputedStyle`. jsdom has no cascade worth trusting and no layout engine,
+ * so the question here is deliberately the narrower one it can answer: what CSS
+ * did this kit write.
+ */
+describe('a length means the same thing in both kits', () => {
+  const box = (): ComponentNode => ({
+    key: 'target',
+    type: 'Box',
+    props: { padding: prop(8), radius: prop(24), background: prop('') },
+    children: [],
+  })
+
+  function formOf(renderers: RendererKit): ReactElement {
+    return (
+      <FormRenderer
+        document={documentOf(box())}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />
+    )
+  }
+
+  /** The declarations one kit wrote for the Box, whichever sink it used. */
+  function declarationsFor(renderers: RendererKit): string {
+    /*
+     * Nothing is cleared between renders, deliberately. Emotion caches by
+     * content hash and will not re-insert a rule it believes is already on the
+     * page, so removing its style tags makes the *next* render emit nothing and
+     * the reading come back empty. The sheets are matched by the element's own
+     * class instead, which is exact and does not care what else is mounted.
+     */
+    const { container } = render(formOf(renderers))
+
+    const el = container.querySelector('[data-fs-key="target"]')
+    if (!el) throw new Error('the Box did not render')
+
+    // The HTML kit writes a style attribute; the MUI kit writes an emotion rule
+    // for the class it put on the element.
+    const inline = el.getAttribute('style') ?? ''
+    const classes = (el.getAttribute('class') ?? '')
+      .split(/\s+/)
+      .filter((c) => c.startsWith('css-'))
+    const sheets = Array.from(document.querySelectorAll('style'))
+      .map((tag) => tag.textContent ?? '')
+      .filter((text) => classes.some((c) => text.includes('.' + c)))
+      .join('')
+
+    return (inline + ';' + sheets).replace(/\s+/g, '')
+  }
+
+  /** One declaration's value, normalised, or nothing if the kit did not write it. */
+  function valueOfDeclaration(css: string, name: string): string | undefined {
+    return new RegExp('[;{]' + name + ':([^;}]+)').exec(';' + css)?.[1]
+  }
+
+  it('renders an authored radius as the same pixels through both kits', () => {
+    const mui = declarationsFor(muiRendererKit)
+    const html = declarationsFor(htmlRendererKit)
+
+    expect(valueOfDeclaration(html, 'border-radius')).toBe('24px')
+    expect(valueOfDeclaration(mui, 'border-radius')).toBe(valueOfDeclaration(html, 'border-radius'))
+  })
+
+  it('renders an authored padding as the same pixels through both kits', () => {
+    const mui = declarationsFor(muiRendererKit)
+    const html = declarationsFor(htmlRendererKit)
+
+    expect(valueOfDeclaration(html, 'padding')).toBe('8px')
+    expect(valueOfDeclaration(mui, 'padding')).toBe(valueOfDeclaration(html, 'padding'))
+  })
+})
+
+/**
+ * A list of options is a document's list, and a document is data.
+ *
+ * Every kit maps over `props.options` and reads `.value` off each entry. A
+ * `null` in that array threw during render — and core has `optionValue`
+ * precisely because these entries cannot be trusted, so the guard existed one
+ * layer down and was not used here.
+ *
+ * The error boundary added for theme 3 keeps a throw inside its own node now, so
+ * this is a lost control rather than a lost page. A lost control is still the
+ * question the form was asking.
+ */
+/**
+ * A list of options is a document's list, and a document is data.
+ *
+ * Every kit mapped over `props.options` and read `.value` off each entry, so a
+ * `null` in that array threw during render — in four places across two kits.
+ * Core has `optionValue` precisely because these entries cannot be trusted, so
+ * the guarded read existed one layer down and was not the one the controls used
+ * to draw. They share `optionEntry` now, which is `optionValue`'s inverse.
+ *
+ * The error boundary added for theme 3 keeps a throw inside its own node, so
+ * this is a lost control rather than a lost page. A lost control is still the
+ * question the form was asking.
+ */
+/**
+ * A document's string does not become a class name, a variant, or a URL.
+ *
+ * Every one of these is a value a kit interpolated or trusted because its own
+ * `defaultProps` only ever holds sensible ones. A document is data, and the same
+ * file already narrows some of them — `Text.align` has a comment saying exactly
+ * why — so what is here is the ones that were missed rather than a new rule.
+ */
+/**
+ * Three obligations every kit already had, that nothing ran.
+ */
+describe('what a data-bound control has to say about itself', () => {
+  /*
+   * Data-bound and not a container. A repeater is data-bound — its value is the
+   * list of rows — but it is not a control anybody types into, and marking a
+   * container invalid or required says nothing a screen reader can use.
+   */
+  function bound(kit: Kit): { type: string; def: ComponentDef }[] {
+    return kit.components
+      .filter((def) => def.dataBound && !def.container)
+      .map((def) => ({ type: def.type, def }))
+  }
+
+  function drawField(
+    renderers: RendererKit,
+    def: ComponentDef,
+    extra: Partial<ComponentNode>,
+  ): HTMLElement {
+    const node: ComponentNode = {
+      ...instantiate(def, { key: 'r', type: 'r', props: {} }),
+      key: 'target',
+      ...extra,
+    }
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        errors={extra.schema ? { target: 'Something is wrong.' } : {}}
+        onChange={() => undefined}
+      />,
+    )
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error(def.type + ' did not render')
+    return element
+  }
+
+  /** The control inside a component, whatever element the kit chose for it. */
+  function control(element: HTMLElement): HTMLElement | null {
+    return element.matches('input, select, textarea')
+      ? element
+      : element.querySelector('input, select, textarea')
+  }
+
+  it.each(KITS)('$name marks a failing control invalid', ({ kit, renderers }) => {
+    /*
+     * A stated obligation of the contract, and one the contract test
+     * deliberately did not cover — so three MUI components never set it while
+     * the HTML kit set it on all three. A control that looks wrong and does not
+     * say so is announced to a screen reader as fine.
+     */
+    const missing = bound(kit)
+      .filter(({ def }) => {
+        const element = drawField(renderers, def, {
+          schema: { type: def.dataType ?? 'string', validations: [] },
+        })
+        const target = control(element)
+
+        /*
+         * A component with no control of its own cannot carry `aria-invalid` --
+         * it is supported on widget roles and inert on a container, which is
+         * what a `Repeater` is. Both kits set it there anyway and this rule
+         * found it and passed, which is a guard reporting a hole as a fix. Such
+         * a component satisfies the obligation by announcing instead: a message
+         * with `role="alert"`, which is what a screen reader will actually read.
+         */
+        if (!target) {
+          return element.querySelector('[role="alert"]') === null
+        }
+
+        return (
+          target.getAttribute('aria-invalid') !== 'true' &&
+          element.getAttribute('aria-invalid') !== 'true'
+        )
+      })
+      .map(({ type }) => type)
+
+    expect(missing).toEqual([])
+  })
+
+  it.each(KITS)('$name marks a required control required', ({ kit, renderers }) => {
+    /*
+     * WCAG 3.3.2. `node` is on `NodeRendererProps` and no renderer read it, in
+     * either kit — so a required field was required in `validateForm` and
+     * ordinary in the accessibility tree, and the first anybody heard of it was
+     * a rejected submit.
+     */
+    const missing = bound(kit)
+      .filter(({ def }) => {
+        const element = drawField(renderers, def, {
+          schema: { type: def.dataType ?? 'string', validations: [{ key: 'required' }] },
+        })
+        const target = control(element)
+        return (
+          target?.getAttribute('aria-required') !== 'true' &&
+          target?.hasAttribute('required') !== true &&
+          element.getAttribute('aria-required') !== 'true'
+        )
+      })
+      .map(({ type }) => type)
+
+    expect(missing).toEqual([])
+  })
+
+  it.each(KITS)('$name leaves an unrequired control unmarked', ({ kit, renderers }) => {
+    // The control. Marking everything required would pass the test above and
+    // announce every field as mandatory.
+    const wrong = bound(kit)
+      .filter(({ def }) => {
+        const element = drawField(renderers, def, {
+          schema: { type: def.dataType ?? 'string', validations: [] },
+        })
+        const target = control(element)
+        return target?.getAttribute('aria-required') === 'true' || target?.hasAttribute('required')
+      })
+      .map(({ type }) => type)
+
+    expect(wrong).toEqual([])
+  })
+})
+
+/**
+ * A value a host seeded, shown in the control that holds it.
+ *
+ * `str(value)` answers `''` for anything that is not a string, so a host
+ * restoring `{age: 30}` saw an empty field whose data was not empty: `required`
+ * passed, the field looked unanswered, and the first keystroke overwrote an
+ * answer nobody had seen. `jsonToString` is what the rest of each kit uses.
+ */
+describe('a control holding a value that is not a string', () => {
+  const holding = (type: string, dataType: string): ComponentNode => ({
+    key: 'target',
+    type,
+    props: {},
+    schema: { type: dataType as 'string', validations: [] },
+  })
+
+  it.each(
+    KITS.flatMap(({ name, kit, renderers }) =>
+      /*
+       * Not `DatePicker`: a `type="date"` input refuses a value that is not a
+       * date and clears itself, whatever the kit hands it, so the assertion
+       * would be about the browser rather than about the kit. It reads its value
+       * the same way as its neighbours; there is just no way to see that here.
+       */
+      ['TextField', 'TextArea', 'NumberField']
+        .filter((type) => kit.components.some((def) => def.type === type))
+        .map((type) => [name + ' ' + type, renderers, type] as const),
+    ),
+  )('%s shows it', (_what, renderers, type) => {
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(holding(type, 'string'))}
+        kit={renderers}
+        data={{ target: 30 }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    const field = element?.querySelector('input, textarea') ?? element
+    expect((field as HTMLInputElement | null)?.value).toBe('30')
+  })
+})
+
+describe('a document value a kit puts somewhere structural', () => {
+  function nodeWith(type: string, props: Record<string, unknown>): ComponentNode {
+    return {
+      key: 'target',
+      type,
+      props: Object.fromEntries(Object.entries(props).map(([k, v]) => [k, prop(v as never)])),
+    }
+  }
+
+  function draw(renderers: RendererKit, node: ComponentNode): HTMLElement {
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error('the component did not render')
+    return element
+  }
+
+  it.each(KITS)('$name does not let a Text variant add classes of its own', ({ renderers }) => {
+    /*
+     * `'fsh-text fsh-text--' + variant` with an unnarrowed variant. React
+     * escapes the attribute, so this is not XSS — but on a host using a utility
+     * CSS framework, `variant: "body fixed inset-0 z-50"` is an element covering
+     * the viewport, over the real form.
+     */
+    const element = draw(
+      renderers,
+      nodeWith('Text', { text: 'hello', variant: 'body fixed inset-0 z-50' }),
+    )
+
+    expect(element.className).not.toContain('inset-0')
+  })
+
+  it.each(KITS)('$name still tells its own variants apart', ({ kit, renderers }) => {
+    /*
+     * The control. Narrowing to nothing would collapse every variant to the
+     * default and pass the test above. Two declared variants have to produce
+     * two different results — which is checkable without knowing how a kit
+     * spells them, and MUI spells them as its own class names rather than as
+     * the authored word.
+     */
+    const declared = (
+      kit.components.find((def) => def.type === 'Text')?.props.find((p) => p.name === 'variant')
+        ?.options ?? []
+    ).map((option) => (typeof option.value === 'string' ? option.value : ''))
+    if (declared.length < 2) return
+
+    const [first, second] = declared as [string, string]
+    const a = draw(renderers, nodeWith('Text', { text: 'hello', variant: first }))
+    const b = draw(renderers, nodeWith('Text', { text: 'hello', variant: second }))
+
+    expect(a.outerHTML).not.toBe(b.outerHTML)
+  })
+
+  it.each(KITS)('$name gives an unrecognised Alert severity a role anyway', ({ renderers }) => {
+    /*
+     * An unnarrowed severity also withheld `role="alert"`, because the check is
+     * `severity === 'error'`. So a document with a typo in the severity of its
+     * error banner drew the banner and announced nothing.
+     */
+    const element = draw(
+      renderers,
+      nodeWith('Alert', { text: 'Something failed', severity: 'eror' }),
+    )
+
+    // Either it is treated as the default severity, or it is announced. What it
+    // must not do is silently become a class name of its own.
+    expect(element.className).not.toContain('eror')
+  })
+
+  it.each(KITS)('$name does not put an arbitrary scheme in an image src', ({ renderers }) => {
+    // `LinkNode` runs `href` through `safeHref`; `Image` put `src` straight into
+    // the DOM. Not script execution, but an outbound request with a referrer on
+    // every render, to an address the document chose.
+    const element = draw(renderers, nodeWith('Image', { src: 'javascript:alert(1)', alt: 'x' }))
+    const img = element.tagName === 'IMG' ? element : element.querySelector('img')
+
+    expect(img?.getAttribute('src') ?? '').not.toContain('javascript:')
+  })
+
+  it.each(KITS)('$name still shows an image with an ordinary address', ({ renderers }) => {
+    const element = draw(
+      renderers,
+      nodeWith('Image', { src: 'https://example.com/a.png', alt: 'x' }),
+    )
+    const img = element.tagName === 'IMG' ? element : element.querySelector('img')
+
+    expect(img?.getAttribute('src')).toBe('https://example.com/a.png')
+  })
+
+  it.each(KITS)('$name falls back when a text prop is cleared to empty', ({ renderers }) => {
+    /*
+     * `str(v, fallback)` returns `''` when the value *is* `''`, so every "safe
+     * default" was bypassed by an emptied field — a button with no text, a link
+     * with no text, a label with nothing in it. Clearing a label in the panel is
+     * the most natural way to try to remove it.
+     */
+    const element = draw(renderers, nodeWith('Button', { text: '' }))
+
+    expect(element.textContent?.trim()).not.toBe('')
+  })
+})
+
+describe('a component whose options a document got wrong', () => {
+  /** Everything a hand-edited document has plausibly been seen to hold. */
+  const RUBBISH: unknown[] = [null, undefined, 'a bare string', 42, [], { label: 'fine', value: 7 }]
+
+  function listNode(type: string, propName: string): ComponentNode {
+    return {
+      key: 'target',
+      type,
+      props: { [propName]: prop(RUBBISH as never), label: prop('Pick one') },
+      schema: { type: 'string', validations: [] },
+    }
+  }
+
+  /** The type each kit gives its list to, and the prop that list arrives on. */
+  const LISTY: [string, string][] = [
+    ['Select', 'options'],
+    ['RadioGroup', 'options'],
+    ['Breadcrumbs', 'items'],
+  ]
+
+  it.each(
+    KITS.flatMap(({ name, kit, renderers }) =>
+      LISTY.filter(([type]) => kit.components.some((def) => def.type === type)).map(
+        ([type, propName]) => [name + ' ' + type, renderers, type, propName] as const,
+      ),
+    ),
+  )('%s renders anyway', (_what, renderers, type, propName) => {
+    const onError = vi.fn()
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(listNode(type, propName))}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onError={onError}
+        onChange={() => undefined}
+      />,
+    )
+
+    // Not merely "the page survived" — the boundary would give us that. The
+    // component itself has to still be the component.
+    expect(onError).not.toHaveBeenCalled()
+    expect(container.querySelector('[data-fs-key="target"]')?.getAttribute('role')).not.toBe(
+      'alert',
+    )
+  })
+
+  it.each(KITS)('$name still shows an option it can read', ({ kit, renderers }) => {
+    /*
+     * The control. Dropping every entry would pass the test above and leave a
+     * select with nothing in it, which is the same lost question by a quieter
+     * route.
+     */
+    if (!kit.components.some((def) => def.type === 'Select')) return
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(listNode('Select', 'options'))}
+        kit={renderers}
+        data={{ target: 7 }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(chosenText(container)).toContain('fine')
+  })
+})
+
+/**
+ * The chosen option, however this kit chooses to draw one.
+ *
+ * The HTML kit renders a native `<select>`, whose options are in the document
+ * and whose selection is `selectedOptions`. MUI renders a combobox and keeps
+ * its options in a menu that is not open, so the only thing on the page is the
+ * label of whatever is selected. Reading `container.textContent` finds the
+ * options in one kit and nothing in the other, which is how a cross-kit
+ * assertion ends up measuring two different things.
+ */
+function chosenText(container: HTMLElement): string {
+  const combobox = container.querySelector('[role="combobox"]')
+  if (combobox) return combobox.textContent ?? ''
+
+  const select = container.querySelector('select')
+  return select?.selectedOptions[0]?.textContent ?? ''
+}
+
+/**
+ * A numeric option value survives being chosen.
+ *
+ * `str()` answers `''` for a number, so a select whose stored answer was `2`
+ * rendered as nothing selected: the user picks an option, the data holds it,
+ * the control shows blank, and the choice can never be made to stick.
+ * `optionValue` in core exists so a numeric value survives the round trip, and
+ * this was the one end that dropped it — the radio group in the same kit
+ * already had it right, which is how one control drifts from its neighbour.
+ */
+describe('a select holding a number', () => {
+  function numeric(): ComponentNode {
+    return {
+      key: 'target',
+      type: 'Select',
+      props: {
+        label: prop('Quantity'),
+        options: prop([
+          { label: 'One', value: 1 },
+          { label: 'Two', value: 2 },
+        ]),
+      },
+      schema: { type: 'number', validations: [] },
+    }
+  }
+
+  it.each(KITS)('$name shows the option the data names', ({ kit, renderers }) => {
+    if (!kit.components.some((def) => def.type === 'Select')) return
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(numeric())}
+        kit={renderers}
+        data={{ target: 2 }}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(chosenText(container)).toBe('Two')
+  })
+
+  it.each(KITS)('$name shows nothing when the data names no option', ({ kit, renderers }) => {
+    // The control: "shows Two" must not be something it would say regardless.
+    if (!kit.components.some((def) => def.type === 'Select')) return
+
+    const { container } = render(
+      <FormRenderer
+        document={documentOf(numeric())}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(chosenText(container)).not.toContain('Two')
+  })
 })
 
 describe.each(KITS)('$name', ({ kit, renderers }) => {
@@ -330,18 +936,30 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
           />,
         )
 
+        /*
+         * Every element that describes itself, not the first one found. A
+         * component can hold more than one control -- a radio group is a list of
+         * inputs, a file upload is an input beside a summary -- and checking the
+         * first meant the rest could point anywhere at all.
+         */
         const host = dom.querySelector('[data-fs-key="field"]')
-        const described = host?.matches('[aria-describedby]')
-          ? host
-          : (host?.querySelector('[aria-describedby]') ?? null)
+        const describers = [
+          ...(host?.matches('[aria-describedby]') ? [host] : []),
+          ...(host?.querySelectorAll('[aria-describedby]') ?? []),
+        ]
 
-        expect(described, `${def.type} has no control carrying aria-describedby`).not.toBeNull()
+        expect(
+          describers.length,
+          `${def.type} has no control carrying aria-describedby`,
+        ).toBeGreaterThan(0)
 
-        for (const id of (described?.getAttribute('aria-describedby') ?? '').split(/\s+/)) {
-          expect(
-            dom.querySelector('[id="' + id + '"]'),
-            `${def.type} points aria-describedby at #${id}, which is not in the DOM`,
-          ).not.toBeNull()
+        for (const described of describers) {
+          for (const id of (described.getAttribute('aria-describedby') ?? '').split(/\s+/)) {
+            expect(
+              dom.querySelector('[id="' + id + '"]'),
+              `${def.type} points aria-describedby at #${id}, which is not in the DOM`,
+            ).not.toBeNull()
+          }
         }
       }
     })
@@ -383,6 +1001,21 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
      */
     const group = kit.components.find((c) => c.type === 'RadioGroup')
     const item = kit.components.find((c) => c.type === 'RadioItem')
+
+    /*
+     * A kit need not offer a radio group at all, and this used to return
+     * quietly whenever either piece was missing -- so deleting `RadioItem`
+     * turned the obligation off instead of failing it, which is the one thing a
+     * contract suite must never let a kit do.
+     *
+     * Offering the group is the commitment. Offering the child without the
+     * group is a palette entry with nothing to join, which is worth failing on
+     * its own.
+     */
+    expect(
+      { group: Boolean(group), item: Boolean(item) },
+      'a RadioGroup and its RadioItem ship together or not at all',
+    ).toEqual({ group: Boolean(group), item: Boolean(group) })
     if (!group || !item) return
 
     const node: ComponentNode = {

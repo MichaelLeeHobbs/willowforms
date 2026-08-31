@@ -1,7 +1,9 @@
 # Validation
 
-**Status: built.** The rule engine, the catalogue, and the Rules tab all exist. The `when` guard has no
-UI, and there is no cross-field rule.
+**Status: partial.** The rule engine, the catalogue and the Rules tab are built and are what most
+readers came for. Two sections below are not: a `when` guard can only be authored through the JSON
+editor, and cross-field rules are a design with no code. The status here is the weakest section, which
+is the rule this index follows -- see [README.md](README.md).
 
 Validation lives in `@formsmith/core`, which imports no React and runs in Node. That is not a
 convenience: it means a form's rules are authored once and enforced in both places, rather than
@@ -79,6 +81,12 @@ correct. Neither the type checker nor the suite had an opinion, because nothing 
 
 **Status: built.**
 
+- A **`pattern` is unanchored**, like JSON Schema's and unlike `<input pattern>`, which browsers wrap in
+  `^(?:...)$` for you. So `\d{5}` accepts `abc12345`, and an author copying a pattern out of an HTML
+  tutorial gets a weaker rule than the one they copied. It stays this way round because `pattern` is
+  exported verbatim into JSON Schema: anchoring it in the engine would make the form and the schema a
+  server validates the same submission against disagree, and that disagreement is silent. Write `^` and
+  `$` yourself.
 - A **`pattern` that will not compile** matches nothing instead of throwing. The expression is authored
   one character at a time, so it is a syntax error for most of the time it is being typed. An uncaught
   throw here took Preview down in the browser and reached the server as an unhandled 500.
@@ -102,8 +110,14 @@ translation key. A localised form with English-only error messages is half local
 **Status: partial.** `when` is in the model and honoured by the engine; there is no UI, so a guarded rule
 can only be authored through the JSON editor.
 
-A guard makes a rule conditional: `required` with `when` applies only when the expression is truthy. It
-needs an injected evaluator, and without one the guarded rule is skipped.
+A guard makes a rule conditional: `required` with `when` applies only when the guard is truthy.
+
+Which guards need an evaluator depends on the kind, and that distinction is the whole point of the
+structured condition. A `computed` guard is an expression, so with no evaluator injected there is no way
+to know and the rule is skipped. A `condition` guard is data the engine reads itself, so it works
+everywhere -- on a server that injects nothing, in the designer, in a worker. A `static` guard is a
+boolean. A guard of a kind this code cannot read is treated as "has not said no", so the rule still
+applies: the other direction turns a required answer optional over a mistyped tag.
 
 Guarded rules are the reason `toJsonSchema` reports lossiness — see
 [10-interchange.md](10-interchange.md).
@@ -129,10 +143,21 @@ Sketch, not yet decided:
 ## The API
 
 ```ts
-validateField(node, data, evaluate?): string | undefined
-validateForm(root, data, evaluate?): FormErrors        // key -> message
-applyRule(rule, value, data, evaluate?): string | undefined
+validateField(node, data, options?): string | undefined
+validateForm(root, data, options?): FormErrors          // key -> message
+applyRule(rule, value, data, options?): string | undefined
+
+interface EvalOptions {
+  evaluate?: Evaluator      // absent means every `custom` rule and `computed` guard is skipped
+  context?: FormContext     // what the host knows: the user, the step, the tenant
+  row?: RowContext          // set by the walk that enters a repeater row, never by a caller
+}
 ```
+
+The last argument is a bag, not an evaluator. It was written here as `evaluate?` for long enough to be
+worth saying twice: passing a function positionally is a type error in TypeScript and, in JavaScript,
+silently drops every `custom` rule and every computed guard -- which is a required answer quietly
+becoming optional, on the server.
 
 `validateForm` returns the first failing message per component, not every failure. Showing one problem at
 a time per field is what a form does; the full list is available by calling `applyRule` directly.

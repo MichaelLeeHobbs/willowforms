@@ -12,6 +12,16 @@
   --fs-bg-panel: #ffffff;
   --fs-bg-well: #eef0f3;
   --fs-border: #d7dbe0;
+  /*
+   * The boundary of a control, which is not the same job as a divider.
+   *
+   * `--fs-border` separates panels, and a divider is decoration: WCAG 1.4.11
+   * asks nothing of it. A text field's outline is what tells somebody there is a
+   * text field there -- the field's background is a shade off the panel it sits
+   * on, so at 1.39:1 the border was carrying the whole message and failing to.
+   * This clears 3:1 on all three surfaces in both themes, which is the rule.
+   */
+  --fs-control-border: #7c838d;
   --fs-text: #1c1f23;
   --fs-text-muted: #5b6470;
   --fs-primary: #0b6fa4;
@@ -35,11 +45,13 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .fs-shell:not([data-fs-theme='light']) {
+  /* `:where()`, for the reason the HTML kit's own dark block gives. */
+  .fs-shell:where(:not([data-fs-theme='light'])) {
     --fs-bg-app: #1b1d21;
     --fs-bg-panel: #24272c;
     --fs-bg-well: #15171a;
     --fs-border: #3a3f46;
+    --fs-control-border: #767e8a;
     --fs-text: #e9ebf0;
     --fs-text-muted: #a4a9b3;
     --fs-primary: #2f9fd8;
@@ -55,6 +67,7 @@
   --fs-bg-panel: #24272c;
   --fs-bg-well: #15171a;
   --fs-border: #3a3f46;
+  --fs-control-border: #767e8a;
   --fs-text: #e9ebf0;
   --fs-text-muted: #a4a9b3;
   --fs-primary: #2f9fd8;
@@ -169,7 +182,6 @@
  * notched outline so every label sat on top of its border. The canvas surface
  * must inherit nothing from here.
  */
-.fs-chrome button,
 .fs-toolbar button,
 .fs-panel button,
 .fs-canvas__bar button {
@@ -177,7 +189,7 @@
   color: inherit;
   padding: 5px 10px;
   background: var(--fs-bg-panel);
-  border: 1px solid var(--fs-border);
+  border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
   cursor: pointer;
 }
@@ -204,7 +216,7 @@
   width: 100%;
   padding: 5px 8px;
   background: var(--fs-bg-app);
-  border: 1px solid var(--fs-border);
+  border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
 }
 
@@ -230,6 +242,13 @@
   align-items: center;
   gap: 8px;
   text-align: start;
+  /*
+   * Declared here rather than in a second block five hundred lines down. A
+   * selector with two blocks is legal CSS and a hazard for this file's own
+   * guard: `declarationsFor` reads the first textual occurrence, so a second
+   * block on an allowlisted selector would set properties nothing checks.
+   */
+  touch-action: none;
 }
 
 /*
@@ -316,11 +335,31 @@
   color: var(--fs-text-muted);
 }
 
+/*
+ * `touch-action: none` here as well as on the palette and the tree rows.
+ *
+ * The surface is `overflow: auto`, so on touch the browser claimed a
+ * press-and-drag as a pan, fired `pointercancel`, and canvas-to-canvas moves
+ * simply did not exist — against the spec's "pointer events throughout, so it
+ * works on touch". The palette and the tree already said this; the one surface
+ * that scrolls did not.
+ *
+ * `pan-y` rather than `none`, so the canvas can still be scrolled vertically
+ * with a finger. A horizontal drag is the gesture the designer wants.
+ */
 .fs-canvas__surface {
+  touch-action: pan-y;
   position: relative;
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  /*
+   * Top padding of 40px, the rest 24px. The selection toolbar sits above the
+   * frame -- about 27px of buttons plus a 4px gap -- so selecting the topmost
+   * component in the form drew it into the surface's 24px of padding and the
+   * overflow clipped it, with nothing to scroll to because it is above the
+   * content. The extra padding is the room it needs.
+   */
+  padding: 40px 24px 24px;
 }
 
 /*
@@ -345,6 +384,27 @@
   display: flex;
   gap: 2px;
   border-block-end: 1px solid var(--fs-border);
+}
+
+/*
+ * A strip with something beside it, on the same row.
+ *
+ * Only the JSON dialog uses it, for its close button. The button cannot go
+ * inside the strip — that is the `tablist` and may hold nothing but tabs — and
+ * wanting it on that row is what led the dialog to grow a second, keyboardless
+ * tab implementation of its own.
+ *
+ * The strip grows so its underline still runs the full width, which is what it
+ * did when it was the only thing on the row.
+ */
+.fs-tabs__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fs-tabs__row > .fs-tabs {
+  flex: 1;
 }
 
 .fs-tabs__tab {
@@ -687,16 +747,33 @@
  * Same discipline as the selection frames: absolutely positioned siblings that
  * never wrap a component, so a drag cannot disturb the kit's layout.
  */
+/*
+ * Above the kit's output, whatever the kit thinks its own z-index is.
+ *
+ * These sat at 2 and 3, in the same stacking context as the rendered form, so a
+ * component that raises itself drew over them: MUI's `AppBar` defaults to 1100
+ * and hid the drop indicator entirely, which is a drag with no visible target.
+ * The designer's overlays are chrome about the form and belong over all of it.
+ */
 .fs-drop {
   position: absolute;
   pointer-events: none;
-  z-index: 3;
+  z-index: 5000;
 }
 
 .fs-drop--bar {
   background: var(--fs-accent);
   border-radius: 2px;
-  box-shadow: 0 0 0 1px var(--fs-bg-app);
+  /*
+   * A halo in the form's own background, not the canvas's. The bar is drawn
+   * between two components, which sit on whatever the kit paints -- usually
+   * white -- and the ring was the app background, the one colour the bar is
+   * never drawn against. `Canvas` is a neutral pair that reads as a separation
+   * on either.
+   */
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 65%),
+    0 0 0 2px rgb(0 0 0 / 20%);
 }
 
 .fs-drop--empty {
@@ -717,10 +794,6 @@
   color: var(--fs-primary-text);
   background: var(--fs-primary);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
-}
-
-.fs-palette__item {
-  touch-action: none;
 }
 
 /*
@@ -766,17 +839,46 @@
  * frame drawn around a desktop canvas would be a picture of a monitor, which
  * tells the author nothing they cannot already see.
  */
+/*
+ * The frame is where the designer's own typography stops.
+ *
+ * `.fs-shell` sets `font-family`, `font-size` and `color`, and all three are
+ * *inherited* — so they flowed through the surface and this frame into whatever
+ * the kit rendered, and nothing put them back. Invariant 3 breached by
+ * inheritance rather than by a descendant selector, which is why the test that
+ * parses selectors could not see it: in dark mode an author styled and approved
+ * text that ships as the browser's default black at the browser's default size.
+ *
+ * `revert` rather than a value: the form should look the way it will look on the
+ * host's page, and this cannot know what that is.
+ */
 .fs-canvas__frame {
   margin-inline: auto;
+  font-family: revert;
+  font-size: revert;
+  color: revert;
 }
 
+/*
+ * A device frame is a width, plus something to see it by.
+ *
+ * No `overflow: hidden` and no background of its own, which is what it used to
+ * carry. Both changed the form rather than the viewport, and only at tablet and
+ * mobile, so the canvas answered a different question depending on which button
+ * was pressed: `overflow: hidden` clipped a focus ring drawn with a positive
+ * offset and turned every `position: sticky` inside the form into a plain one,
+ * and the panel background painted the designer's own colour behind a kit that
+ * has a background of its own -- a dark builder around a light form, unreadable
+ * at two widths out of three.
+ *
+ * The border and the shadow stay: they say where the device edge is, and they
+ * are drawn outside the content rather than over it.
+ */
 .fs-canvas__frame[data-fs-viewport='tablet'],
 .fs-canvas__frame[data-fs-viewport='mobile'] {
   border: 1px solid var(--fs-border);
   border-radius: calc(var(--fs-radius) * 2);
-  background: var(--fs-bg-panel);
   box-shadow: 0 1px 12px rgb(0 0 0 / 12%);
-  overflow: hidden;
 }
 
 /*
@@ -927,7 +1029,8 @@
   position: absolute;
   pointer-events: none;
   border-radius: 3px;
-  z-index: 2;
+  /* Above the kit's output, for the reason `.fs-drop` gives. */
+  z-index: 4000;
 }
 
 .fs-selection--hover {

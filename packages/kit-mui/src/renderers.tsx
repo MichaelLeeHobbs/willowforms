@@ -33,15 +33,76 @@ import Typography from '@mui/material/Typography'
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 
-import { jsonToString, optionValue, safeHref } from '@formsmith/core'
-import type { JsonValue } from '@formsmith/core'
+import type { ComponentNode } from '@formsmith/core'
+import {
+  isRequired,
+  jsonToString,
+  optionEntry,
+  optionValue,
+  safeHref,
+  safeStyleValue,
+} from '@formsmith/core'
 import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
-const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
+/**
+ * A string, or the fallback.
+ *
+ * `v || fallback`, not a bare type check. An emptied field *is* a string, so
+ * every "safe default" here was bypassed by clearing one — which is the most
+ * natural way to try to remove a label. A button with no text, an `aria-label`
+ * of `''`.
+ */
+const str = (v: unknown, fallback = ''): string => (typeof v === 'string' && v ? v : fallback)
 const bool = (v: unknown): boolean => v === true
-const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback)
+/*
+ * A finite number, or the fallback.
+ *
+ * `typeof NaN` is `'number'`, and a document can hold one: `JSON.parse('{"a":1e999}')`
+ * gives `Infinity`, and an expression can return either. It reached
+ * `aria-valuenow="NaN"` and an inline width of `NaN%`, which browsers drop --
+ * so an indeterminate progress bar painted itself full and told a screen
+ * reader a number that is not one.
+ */
+const num = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? v : fallback
+
+/**
+ * Lengths as CSS strings, not as theme multiples.
+ *
+ * `sx` reads a bare number as a multiple of a theme value — `padding` through
+ * `theme.spacing`, `borderRadius` through `theme.shape.borderRadius` — so the
+ * kit used to divide by the scale to get back to the pixels the document
+ * authored. That round-trips only under the defaults it was written against,
+ * and MUI's whole point is that a host replaces them: under `spacing: 3` an
+ * authored 8px drew at 3px. One of the two divisions was against the wrong
+ * default and was wrong even under the defaults, dividing `radius` by 8 where
+ * MUI multiplies by 4, so an authored 24 drew at 12.
+ *
+ * A string is passed through untouched, so the document's number is the number
+ * on the page in every theme. `Grid` already carries a note about the same
+ * failure — "made the same document lay out differently in the two kits" — and
+ * this was the same failure two functions below it, undetected because no test
+ * rendered one document through both kits and compared what came out.
+ */
+const px = (value: number): string => String(value) + 'px'
+
+/**
+ * What a control has to say about itself beyond its value.
+ *
+ * `aria-required` rather than the platform `required`, deliberately: the
+ * obligation is WCAG 3.3.2, which is about the accessibility tree, and native
+ * `required` also turns on the browser's own validation — a second validator
+ * with its own messages, competing with the form's, inside whatever `<form>` a
+ * host has wrapped this in.
+ *
+ * `isRequired` lives in core so the two kits cannot answer differently, and it
+ * counts only an *unguarded* required rule: a field that is required sometimes
+ * cannot be announced as one that always is.
+ */
+const requiredProps = (node: ComponentNode): { 'aria-required'?: true } =>
+  isRequired(node) ? { 'aria-required': true } : {}
 
 /*
  * The message a field is described by.
@@ -97,10 +158,15 @@ function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps):
        * nowhere else to appear, which is why the kit contract's message
        * obligation applies here like anywhere else.
        */}
+      {/*
+       * `role="group"` and a description, not `aria-invalid`, which is supported
+       * on widget roles and inert on a container of components. The message
+       * below carries `role="alert"`, which is what actually announces it.
+       */}
       <Stack
+        role="group"
         direction="column"
         gap={num(props['gap'], 2)}
-        aria-invalid={error ? true : undefined}
         aria-describedby={messageId}
       >
         {children}
@@ -129,7 +195,14 @@ function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
-function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function TextFieldNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   // MUI derives the helper text's id, and the input's aria-describedby, from
   // this one. Without it there is no description at all.
   const id = useId()
@@ -142,16 +215,20 @@ function TextFieldNode({ props, nodeProps, value, error, onChange }: NodeRendere
       placeholder={str(props['placeholder'])}
       multiline={bool(props['multiline'])}
       disabled={bool(props['disabled'])}
-      value={str(value)}
+      // `jsonToString`, not `str`: a host seeding `{age: 30}` saw an empty
+      // field whose data was not empty, so `required` passed, the field looked
+      // unanswered, and the first keystroke overwrote an answer nobody saw.
+      value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error) }}
+      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
       onChange={(e) => onChange(e.target.value)}
     />
   )
 }
 
 function NumberFieldNode({
+  node,
   props,
   nodeProps,
   value,
@@ -170,13 +247,20 @@ function NumberFieldNode({
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error) }}
+      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
       onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
     />
   )
 }
 
-function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function CheckboxNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   // Every other field in this kit shows its error. This one used to drop it on
   // the floor, so a required checkbox failed a submit while saying nothing. The
   // kit contract test caught it.
@@ -188,7 +272,17 @@ function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRenderer
         control={
           <Checkbox
             checked={bool(value)}
-            inputProps={{ 'aria-describedby': messageId }}
+            inputProps={{
+              'aria-describedby': messageId,
+              /*
+               * Stated on the input, because that is what a screen reader
+               * announces. `FormControl error` colours the label and says
+               * nothing to anybody not looking at it — which is why this was
+               * missing here and present on all three in the HTML kit.
+               */
+              ...(error ? { 'aria-invalid': true } : {}),
+              ...(isRequired(node) ? { 'aria-required': true } : {}),
+            }}
             onChange={(e) => onChange(e.target.checked)}
           />
         }
@@ -200,7 +294,14 @@ function CheckboxNode({ props, nodeProps, value, error, onChange }: NodeRenderer
   )
 }
 
-function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function SelectNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const raw = props['options']
   const options = Array.isArray(raw) ? raw : []
   const id = useId()
@@ -212,21 +313,39 @@ function SelectNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
       fullWidth
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
-      value={str(value)}
+      /*
+       * `jsonToString`, not `str`. `str` answers `''` for a number, so a stored
+       * answer of `2` rendered as nothing selected: the user picks an option,
+       * the data holds it, the control shows blank, and the choice can never be
+       * made to stick. `optionValue` in core exists so a numeric option value
+       * survives the round trip, and this was the one end that dropped it —
+       * `RadioGroupNode` in this same file already had it right.
+       */
+      value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error) }}
+      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
       onChange={(e) => onChange(optionValue(options, e.target.value))}
     >
+      {/*
+       * The empty choice, which this kit did not draw at all.
+       *
+       * Without it a MUI select could be answered and never unanswered: there
+       * was no option to pick that means "none", so clearing a non-required
+       * field was impossible once anybody had touched it. The HTML kit had one
+       * and hardcoded its English; both now read the authored `placeholder`.
+       */}
+      <MenuItem value="">{str(props['placeholder'], 'Choose…')}</MenuItem>
       {options.map((option, i) => {
-        const o = option as { label?: unknown; value?: JsonValue }
-        // jsonToString, not a fallback to the array index: a numeric option
-        // value used to become its own position, so the first option submitted
-        // "0" whatever it said.
-        const v = o.value === undefined ? String(i) : jsonToString(o.value)
+        /*
+         * `optionEntry` in core, which is `optionValue`'s inverse: the two have
+         * to agree on what an entry means or a choice cannot round-trip. Read
+         * inline here, it also threw on a `null` in the array.
+         */
+        const { value: v, label } = optionEntry(option, i)
         return (
-          <MenuItem key={v || String(i)} value={v}>
-            {str(o.label, v)}
+          <MenuItem key={String(i) + ':' + v} value={v}>
+            {label}
           </MenuItem>
         )
       })}
@@ -256,7 +375,7 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
         // auto-fit with a floor: columns collapse when they cannot fit, so the
         // author never writes a breakpoint.
         gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
-        gap: gap / 8,
+        gap: px(gap),
         // `columns` caps how many can ever fit, which is what makes it mean
         // something alongside auto-fit. Ignoring it here made the same document
         // lay out differently in the two kits.
@@ -273,9 +392,9 @@ function BoxNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
     <Box
       {...nodeProps}
       sx={{
-        padding: num(props['padding'], 16) / 8,
-        background: str(props['background']) || undefined,
-        borderRadius: num(props['radius'], 0) / 8,
+        padding: px(num(props['padding'], 16)),
+        background: safeStyleValue(str(props['background'])),
+        borderRadius: px(num(props['radius'], 0)),
       }}
     >
       {children}
@@ -348,14 +467,21 @@ function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <Box
       {...nodeProps}
       component="img"
-      src={str(props['src'])}
+      src={safeHref(props['src']) ?? ''}
       alt={str(props['alt'])}
       sx={{ objectFit: fit, width: width > 0 ? width : '100%', display: 'block' }}
     />
   )
 }
 
-function TextAreaNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function TextAreaNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   return (
     <TextField
@@ -367,10 +493,13 @@ function TextAreaNode({ props, nodeProps, value, error, onChange }: NodeRenderer
       label={str(props['label'])}
       placeholder={str(props['placeholder'])}
       disabled={bool(props['disabled'])}
-      value={str(value)}
+      // `jsonToString`, not `str`: a host seeding `{age: 30}` saw an empty
+      // field whose data was not empty, so `required` passed, the field looked
+      // unanswered, and the first keystroke overwrote an answer nobody saw.
+      value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error) }}
+      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
       onChange={(e) => onChange(e.target.value)}
     />
   )
@@ -391,7 +520,14 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
   )
 }
 
-function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererProps): ReactNode {
+function SwitchNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const messageId = useId()
   return (
     <FormControl {...nodeProps} error={Boolean(error)} disabled={bool(props['disabled'])}>
@@ -400,7 +536,11 @@ function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
         control={
           <Switch
             checked={bool(value)}
-            inputProps={{ 'aria-describedby': messageId }}
+            inputProps={{
+              'aria-describedby': messageId,
+              ...(error ? { 'aria-invalid': true } : {}),
+              ...(isRequired(node) ? { 'aria-required': true } : {}),
+            }}
             onChange={(e) => onChange(e.target.checked)}
           />
         }
@@ -413,6 +553,7 @@ function SwitchNode({ props, nodeProps, value, error, onChange }: NodeRendererPr
 }
 
 function RadioGroupNode({
+  node,
   props,
   nodeProps,
   value,
@@ -438,17 +579,20 @@ function RadioGroupNode({
         row={row}
         value={jsonToString(value)}
         aria-describedby={messageId}
+        {...(error ? { 'aria-invalid': true } : {})}
+        {...requiredProps(node)}
         onChange={(e) => onChange(optionValue(options, e.target.value))}
       >
         {options.map((option, i) => {
-          const o = option as { label?: unknown; value?: JsonValue }
-          const v = o.value === undefined ? String(i) : jsonToString(o.value)
+          const { value: v, label } = optionEntry(option, i)
           return (
             <FormControlLabel
-              key={v || String(i)}
+              // Position first, so two options sharing a value are still two
+              // keys. React drops one of a duplicated pair without a word.
+              key={String(i) + ':' + v}
               value={v}
               control={<Radio />}
-              label={typeof o.label === 'string' ? o.label : v}
+              label={label}
             />
           )
         })}
@@ -481,6 +625,7 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 }
 
 function DatePickerNode({
+  node,
   props,
   nodeProps,
   value,
@@ -501,7 +646,7 @@ function DatePickerNode({
       type="date"
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
-      value={str(value)}
+      value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
       slotProps={{
@@ -509,6 +654,7 @@ function DatePickerNode({
         // Without this the label sits on top of the browser's date placeholder.
         inputLabel: { shrink: true },
         htmlInput: {
+          ...requiredProps(node),
           ...(str(props['min']) ? { min: str(props['min']) } : {}),
           ...(str(props['max']) ? { max: str(props['max']) } : {}),
         },
@@ -518,8 +664,31 @@ function DatePickerNode({
   )
 }
 
-function FileUploadNode({ props, nodeProps, error, onChange }: NodeRendererProps): ReactNode {
+function FileUploadNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  error,
+  onChange,
+}: NodeRendererProps): ReactNode {
   const id = useId()
+  /*
+   * The names the document holds, drawn beside the input.
+   *
+   * A file input is uncontrolled by design and cannot be given a value, so a
+   * restored draft showed "No file chosen" while the payload was about to
+   * submit a filename. Nothing on screen said what the form was going to send.
+   *
+   * It is also the only thing that follows the row a value belongs to: rows are
+   * keyed by index, so the browser's own idea of which file this input holds
+   * stays with the index rather than with the data. See the note on row keys in
+   * the renderer.
+   */
+  const filesHeld = (Array.isArray(value) ? value : [value])
+    .filter((name): name is string => typeof name === 'string' && name !== '')
+    .join(', ')
+
   const multiple = bool(props['multiple'])
   /*
    * The value is the selected file's name and nothing more. A file input is
@@ -535,18 +704,41 @@ function FileUploadNode({ props, nodeProps, error, onChange }: NodeRendererProps
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
       error={Boolean(error)}
-      helperText={message(error, str(props['helperText']))}
+      /*
+       * The held filename joins the helper text, because a MUI `TextField` is
+       * one element and there is nowhere else to put it without wrapping the
+       * component and moving where `nodeProps` is spread.
+       */
+      helperText={message(error, filesHeld ? 'Holding ' + filesHeld : str(props['helperText']))}
       slotProps={{
         formHelperText: alertWhenError(error),
         inputLabel: { shrink: true },
         htmlInput: {
+          ...requiredProps(node),
           multiple,
           ...(str(props['accept']) ? { accept: str(props['accept']) } : {}),
         },
       }}
       onChange={(e) => {
-        const input = e.target as unknown as HTMLInputElement
-        const files = Array.from(input.files ?? []).map((file) => file.name)
+        /*
+         * Narrowed, not laundered. `as unknown as HTMLInputElement` asserted a
+         * type nothing had checked -- and this handler is reachable from a
+         * `TextField` that is not a file input, where `files` is undefined and
+         * the assertion would have said otherwise.
+         */
+        const input = e.target
+        if (!(input instanceof HTMLInputElement)) return
+        /*
+         * `maxSize` is honoured here rather than left to a host that may never
+         * look: it was a number in a panel whose own hint admitted it did
+         * nothing. Oversized files are left out and the rest are kept, so one
+         * file being too large does not silently drop the others. Kilobytes,
+         * which is what the label says.
+         */
+        const limit = num(props['maxSize'], 0) * 1024
+        const files = Array.from(input.files ?? [])
+          .filter((file) => limit <= 0 || file.size <= limit)
+          .map((file) => file.name)
         onChange(multiple ? files : (files[0] ?? null))
       }}
     />
@@ -624,9 +816,15 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   return (
     <Breadcrumbs {...nodeProps} aria-label="Breadcrumb">
       {items.map((item, i) => {
-        const entry = item as { label?: unknown; href?: JsonValue }
-        const text = typeof entry.label === 'string' ? entry.label : String(i + 1)
-        const href = safeHref(entry.href)
+        /*
+         * Guarded like an option, and for the same reason: a crumb comes out of
+         * a document. Reading `.label` off a `null` threw during render, and the
+         * HTML kit had the identical line — one shared test found both.
+         */
+        const entry =
+          item !== null && typeof item === 'object' && !Array.isArray(item) ? item : undefined
+        const text = typeof entry?.['label'] === 'string' ? entry['label'] : String(i + 1)
+        const href = safeHref(entry?.['href'])
         // The last crumb is where you are, so it is text and says so.
         return i === last || !href ? (
           <Typography

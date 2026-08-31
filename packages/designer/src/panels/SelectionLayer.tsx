@@ -9,7 +9,7 @@
  * disturb the kit's layout.
  */
 
-import { useCallback, useLayoutEffect, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { FormDocument } from '@formsmith/core'
 
@@ -22,11 +22,29 @@ import type { Rect } from '../geometry.js'
  * selectable node currently goes invisible. If per-node CSS ever lands, a
  * `display: none` node would measure zero here and want a visibility check.
  */
-function measure(surface: HTMLElement, key: string | undefined): Rect | undefined {
+function measure(surface: HTMLElement, key: string | undefined, row?: string): Rect | undefined {
   if (!key) return undefined
-  const element = nodeElement(surface, key)
+  const element = nodeElement(surface, key, row)
   if (!element) return undefined
   return measureIn(surface, element)
+}
+
+/** Two rectangles a viewer could not tell apart. */
+function samePlace(a: Rect | undefined, b: Rect | undefined): boolean {
+  if (!a || !b) return a === b
+  return a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height
+}
+
+/**
+ * Keep the previous object when nothing moved.
+ *
+ * `measure` returns a fresh object every call and the results feed `useState`,
+ * so a scroll event that moved nothing -- which is most of them, since the
+ * overlay is positioned in the surface's own scrolling space -- still set state
+ * and re-rendered the whole layer at scroll frequency.
+ */
+function keepIfSame(previous: Rect | undefined, next: Rect | undefined): Rect | undefined {
+  return samePlace(previous, next) ? previous : next
 }
 
 function frameStyle(box: Rect): CSSProperties {
@@ -38,6 +56,14 @@ export interface SelectionLayerProps {
   /** Only used to re-measure after an edit changes a component's size. */
   document: FormDocument
   selectedKey: string | undefined
+  /**
+   * Which drawn copy of the selected node the author pointed at.
+   *
+   * A repeater draws one subtree per row, so a key is not unique in the DOM and
+   * the first match is row 0. Absent outside a repeater, and absent for a
+   * selection made from the tree, which names a node and no row.
+   */
+  selectedRow?: string
   /** Component type of the selection, shown on the frame's label. */
   selectedType: string | undefined
   hoverKey: string | undefined
@@ -58,6 +84,7 @@ export function SelectionLayer({
   surfaceRef,
   document,
   selectedKey,
+  selectedRow,
   selectedType,
   hoverKey,
   actions,
@@ -65,15 +92,41 @@ export function SelectionLayer({
   const [selected, setSelected] = useState<Rect | undefined>(undefined)
   const [hover, setHover] = useState<Rect | undefined>(undefined)
 
+  /*
+   * What to measure, held in a ref so the observer does not care that it
+   * changed.
+   *
+   * `remeasure` used to close over the selection and the hover, so it was a new
+   * function every time either moved — and the effect below lists it, so the
+   * `ResizeObserver` and both listeners were torn down and rebuilt on every
+   * hover move. `observe()` delivers an immediate callback, so a sweep across
+   * thirty components cost thirty observer cycles and thirty extra renders on
+   * top of the thirty it was actually asked for.
+   */
+  const what = useRef({ selectedKey, selectedRow, hoverKey })
+
   const remeasure = useCallback(() => {
     const surface = surfaceRef.current
     if (!surface) return
-    setSelected(measure(surface, selectedKey))
+    const { selectedKey: key, selectedRow: row, hoverKey: hovered } = what.current
+    const nextSelected = measure(surface, key, row)
     // One frame is enough when the pointer is over the selection already.
-    setHover(measure(surface, hoverKey === selectedKey ? undefined : hoverKey))
-  }, [surfaceRef, selectedKey, hoverKey])
+    const nextHover = measure(surface, hovered === key ? undefined : hovered)
 
-  useLayoutEffect(remeasure, [remeasure, document])
+    setSelected((current) => keepIfSame(current, nextSelected))
+    setHover((current) => keepIfSame(current, nextHover))
+  }, [surfaceRef])
+
+  /*
+   * On every change to what is selected or hovered, as well as to the document.
+   * The ref is written here rather than in its own effect, because a layout
+   * effect runs before an ordinary one — so the first measure after a selection
+   * would have read the previous one and drawn no frame at all.
+   */
+  useLayoutEffect(() => {
+    what.current = { selectedKey, selectedRow, hoverKey }
+    remeasure()
+  }, [remeasure, document, selectedKey, selectedRow, hoverKey])
 
   useLayoutEffect(() => {
     const surface = surfaceRef.current
@@ -81,7 +134,15 @@ export function SelectionLayer({
 
     const observer = new ResizeObserver(remeasure)
     observer.observe(surface)
-    // The form root, not every frame: observing our own output would loop.
+    /*
+     * The form root, not every frame: observing our own output would loop.
+     *
+     * Re-resolved whenever the document changes, because React replaces this
+     * element when the root's type or key does -- switching kits, or applying a
+     * pasted document -- and the observer would then be watching a detached
+     * node while the new one resized unwatched. The effect lists `document` for
+     * that reason and for no other.
+     */
     const root = surface.querySelector('[data-fs-key]')
     if (root) observer.observe(root)
 
@@ -93,14 +154,33 @@ export function SelectionLayer({
       surface.removeEventListener('scroll', remeasure)
       window.removeEventListener('resize', remeasure)
     }
-  }, [surfaceRef, remeasure])
+  }, [surfaceRef, remeasure, document])
 
   // Selecting in the tree should bring the component into view on the canvas.
   useLayoutEffect(() => {
     const surface = surfaceRef.current
     if (!surface || !selectedKey) return
-    nodeElement(surface, selectedKey)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [surfaceRef, selectedKey])
+    const element = nodeElement(surface, selectedKey, selectedRow)
+    if (!element) return
+
+    /*
+     * The canvas scrolls; the page does not.
+     *
+     * `scrollIntoView` walks every scrollable ancestor, so selecting a component
+     * from the tree scrolled the host's own page as well -- a form builder
+     * embedded halfway down an admin screen jumped that screen every time
+     * somebody clicked a tree row. This moves the surface's own scroll offset
+     * and touches nothing above it.
+     */
+    const box = element.getBoundingClientRect()
+    const view = surface.getBoundingClientRect()
+
+    if (box.top < view.top) surface.scrollTop -= view.top - box.top
+    else if (box.bottom > view.bottom) surface.scrollTop += box.bottom - view.bottom
+
+    if (box.left < view.left) surface.scrollLeft -= view.left - box.left
+    else if (box.right > view.right) surface.scrollLeft += box.right - view.right
+  }, [surfaceRef, selectedKey, selectedRow])
 
   return (
     <>

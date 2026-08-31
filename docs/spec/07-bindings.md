@@ -1,25 +1,34 @@
 # Property bindings
 
-**Status: built.** All three modes are authored in the panel. Expression authoring is a plain textarea
-with no completion, and translation keys do not follow a rename.
+**Status: partial.** Every mode is authored in the panel, and the weakest section here is expression
+authoring: a plain textarea with no completion, no syntax check and no way to try an expression out.
+Translation keys do not follow a rename either.
 
-Any property can be a literal value, an expression computed at render time, or a key into a translation
-bundle. Which of the three a property may be is declared by its `PropSchema`, not chosen freely.
+Any property can be a literal value, an expression computed at render time, a key into a translation
+bundle, or -- where the schema opts in -- a structured condition. Which of them a property may be is
+declared by its `PropSchema`, not chosen freely.
 
-## The three modes
+## The four modes
 
 ```ts
 type PropValue =
   | { kind: 'static'; value: JsonValue }
   | { kind: 'computed'; expression: string }
   | { kind: 'i18n'; key: string }
+  | { kind: 'condition'; condition: Condition }
 ```
 
-| Mode       | Panel label | Resolves to                                                            |
-| ---------- | ----------- | ---------------------------------------------------------------------- |
-| `static`   | Value       | the literal, unchanged                                                 |
-| `computed` | Expression  | whatever the injected evaluator returns, or `null` with no evaluator   |
-| `i18n`     | Translation | the bundle entry for the active language, or the key itself if missing |
+| Mode        | Panel label | Resolves to                                                            |
+| ----------- | ----------- | ---------------------------------------------------------------------- |
+| `static`    | Value       | the literal, unchanged                                                 |
+| `computed`  | Expression  | whatever the injected evaluator returns, or `null` with no evaluator   |
+| `i18n`      | Translation | the bundle entry for the active language, or the key itself if missing |
+| `condition` | Condition   | a boolean, evaluated in core with no sandbox                           |
+
+`condition` is offered only where a schema opts in with `conditional: true`, and it is what `renderWhen`
+and a validation rule's `when` guard hold. It is listed here because it is a member of the same union,
+so anything switching on `kind` has to handle it -- see
+[08-validation.md](08-validation.md#guards) for what a guard of each kind needs.
 
 Resolution happens once, in the renderer, for every kit. A kit renderer receives resolved plain JSON and
 never sees a `PropValue` — see [02-kit-contract.md](02-kit-contract.md).
@@ -92,7 +101,9 @@ Each language gets a field beside the property, so translating does not mean nav
 being translated. The field carries the language's `dir`, so right-to-left copy is authored the right way
 round.
 
-Languages themselves are managed on the Form tab: add, remove, set the default, set writing direction.
+Languages themselves are managed on the Settings tab in the left pane: add, remove, set the default, set
+writing direction. It moved there when form settings stopped being a tab of the inspector, because they
+belong to the document rather than to whatever is selected.
 The last language cannot be removed, and removing the current default moves it — a document naming a
 language it does not have renders every translation as a raw key.
 
@@ -106,12 +117,13 @@ They should be `PropValue`. See [08-validation.md](08-validation.md#messages).
 
 ## The active language
 
-**Status: partial.** `FormRenderer` takes a `language` prop and falls back to `document.defaultLanguage`.
-The designer never passes it, so the canvas always shows the default and there is no way to see the form
-in another language while building it.
+**Status: built.** `FormRenderer` takes a `language` prop and falls back to
+`document.defaultLanguage`. The toolbar draws a selector whenever the document has more than one
+language, and the designer passes the choice to the canvas, so a form can be seen in any of its
+languages while it is being built. See [04-shell.md](04-shell.md).
 
-**Planned:** a language selector in the toolbar that sets the canvas language. See
-[04-shell.md](04-shell.md).
+Removing the language the canvas is showing drops the selection back to the document's default rather
+than leaving the canvas pointed at a language that is gone.
 
 ## Why a tagged union
 

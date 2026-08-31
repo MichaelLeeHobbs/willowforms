@@ -27,7 +27,11 @@ function Field({ nodeProps }: NodeRendererProps): ReactNode {
   return <div {...nodeProps} />
 }
 
-const rendererKit: RendererKit = { id: 'fake', renderers: { Screen: Screen_, Field } }
+function List({ nodeProps, children }: NodeRendererProps): ReactNode {
+  return <div {...nodeProps}>{children}</div>
+}
+
+const rendererKit: RendererKit = { id: 'fake', renderers: { Screen: Screen_, Field, List } }
 
 const kit: Kit = {
   id: 'fake',
@@ -72,6 +76,23 @@ const kit: Kit = {
       props: [],
       events: [],
     },
+    /*
+     * A repeater: a container whose data type is `array`, which is what core
+     * reads as row scope. It is here so a condition can be authored *inside* a
+     * row, which is the only place `scope: 'row'` means anything.
+     */
+    {
+      type: 'List',
+      label: 'List',
+      icon: 'stack',
+      group: 'layout',
+      container: true,
+      dataBound: true,
+      dataType: 'array',
+      defaultProps: {},
+      props: [],
+      events: [],
+    },
   ],
 }
 
@@ -79,6 +100,10 @@ interface Harness {
   user: ReturnType<typeof userEvent.setup>
   latest: () => ComponentNode | undefined
   select: () => Promise<void>
+  /** Select any node in the tree, not only the first child of the root. */
+  selectKey: (key: string) => Promise<void>
+  /** Any node in the current document, by key. */
+  node: (key: string) => ComponentNode | undefined
 }
 
 function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
@@ -89,8 +114,13 @@ function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
     name: 'Contact',
     root: { key: 'root', type: 'Screen', props: {}, children: [node, ...siblings] },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -110,14 +140,27 @@ function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
   // test starts where it used to, rather than repeating the click in each.
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
+  const clickRow = async (key: string): Promise<void> => {
+    const row = view.container.querySelector<HTMLElement>('[data-fs-tree-row="' + key + '"]')
+    if (!row) throw new Error('no tree row for ' + key)
+    await user.click(row)
+  }
+
+  const find = (key: string, from: ComponentNode): ComponentNode | undefined => {
+    if (from.key === key) return from
+    for (const child of from.children ?? []) {
+      const hit = find(key, child)
+      if (hit) return hit
+    }
+    return undefined
+  }
+
   return {
     user,
     latest: (): ComponentNode | undefined => current.root.children?.[0],
-    select: async (): Promise<void> => {
-      const row = view.container.querySelector<HTMLElement>('[data-fs-row="' + node.key + '"]')
-      if (!row) throw new Error('no tree row')
-      await user.click(row)
-    },
+    select: (): Promise<void> => clickRow(node.key),
+    selectKey: clickRow,
+    node: (key: string): ComponentNode | undefined => find(key, current.root),
   }
 }
 
@@ -126,6 +169,140 @@ const dataField = (): ComponentNode => ({
   type: 'Field',
   props: {},
   schema: { type: 'string', validations: [] },
+})
+
+/**
+ * The Key field, which this file never touched.
+ *
+ * The write-tests skill names it as the reference draft-and-commit shape --
+ * type freely, commit on blur or Enter, refuse with a reason and keep the text
+ * so it can be corrected -- and the panel that owns it had no test for it here
+ * at all. A rename also re-points every condition naming the old key, so a
+ * refusal that quietly half-applied is the worst outcome available.
+ */
+describe('the key field', () => {
+  const keyBox = (): HTMLElement => screen.getByRole('textbox', { name: /^Key/ })
+
+  it('renames the component on Enter', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email{Enter}')
+
+    expect(node('email')).toBeDefined()
+    expect(node('emailField')).toBeUndefined()
+  })
+
+  it('renames on blur as well, since leaving the field is a commit', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email')
+    await user.tab()
+
+    expect(node('email')).toBeDefined()
+  })
+
+  it('holds the draft while it is being typed, and changes nothing yet', async () => {
+    /*
+     * The reason this is a draft rather than a live write: every intermediate
+     * spelling of a key is a rename of its own, and `em` is a key like any
+     * other. Committing per keystroke would rewrite the document, and every
+     * condition naming it, eleven times.
+     */
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'em')
+
+    expect(keyBox()).toHaveProperty('value', 'em')
+    expect(node('emailField'), 'the rename happened mid-word').toBeDefined()
+    expect(node('em')).toBeUndefined()
+  })
+
+  it('refuses a key another component already has, and says which', async () => {
+    const { user, select, node } = setup(dataField(), [{ key: 'taken', type: 'Field', props: {} }])
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'taken{Enter}')
+
+    expect(screen.getByRole('alert').textContent).toMatch(/already used/)
+    expect(keyBox().getAttribute('aria-invalid')).toBe('true')
+    /*
+     * The field goes back to the key the component actually has. It reverts and
+     * says why, which is the whole point of the docblock on `KeyField`: the
+     * version before it reverted silently, so a refused rename looked like a
+     * field that would not accept typing.
+     */
+    expect(keyBox()).toHaveProperty('value', 'emailField')
+    expect(node('emailField')).toBeDefined()
+    expect(node('taken')).toBeDefined()
+  })
+
+  it('refuses a key the grammar does not allow', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), '2 fields{Enter}')
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(node('emailField')).toBeDefined()
+  })
+
+  it('puts the real key back on Escape', async () => {
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'somethingElse{Escape}')
+
+    expect(keyBox()).toHaveProperty('value', 'emailField')
+    expect(node('emailField')).toBeDefined()
+  })
+
+  it("re-points the component's own condition, which names its own key", async () => {
+    /*
+     * A `Step` is a Step because its `renderWhen` compares `context.step`
+     * against its own key, so a rename that moved the key and left the
+     * condition made the step unsatisfiable, permanently, with nothing
+     * reporting why. Same hole `duplicateNode` had from the other side.
+     *
+     * Only its own condition. What a *sibling* names is a data key, and a
+     * rename does not follow those -- see `found.md`.
+     */
+    const step: ComponentNode = {
+      key: 'who',
+      type: 'Field',
+      props: {},
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: 'who' },
+        },
+      },
+    }
+    const { user, select, node } = setup(step)
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'whoElse{Enter}')
+
+    expect(node('whoElse')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: 'whoElse' },
+      },
+    })
+  })
 })
 
 describe('the data key field', () => {
@@ -255,12 +432,47 @@ describe('the colour editor', () => {
     expect(latest()?.props['tint']).toEqual({ kind: 'static', value: 'var(--brand)' })
   })
 
-  it('shows black in the swatch for a value it cannot represent', async () => {
+  it('shows a hex value in the swatch', async () => {
+    // The wiring, asserted first, because everything below is about what the
+    // swatch does *not* do and none of it means anything if it shows nothing.
     const { user } = await open()
+    await user.type(screen.getByLabelText('Tint'), '#336699')
+
+    expect(screen.getByLabelText('Pick a colour')).toHaveProperty('value', '#336699')
+  })
+
+  it('leaves a value it cannot represent exactly where it was', async () => {
+    /*
+     * The swatch falls back to black for anything that is not `#rrggbb`, and the
+     * assertion here used to be that it shows `#000000` -- which jsdom produces
+     * on its own for an unparseable value, so deleting the fallback left it
+     * green. What can fail, and is the actual contract, is the other half: the
+     * text and the document still say `transparent`, because a swatch that owned
+     * the value would have rewritten it to the nearest hex on first paint.
+     */
+    const { user, latest } = await open()
+    const text = screen.getByLabelText('Tint')
+    await user.type(text, 'transparent')
+
+    expect(text).toHaveProperty('value', 'transparent')
+    expect(latest()?.props['tint']).toEqual({ kind: 'static', value: 'transparent' })
+    expect(screen.getByLabelText('Pick a colour')).toHaveProperty('value', '#000000')
+  })
+
+  it('writes the hex through when somebody uses the swatch', async () => {
+    const { user, latest } = await open()
     await user.type(screen.getByLabelText('Tint'), 'transparent')
 
-    const swatch = screen.getByLabelText('Pick a colour')
-    expect(swatch).toHaveProperty('value', '#000000')
+    fireEvent.change(screen.getByLabelText('Pick a colour'), { target: { value: '#ff0000' } })
+
+    // Picking is a deliberate act, so it replaces whatever was there.
+    expect(latest()?.props['tint']).toEqual({ kind: 'static', value: '#ff0000' })
+    /*
+     * By role, because the row's label picks up a visually hidden "(modified)"
+     * once the property has been touched, which is the marker the panel draws to
+     * say a value is no longer the default.
+     */
+    expect(screen.getByRole('textbox', { name: /^Tint/ })).toHaveProperty('value', '#ff0000')
   })
 
   it('names the swatch, since the row label belongs to the text field', async () => {
@@ -416,17 +628,22 @@ describe('the visibility row', () => {
   })
 
   it.each([
-    ['static true', { kind: 'static', value: true }, 'always'],
+    ['static true', { kind: 'static', value: true }, 'other'],
     ['static false', { kind: 'static', value: false }, 'never'],
-    ['a translation key', { kind: 'i18n', key: 'x' }, 'always'],
+    ['a translation key', { kind: 'i18n', key: 'x' }, 'other'],
     ['an expression', { kind: 'computed', expression: 'a' }, 'computed'],
   ])('reads %s out of a hand-edited document as %s', async (_label, renderWhen, expected) => {
     /*
      * `renderWhen` is a PropValue, so a document can hold any of its kinds.
      * Reading anything truthy as "a condition" left the select saying so while
      * rendering no editor, which made those documents unfixable from the panel.
-     * A static truthy and a translation key both behave as no condition, which
-     * is what isVisible does with them.
+     *
+     * A static truthy and a translation key both *behave* as no condition, which
+     * is what `isVisible` does with them -- and they read as `other` rather than
+     * `always`, because a select already showing Always fires no change when
+     * Always is chosen, so the row displayed the stray value and could not
+     * remove it. The option says "Always (unrecognised rule)" and choosing
+     * anything replaces it.
      */
     const harness = setup({ ...dataField(), renderWhen: renderWhen as PropValue }, [
       { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
@@ -434,6 +651,17 @@ describe('the visibility row', () => {
     await harness.select()
 
     expect(screen.getByLabelText('Show when')).toHaveProperty('value', expected)
+  })
+
+  it('lets an unrecognised rule be cleared, which is why it is not named Always', async () => {
+    const harness = setup({ ...dataField(), renderWhen: { kind: 'i18n', key: 'x' } }, [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'always')
+
+    expect(harness.latest()?.renderWhen).toBeUndefined()
   })
 
   it('sets a static false for Never, which is not the same as absent', async () => {
@@ -465,8 +693,8 @@ describe('the visibility row', () => {
     await harness.select()
 
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
-    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
-      (o) => o.value,
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map((o) =>
+      o.value.replace(/^(form|row):/, ''),
     )
 
     expect(options).toContain('country')
@@ -533,8 +761,8 @@ describe('the visibility row', () => {
     const harness = await withSibling()
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
 
-    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map(
-      (o) => o.value,
+    const options = [...screen.getByLabelText('Subject').querySelectorAll('option')].map((o) =>
+      o.value.replace(/^(form|row):/, ''),
     )
     expect(options).toContain('firstName')
     expect(options).not.toContain('website')
@@ -591,6 +819,72 @@ describe('the condition binding mode', () => {
       .querySelector<HTMLOptionElement>('option[value="condition"]')
 
     expect(option?.disabled).toBe(true)
+  })
+})
+
+describe('a literal the plain grammar cannot spell', () => {
+  const withCondition = (literal: unknown): ComponentNode =>
+    ({
+      ...dataField(),
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'ref', dataKey: 'firstName' },
+          right: { kind: 'literal', value: literal },
+        },
+      },
+    }) as ComponentNode
+
+  const open = async (literal: unknown): Promise<ReturnType<typeof setup>> => {
+    const harness = setup(withCondition(literal), [
+      { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
+    await harness.select()
+    return harness
+  }
+
+  it('shows an object literal as JSON rather than as an empty box', async () => {
+    // An empty box says the condition compares against nothing, which is not
+    // what the document says -- and typing into it replaced the structure.
+    await open({ a: 1 })
+    expect(screen.getByDisplayValue('{"a":1}')).toBeTruthy()
+  })
+
+  it('shows null as null', async () => {
+    await open(null)
+    expect(screen.getByDisplayValue('null')).toBeTruthy()
+  })
+
+  it('lets a quoted string be authored as a string', async () => {
+    /*
+     * `true` and `18` become the boolean and the number, which is what a form
+     * needs and what made the *words* unauthorable: a condition testing a text
+     * field whose answer is "true" could not be written here at all. Quoting is
+     * the escape hatch, and it is JSON's own.
+     */
+    const harness = await open('x')
+    const box = screen.getByDisplayValue('x')
+    await harness.user.clear(box)
+    await harness.user.type(box, '"true"')
+    await harness.user.tab()
+
+    const condition = harness.latest()?.renderWhen
+    expect(condition).toMatchObject({
+      condition: { right: { kind: 'literal', value: 'true' } },
+    })
+  })
+
+  it('still reads an unquoted true as the boolean', async () => {
+    const harness = await open('x')
+    const box = screen.getByDisplayValue('x')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'true')
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toMatchObject({
+      condition: { right: { kind: 'literal', value: true } },
+    })
   })
 })
 
@@ -798,5 +1092,395 @@ describe('removing a nested condition', () => {
 
     const remaining = screen.getAllByLabelText('Options, one per line')
     expect(remaining[0]).toHaveProperty('value', 'second')
+  })
+})
+
+/**
+ * Authoring a condition inside a repeater's row.
+ *
+ * A `ref` carries an optional scope, and absent means the top level. So a
+ * condition authored inside a row and left at the default reads a key the top
+ * level does not hold, resolves to nothing, hides its component, and
+ * `validateForm` then skips every rule beneath it. A required answer becomes
+ * advisory on the server, where nobody is looking.
+ *
+ * The panel answers that by never offering the choice loosely: inside a row the
+ * field list is two groups, and which group an option came from is what decides
+ * the scope. There is no default to leave wrong.
+ */
+describe('a condition authored inside a row', () => {
+  /*
+   * Not one name in this fixture is reused. The repeater's key is `contactList`
+   * and its data key is `contacts`; every field's key differs from its data key
+   * too. Every repeater fixture in this repository used to set the two to the
+   * same string, which made the row-addressing design and its opposite produce
+   * identical output across the whole suite.
+   */
+  const field = (key: string, dataKey: string): ComponentNode => ({
+    key,
+    type: 'Field',
+    props: {},
+    dataKey,
+    schema: { type: 'string', validations: [] },
+  })
+
+  const list = (renderWhen?: ComponentNode['renderWhen']): ComponentNode => ({
+    key: 'contactList',
+    type: 'List',
+    props: {},
+    dataKey: 'contacts',
+    schema: { type: 'array', validations: [] },
+    children: [
+      { ...field('rowEmail', 'email'), ...(renderWhen ? { renderWhen } : {}) },
+      field('rowKind', 'kind'),
+      field('rowNote', 'note'),
+    ],
+  })
+
+  const topLevel = field('nameField', 'fullName')
+
+  const rowScoped = (dataKey: string): ComponentNode['renderWhen'] => ({
+    kind: 'condition',
+    condition: { op: 'truthy', value: { kind: 'ref', dataKey, scope: 'row' } },
+  })
+
+  const subject = (): HTMLElement => screen.getByLabelText('Subject')
+
+  it('keeps the row scope when the field it tests is changed', async () => {
+    /*
+     * The CRITICAL. The field select rebuilt the operand from scratch, so
+     * changing which field a row-scoped condition tested silently re-pointed it
+     * at the form — the same rule, reading a different place, with nothing on
+     * screen saying so.
+     */
+    const harness = setup(list(rowScoped('kind')), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(subject(), 'row:note')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'note', scope: 'row' } },
+    })
+  })
+
+  it('can author the row scope in the first place', async () => {
+    // Starting from a form-scoped condition, so the assertion is that the
+    // picker *wrote* the scope rather than that it was already there.
+    const harness = setup(
+      list({
+        kind: 'condition',
+        condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'fullName' } },
+      }),
+      [topLevel],
+    )
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(subject(), 'row:kind')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'kind', scope: 'row' } },
+    })
+  })
+
+  it('seeds a fresh condition on the row rather than on the form', async () => {
+    // The default is the failure: a condition seeded at form scope inside a row
+    // names a key the top level does not hold, so it is false on arrival and
+    // hides the component it was just authored on.
+    const harness = setup(list(), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'kind', scope: 'row' } },
+    })
+  })
+
+  it('writes no scope for a field at the top level, because absent means the form', async () => {
+    // The other half of the same control. If the picker wrote `row` whenever it
+    // could, the test above would pass and the feature would still be broken.
+    const harness = setup(list(rowScoped('kind')), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    await harness.user.selectOptions(subject(), 'form:fullName')
+
+    expect(harness.node('rowEmail')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'fullName' } },
+    })
+  })
+
+  it('separates the row from the form in the list it offers', async () => {
+    const harness = setup(list(rowScoped('kind')), [topLevel])
+    await harness.selectKey('rowEmail')
+
+    const groups = Array.from(subject().querySelectorAll('optgroup')).map((group) => [
+      group.label,
+      Array.from(group.querySelectorAll('option')).map((option) => option.value),
+    ])
+
+    // `email` is absent from the row group: a component cannot test its own
+    // field, whichever scope the field is in.
+    expect(groups).toEqual([
+      ['This row', ['row:kind', 'row:note']],
+      // Document order, and the repeater's own key is a top-level answer: it
+      // holds the list, which `is empty` is a fair thing to test.
+      ['This form', ['form:contacts', 'form:fullName']],
+    ])
+  })
+
+  it('offers no groups at all outside a row', async () => {
+    // Nothing changes for the document that has no repeater in it, which is
+    // every document written before this existed.
+    const harness = setup(topLevel, [field('other', 'phone')])
+    await harness.select()
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    expect(subject().querySelectorAll('optgroup')).toHaveLength(0)
+    expect(harness.node('nameField')?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'phone' } },
+    })
+  })
+})
+
+/**
+ * Tabbing past a control is not editing it.
+ *
+ * The options box commits on blur, and it committed unconditionally — so simply
+ * moving focus through the panel parsed the stored list and wrote the parse
+ * back. Parsing is lossy on purpose: it trims, drops blanks, and reads text that
+ * looks numeric as a number. So a stored `"007"` became the number `7` and a
+ * stored `" x "` became `"x"`, without anybody typing anything, and each pass
+ * left an undo entry for an edit that was never made.
+ */
+describe('moving focus through a membership condition', () => {
+  const stored = (options: unknown[]): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'in',
+        value: { kind: 'ref', dataKey: 'website' },
+        options: options as never,
+      },
+    },
+  })
+
+  it('leaves the stored options byte-identical', async () => {
+    /*
+     * Both of these survive a render and are changed by a parse, which is what
+     * makes them the fixture: `007` is text a postcode or an account number
+     * would hold, and the spaces are somebody's deliberate padding.
+     */
+    const harness = setup(stored(['007', ' x ']))
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    box.focus()
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['007', ' x '] },
+    })
+  })
+
+  it('records no edit at all', async () => {
+    // Undo is the visible half. Every tab-through used to push a version, so
+    // undo walked back through edits nobody made before reaching a real one.
+    const harness = setup(stored([18, 21]))
+    await harness.select()
+
+    const before = harness.latest()
+
+    const box = screen.getByLabelText('Options, one per line')
+    box.focus()
+    await harness.user.tab()
+
+    // Same object, not merely an equal one: tree operations are immutable, so a
+    // commit that changed nothing would still hand back a new document.
+    expect(harness.latest()).toBe(before)
+  })
+
+  it('still commits an edit that was actually made', async () => {
+    // The control. Never committing would pass both tests above.
+    const harness = setup(stored(['007']))
+    await harness.select()
+
+    const box = screen.getByLabelText('Options, one per line')
+    await harness.user.clear(box)
+    await harness.user.type(box, 'GB')
+    await harness.user.tab()
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'website' }, options: ['GB'] },
+    })
+  })
+})
+
+/**
+ * The data key field, after an undo.
+ *
+ * It holds a draft and commits on blur, which is right — but it never re-synced,
+ * and its React key is the node's key, which does not change when only the data
+ * key changes. So an undo restored the document while the box went on showing
+ * the text from before it, and the next blur wrote that text back: the undo
+ * silently reversed, and the payload's key with it.
+ *
+ * The same shape as the raw CSS field, the JSON editor and the options box.
+ * This one was the last editor here without it.
+ */
+describe('the data key field and undo', () => {
+  const named = (): ComponentNode => ({
+    key: 'emailField',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  it('shows the key the document holds after an undo', async () => {
+    const harness = setup(named())
+    await harness.select()
+
+    const input = screen.getByLabelText('Data key')
+    await harness.user.clear(input)
+    await harness.user.type(input, 'primaryEmail')
+    await harness.user.tab()
+    expect(harness.node('emailField')?.dataKey).toBe('primaryEmail')
+
+    await harness.user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(screen.getByLabelText('Data key')).toHaveProperty('value', 'emailField')
+  })
+
+  it('does not write the stale text back on the next blur', async () => {
+    // The failure that made this worth fixing. The box kept the old text, and
+    // blurring it committed that text — so the undo undid itself.
+    const harness = setup(named())
+    await harness.select()
+
+    const input = screen.getByLabelText('Data key')
+    await harness.user.clear(input)
+    await harness.user.type(input, 'primaryEmail')
+    await harness.user.tab()
+
+    await harness.user.click(screen.getByRole('button', { name: 'Undo' }))
+    await harness.user.click(screen.getByLabelText('Data key'))
+    await harness.user.tab()
+
+    expect(harness.node('emailField')?.dataKey).toBeUndefined()
+  })
+
+  it('keeps an edit in progress when the document changes elsewhere', async () => {
+    /*
+     * The control, and the reason a draft exists at all. Re-syncing on every
+     * render would throw away what is being typed; only the version this field
+     * last saw is replaced.
+     */
+    const harness = setup(named())
+    await harness.select()
+
+    const input = screen.getByLabelText('Data key')
+    await harness.user.clear(input)
+    await harness.user.type(input, 'halfTyped')
+
+    expect(input).toHaveProperty('value', 'halfTyped')
+    expect(harness.node('emailField')?.dataKey).toBeUndefined()
+  })
+})
+
+/**
+ * A literal that looks numeric and is not.
+ *
+ * `coerce` turned anything `Number()` accepts into a number, so `is 01234`
+ * stored `1234` and could never match the string a postcode field holds. The
+ * doc comment beside it named postcodes and phone numbers as the cost and said
+ * comparison operators "are the only place this matters" — the code applied it
+ * to every literal in every operator.
+ *
+ * The rule now is that a number has to be spelled the way JavaScript spells it.
+ * `18` round-trips to `18` and becomes a number; `01234` round-trips to `1234`,
+ * which is not what was typed, so it stays text.
+ */
+describe('typing a literal into a condition', () => {
+  const listy = (): ComponentNode => ({
+    key: 'website',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'ref', dataKey: 'website' },
+        right: { kind: 'literal', value: '' },
+      },
+    },
+  })
+
+  const stored = (harness: Harness): unknown => {
+    const when = harness.node('website')?.renderWhen
+    return when?.kind === 'condition' && 'right' in when.condition
+      ? when.condition.right
+      : undefined
+  }
+
+  it.each([
+    ['a postcode with a leading zero', '01234', '01234'],
+    ['a phone number', '+441234567890', '+441234567890'],
+    ['a version', '1.50', '1.50'],
+    ['something in exponent form', '1e3', '1e3'],
+  ])('keeps %s as text', async (_what, typed, expected) => {
+    const harness = setup(listy())
+    await harness.select()
+
+    const right = screen.getByLabelText('Right')
+    await harness.user.clear(right)
+    await harness.user.type(right, typed)
+    await harness.user.tab()
+
+    expect(stored(harness)).toEqual({ kind: 'literal', value: expected })
+  })
+
+  it.each([
+    ['a whole number', '18', 18],
+    ['a negative', '-4', -4],
+    ['a decimal', '1.5', 1.5],
+    ['zero', '0', 0],
+  ])('still reads %s as a number', async (_what, typed, expected) => {
+    /*
+     * The control, and the reason coercion exists: ordering refuses to compare
+     * a string to a number rather than guessing, so `is at least 18` against a
+     * number field can never be true if the literal is text.
+     */
+    const harness = setup(listy())
+    await harness.select()
+
+    const right = screen.getByLabelText('Right')
+    await harness.user.clear(right)
+    await harness.user.type(right, typed)
+    await harness.user.tab()
+
+    expect(stored(harness)).toEqual({ kind: 'literal', value: expected })
+  })
+
+  it('still reads true and false as booleans', async () => {
+    const harness = setup(listy())
+    await harness.select()
+
+    const right = screen.getByLabelText('Right')
+    await harness.user.clear(right)
+    await harness.user.type(right, 'true')
+    await harness.user.tab()
+
+    expect(stored(harness)).toEqual({ kind: 'literal', value: true })
   })
 })

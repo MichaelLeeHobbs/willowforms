@@ -1,7 +1,11 @@
 # Component catalogue
 
-**Status: partial.** Eight of the twenty-six below are built, in both kits. Two of the six palette groups
-have no components at all.
+**Status: built.** 27 of the 27 below are built, in both kits, and every palette group this catalogue
+uses has components in it.
+
+The two numbers are digits rather than words on purpose: `test/docs.test.ts` reads them and compares
+them against the table below and against both kits' `definitions.ts`, so a component added to a kit and
+not to this page fails the build.
 
 This is the list Formsmith commits to. A kit is free to offer more or fewer — nothing in the contract
 requires this catalogue — but the two kits in this repository implement it, which is what lets a document
@@ -58,13 +62,13 @@ components, which is the reason to move them rather than a reason not to.
 
 ## Palette groups
 
-`PaletteGroup` is `inputs | selection | layout | display | feedback | navigation | custom`. Every group
-below is used, which closes two that are currently empty. `custom` is reserved for host-defined
-components and this catalogue never uses it.
+`PaletteGroup` is `inputs | selection | layout | display | feedback | navigation | custom`. All six
+groups below hold components. `custom` is reserved for host-defined components and this catalogue never
+uses it.
 
 ## The catalogue
 
-Twenty-six components. **Built** means both kits implement it and the contract test passes.
+27 components. **Built** means both kits implement it and the contract test passes.
 
 ### Layout
 
@@ -125,7 +129,7 @@ statement from having forgotten.
 | `DatePicker`  | Built  | `date`    | `label`, `helperText`, `min`, `max`, `disabled`                    |
 | `FileUpload`  | Built  | `file`    | `label`, `helperText`, `accept`, `multiple`, `maxSize`, `disabled` |
 | `Button`      | Built  | no        | `text`, `variant`, `disabled`                                      |
-| `ButtonGroup` | Built  | no        | `orientation`, `variant`                                           |
+| `ButtonGroup` | Built  | no        | `orientation`                                                      |
 
 `TextArea` exists separately rather than as `TextField` with `multiline`, because the two have different
 properties (`rows` versus nothing) and a palette entry that changes shape based on a checkbox is harder
@@ -139,10 +143,10 @@ posted somewhere would be a backend, which is a non-goal.
 | Component    | Status | Data type | Properties                                                |
 | ------------ | ------ | --------- | --------------------------------------------------------- |
 | `Select`     | Built  | `string`  | `label`, `options`, `helperText`, `disabled`              |
-| `Checkbox`   | Built  | `boolean` | `label`, `disabled`                                       |
+| `Checkbox`   | Built  | `boolean` | `label`, `helperText`, `disabled`                         |
 | `RadioGroup` | Built  | `string`  | `label`, `options`, `direction`, `helperText`, `disabled` |
 | `RadioItem`  | Built  | no        | `label`, `value`, `disabled`                              |
-| `Switch`     | Built  | `boolean` | `label`, `disabled`                                       |
+| `Switch`     | Built  | `boolean` | `label`, `helperText`, `disabled`                         |
 
 `options` is a `json` editor taking `{ label, value }[]`. Option values keep their type: a numeric value
 stays a number, and choosing that option submits the number. An earlier version replaced any non-string
@@ -204,8 +208,9 @@ lifecycle events are declared only by `Screen`. Settle them when something reads
 
 1. Add the `ComponentDef` to both kits' metadata.
 2. Add a renderer to both kits, spreading `nodeProps`.
-3. Run `test/kit-contract.test.tsx`. It checks sixteen obligations against every kit. Most hold for the
-   kit as a whole; the `nodeProps` rule runs once per component.
+3. Run `test/kit-contract.test.tsx`. It checks twenty obligations against every kit, one per row of the
+   table in [02-kit-contract.md](02-kit-contract.md), and `docs.test.ts` fails when the two counts
+   disagree. Most hold for the kit as a whole; the `nodeProps` rule runs once per component.
 4. Add a row above and mark it Built.
 
 ## Repeated scope

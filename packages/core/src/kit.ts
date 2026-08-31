@@ -138,9 +138,22 @@ export interface Kit {
   components: ComponentDef[]
 }
 
-/** Index a kit's components by type for O(1) lookup. */
+/**
+ * Index a kit's components by type for O(1) lookup.
+ *
+ * The **first** declaration of a type wins, and `groupKit` below drops the rest,
+ * so the two readings of a kit agree. A `Map` built from the list keeps the
+ * last, while the palette listed both -- so a kit declaring `TextField` twice
+ * drew two entries, one of which added a node whose renderer was the other
+ * definition's. A kit is third-party code and can do this by accident when two
+ * files are merged.
+ */
 export function indexKit(kit: Kit): ReadonlyMap<string, ComponentDef> {
-  return new Map(kit.components.map((c) => [c.type, c]))
+  const byType = new Map<string, ComponentDef>()
+  for (const component of kit.components) {
+    if (!byType.has(component.type)) byType.set(component.type, component)
+  }
+  return byType
 }
 
 /**
@@ -152,8 +165,13 @@ export function indexKit(kit: Kit): ReadonlyMap<string, ComponentDef> {
  */
 export function groupKit(kit: Kit): Array<{ group: PaletteGroup; components: ComponentDef[] }> {
   const out: Array<{ group: PaletteGroup; components: ComponentDef[] }> = []
+  const seen = new Set<string>()
+
   for (const component of kit.components) {
     if (component.root === true) continue
+    // One entry per type, the first, which is the one `indexKit` resolves to.
+    if (seen.has(component.type)) continue
+    seen.add(component.type)
     let bucket = out.find((b) => b.group === component.group)
     if (!bucket) {
       bucket = { group: component.group, components: [] }

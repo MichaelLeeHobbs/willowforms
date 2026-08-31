@@ -1,12 +1,15 @@
 # Document model
 
 **Status: partial.** The tree, property values, and validation rules are built and tested. The format has
-no version migration path, and five fields the types declare have nothing reading them:
-`ComponentNode.css` and `ComponentNode.events` (see [06-inspector.md](06-inspector.md#style) and
-[09-actions.md](09-actions.md)), `FormDocument.version`, and both members of `FormSettings`.
+no version migration path, and three fields the types declare are checked by `validateDocument` and then
+acted on by nothing: `ComponentNode.events` (see [09-actions.md](09-actions.md)) and both members of
+`FormSettings`.
 
-That list was six. `FieldSchema.autoValidate` came off it when the canvas preview began reading it, and
-`ComponentDef.icon` when the palette began drawing it.
+That list was six. `FieldSchema.autoValidate` came off it when the canvas preview began reading it,
+`ComponentDef.icon` when the palette began drawing it, `ComponentNode.css` when the Style tab began
+writing it and `styleSheetFor` began reading it, and `FormDocument.version` when the gate began refusing
+a document that does not say `'1'` — which is not a migration, but it is a reader, and a document with
+the wrong version no longer loads at all.
 
 A form is a recursive tree of `ComponentNode`. The tree is the source of truth. Everything else —
 JSON Schema, submitted data, the palette, the properties panel — is derived from it or projected out
@@ -119,10 +122,20 @@ empty. `ComponentDef.container` declares the same fact for the palette, and the 
 
 ### css
 
-**Status: planned.** Declared as raw CSS text per breakpoint. Nothing writes it and nothing reads it, so
-per-breakpoint styling does not exist. See [06-inspector.md](06-inspector.md) for the Style tab and
-[04-shell.md](04-shell.md) for viewport simulation, which has to come first: authoring a tablet rule is
-meaningless without a way to see the tablet.
+**Status: built.** Raw CSS text per breakpoint. The Style tab writes it, `styleSheetFor` in core turns
+the tree's entries into one stylesheet, and the renderer emits that alongside the form. See
+[06-inspector.md](06-inspector.md) for the Style tab and [04-shell.md](04-shell.md) for viewport
+simulation, which had to come first: authoring a tablet rule is meaningless without a way to see the
+tablet.
+
+The text is **declarations only**. `safeDeclarations` refuses anything holding `{`, `}`, `<` or `@`,
+because a component's styling that can leave its own block can style the whole page, and a document is
+data. Refused text is reported in the Style tab rather than silently dropped.
+
+A single style _value_ is judged more strictly than a declaration list, by `safeStyleValue` in core.
+That one also refuses `;`, `!`, a comment, a backslash and anything that fetches, because a value on a
+prop whose editor is `color` has no use for them and `url(https://…)` on a page collecting answers is an
+exfiltration channel rather than a broken rule.
 
 ### events
 
@@ -132,8 +145,8 @@ meaningless without a way to see the tablet.
 
 ### renderWhen
 
-**Status: partial.** The model, the renderer, and validation all honour it; there is no UI, so a
-conditional field can only be authored through the JSON editor.
+**Status: built.** The model, the renderer, and validation all honour it, and the Properties panel
+offers a Show when row: Always, Never, a structured condition, or an expression.
 
 Visibility is decided by `isVisible()` in core and by nothing else. The renderer and `validateForm` both
 call it, so they cannot disagree about what is on screen. They did once: the renderer skipped a hidden
@@ -224,11 +237,16 @@ type PropValue =
   | { kind: 'static'; value: JsonValue }
   | { kind: 'computed'; expression: string }
   | { kind: 'i18n'; key: string }
+  | { kind: 'condition'; condition: Condition }
 ```
 
 A tagged union rather than a bag discriminated by which optional field happens to be present. Every
-consumer switches on `kind` exhaustively, so adding a fourth binding mode is a compile error at every
-call site instead of a silent fallthrough. FormEngine uses the other shape.
+consumer switches on `kind` exhaustively, so adding a binding mode is a compile error at every call site
+instead of a silent fallthrough. FormEngine uses the other shape.
+
+`condition` is the fourth member and the newest. It is what `renderWhen` and a rule's `when` guard hold,
+and the reason both work with no evaluator injected: a condition is data the engine reads, not a string
+somebody has to sandbox.
 
 Switching a property between modes starts the new mode empty. An expression is not a label, and seeding
 one with the other produces something that looks authored and is broken.

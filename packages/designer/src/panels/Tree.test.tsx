@@ -12,6 +12,7 @@
  * a focus that has not moved.
  */
 
+import { readdirSync, readFileSync } from 'node:fs'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -82,8 +83,13 @@ function makeDocument(): FormDocument {
       ],
     },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -118,7 +124,7 @@ function setup(): Harness {
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const row = (key: string): HTMLElement => {
-    const element = view.container.querySelector<HTMLElement>(`[data-fs-row="${key}"]`)
+    const element = view.container.querySelector<HTMLElement>(`[data-fs-tree-row="${key}"]`)
     if (!element) throw new Error('no tree row for ' + key)
     return element
   }
@@ -130,15 +136,15 @@ function setup(): Harness {
     row,
     focused: () =>
       document.activeElement instanceof HTMLElement
-        ? document.activeElement.dataset['fsRow']
+        ? document.activeElement.dataset['fsTreeRow']
         : undefined,
     live: () => {
       const region = view.container.querySelector('[aria-live="polite"]')
       return (region?.textContent ?? '').replace(new RegExp(String.fromCharCode(0x200b), 'g'), '')
     },
     keys: () =>
-      Array.from(view.container.querySelectorAll('[data-fs-row]')).map(
-        (el) => (el as HTMLElement).dataset['fsRow'] ?? '',
+      Array.from(view.container.querySelectorAll('[data-fs-tree-row]')).map(
+        (el) => (el as HTMLElement).dataset['fsTreeRow'] ?? '',
       ),
   }
 }
@@ -157,12 +163,12 @@ function childrenOf(doc: FormDocument, key: string): string[] {
 describe('tree keyboard navigation', () => {
   it('exposes exactly one tab stop for the whole tree', () => {
     const { view } = setup()
-    const rows = Array.from(view.container.querySelectorAll('[data-fs-row]'))
+    const rows = Array.from(view.container.querySelectorAll('[data-fs-tree-row]'))
     const stops = rows.filter((r) => r.getAttribute('tabindex') === '0')
 
     // Every row being a tab stop buries the rest of the page behind them.
     expect(stops).toHaveLength(1)
-    expect((stops[0] as HTMLElement).dataset['fsRow']).toBe('root')
+    expect((stops[0] as HTMLElement).dataset['fsTreeRow']).toBe('root')
   })
 
   it('moves the tab stop to whatever is selected', async () => {
@@ -170,11 +176,11 @@ describe('tree keyboard navigation', () => {
 
     await user.click(row('footer'))
 
-    const stops = Array.from(view.container.querySelectorAll('[data-fs-row]')).filter(
+    const stops = Array.from(view.container.querySelectorAll('[data-fs-tree-row]')).filter(
       (r) => r.getAttribute('tabindex') === '0',
     )
     expect(stops).toHaveLength(1)
-    expect((stops[0] as HTMLElement).dataset['fsRow']).toBe('footer')
+    expect((stops[0] as HTMLElement).dataset['fsTreeRow']).toBe('footer')
   })
 
   it('walks down the flattened tree, stepping into containers', async () => {
@@ -375,29 +381,219 @@ describe('landmarks and names', () => {
     expect(screen.getByRole('complementary', { name: 'Component properties' })).toBeTruthy()
   })
 
-  it('names every button in the shell', () => {
-    const { view } = setup()
-    const unnamed = Array.from(view.container.querySelectorAll('button')).filter((button) => {
-      const name = button.getAttribute('aria-label') ?? button.textContent ?? ''
-      return name.trim() === ''
-    })
+  /*
+   * Both sweeps below used to run against one state: the Tree tab, with nothing
+   * selected. That is the toolbar and five rows, and it is not where controls
+   * come from -- the Style tab has seven inputs, the condition editor has a
+   * select and a Remove button per row, and the Rules tab builds its controls
+   * from whatever rule was added. None of them was ever swept.
+   *
+   * So each state is driven, then swept. The drivers are ordinary interactions
+   * rather than fixtures, because a panel that renders nothing would otherwise
+   * pass every sweep in this file.
+   */
+  const STATES: [string, (harness: Harness) => Promise<void>][] = [
+    ['at rest', (): Promise<void> => Promise.resolve()],
+    [
+      'with a component selected',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+      },
+    ],
+    [
+      'on the Style tab',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+        await user.click(screen.getByRole('tab', { name: 'Style' }))
+      },
+    ],
+    [
+      'on the Rules tab, with a rule on the field',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+        await user.click(screen.getByRole('tab', { name: 'Rules' }))
+      },
+    ],
+    [
+      'with a condition being edited',
+      async ({ user, row }) => {
+        await user.click(row('heading'))
+        await user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+      },
+    ],
+    [
+      'on the Settings tab',
+      async ({ user }) => {
+        await user.click(screen.getByRole('tab', { name: 'Settings' }))
+      },
+    ],
+    [
+      'with the palette open',
+      async ({ user }) => {
+        await user.click(screen.getByRole('tab', { name: 'Components' }))
+      },
+    ],
+  ]
+
+  it.each(STATES)('names every button in the shell, %s', async (_label, drive) => {
+    const harness = setup()
+    await drive(harness)
+
+    const unnamed = Array.from(harness.view.container.querySelectorAll('button')).filter(
+      (button) => {
+        const name = button.getAttribute('aria-label') ?? button.textContent ?? ''
+        return name.trim() === ''
+      },
+    )
 
     // The study in docs/prior-art counted 30 unnamed buttons in the product
     // this project studied. Zero is the bar.
     expect(unnamed.map((b) => b.outerHTML)).toEqual([])
   })
 
-  it('labels every form control in the shell', () => {
-    const { view } = setup()
-    const controls = Array.from(view.container.querySelectorAll('input, select, textarea'))
+  it.each(STATES)('labels every form control in the shell, %s', async (_label, drive) => {
+    const harness = setup()
+    await drive(harness)
+
+    const controls = Array.from(harness.view.container.querySelectorAll('input, select, textarea'))
+    expect(controls.length, 'a state with no controls sweeps nothing').toBeGreaterThan(0)
 
     const unlabelled = controls.filter((control) => {
       if (control.getAttribute('aria-label')) return false
       const id = control.getAttribute('id')
-      if (id && view.container.querySelector(`label[for="${id}"]`)) return false
+      if (id && harness.view.container.querySelector(`label[for="${id}"]`)) return false
       return !control.closest('label')
     })
 
     expect(unlabelled.map((c) => c.outerHTML)).toEqual([])
+  })
+})
+
+/**
+ * Two kinds of row, two attribute names.
+ *
+ * `data-fs-tree-row` meant two different things in one DOM. On the canvas it is a
+ * repeater coordinate — `addresses[1]`, written by the renderer and part of the
+ * public `NodeAttributes` — and in this panel it was the key of a list row.
+ * Neither name was wrong on its own; having one name was.
+ *
+ * The collision is not theoretical. `[data-fs-tree-row][tabindex="0"]` is how the
+ * keyboard specs find the focused tree row, and `Canvas.test.tsx` reads
+ * `[data-fs-tree-row]` specifically to get the tree's projection rather than the
+ * canvas's — a distinction Trap 9 exists for. Both start matching canvas
+ * elements the moment a document holds a repeater, and neither would fail
+ * loudly: they would silently be measuring a longer list.
+ *
+ * The renderer keeps the name. It is the published one, it is in the type a kit
+ * spreads, and there "row" means an actual row of data. The panel's rows are
+ * rows of a list, which is a different word wearing the same spelling.
+ */
+describe('the tree rows and the canvas rows are told apart', () => {
+  /** A document with a repeater, so both attributes are in the DOM at once. */
+  function withRepeater(): FormDocument {
+    return {
+      ...makeDocument(),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'addressList',
+            dataKey: 'addresses',
+            type: 'Stack',
+            props: {},
+            schema: { type: 'array', validations: [] },
+            children: [
+              {
+                key: 'street',
+                dataKey: 'line1',
+                type: 'Field',
+                props: {},
+                schema: { type: 'string', validations: [] },
+              },
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  function renderBoth(): ReturnType<typeof render> {
+    const view = render(
+      <Designer
+        initialDocument={withRepeater()}
+        kit={kit}
+        rendererKit={rendererKit}
+        onChange={() => undefined}
+      />,
+    )
+    fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
+    return view
+  }
+
+  it('puts both attributes in the DOM, so this is not measuring an empty page', () => {
+    const view = renderBoth()
+
+    expect(view.container.querySelectorAll('[data-fs-tree-row]').length).toBeGreaterThan(0)
+    expect(view.container.querySelectorAll('[data-fs-row]').length).toBeGreaterThan(0)
+  })
+
+  it('never puts both on one element', () => {
+    const view = renderBoth()
+
+    const both = Array.from(view.container.querySelectorAll('[data-fs-row][data-fs-tree-row]'))
+    expect(both).toEqual([])
+  })
+
+  it('is never written by the designer, which owns only the tree one', () => {
+    /*
+     * The runtime check above needs a repeater in the fixture to see anything.
+     * This one needs nothing: `data-fs-row` belongs to the renderer and is part
+     * of the `NodeAttributes` a kit spreads, so the designer must never *write*
+     * one — a second author of the same attribute is how it came to mean two
+     * things in the first place.
+     *
+     * Reading one is a different matter and is now how the selection frame finds
+     * the row an author clicked in, so the check is for a JSX attribute rather
+     * than for any mention of the name.
+     */
+    // From the repository root: this file runs under jsdom, where
+    // `import.meta.url` is not a file URL and cannot be resolved against.
+    const src = process.cwd() + '/packages/designer/src/'
+    const offenders: string[] = []
+
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = dir + entry.name
+        if (entry.isDirectory()) {
+          walk(path + '/')
+          continue
+        }
+        if (!/\.tsx?$/.test(entry.name)) continue
+        // `data-fs-row` and nothing longer: `data-fs-tree-row` is this panel's.
+        if (/data-fs-row=\{/.test(readFileSync(path, 'utf8'))) offenders.push(entry.name)
+      }
+    }
+    walk(src)
+
+    expect(offenders).toEqual([])
+  })
+
+  it('gives the canvas a coordinate and the tree a key', () => {
+    const view = renderBoth()
+
+    // The canvas says which row of which answer. The tree says which node.
+    const canvas = Array.from(view.container.querySelectorAll('[data-fs-row]')).map((el) =>
+      el.getAttribute('data-fs-row'),
+    )
+    const tree = Array.from(view.container.querySelectorAll('[data-fs-tree-row]')).map((el) =>
+      el.getAttribute('data-fs-tree-row'),
+    )
+
+    expect(canvas).toContain('addresses[0]')
+    expect(tree).toEqual(['root', 'addressList', 'street'])
+    // The names cannot overlap: a coordinate always carries an index.
+    expect(tree.filter((key) => canvas.includes(key))).toEqual([])
   })
 })

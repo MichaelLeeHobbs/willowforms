@@ -15,7 +15,8 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import type { FormDocument, Kit, ValidationRule } from '@formsmith/core'
+import { autoValidateKeys } from '@formsmith/core'
+import type { ComponentNode, FormDocument, Kit, ValidationRule } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
@@ -70,8 +71,13 @@ function makeDocument(validations: ValidationRule[] = []): FormDocument {
       ],
     },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -104,7 +110,7 @@ function setup(validations: ValidationRule[] = []): Harness {
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const selectRow = async (key: string): Promise<void> => {
-    const row = view.container.querySelector<HTMLElement>(`[data-fs-row="${key}"]`)
+    const row = view.container.querySelector<HTMLElement>(`[data-fs-tree-row="${key}"]`)
     if (!row) throw new Error(`no tree row for ${key}`)
     await user.click(row)
   }
@@ -113,6 +119,11 @@ function setup(validations: ValidationRule[] = []): Harness {
   }
 
   return { user, view, latest: () => current, selectRow, openRules }
+}
+
+/** The schema on one field, read back out of the document. */
+function schemaOf(doc: FormDocument, key: string): ComponentNode['schema'] {
+  return doc.root.children?.find((c) => c.key === key)?.schema
 }
 
 /** The rules on the selected field, read back out of the document. */
@@ -202,6 +213,40 @@ describe('rules editor', () => {
     expect(screen.getByText(/holds no form data/)).toBeTruthy()
   })
 
+  it('writes "Validate while typing" onto the field it belongs to', async () => {
+    /*
+     * The one control on this tab with no test anywhere, and it decides which
+     * errors somebody sees before they press anything: `autoValidateKeys` reads
+     * it, the renderer asks that set which fields validate on every keystroke.
+     * It was written by this tab and read by nothing at all for the whole of
+     * the tab's life, which is the reason to pin both ends of it.
+     */
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    const box = screen.getByLabelText('Validate while typing')
+    expect(box).toHaveProperty('checked', false)
+
+    await user.click(box)
+
+    expect(schemaOf(latest(), 'email')?.autoValidate).toBe(true)
+    expect(autoValidateKeys(latest().root)).toEqual(new Set(['email']))
+  })
+
+  it('turns it off again, rather than only ever on', async () => {
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    const box = screen.getByLabelText('Validate while typing')
+    await user.click(box)
+    await user.click(box)
+
+    expect(schemaOf(latest(), 'email')?.autoValidate).toBe(false)
+    expect(autoValidateKeys(latest().root)).toEqual(new Set())
+  })
+
   it('adds a rule to the document', async () => {
     const { user, selectRow, openRules, latest } = setup()
 
@@ -230,8 +275,77 @@ describe('rules editor', () => {
     const input = screen.getByLabelText('Value')
     await user.clear(input)
     await user.type(input, '8')
+    // Committed on blur, because the box holds a draft: written straight
+    // through, clearing it would have stored `Number('') === 0`.
+    await user.tab()
 
     expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 8 }])
+  })
+
+  it('leaves the rule alone while the box is empty', async () => {
+    /*
+     * `Number('')` is `0`, so backspacing the last digit used to set
+     * `minLength` to zero -- a rule that passes everything, written by somebody
+     * in the middle of typing a different number.
+     */
+    const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
+
+    await selectRow('email')
+    await openRules()
+    await user.clear(screen.getByLabelText('Value'))
+
+    expect(screen.getByLabelText('Value')).toHaveProperty('value', '')
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 3 }])
+  })
+
+  it('puts the stored number back when an empty box is left', async () => {
+    const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
+
+    await selectRow('email')
+    await openRules()
+    await user.clear(screen.getByLabelText('Value'))
+    await user.tab()
+
+    expect(screen.getByLabelText('Value')).toHaveProperty('value', '3')
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 3 }])
+  })
+
+  it('edits a pattern, which is text rather than a number', async () => {
+    // The `pattern` editor had no test: it is the one parameter that is a
+    // string, so a row that reused the numeric input would have stored
+    // `Number('^a')` -- `NaN` -- and refused every value silently.
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Add a rule'), 'pattern')
+    const box = screen.getByLabelText(/regular expression|Value/i)
+    await user.clear(box)
+    // `fill`-style typing: userEvent reads `[` and `{` as keyboard descriptors,
+    // and a regular expression is mostly those.
+    fireEvent.change(box, { target: { value: '^[A-Z]{3}$' } })
+
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'pattern', value: '^[A-Z]{3}$' }])
+  })
+
+  it('edits a custom rule expression, and says it needs an evaluator', async () => {
+    /*
+     * The other untested editor, and the one whose failure is quietest: with no
+     * evaluator injected a `custom` rule passes, so a form that looks guarded is
+     * not. The panel says so beside the box, which is why the text matters as
+     * much as the write.
+     */
+    const { user, selectRow, openRules, latest } = setup()
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Add a rule'), 'custom')
+    // The box, not the hint beside it that also says "expression".
+    const box = screen.getByRole('textbox', { name: /expression/i })
+    await user.type(box, 'value.length > 2')
+
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'custom', expression: 'value.length > 2' }])
+    expect(screen.getByText(/evaluator/i)).toBeTruthy()
   })
 
   it('drops the message key rather than storing an empty string', async () => {

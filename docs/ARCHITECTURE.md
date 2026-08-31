@@ -42,10 +42,12 @@ written against concrete components, and every one of those call sites becomes a
 second kit is wanted. The abstraction is not speculative: the competitor this project studied ships
 three kits, and the registry is where its extensibility lives.
 
-`@formsmith/kit-html` is the evidence rather than the argument. Adding it touched four files outside its
-own package, all of them build plumbing: a project reference, a source alias, a stylesheet copy, and the
-lockfile. Nothing in `core`, `renderer`, or `designer` changed. The playground switches between the two
-kits at runtime on the same document.
+`@formsmith/kit-html` is the evidence rather than the argument. Adding it changed nothing in `core`,
+`renderer` or `designer`. It did touch build configuration -- a project reference, a source alias, a
+stylesheet copy, the lockfile -- along with the playground, which had to offer the choice, and one bug in
+the other kit that the new contract test exposed. "Four files, all build plumbing" is a figure an earlier
+draft of `00-product.md` retracted: it counted the build files and not the files. The playground switches
+between the two kits at runtime on the same document.
 
 `test/kit-contract.test.tsx` turns the contract into an executable spec that runs against every kit in
 the repo: a renderer for every palette entry and no orphans, `nodeProps` reaching the DOM, containers
@@ -83,11 +85,14 @@ type PropValue =
   | { kind: 'static'; value: JsonValue }
   | { kind: 'computed'; expression: string }
   | { kind: 'i18n'; key: string }
+  | { kind: 'condition'; condition: Condition }
 ```
 
 FormEngine's equivalent is a bag discriminated by the _presence_ of an optional `computeType` field.
-A tagged union means every consumer switches exhaustively, so adding a fourth binding mode is a compile
-error at every call site rather than a silent fallthrough.
+A tagged union means every consumer switches exhaustively, so adding a binding mode is a compile error
+at every call site rather than a silent fallthrough. That is not hypothetical: `condition` is the fourth
+member, added when `renderWhen` and rule guards needed a rule the engine can evaluate without a sandbox,
+and the compiler named every place that had to learn about it.
 
 ### Validation rules carry their parameters
 
@@ -139,13 +144,23 @@ reached straight into the MUI components on the canvas, overrode their padding, 
 outline so every field label sat on top of its own border. The canvas hosts the kit's components and
 must inherit nothing from the builder.
 
-There is exactly one deliberate exception, and it sets no visual property:
+There are two deliberate exceptions, and neither sets a visual property. Both are allowlisted in
+`designer.css.test.ts`, pinned to the exact declarations they may carry, so a third one cannot arrive
+without somebody saying so:
 
 ```css
 .fs-canvas__surface:not(.is-preview) [data-fs-key] {
   pointer-events: auto;
 }
+
+.fs-canvas__surface [data-fs-key] {
+  scrollbar-color: ...;
+  scrollbar-width: ...;
+}
 ```
+
+The first gives a kit component back the hit-testing the surface took from it. The second undoes the
+scrollbar styling the surface would otherwise push inward.
 
 MUI sets `pointer-events: none` on a disabled Button, and a kit is free to do the same on any disabled
 control. Without this rule that component cannot be clicked on the canvas, and the click silently

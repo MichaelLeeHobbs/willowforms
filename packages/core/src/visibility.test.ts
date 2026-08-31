@@ -78,6 +78,39 @@ describe('validateForm and visibility', () => {
     expect(validateForm(root, { visible: 'filled' })).toEqual({})
   })
 
+  it('validates nothing at all when the root it was given is itself hidden', () => {
+    /*
+     * `validateForm(stepNode, data)` is the documented way to validate one step
+     * of a wizard, and a `Step` carries a `renderWhen` comparing `context.step`
+     * against its own key. Hand it no context and the root is hidden, so the
+     * whole form reports zero errors and a submit sails through.
+     *
+     * That is the silent-permissive answer this library takes deliberately over
+     * a crash, and no test gave the root a condition of its own, so nothing
+     * pinned it. It is pinned here in both directions: hidden root, nothing
+     * checked; the same root with the context it wanted, everything checked.
+     */
+    const step: ComponentNode = {
+      key: 'who',
+      type: 'Step',
+      props: {},
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: 'who' },
+        },
+      },
+      children: [field('name')],
+    }
+
+    expect(validateForm(step, {}), 'a form nobody can see reports nothing').toEqual({})
+    expect(validateForm(step, {}, { context: { step: 'who' } })).toEqual({
+      name: 'This field is required.',
+    })
+  })
+
   it('starts validating a field once its condition turns true', () => {
     const conditional: ComponentNode = {
       key: 'root',
@@ -91,6 +124,71 @@ describe('validateForm and visibility', () => {
     expect(validateForm(conditional, { other: 'yes' }, { evaluate })['why']).toBe(
       'This field is required.',
     )
+  })
+})
+
+describe('what validateForm hands down to a condition', () => {
+  it('forwards the context, so a condition can read what the host knows', () => {
+    /*
+     * Verified only through outcomes before: `options.context` reaching a
+     * `renderWhen` is what makes a per-role field validate or not, and a walk
+     * that dropped it would hide every context-gated field and report nothing.
+     */
+    const gated: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'salary',
+          type: 'TextField',
+          props: {},
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'user.role' },
+              right: { kind: 'literal', value: 'admin' },
+            },
+          },
+        },
+      ],
+    }
+
+    expect(validateForm(gated, {})).toEqual({})
+    expect(validateForm(gated, {}, { context: { user: { role: 'guest' } } })).toEqual({})
+    expect(validateForm(gated, {}, { context: { user: { role: 'admin' } } })).toEqual({
+      salary: 'This field is required.',
+    })
+  })
+
+  it('hides a container by a condition, not only by a static false', () => {
+    /*
+     * The hidden-container case used a `static` false, which is the one shape
+     * that needs no evaluation at all -- so the walk could have skipped reading
+     * a container's condition entirely and every test here stayed green.
+     */
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'group',
+          type: 'Stack',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'wanted' } },
+          },
+          children: [field('buried')],
+        },
+      ],
+    }
+
+    expect(validateForm(root, {})).toEqual({})
+    expect(validateForm(root, { wanted: true })).toEqual({ buried: 'This field is required.' })
   })
 })
 
@@ -134,5 +232,87 @@ describe('a structured condition needs no sandbox', () => {
     const broken = { op: 'nonsense' } as unknown as Condition
     expect(() => isVisible(node(broken), {})).not.toThrow()
     expect(isVisible(node(broken), {})).toBe(false)
+  })
+})
+
+/**
+ * A `renderWhen` whose kind this code does not recognise.
+ *
+ * TypeScript permits the missing tail return because `PropValue` is a closed
+ * union — and a document is data, so a one-character typo reaches it. `kind:
+ * 'conditon'` fell off the switch and returned `undefined`, which every caller
+ * reads as *hidden*: the node and its whole subtree left the DOM and left
+ * `validateForm`, so a required answer quietly became advisory on the server.
+ *
+ * Shown is the safe reading, and it is the reading this function already gives
+ * a kind that is not a condition: `i18n` returns true with the comment that a
+ * translation key expresses no condition. An unrecognised kind expresses none
+ * either. Being shown when you should not be is a question the user can see;
+ * being unvalidated is not.
+ *
+ * This does not contradict `evaluateCondition`, which is false for an
+ * unreadable condition. That one is asked whether a condition *holds*, and an
+ * unreadable one does not hold. This one is asked whether a rule was expressed.
+ */
+describe('a renderWhen this code cannot read', () => {
+  const typo = {
+    kind: 'conditon',
+    condition: { op: 'truthy', value: { kind: 'literal', value: 1 } },
+  }
+
+  it('shows the component rather than dropping it silently', () => {
+    expect(isVisible(field('a', typo as unknown as ComponentNode['renderWhen']), {})).toBe(true)
+  })
+
+  it('never answers undefined, which is what made this invisible', () => {
+    // The failure was not "the wrong boolean", it was "not a boolean at all".
+    expect(typeof isVisible(field('a', typo as unknown as ComponentNode['renderWhen']), {})).toBe(
+      'boolean',
+    )
+  })
+
+  it('keeps the field in validation, which is the point', () => {
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [field('a', typo as unknown as ComponentNode['renderWhen'])],
+    }
+
+    // Hidden meant unvalidated. A required answer must not stop being required
+    // because somebody mistyped a tag.
+    expect(Object.keys(validateForm(root, {}))).toEqual(['a'])
+  })
+})
+
+/**
+ * A host's evaluator is arbitrary JavaScript, and it can throw.
+ *
+ * `matchesPattern` two files over catches for exactly this, and its comment
+ * records the incident: an uncaught throw "took Preview down in the browser and
+ * surfaced as an unhandled 500 on the server". This called `options.evaluate`
+ * with nothing around it, so an author's half-written expression did the same
+ * thing from a different place.
+ */
+describe('an evaluator that throws', () => {
+  const boom: Evaluator = () => {
+    throw new Error('half-written expression')
+  }
+
+  const computed = (): ComponentNode => field('a', { kind: 'computed', expression: 'data.x.y' })
+
+  it('does not take the caller down', () => {
+    expect(() => isVisible(computed(), {}, { evaluate: boom })).not.toThrow()
+  })
+
+  it('reads as hidden, which is what no answer already means here', () => {
+    // The same answer a missing evaluator gets, one case up: this function
+    // agrees with what the renderer draws, and the renderer draws nothing.
+    expect(isVisible(computed(), {}, { evaluate: boom })).toBe(false)
+  })
+
+  it('still uses an evaluator that works', () => {
+    const evaluate: Evaluator = () => true
+    expect(isVisible(computed(), {}, { evaluate })).toBe(true)
   })
 })

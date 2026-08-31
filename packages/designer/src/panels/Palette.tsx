@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { ComponentDef, Kit, PaletteGroup } from '@formsmith/core'
 import { groupKit } from '@formsmith/core'
@@ -21,10 +21,33 @@ export interface PaletteProps {
   onAdd: (def: ComponentDef) => void
   /** Press and move. The drag controller decides which of the two happened. */
   onDragStart: (def: ComponentDef, event: ReactPointerEvent) => void
+  /**
+   * Whether the click now arriving is really the tail of a drag.
+   *
+   * The controller decides which of the two a release was and raises a flag;
+   * the canvas and the tree both ask. This did not, so a drag begun on a
+   * palette entry and abandoned back over it added a component anyway — which
+   * is exactly what dragging out and changing your mind looks like.
+   */
+  consumeClick: () => boolean
+  /**
+   * The search text, held by the pane rather than here.
+   *
+   * The pane unmounts this panel when another tab is chosen, so a query kept in
+   * local state disappeared the moment somebody looked at the tree.
+   */
+  query: string
+  onQuery: (next: string) => void
 }
 
-export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
-  const [query, setQuery] = useState('')
+export function Palette({
+  kit,
+  query,
+  onQuery,
+  onAdd,
+  onDragStart,
+  consumeClick,
+}: PaletteProps): ReactNode {
   const groups = useMemo(() => groupKit(kit), [kit])
 
   const filtered = useMemo(() => {
@@ -33,7 +56,12 @@ export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
     return groups
       .map((g) => ({
         ...g,
-        components: g.components.filter((c) => c.label.toLowerCase().includes(q)),
+        components: g.components.filter(
+          // The type as well as the label. A document names components by type,
+          // so somebody reading one and looking for `RadioGroup` in the palette
+          // searched for the string the document uses and found nothing.
+          (c) => c.label.toLowerCase().includes(q) || c.type.toLowerCase().includes(q),
+        ),
       }))
       .filter((g) => g.components.length > 0)
   }, [groups, query])
@@ -53,12 +81,21 @@ export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
           type="search"
           placeholder="Search components"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => onQuery(e.target.value)}
         />
       </div>
 
       {filtered.length === 0 ? (
-        <p className="fs-empty">No components match “{query}”.</p>
+        /*
+         * Two different empty states. A kit with no components at all is a
+         * broken kit, and telling its author that nothing matches the empty
+         * search sends them looking at the search box.
+         */
+        <p className="fs-empty">
+          {groups.length === 0
+            ? 'This kit declares no components.'
+            : 'No components match “' + query + '”.'}
+        </p>
       ) : (
         filtered.map((group) => (
           <div key={group.group} className="fs-palette__group">
@@ -69,8 +106,20 @@ export function Palette({ kit, onAdd, onDragStart }: PaletteProps): ReactNode {
                   key={def.type}
                   type="button"
                   className="fs-palette__item"
-                  onClick={() => onAdd(def)}
-                  onPointerDown={(event) => onDragStart(def, event)}
+                  onClick={() => {
+                    if (consumeClick()) return
+                    onAdd(def)
+                  }}
+                  onPointerDown={(event) => {
+                    /*
+                     * The primary button only. Any button armed a drag, so a
+                     * right-click on a palette entry started one -- the label
+                     * followed the pointer while the context menu was open, and
+                     * the release that dismissed the menu dropped a component.
+                     */
+                    if (event.button !== 0) return
+                    onDragStart(def, event)
+                  }}
                   title={'Add ' + def.label + ', or drag it onto the canvas'}
                 >
                   {/*

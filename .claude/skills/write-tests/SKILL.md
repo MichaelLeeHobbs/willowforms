@@ -168,11 +168,17 @@ partial edit and an undo all survive.
 
 ## Trap 11 — a fixture that collapses the distinction under test
 
-Every repeater fixture in the repository sets `key` and `dataKey` to the same string. So the
-row-addressing design and its opposite produce **byte-identical output across all 911 unit tests
+Every repeater fixture in the repository set `key` and `dataKey` to the same string. So the
+row-addressing design and its opposite produced **byte-identical output across all 911 unit tests
 and 65 end-to-end tests** — a patched build of the alternative design was run and the whole suite
 stayed green. The suite could not have caught the defect that prompted the question: a repeater
-whose two names differ silently discards every keystroke in its rows.
+whose two names differ silently discarded every keystroke in its rows.
+
+Fixed on 2026-08-30, and how it was fixed is the lesson: the design change was three tokens, and
+the fixture that can see it took longer to write. `rows.test.ts`, `renderer.test.tsx` and
+`repeater.spec.ts` each now carry a repeater named `addressList` holding `addresses`, with a
+`street` field holding `line1`. Keep it that way. A new repeater fixture whose two names match adds
+coverage of everything except the thing that broke.
 
 This is not Trap 5. The fixture is one the product builds readily — the Data key editor is
 offered on any node with a schema, and a `Repeater` has one. It is producible, it is realistic,

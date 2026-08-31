@@ -19,10 +19,12 @@ filling the form in are not the same person.
 which means most deployments would ship it.
 
 ```ts
-type Evaluator = (expression: string, data: FormData) => JsonValue
+type Evaluator = (expression: string, data: FormData, context?: FormContext) => JsonValue
 ```
 
-That signature is the whole contract. Everything that runs author code — computed properties, `custom`
+That signature is the whole contract. The third argument is what the host knows and does not submit --
+the signed-in user, the step, the tenant -- and it is passed separately from `data` on purpose: an
+expression can read it, and nothing can submit it. Everything that runs author code — computed properties, `custom`
 rules, rule guards, and the actions below — goes through it.
 
 ### What a host must supply
@@ -198,20 +200,25 @@ flows, the blockers sort into four groups, and the action model touches none of 
   the host owns and supplies, and which a condition can read because it is JSON that survives a trip to
   the server. What cannot survive that trip stays in the kit component and nothing authored may depend on
   it. See [12-api.md](12-api.md#state-that-is-not-an-answer).
-- **Steps.** There is no Step component, so there is no per-step validation scope, no branch-to-question,
-  and no progress. That is the defining feature of onboarding and surveys.
-  See [03-components.md](03-components.md).
-- **Repeated scope.** Already known and already blocked. A Remove button inside row three has no way to
-  say "row three", which is a document-model gap rather than an action gap.
-  See [01-document-model.md](01-document-model.md#datakey).
+- **Steps.** Built. A `Step` component in both kits, shown when `context.step` names it, and
+  `validateAcross` checks every step's fields rather than only the one on screen. Branch-to-question and
+  a progress indicator are still missing. See [03-components.md](03-components.md).
+- **Repeated scope.** Built. A row coordinate is formed at the boundary, `Operand.ref` carries a scope
+  discriminant, and `applyChange` places a write into the right row. What is still missing for actions is
+  narrower than it was: a Remove button inside row three needs to _name_ row three, and a row is
+  addressed rather than identified. See [03-components.md](03-components.md#repeated-scope).
 - **Timers.** No scheduled trigger, so no cooldown, no autosave, no session warning.
 
-**And the sandbox is already required for something more common than actions.** `renderWhen` is a
-`PropValue`, so its only conditional form is `computed`, which needs an evaluator, and it has no
-authoring UI. Conditional visibility — the most common dynamic behaviour a form has — today needs a
-sandbox _and_ hand-edited JSON. A closed structured condition would do more for "most forms need no
-JavaScript" than this entire document. See
-[01-document-model.md](01-document-model.md#conditions).
+**The argument that used to close this section has been answered, and it is worth saying how.** It read:
+`renderWhen`'s only conditional form is `computed`, which needs an evaluator and has no authoring UI, so
+conditional visibility — the most common dynamic behaviour a form has — needs a sandbox _and_ hand-edited
+JSON, and a closed structured condition would do more for "most forms need no JavaScript" than this
+entire document.
+
+That is what happened. `Condition` is a fourth `PropValue` kind, evaluated by core with no sandbox, and
+the Properties panel draws it as a picker. So the case for actions no longer rests on conditional
+visibility being unreachable without one; it rests on what an action does that a condition cannot, which
+is change something. See [01-document-model.md](01-document-model.md#conditions).
 
 ## Authoring
 

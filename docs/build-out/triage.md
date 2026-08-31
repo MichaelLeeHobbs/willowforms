@@ -12,4 +12,181 @@ wrong; if it is merely inconvenient, fix it.
 
 Add an entry as: `area / file:line` — the finding in one clause, then the reason in one line.
 
-_Nothing yet._
+## Catastrophic backtracking is bounded, not closed — `validation.ts` pattern rule
+
+**HIGH, area 2.** An author's `pattern` is compiled and run on the server against text an attacker
+chose. Confirmed by execution, which the report had marked BLOCKED: `^(a+)+$` against 31 characters
+hung a test run for five minutes.
+
+**Fixed:** the input is capped at 4096 characters, and a pattern with an unbounded quantifier inside
+another unbounded one — `(a+)+`, `(a*)*`, `((a+)*)+` — is refused rather than run. Refused means the
+rule _fails_, because a pattern that cannot be trusted has not been satisfied.
+
+**Not fixed, and this is the entry:** `(a|a)*` is exponential too and is not caught. No cheap syntactic
+rule separates a dangerous alternation from `(ab|cd)+`, and refusing every quantified alternation would
+reject patterns real forms are full of. Neither is there a timeout: Node cannot interrupt a synchronous
+match, so bounding the _time_ means a worker thread or a linear-time engine such as RE2 — a runtime
+dependency that does not work in the browser, where this same code runs.
+
+That is a dependency decision with a cross-platform cost, and it belongs to whoever owns the project
+rather than to a remediation run. The mitigation above removes the shape the report demonstrated and
+every polynomial case; what remains is an alternation an author has to write deliberately.
+
+## Rows are keyed by index, and browser-owned state follows the index — `renderer/index.tsx`
+
+**HIGH, area 3.** React reuses the component instance at each index and unmounts only the last, so
+deleting row 0 leaves the instance that drew row 0 drawing row 1. Anything a kit derives from `value`
+follows the data and is fine; anything the browser owns does not. The vehicle the review named is
+`FileUploadNode`, which renders `type="file"` with no `value` — the input still shows `a.pdf` while the
+data holds `b.pdf`. Focus, text selection and IME composition ride along.
+
+**Not fixed, and this is the entry.** There is no better key available, and that is a consequence of a
+decision rather than an oversight. A React key has to be stable for the row's lifetime, and both
+candidates fail: a generated row id would be a non-answer living inside `data` and in the submitted
+payload, which `12-api.md` refuses by name and the row-addressing decision rejected explicitly; and the
+row object's own identity changes every time that row is edited, so keying on it would remount the row
+on every keystroke.
+
+**What was done:** the comment defending the choice stated the opposite of what React does — that index
+keys "remount rows below a deletion" — which is why nobody had noticed. It now says what actually
+happens and what it costs.
+
+**What would close it:** a row identity that lives outside `data`, held by the renderer for the lifetime
+of the mount. That is a real design, it is not small, and it reopens a decision that was settled with
+reasons. It belongs to whoever owns the project, not to a remediation run.
+
+## `JsonValue` admits `NaN` and `Infinity` — `types.ts:9`, area 1
+
+**LOW.** `JSON.stringify({a: NaN})` is `{"a": null}`, so a context value the browser compared as a
+number arrives at the server as `null` and the two disagree about the same condition. TypeScript cannot
+express "a number that is finite", so the type cannot carry the rule. What could be done was: `order`
+now answers "unordered" for `NaN` instead of subtracting, so a comparison against one is false rather
+than accidentally true, and two infinities compare equal. The round trip stays the host's problem, and
+`FormContext`'s docblock already says the values have to survive `JSON.stringify`.
+
+## `ValidationRule['when']` admits `i18n` and `computed` — `types.ts:120-129`, area 1
+
+**NOTE.** A guard is a boolean and `PropValue` has four members, two of which do not denote one. Narrowing
+the field to `static | computed | condition` is a compile-time improvement only: `when` arrives from a
+pasted document, so `guardPasses` still has to be total and still has to choose an answer for a kind it
+does not know. The complaint that the two consumers "chose opposite polarities" was the real defect and it
+is not one -- both answer `true`, both meaning "no guard was expressed" -- but only one of them said so.
+Now both do.
+
+## `pattern` is unanchored — `validation.ts:183`, area 2
+
+**LOW.** It matches JSON Schema, not `<input pattern>`, so `\d{5}` accepts `abc12345` and an author
+copying from an HTML tutorial gets a weaker rule than the one they copied. Anchoring it would make the
+engine disagree with the schema the same document exports, and a server validating a submission against
+that export would then accept what the form refused -- silently, which is the failure mode this project
+is organised against. Documented instead, in `08-validation.md` where an author reads it and beside the
+code that does it.
+
+## The MUI helper-text spacer is already a non-breaking space — `renderers.tsx:52-55`, area 3
+
+**LOW, refuted.** The finding says the comment claims U+00A0 while the literal is U+0020. The file holds
+`M-BM- ` on that line, which is U+00A0 in UTF-8: the review read the rendered character rather than the
+bytes. Nothing to change.
+
+## A "circular" Progress in the HTML kit is a disc, not an arc — `kit-html.css:447-451`, area 4
+
+**NOTE.** MUI draws a real `CircularProgress`; the HTML kit draws a round element with the same fill,
+which reads as a pie rather than a ring. Making them match means an SVG arc with its own animation, its
+own reduced-motion behaviour and its own determinate geometry — a component, not a repair, and the kit's
+stated job is to prove a kit is a package rather than to match MUI's drawing. The two agree on the
+semantics that matter and the contract checks: `role="progressbar"`, the value attributes, and the
+absence of them when indeterminate.
+
+## `FormData` and `FormContext` cannot be told apart in both directions — `types.ts:186,207`, area 1
+
+**LOW, partly fixed.** `FormContext` is `Readonly` now, so handing a context to something that wants data
+is a type error — the direction where the host's own facts would end up in the payload. The opposite
+direction still compiles, and closing it needs a nominal brand, which would make every host cast an
+object literal to call `validateForm`. A library that is unpleasant to call is a library people wrap,
+and a wrapper is where the two get swapped for real.
+
+## The canvas zone should not bounds-check a release — `Canvas.tsx:315-326`, area 6
+
+**NOTE.** The finding is that `resolveRelease` never checks the release point is inside the surface. I
+wrote the check, and it broke `dragging a component on the canvas moves it`: the canvas scrolls, so a
+drop onto the last component of a long form is released below the surface's visible box while sitting
+squarely inside the form's own geometry. The client box is the wrong question, and the right one --
+"is this point inside any container?" -- is what `resolveDrop` already answers by returning nothing.
+The guard exists one layer down. The fabricated `dragId` of `0` in the same finding was real and is
+fixed: it is `-1` now, a value no drag can be holding.
+
+## Perf notes with no defect behind them — areas 5 and 6
+
+**NOTE, five findings.** `groupKit` is O(components × groups) and `findLanguage` is linear, both over
+lists of at most a few dozen entries; `indexKit(kit)` allocates a Map per pointer move in `Tree.tsx`, on
+a kit with 27 components; `measureIn` reads 2N rectangles where N+1 would do, per drag rather than per
+move; and `DocumentDialog` re-serialises the document on every keystroke in a textarea nobody types a
+whole document into. Each is a real observation and none of them is a defect: the numbers are small, the
+work is not on a frame budget, and the fix in every case is a memo or a shared instance that has to stay
+correct across an edit. Worth doing on evidence -- a profile, a form somebody says is slow -- and not
+before.
+
+## `LeftPane` re-renders `Tree` when `api` changes — `LeftPane.tsx:55-65`, area 5
+
+**NOTE, no longer true.** The finding says `api` is a new object every render. `useDesigner` memoises it
+now, so it changes when the document, the selection or one of its callbacks does -- which is when the
+tree has something new to draw.
+
+## Two glyphs hardcode `opacity` — `Icon.tsx:111,166`, area 5
+
+**NOTE.** In forced-colors mode the browser replaces the colour and leaves the opacity, so those two
+glyphs stay faint where the rest go solid. The fix is an SVG attribute that cannot be media-queried from
+this file, so it means either drawing the two glyphs differently or moving icon styling into
+`designer.css` and giving every glyph a class -- a change to how icons are drawn, made for a mode
+neither kit has been tested in. It is worth doing as part of a forced-colors pass, with something to
+check the result against.
+
+## The ResizeObserver stub counts; no test consumes it yet — `setup.ts:22`, area 10
+
+**NOTE, half fixed.** The stub records constructions, observations and disconnects now, and holds the
+tally on `globalThis` because the setup file runs once per test file while the stub it installs is
+global -- counters in module scope would be incremented by whichever file ran first and read as zero
+everywhere else, which is the silent pass the counting was added to prevent.
+
+I could not make the leak test itself trustworthy in the time it deserved. The counters are cross-file
+state, testing-library's `cleanup` disconnects observers between tests, and the reading a test gets
+therefore depends on what ran before it in the same worker -- I had a version passing at the end of one
+file and failing at the top of it, which is a test that reports the order of the suite rather than the
+behaviour of the code. The instrument is in place for a test written against a mounted-and-unmounted
+component in isolation.
+
+## `scrollIntoView` is stubbed and nothing asserts it — `setup.ts:32`, area 10
+
+**LOW, no longer applicable.** The selection layer does not call it any more: it scrolls the canvas by
+its own offsets, because `scrollIntoView` walks every scrollable ancestor and dragged the host's page
+around whenever somebody clicked a tree row. The stub stays because `userEvent` calls it while typing
+and a kit is free to; the docblock says so now.
+
+## axe's `target-size` and `scrollable-region-focusable` are covered nowhere — `a11y.test.tsx:34`, area 10
+
+**NOTE.** Both are disabled for want of layout, like `color-contrast`, and only contrast has a
+compensating check. Covering them means measuring hit areas and scroll containers in a real browser --
+a Playwright axe pass, which is a piece of infrastructure rather than a test, and worth adding as one
+deliberate step rather than as a corner of a stage-5 sweep.
+
+## Two documented checks that were already true — areas 8 and 10
+
+**NOTE, no longer applicable.** `vite.config.ts:9` (no `strictPort`) was fixed in item 22, when the same
+hazard turned up from the Playwright side. `designer.css.test.ts:36` (`declarationsFor` locating a block
+by substring) was fixed in item 26, where a duplicated selector made the substring reader lose half a
+rule; it now walks every block a selector has and checks the prelude is the whole selector rather than
+part of one.
+
+## The remaining tail of designer test gaps — area 10
+
+**LOW.** The review's last finding lists a dozen small coverage gaps. Seven are covered now: `modesFor`'s
+conditional arm, `describeMove`'s four arms, the `pattern` and `custom` rule editors, the raw box
+following a structured control, `pointercancel`, the drag label's source, an unknown icon name and the
+icon's height.
+
+The rest are left: the one-step viewport switcher case in `Canvas.test.tsx`, `aria-labelledby` as an
+accepted label in `Tree.test.tsx`'s sweep, `download` and `onFile` in `DocumentDialog.test.tsx`, and
+hook-level tests for five `DesignerApi` writers that are covered through the panels that call them.
+Each is a real gap and none of them is a defect: they are tests to write when something touches those
+paths, which is when a test written for them will be checked against a change rather than against the
+code it was copied from.

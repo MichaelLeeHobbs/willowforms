@@ -20,7 +20,16 @@ test('typing a label is one undo step, not one per keystroke', async ({ designer
   await designer.select('message')
   const before = await designer.node('message').locator('label').first().textContent()
 
-  await designer.page.locator('#fs-prop-label').fill('Tell us more')
+  /*
+   * Typed one character at a time, because a run of keystrokes is the thing
+   * under test. This used `fill()`, which sets the whole value in a single
+   * event: the label changed once, so one undo took it back whether or not
+   * anything coalesced, and a build that pushed an entry per character passed.
+   */
+  const label = designer.page.locator('#fs-prop-label')
+  await label.click()
+  await label.press('ControlOrMeta+a')
+  await label.pressSequentially('Tell us more')
   await expect(designer.node('message').locator('label').first()).toHaveText(/Tell us more/)
 
   await designer.undo()
@@ -58,7 +67,17 @@ test('a rule authored in the panel fails a real submit with its own message', as
 
   await designer.page.getByLabel('Add a rule').selectOption('minLength')
   await designer.page.getByLabel('Value').fill('12')
-  await designer.page.getByLabel('Message').last().fill('Needs at least 12 characters.')
+  /*
+   * Scoped to the rule, not `.last()`. Disambiguating by DOM order means a
+   * panel that grows another Message field, or one that reorders its rows,
+   * silently fills a different box -- and the assertion below would then be
+   * about the default message rather than the authored one.
+   */
+  await designer.page
+    .locator('.fs-rule')
+    .filter({ hasText: 'Minimum length' })
+    .getByLabel('Message')
+    .fill('Needs at least 12 characters.')
 
   await designer.page.getByRole('button', { name: 'Preview' }).click()
   await designer.node('email').locator('input').fill('a@b.co')
@@ -117,7 +136,16 @@ test('adding a language leaves the document valid', async ({ designer }) => {
   await designer.page.getByRole('button', { name: 'Add language' }).click()
 
   const doc = await designer.document()
-  // Comparing a tag against a bare code used to rewrite this silently.
+  /*
+   * The language landed, under the name that was typed. The only assertion here
+   * was the one below, on a value the sample already ships: the button could
+   * have done nothing at all and this test would have said so approvingly.
+   */
+  expect(doc.languages.map((language) => language.code)).toContain('fr')
+  expect(doc.languages.find((language) => language.code === 'fr')?.name).toBe('French')
+
+  // And it did not become the default. Comparing a tag against a bare code used
+  // to rewrite this silently.
   expect(doc.defaultLanguage).toBe('en-US')
 
   // And the document it produced still passes its own import gate.
@@ -129,11 +157,25 @@ test('adding a language leaves the document valid', async ({ designer }) => {
 test('a computed property renders nothing rather than throwing', async ({ designer }) => {
   await designer.select('email')
   await designer.page.getByLabel('Helper text binding').selectOption('computed')
-  // Exact: the binding picker's label also starts with "Helper text".
-  await designer.page.getByLabel('Helper text', { exact: true }).fill("'hi ' + data.firstName")
+  /*
+   * "Helper text expression". The box had no accessible name of its own — the
+   * only label on the row points at the mode select — so it announced itself as
+   * nothing, and the accessibility suite audits a component at rest, which is a
+   * state this box is not in.
+   */
+  await designer.page
+    .getByLabel('Helper text expression', { exact: true })
+    .fill("'hi ' + data.firstName")
 
-  // The playground injects no evaluator, so this resolves to nothing and the
-  // field keeps rendering.
+  /*
+   * The playground injects no evaluator, so this resolves to nothing and the
+   * field keeps rendering. "Nothing" is the part this used to leave out: a
+   * helper text of `null` renders as an empty message, and the expression's own
+   * text must not appear on the canvas -- printing the source of an unevaluated
+   * expression to the person filling in the form is the other way this fails.
+   */
   await expect(designer.node('email')).toBeVisible()
   await expect(designer.page.locator('.fs-shell')).toBeVisible()
+  await expect(designer.node('email')).not.toContainText('data.firstName')
+  await expect(designer.node('email')).not.toContainText('null')
 })

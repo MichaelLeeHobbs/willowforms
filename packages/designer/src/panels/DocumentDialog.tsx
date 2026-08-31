@@ -17,7 +17,14 @@ import type { ReactNode } from 'react'
 import type { FormDocument } from '@formsmith/core'
 import { toJsonSchema, unexportableRules, validateDocument } from '@formsmith/core'
 
+import { Tabs } from './Tabs.js'
+
 type View = 'document' | 'schema'
+
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'document', label: 'Document' },
+  { id: 'schema', label: 'JSON Schema' },
+]
 
 export interface DocumentDialogProps {
   open: boolean
@@ -135,123 +142,138 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
 
   return (
     <>
-      <div className="fs-dialog__head">
-        <div className="fs-tabs" role="tablist" aria-label="JSON view">
-          <ViewTab id="document" label="Document" view={view} onSelect={setView} />
-          <ViewTab id="schema" label="JSON Schema" view={view} onSelect={setView} />
-        </div>
-
-        <button type="button" className="fs-dialog__close" onClick={onClose} aria-label="Close">
-          &times;
-        </button>
-      </div>
-
-      {view === 'document' ? (
-        <>
-          <label className="fs-visually-hidden" htmlFor="fs-document-json">
-            Form document JSON
-          </label>
-          <textarea
-            id="fs-document-json"
-            className="fs-dialog__editor"
-            spellCheck={false}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-
-          {errors.length > 0 && (
-            <ul className="fs-dialog__errors" role="alert">
-              {errors.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          )}
-
-          <div className="fs-dialog__actions">
-            <button type="button" className="is-primary" onClick={apply}>
-              Apply
-            </button>
-            <button type="button" onClick={() => copy(documentJson, 'The document')}>
-              Copy
-            </button>
-            <button type="button" onClick={() => download(documentJson, slug + '.json')}>
-              Download
-            </button>
-            <label className="fs-dialog__file">
-              Import file
-              <input
-                type="file"
-                accept="application/json,.json"
-                className="fs-visually-hidden"
-                onChange={(e) => onFile(e.target.files?.[0])}
-              />
+      {/*
+       * `Tabs`, not a second implementation of it.
+       *
+       * This was a hand-rolled tablist with a roving `tabIndex`, no arrow-key
+       * handler, no `aria-controls` and no tabpanel — and a roving tabindex puts
+       * exactly one tab in the tab order, so the JSON Schema view could not be
+       * reached from the keyboard at all. `Tabs.tsx`'s own comment says two
+       * copies was the mistake it existed to avoid; this was the second copy.
+       *
+       * The close button goes in `aside` because it cannot go in the strip: the
+       * strip is the `tablist` and may hold nothing but tabs. Wanting it on that
+       * row is what the second implementation was for.
+       */}
+      <Tabs
+        label="JSON view"
+        tabs={VIEWS}
+        active={view}
+        onSelect={setView}
+        aside={
+          <button type="button" className="fs-dialog__close" onClick={onClose} aria-label="Close">
+            &times;
+          </button>
+        }
+      >
+        {view === 'document' ? (
+          <>
+            <label className="fs-visually-hidden" htmlFor="fs-document-json">
+              Form document JSON
             </label>
-            <button type="button" onClick={() => setDraft(documentJson)}>
-              Revert
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <label className="fs-visually-hidden" htmlFor="fs-schema-json">
-            JSON Schema
-          </label>
-          <textarea
-            id="fs-schema-json"
-            className="fs-dialog__editor"
-            spellCheck={false}
-            readOnly
-            value={schemaJson}
-          />
+            <textarea
+              id="fs-document-json"
+              className="fs-dialog__editor"
+              spellCheck={false}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
 
-          <p className="fs-dialog__note">
-            An export, never storage. JSON Schema cannot express layout or nesting, so this
-            describes the submitted data and nothing about how the form looks.
-            {lossy.length > 0 && (
-              <> No equivalent here for {lossy.map((l) => l.rule + ' on ' + l.key).join(', ')}.</>
+            {errors.length > 0 && (
+              <ul className="fs-dialog__errors" role="alert">
+                {/*
+                 * Keyed by position as well as text. `validateDocument` reports
+                 * per node, so two components can produce the same sentence --
+                 * "root.children[0] is not a component node" for a document with
+                 * two of them -- and React kept one row and dropped the other,
+                 * so the count on screen disagreed with the list.
+                 */}
+                {errors.map((message, index) => (
+                  <li key={String(index) + ':' + message}>{message}</li>
+                ))}
+              </ul>
             )}
+
+            <div className="fs-dialog__actions">
+              <button type="button" className="is-primary" onClick={apply}>
+                Apply
+              </button>
+              {/*
+               * The draft, not the stored document. These serialised `doc`, so
+               * after editing the textarea both handed over the version from
+               * before the edit -- silently, with the edit still on screen. Copy
+               * and Download are about what is in front of you; Revert is the
+               * button that means "give me the stored one back".
+               */}
+              <button type="button" onClick={() => copy(draft, 'The document')}>
+                Copy
+              </button>
+              <button type="button" onClick={() => download(draft, slug + '.json')}>
+                Download
+              </button>
+              <label className="fs-dialog__file">
+                Import file
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="fs-visually-hidden"
+                  onChange={(e) => {
+                    onFile(e.target.files?.[0])
+                    /*
+                     * Cleared, so importing the same file twice does something
+                     * the second time. A file input fires nothing when the
+                     * chosen file has not changed, so re-importing after
+                     * editing it on disk silently did nothing at all — no note,
+                     * no error, just a button that had stopped working.
+                     */
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+              <button type="button" onClick={() => setDraft(documentJson)}>
+                Revert
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="fs-visually-hidden" htmlFor="fs-schema-json">
+              JSON Schema
+            </label>
+            <textarea
+              id="fs-schema-json"
+              className="fs-dialog__editor"
+              spellCheck={false}
+              readOnly
+              value={schemaJson}
+            />
+
+            <p className="fs-dialog__note">
+              An export, never storage. JSON Schema cannot express layout or nesting, so this
+              describes the submitted data and nothing about how the form looks.
+              {lossy.length > 0 && (
+                <> No equivalent here for {lossy.map((l) => l.rule + ' on ' + l.key).join(', ')}.</>
+              )}
+            </p>
+
+            <div className="fs-dialog__actions">
+              <button type="button" onClick={() => copy(schemaJson, 'The schema')}>
+                Copy
+              </button>
+              <button type="button" onClick={() => download(schemaJson, slug + '.schema.json')}>
+                Download
+              </button>
+            </div>
+          </>
+        )}
+
+        {note && (
+          <p className="fs-dialog__note" role="status">
+            {note}
           </p>
-
-          <div className="fs-dialog__actions">
-            <button type="button" onClick={() => copy(schemaJson, 'The schema')}>
-              Copy
-            </button>
-            <button type="button" onClick={() => download(schemaJson, slug + '.schema.json')}>
-              Download
-            </button>
-          </div>
-        </>
-      )}
-
-      {note && (
-        <p className="fs-dialog__note" role="status">
-          {note}
-        </p>
-      )}
+        )}
+      </Tabs>
     </>
-  )
-}
-
-interface ViewTabProps {
-  id: View
-  label: string
-  view: View
-  onSelect: (view: View) => void
-}
-
-function ViewTab({ id, label, view, onSelect }: ViewTabProps): ReactNode {
-  const active = view === id
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      tabIndex={active ? 0 : -1}
-      className={'fs-tabs__tab' + (active ? ' is-active' : '')}
-      onClick={() => onSelect(id)}
-    >
-      {label}
-    </button>
   )
 }
 

@@ -11,7 +11,7 @@
  * phone, so the test that matters most here is that the document does not move.
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -89,7 +89,10 @@ interface Harness {
   latest: () => FormDocument
 }
 
-function setup(languages: Language[] = [ENGLISH, FRENCH], onSave?: () => void): Harness {
+function setup(
+  languages: Language[] = [ENGLISH, FRENCH],
+  onSave?: (document: FormDocument) => void,
+): Harness {
   const user = userEvent.setup()
   let current = documentOf(languages)
   const view = render(
@@ -204,12 +207,101 @@ describe('the Save button', () => {
   })
 
   it('hands the host the current document', async () => {
-    const onSave = vi.fn()
-    const { user } = setup([ENGLISH, FRENCH], onSave)
+    const onSave = vi.fn<(document: FormDocument) => void>()
+    const { user, shell } = setup([ENGLISH, FRENCH], onSave)
+
+    /*
+     * With an edit in between, because the call count was the whole assertion:
+     * a Save that handed over the document the designer booted with -- the
+     * failure this button has exactly one way to get wrong -- passed it.
+     */
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = shell.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await user.click(row)
+    fireEvent.keyDown(shell, { key: 'Delete' })
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onSave).toHaveBeenCalledTimes(1)
+    const saved = onSave.mock.calls[0]?.[0]
+    expect(
+      saved?.root.children?.map((child) => child.key),
+      'Save handed over a stale document',
+    ).toEqual([])
+  })
+})
+
+/**
+ * The undo shortcuts, which no test in any suite had ever pressed.
+ *
+ * The buttons are covered and the keys are not, and they are not the same code
+ * path: the handler reads `ctrlKey || metaKey`, lowercases the key, and routes
+ * shift to redo. Every one of those is a place to be wrong, and being wrong
+ * there costs an author the edit they just made.
+ */
+describe('the undo and redo shortcuts', () => {
+  /** Delete the one component, so the document has a visible before and after. */
+  async function withAnEdit(): Promise<Harness> {
+    const harness = setup()
+    await harness.user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = harness.shell.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await harness.user.click(row)
+    fireEvent.keyDown(harness.shell, { key: 'Delete' })
+
+    expect(harness.latest().root.children).toEqual([])
+    return harness
+  }
+
+  const keys = (): string[] => {
+    const children = screen.queryAllByText('Email')
+    return children.map((element) => element.textContent ?? '')
+  }
+
+  it('takes an edit back on Ctrl+Z and puts it back on Ctrl+Y', async () => {
+    const { shell, latest } = await withAnEdit()
+
+    fireEvent.keyDown(shell, { key: 'z', ctrlKey: true })
+    expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
+    // And the canvas says so too, not only the document the host was handed.
+    expect(keys()).toHaveLength(1)
+
+    fireEvent.keyDown(shell, { key: 'y', ctrlKey: true })
+    expect(latest().root.children).toEqual([])
+  })
+
+  it('redoes on Ctrl+Shift+Z as well', async () => {
+    const { shell, latest } = await withAnEdit()
+
+    fireEvent.keyDown(shell, { key: 'z', ctrlKey: true })
+    expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
+
+    fireEvent.keyDown(shell, { key: 'Z', ctrlKey: true, shiftKey: true })
+    expect(latest().root.children).toEqual([])
+  })
+
+  it('answers to the meta key, for the half of the world on a Mac', async () => {
+    const { shell, latest } = await withAnEdit()
+
+    fireEvent.keyDown(shell, { key: 'z', metaKey: true })
+    expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
+  })
+
+  it('leaves the shortcut alone while a text field has focus', async () => {
+    /*
+     * The guard that makes the rest safe. Ctrl+Z in a property box is the
+     * browser's own undo for the text being typed, and stealing it would undo
+     * the last structural edit instead of the last few characters.
+     */
+    const { user, latest } = await withAnEdit()
+
+    await user.click(screen.getByRole('tab', { name: 'Settings' }))
+    const name = screen.getByLabelText('Form name')
+    await user.click(name)
+    fireEvent.keyDown(name, { key: 'z', ctrlKey: true })
+
+    expect(latest().root.children, 'the designer took the field own undo').toEqual([])
   })
 })
 
@@ -282,5 +374,52 @@ describe('collapsing a pane', () => {
     await user.click(handle('left'))
     const controls = handle('left').getAttribute('aria-controls')
     expect(shell.querySelector('[id="' + controls + '"]')).not.toBeNull()
+  })
+})
+
+/**
+ * A palette entry is a button and a drag handle, and the two have to be told
+ * apart.
+ *
+ * It arms a drag on `pointerdown` and adds on `click`. The drag controller
+ * already decides which of the two happened and raises a flag saying "that
+ * release was a drag, not a click" — and the palette never asked. So a drag
+ * begun on a button and abandoned back over it added a component anyway, which
+ * is what dragging out and changing your mind looks like.
+ *
+ * The canvas and the tree both ask. The palette could not: `PaletteProps` had
+ * no way to reach the controller, so the gap was structural rather than an
+ * oversight in a handler.
+ */
+describe('a palette entry pressed and dragged', () => {
+  /** Press, move past the threshold, release — all over the same button. */
+  function dragAndReturn(button: HTMLElement): void {
+    fireEvent.pointerDown(button, { clientX: 10, clientY: 10, bubbles: true })
+    fireEvent.pointerMove(window, { clientX: 12, clientY: 12 })
+    fireEvent.pointerMove(window, { clientX: 90, clientY: 90 })
+    fireEvent.pointerUp(window, { clientX: 10, clientY: 10 })
+    fireEvent.click(button, { bubbles: true })
+  }
+
+  it('does not add a component when the drag is abandoned over it', async () => {
+    const harness = setup()
+    await harness.user.click(screen.getByRole('tab', { name: 'Components' }))
+
+    const before = harness.latest().root.children?.length ?? 0
+    dragAndReturn(screen.getByRole('button', { name: 'Field' }))
+
+    expect(harness.latest().root.children?.length ?? 0).toBe(before)
+  })
+
+  it('still adds one on a plain click', async () => {
+    // The control, and the one that matters most: this is the no-aim path the
+    // palette exists for, and swallowing every click would remove it.
+    const harness = setup()
+    await harness.user.click(screen.getByRole('tab', { name: 'Components' }))
+
+    const before = harness.latest().root.children?.length ?? 0
+    await harness.user.click(screen.getByRole('button', { name: 'Field' }))
+
+    expect(harness.latest().root.children?.length ?? 0).toBe(before + 1)
   })
 })

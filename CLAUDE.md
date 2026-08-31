@@ -6,11 +6,6 @@ renderer, because every competitor paywalls exactly that piece.
 > Working agreement and personal defaults live in the global `~/.claude/CLAUDE.md`. This file is repo
 > facts only.
 
-> **A build-out is in progress.** The frozen queue, the `/goal` line to paste, and how far the run has
-> got: `docs/build-out/queue.md`. The contract it follows: `docs/build-out/RUN.md`. Decisions:
-> `docs/decisions.md`. If no goal is active, tell me to paste the line at the top of the queue file.
-> Delete this block when the queue empties.
-
 ## Read first
 
 - `docs/spec/README.md` — the specification, one file per contract, each section carrying a status.
@@ -46,9 +41,12 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 1. **`@formsmith/core` imports no React and no component library.** Server-side validation depends on it.
 2. **`@formsmith/designer` imports no component library.** It consumes `ComponentDef` metadata only. If
    you find yourself importing MUI into the designer, the abstraction has leaked.
-3. **Designer CSS is scoped to `.fs-toolbar`, `.fs-panel`, `.fs-canvas__bar` — never `.fs-shell`.** A
-   bare `.fs-shell input` rule reaches into the kit's components on the canvas and breaks them. This has
-   already happened once.
+3. **Designer CSS styles the designer's own markup and nothing else.** Every selector must name an
+   `fs-` class, and a selector that descends from a scope containing the form (`.fs-shell`,
+   `.fs-canvas` and anything under them that is not chrome) must end on one — so `.fs-shell` itself is
+   fine and carries the theme tokens, while `.fs-shell input` or `.fs-canvas__frame input` reaches into
+   the kit's components on the canvas and breaks them. That has already happened once, to MUI's notched
+   outline. Two exceptions are allowlisted in the test, each pinned to the properties it may set.
 4. **Tree operations are immutable.** Undo holds references to prior documents.
 5. **Only `required` fails on an empty value.** Every other rule passes when the value is empty.
 6. **No `eval` default for computed values.** The host injects an evaluator and owns the sandbox.
@@ -57,12 +55,12 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 911 tests
+pnpm test          # vitest, 1500 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
 pnpm build         # tsc --build, then copies designer.css
-pnpm e2e           # playwright, 65 tests in a real browser
+pnpm e2e           # playwright, 68 tests in a real browser
 ```
 
 CI runs exactly these, in that order, plus a check that every package emitted `dist/index.js` and

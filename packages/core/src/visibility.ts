@@ -13,8 +13,36 @@
  */
 
 import { evaluateCondition } from './condition.js'
+import { unreadableTag } from './exhaustive.js'
 import type { ComponentNode, FormData } from './types.js'
 import type { EvalOptions } from './validation.js'
+
+/**
+ * A host's evaluator, run without letting it take the caller down.
+ *
+ * The evaluator is arbitrary JavaScript and the expression is authored a
+ * character at a time, so it is a syntax error or a null dereference for most
+ * of the time it is being typed. `matchesPattern` in `validation.ts` catches for
+ * exactly this and its comment records the incident: an uncaught throw "took
+ * Preview down in the browser and surfaced as an unhandled 500 on the server".
+ * This called straight through.
+ *
+ * A throw reads as hidden, which is the answer a missing evaluator already gets
+ * one case up — and this function's job is to agree with what the renderer
+ * draws, which in both cases is nothing.
+ */
+function runs(
+  evaluate: NonNullable<EvalOptions['evaluate']>,
+  expression: string,
+  data: FormData,
+  options: EvalOptions,
+): boolean {
+  try {
+    return Boolean(evaluate(expression, data, options.context))
+  } catch {
+    return false
+  }
+}
 
 export function isVisible(node: ComponentNode, data: FormData, options: EvalOptions = {}): boolean {
   const when = node.renderWhen
@@ -31,9 +59,7 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
      * because agreeing with what the user sees matters more than guessing.
      */
     case 'computed':
-      return options.evaluate
-        ? Boolean(options.evaluate(when.expression, data, options.context))
-        : false
+      return options.evaluate ? runs(options.evaluate, when.expression, data, options) : false
 
     /*
      * A translation key is not a condition. Treating it as one would hide a
@@ -50,5 +76,19 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
      */
     case 'condition':
       return evaluateCondition(when.condition, data, options.context, options.row)
+
+    /*
+     * A kind this code does not have. Shown, which is the same answer `i18n`
+     * gets one case up and for the same reason: a tag that is not a condition
+     * expresses no condition, and the absence of a rule means shown.
+     *
+     * Not the answer `evaluateCondition` gives, and the two questions are
+     * different. That one is asked whether a condition *holds*, and an
+     * unreadable one does not hold. This one is asked whether a rule was
+     * expressed at all, and answering "hidden" to that takes the node and its
+     * whole subtree out of validation over a typo.
+     */
+    default:
+      return unreadableTag(when, true)
   }
 }

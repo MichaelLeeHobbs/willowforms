@@ -25,8 +25,13 @@ function doc(children: ComponentNode[], name = 'Contact request'): FormDocument 
     name,
     root: { key: 'root', type: 'Screen', props: {}, children },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -131,6 +136,30 @@ describe('toJsonSchema', () => {
     expect(schema.properties['email']).not.toHaveProperty('required')
   })
 
+  it('leaves a guarded required off the object', () => {
+    /*
+     * A rule with a `when` applies sometimes, and JSON Schema's `required` is
+     * unconditional, so exporting it rejects payloads the form itself accepts.
+     * No fixture had a guard on the rule, only a `renderWhen` on the node, so
+     * `&& !rule.when` could be deleted and every schema test stayed green.
+     */
+    const guarded = field('vat', 'string', [
+      { key: 'required', when: { kind: 'static', value: true } },
+    ])
+    const schema = toJsonSchema(doc([guarded, field('email', 'string', [{ key: 'required' }])]))
+
+    expect(schema.required).toEqual(['email'])
+  })
+
+  it('reports that guarded rule as lost rather than exporting it as absolute', () => {
+    // The other half: dropping it from `required` is only honest if the caller
+    // is told the export no longer says everything the form does.
+    const guarded = field('vat', 'string', [
+      { key: 'required', when: { kind: 'static', value: true } },
+    ])
+    expect(unexportableRules(doc([guarded]))).toEqual([{ key: 'vat', rule: 'required' }])
+  })
+
   it('omits required entirely when no field demands it', () => {
     const schema = toJsonSchema(doc([field('note', 'string')]))
     expect(schema.required).toBeUndefined()
@@ -139,6 +168,22 @@ describe('toJsonSchema', () => {
   it('titles a property from its static label', () => {
     const schema = toJsonSchema(doc([field('email', 'string', [], 'Email address')]))
     expect(schema.properties['email']?.title).toBe('Email address')
+  })
+
+  it('titles a button from its text, since that is the label it has', () => {
+    // `titleOf` reads `label` and falls back to `props.text`, and the fallback
+    // had no fixture: a Button carries `text`, not `label`.
+    const node = field('agree', 'boolean')
+    node.props['text'] = { kind: 'static', value: 'I agree' }
+    const schema = toJsonSchema(doc([node]))
+
+    expect(schema.properties['agree']?.title).toBe('I agree')
+  })
+
+  it('prefers the label when a component has both', () => {
+    const node = field('agree', 'boolean', [], 'Terms')
+    node.props['text'] = { kind: 'static', value: 'I agree' }
+    expect(toJsonSchema(doc([node])).properties['agree']?.title).toBe('Terms')
   })
 
   it('leaves the title off when the label is a binding rather than static text', () => {
@@ -167,6 +212,78 @@ describe('unexportableRules', () => {
       field('b', 'string', [{ key: 'required' }]),
     ])
     expect(unexportableRules(document)).toEqual([{ key: 'a', rule: 'custom' }])
+  })
+})
+
+describe('a repeater inside a repeater, and a root that is a field', () => {
+  const nested = (): FormDocument => {
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'orderList',
+          dataKey: 'orders',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [
+            field('reference', 'string', [{ key: 'required' }]),
+            {
+              key: 'lineList',
+              dataKey: 'lines',
+              type: 'Repeater',
+              props: {},
+              schema: { type: 'array', validations: [] },
+              children: [field('sku', 'string', [{ key: 'required' }])],
+            },
+          ],
+        },
+      ],
+    }
+    return { ...createDocument('Nested', 'nested'), root }
+  }
+
+  it('nests items inside items, all the way down', () => {
+    /*
+     * One level of repeater was the deepest fixture here, so the recursion --
+     * `objectFor` calling itself for a row scope -- was never exercised, and a
+     * version that flattened the inner list would have exported a schema a
+     * server accepts every submission against.
+     */
+    const schema = toJsonSchema(nested())
+    const orders = schema.properties['orders']
+
+    expect(orders?.type).toBe('array')
+    expect(orders?.items?.required).toEqual(['reference'])
+
+    const lines = orders?.items?.properties?.['lines']
+    expect(lines?.type).toBe('array')
+    expect(lines?.items?.required).toEqual(['sku'])
+  })
+
+  it('names the inner list by its data key, not its component key', () => {
+    const schema = toJsonSchema(nested())
+    const orders = schema.properties['orders']
+    expect(Object.keys(orders?.items?.properties ?? {})).toEqual(['reference', 'lines'])
+  })
+
+  it('exports a root that carries its own schema as a property of itself', () => {
+    /*
+     * `validateForm(stepNode, data)` hands core a subtree, and that subtree can
+     * be a field. The branch that visits the root itself had no fixture, and
+     * visiting it twice -- once directly, once through its children -- was the
+     * defect it was hiding.
+     */
+    const root: ComponentNode = {
+      ...field('note', 'string', [{ key: 'required' }]),
+      children: [field('ignored', 'string')],
+    }
+    const schema = toJsonSchema({ ...createDocument('One', 'one'), root })
+
+    expect(Object.keys(schema.properties)).toEqual(['note', 'ignored'])
+    expect(schema.required).toEqual(['note'])
   })
 })
 
@@ -254,7 +371,10 @@ describe('a repeater in the exported schema', () => {
     const schema = toJsonSchema(doc())
     expect(schema.properties['lines']).toEqual({
       type: 'array',
-      minLength: 1,
+      // A repeater holds a list, so a length rule on it counts rows. It used to
+      // export `minLength`, which every JSON Schema validator ignores on an
+      // array — the form enforced a minimum the exported schema did not.
+      minItems: 1,
       items: {
         type: 'object',
         properties: { sku: { type: 'string' }, qty: { type: 'number' } },
@@ -282,5 +402,184 @@ describe('a repeater in the exported schema', () => {
     const schema = toJsonSchema(plain)
     expect(schema.properties).toEqual({ email: { type: 'string' } })
     expect(schema.required).toEqual(['email'])
+  })
+})
+
+/**
+ * Two ways the export said something the form does not mean.
+ *
+ * The exported schema is what a server validates a real payload against, so a
+ * constraint it states and the form does not — or the other way round — is a
+ * disagreement between two validators nobody is comparing.
+ *
+ * `unexportableRules` exists to tell an author what the export could not carry.
+ * Both of these were absent from it, so the dialog said the export was
+ * lossless while it was wrong.
+ */
+describe('what the export cannot carry', () => {
+  const doc = (root: ComponentNode): FormDocument => ({
+    ...createDocument('Export', 'export'),
+    root,
+  })
+
+  describe('a field made conditional by renderWhen', () => {
+    const conditional = (): ComponentNode => ({
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'married',
+          type: 'Checkbox',
+          props: {},
+          schema: { type: 'boolean', validations: [] },
+        },
+        {
+          key: 'spouse',
+          type: 'TextField',
+          props: {},
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+          renderWhen: {
+            kind: 'condition',
+            condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } },
+          },
+        },
+      ],
+    })
+
+    it('is not exported as unconditionally required', () => {
+      /*
+       * A guarded *rule* was already excluded, with a comment saying why:
+       * JSON Schema's `required` is unconditional, so exporting one the form
+       * applies only sometimes rejects payloads the form itself accepts. A
+       * field hidden by `renderWhen` is the same fact reached from the node
+       * rather than from the rule — and `validateForm` does not require it.
+       */
+      expect(toJsonSchema(doc(conditional())).required ?? []).toEqual([])
+    })
+
+    it('is reported as lossy, so the dialog stops calling the export complete', () => {
+      expect(unexportableRules(doc(conditional()))).toEqual([{ key: 'spouse', rule: 'required' }])
+    })
+
+    it('still exports a field nothing hides', () => {
+      // The control. Dropping every `required` would pass both tests above.
+      const plain = conditional()
+      delete plain.children?.[1]?.renderWhen
+
+      expect(toJsonSchema(doc(plain)).required).toEqual(['spouse'])
+      expect(unexportableRules(doc(plain))).toEqual([])
+    })
+  })
+
+  describe('a length rule on a field that holds a list', () => {
+    const multi = (rules: ComponentNode['schema']): ComponentNode => ({
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        { key: 'colours', type: 'MultiSelect', props: {}, ...(rules ? { schema: rules } : {}) },
+      ],
+    })
+
+    it('exports as a count of items rather than a length of text', () => {
+      /*
+       * `minLength` on an `array` is ignored by every JSON Schema validator —
+       * the keyword for a list is `minItems`. The form counts items, so the
+       * export was dropping a constraint the form enforces.
+       */
+      const schema = toJsonSchema(
+        doc(
+          multi({
+            type: 'array',
+            validations: [
+              { key: 'minLength', value: 2 },
+              { key: 'maxLength', value: 4 },
+            ],
+          }),
+        ),
+      )
+
+      expect(schema.properties['colours']).toMatchObject({
+        type: 'array',
+        minItems: 2,
+        maxItems: 4,
+      })
+      expect(schema.properties['colours']).not.toHaveProperty('minLength')
+    })
+
+    it('still exports a length as a length on text', () => {
+      // The control: the same two rules on a string mean characters.
+      const schema = toJsonSchema(
+        doc(multi({ type: 'string', validations: [{ key: 'minLength', value: 2 }] })),
+      )
+
+      expect(schema.properties['colours']).toMatchObject({ type: 'string', minLength: 2 })
+      expect(schema.properties['colours']).not.toHaveProperty('minItems')
+    })
+  })
+})
+
+/**
+ * The other half of `unexportableRules`, which no fixture executed.
+ *
+ * Deleting the `rule.when` line left both of this file's tests green, so a host
+ * could be told a lossy export was lossless — which is the one thing this
+ * function exists to prevent.
+ */
+describe('a rule that applies only sometimes', () => {
+  const guarded = (): FormDocument => ({
+    ...createDocument('Export', 'export'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'business',
+          type: 'Checkbox',
+          props: {},
+          schema: { type: 'boolean', validations: [] },
+        },
+        {
+          key: 'vat',
+          type: 'TextField',
+          props: {},
+          schema: {
+            type: 'string',
+            validations: [
+              {
+                key: 'required',
+                when: {
+                  kind: 'condition',
+                  condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'business' } },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  })
+
+  it('is reported as lossy', () => {
+    expect(unexportableRules(guarded())).toEqual([{ key: 'vat', rule: 'required' }])
+  })
+
+  it('is not exported as unconditionally required', () => {
+    // The same fact from the other side: JSON Schema's `required` cannot say
+    // "sometimes", so exporting it rejects payloads the form itself accepts.
+    expect(toJsonSchema(guarded()).required ?? []).toEqual([])
+  })
+
+  it('says nothing about the same rule unguarded', () => {
+    // The control. Reporting every `required` as lossy would pass both tests
+    // above and make the dialog's warning meaningless.
+    const plain = guarded()
+    const vat = plain.root.children?.[1]
+    if (vat?.schema) vat.schema.validations = [{ key: 'required' }]
+
+    expect(unexportableRules(plain)).toEqual([])
+    expect(toJsonSchema(plain).required).toEqual(['vat'])
   })
 })

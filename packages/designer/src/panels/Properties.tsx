@@ -4,12 +4,13 @@ import type {
   ComponentNode,
   IconName,
   JsonValue,
+  KeyScopes,
   Kit,
   Language,
   PropSchema,
   PropValue,
 } from '@formsmith/core'
-import { dataKeyOf, flatten, indexKit, jsonToString } from '@formsmith/core'
+import { dataKeyOf, indexKit, jsonToString, keyScopesFor, optionValue } from '@formsmith/core'
 
 import { Icon, ICON_NAMES } from '../Icon.js'
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
@@ -38,22 +39,15 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
   const advanced = props.filter((prop) => prop.section === 'advanced')
 
   /*
-   * Every data key in the document, so a condition can only name a field that
-   * exists. Taken from the tree rather than the kit, because a data key is a
-   * property of the document and may have been renamed away from its node key.
+   * Every data key a condition on this node may name, split by where it lives.
+   * Taken from the tree rather than the kit, because a data key is a property of
+   * the document and may have been renamed away from its node key.
    *
-   * Deduplicated, because data keys are allowed to repeat: two fields behind
-   * opposite guards can write one answer. As a list of things to test they are
-   * one entry, and leaving the duplicate in gave two identical options with the
-   * same React key.
+   * `form` and `row` are separate lists because the same name can be two
+   * different answers, and a ref that names the wrong one fails silently. Core
+   * owns the split — the panel only draws it.
    */
-  const dataKeys = [
-    ...new Set(
-      flatten(api.document.root)
-        .filter((row) => row.node.schema)
-        .map((row) => dataKeyOf(row.node)),
-    ),
-  ]
+  const scopes = keyScopesFor(api.document.root, node.key)
 
   return (
     <section className="fs-properties">
@@ -95,7 +89,8 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
          * filtering unconditionally hid a real field from a container that
          * happened to share its name.
          */
-        dataKeys={node.schema ? dataKeys.filter((key) => key !== dataKeyOf(node)) : dataKeys}
+        dataKeys={withoutOwn(scopes.form, node)}
+        {...(scopes.row ? { rowDataKeys: withoutOwn(scopes.row, node) } : {})}
         onChange={(next) => api.setRenderWhen(node.key, next)}
       />
 
@@ -107,12 +102,12 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
        * author choosing between a Stack's gap and a hand-written margin sees
        * both at once.
        */}
-      <PropRows api={api} node={node} schemas={main} />
+      <PropRows api={api} node={node} schemas={main} scopes={scopes} />
 
       {advanced.length > 0 && (
         <details className="fs-advanced">
           <summary>Advanced</summary>
-          <PropRows api={api} node={node} schemas={advanced} />
+          <PropRows api={api} node={node} schemas={advanced} scopes={scopes} />
         </details>
       )}
     </section>
@@ -142,6 +137,25 @@ function DataKeyField({
   onCommit: (next: string) => void
 }): ReactNode {
   const [draft, setDraft] = useState(value)
+  const [committed, setCommitted] = useState(value)
+
+  /*
+   * Re-sync when the document changes underneath, without losing an edit in
+   * progress: only the version this field last saw is replaced.
+   *
+   * It had none, and its React key is the node's key, which does not change
+   * when only the data key does — so an undo restored the document while this
+   * box went on showing the text from before it, and the next blur wrote that
+   * text back. The undo silently reversed itself, and the submitted payload's
+   * key with it.
+   *
+   * The same shape as the raw CSS field, the JSON editor and the options box.
+   * This was the last editor here without it.
+   */
+  if (value !== committed) {
+    setCommitted(value)
+    setDraft(value)
+  }
 
   const commit = (): void => {
     /*
@@ -153,6 +167,7 @@ function DataKeyField({
     const trimmed = draft.trim()
     if (trimmed !== draft) setDraft(trimmed)
     if (trimmed === value) return
+    setCommitted(trimmed)
     onCommit(trimmed)
   }
 
@@ -204,8 +219,17 @@ function KeyField({
   const [error, setError] = useState('')
 
   const commit = (): void => {
-    if (draft === value) return
-    const result = onRename(draft)
+    /*
+     * Normalised first, then compared — the same order `DataKeyField` uses.
+     * Comparing the untrimmed draft and leaving the trimming to the store meant
+     * that typing " email " over `email` was a rename to the same key: the store
+     * did nothing, and the panel went on showing a key the document does not
+     * have.
+     */
+    const trimmed = draft.trim()
+    if (trimmed !== draft) setDraft(trimmed)
+    if (trimmed === value) return
+    const result = onRename(trimmed)
     if (result.ok) {
       setError('')
       return
@@ -260,12 +284,21 @@ function KeyField({
 function VisibilityRow({
   value,
   dataKeys,
+  rowDataKeys,
   onChange,
 }: {
   value: PropValue | undefined
   dataKeys: string[]
+  rowDataKeys?: string[] | undefined
   onChange: (next: PropValue | undefined) => void
 }): ReactNode {
+  /*
+   * Inside a row, a fresh condition starts on the row. Seeded on the form it
+   * would name a key the top level does not hold, so it would be false from the
+   * moment it was created and would hide the component it was authored on.
+   */
+  const inRow = rowDataKeys?.[0]
+  const testable = (rowDataKeys?.length ?? 0) + dataKeys.length
   /*
    * `renderWhen` is a `PropValue`, so a hand-edited document can hold a static
    * boolean or a translation key as well as the two this row authors. Reading
@@ -276,8 +309,22 @@ function VisibilityRow({
    * `isVisible` treats a static truthy and a translation key alike as no
    * condition expressed, so both read as Always, which is what they do.
    */
-  const mode =
-    value?.kind === 'computed'
+  /*
+   * A `renderWhen` this row cannot author -- a translation key, or a static
+   * `true` -- reads as Always, because that is what it does. Naming it Always in
+   * the select made it unremovable: the select already showed Always, so
+   * choosing Always fired no change, and the stray value sat in the document
+   * with no way to clear it from the panel that displays it.
+   */
+  const stray =
+    value !== undefined &&
+    value.kind !== 'computed' &&
+    value.kind !== 'condition' &&
+    !(value.kind === 'static' && !value.value)
+
+  const mode = stray
+    ? 'other'
+    : value?.kind === 'computed'
       ? 'computed'
       : value?.kind === 'condition'
         ? 'condition'
@@ -297,18 +344,26 @@ function VisibilityRow({
             if (e.target.value === 'always') return onChange(undefined)
             if (e.target.value === 'never') return onChange({ kind: 'static', value: false })
             if (e.target.value === 'computed') return onChange({ kind: 'computed', expression: '' })
+            if (inRow !== undefined) {
+              return onChange({ kind: 'condition', condition: emptyCondition(inRow, 'row') })
+            }
             const first = dataKeys[0]
             if (first) onChange({ kind: 'condition', condition: emptyCondition(first) })
           }}
         >
           <option value="always">Always</option>
           <option value="never">Never</option>
+          {stray && (
+            // Only when the document holds one. Choosing anything else replaces
+            // it, which is the point: the row can now let go of it.
+            <option value="other">Always (unrecognised rule)</option>
+          )}
           {/*
             Disabled when there is nothing to test. A condition naming no field
             evaluates to false, so choosing it would hide the component
             immediately and offer no field that could bring it back.
           */}
-          <option value="condition" disabled={dataKeys.length === 0}>
+          <option value="condition" disabled={testable === 0}>
             A condition
           </option>
           <option value="computed">An expression</option>
@@ -319,16 +374,22 @@ function VisibilityRow({
             id="fs-prop-renderwhen"
             value={value.condition}
             dataKeys={dataKeys}
+            rowDataKeys={rowDataKeys}
             onChange={(condition) => onChange({ kind: 'condition', condition })}
           />
         )}
 
         {value?.kind === 'computed' && (
-          <ComputedEditor id="fs-prop-renderwhen" value={value} onChange={onChange} />
+          <ComputedEditor
+            id="fs-prop-renderwhen"
+            label="Show when"
+            value={value}
+            onChange={onChange}
+          />
         )}
       </div>
 
-      {dataKeys.length === 0 && (
+      {testable === 0 && (
         <p className="fs-prop-row__hint">
           No other component holds data yet, so there is nothing to test against.
         </p>
@@ -348,18 +409,19 @@ export function PropRows({
   api,
   node,
   schemas,
+  scopes,
 }: {
   api: DesignerApi
   node: ComponentNode
   schemas: PropSchema[]
+  scopes: KeyScopes
 }): ReactNode {
-  const dataKeys = [
-    ...new Set(
-      flatten(api.document.root)
-        .filter((row) => row.node.schema)
-        .map((row) => dataKeyOf(row.node)),
-    ),
-  ]
+  /*
+   * Unlike `renderWhen`, a property may test its own field: hiding a component
+   * on its own emptiness removes the control that would fill it, but disabling
+   * one on its own value is a real thing to want.
+   */
+  const dataKeys = scopes.form
 
   return (
     <>
@@ -374,6 +436,7 @@ export function PropRows({
           value={node.props[schema.name]}
           componentKey={node.key}
           dataKeys={dataKeys}
+          {...(scopes.row ? { rowDataKeys: scopes.row } : {})}
           languages={api.document.languages}
           defaultLanguage={api.document.defaultLanguage}
           translations={api.document.translations}
@@ -385,12 +448,44 @@ export function PropRows({
   )
 }
 
+/**
+ * A list without the component's own answer.
+ *
+ * A component cannot test its own field: hiding it when its own value is empty
+ * removes the only control that could fill it. Only where there is a field to
+ * exclude, though — `dataKeyOf` falls back to the node key, so filtering
+ * unconditionally hid a real field from a container that happened to share its
+ * name.
+ */
+function withoutOwn(keys: string[], node: ComponentNode): string[] {
+  return node.schema ? keys.filter((key) => key !== dataKeyOf(node)) : keys
+}
+
+/**
+ * The field a fresh condition starts on, and the scope that goes with it.
+ *
+ * The row wins wherever there is one. A seed at form scope inside a row names a
+ * key the top level does not hold, so the condition is false from the moment it
+ * exists and hides the component it was authored on.
+ */
+function seedProps(
+  dataKeys: string[],
+  rowDataKeys: string[] | undefined,
+): { firstDataKey: string; firstDataKeyScope?: 'form' | 'row' } | undefined {
+  const inRow = rowDataKeys?.[0]
+  if (inRow !== undefined) return { firstDataKey: inRow, firstDataKeyScope: 'row' }
+  const first = dataKeys[0]
+  return first === undefined ? undefined : { firstDataKey: first }
+}
+
 interface PropRowProps {
   schema: PropSchema
   value: PropValue | undefined
   componentKey: string
   /** Every data key in the document, so a condition can only name a real field. */
   dataKeys: string[]
+  /** The enclosing row's data keys, when this component sits inside a row. */
+  rowDataKeys?: string[] | undefined
   languages: Language[]
   defaultLanguage: string
   translations: Record<string, Record<string, string>>
@@ -403,6 +498,7 @@ function PropRow({
   value,
   componentKey,
   dataKeys,
+  rowDataKeys,
   languages,
   defaultLanguage,
   translations,
@@ -419,7 +515,7 @@ function PropRow({
       schema={schema}
       value={value}
       componentKey={componentKey}
-      {...(dataKeys[0] ? { firstDataKey: dataKeys[0] } : {})}
+      {...(seedProps(dataKeys, rowDataKeys) ?? {})}
       onChange={onChange}
     />
   )
@@ -432,7 +528,7 @@ function PropRow({
         <label htmlFor={id}>{schema.label}</label>
         <div className="fs-prop-row__control">
           {mode}
-          <ComputedEditor id={id} value={value} onChange={onChange} />
+          <ComputedEditor id={id} label={schema.label} value={value} onChange={onChange} />
         </div>
         <ClearButton label={schema.label} onClear={() => onChange(undefined)} />
       </div>
@@ -463,13 +559,21 @@ function PropRow({
   if (value?.kind === 'condition') {
     return (
       <div className="fs-prop-row is-set is-binding">
-        <label htmlFor={id + '-op'}>{schema.label}</label>
+        {/*
+         * A caption, not a label. It pointed at the operator select inside the
+         * condition editor, which already has a hidden label of its own -- so
+         * that select announced itself as "Helper text Comparison", two labels
+         * concatenated, and the row's own name pointed at a control three levels
+         * down that it does not describe.
+         */}
+        <span className="fs-prop-row__caption">{schema.label}</span>
         <div className="fs-prop-row__control">
           {mode}
           <ConditionEditor
             id={id}
             value={value.condition}
             dataKeys={dataKeys}
+            rowDataKeys={rowDataKeys}
             onChange={(condition) => onChange({ kind: 'condition', condition })}
           />
         </div>
@@ -541,8 +645,21 @@ function PropRow({
         ) : schema.editor === 'select' ? (
           <select
             id={id}
-            value={typeof raw === 'string' ? raw : ''}
-            onChange={(e) => set(e.target.value)}
+            /*
+             * Read and written through `jsonToString` and `optionValue`, which
+             * are inverses. `PropOption.value` is a `JsonValue`, and this
+             * treated it as a string in both directions — so a kit declaring
+             * `{ label: 'Two', value: 2 }` showed nothing selected and stored
+             * `"2"`. Neither shipped kit does that today, which is the only
+             * reason it was invisible: the panel is the part a third kit meets
+             * first.
+             */
+            value={jsonToString(raw)}
+            onChange={(e) =>
+              e.target.value === ''
+                ? onChange(undefined)
+                : set(optionValue(schema.options?.map((o) => o.value) ?? [], e.target.value))
+            }
           >
             <option value="">(default)</option>
             {schema.options?.map((o) => (
@@ -628,6 +745,13 @@ function JsonEditor({
         spellCheck={false}
         value={draft}
         aria-invalid={error ? true : undefined}
+        /*
+         * And named as the box's description, which it was not. `role="alert"`
+         * reads the message once as it appears; a screen-reader user who moves
+         * away and comes back had no way to hear it again, and no way to know
+         * the field is invalid beyond a flag with nothing attached to it.
+         */
+        {...(error ? { 'aria-describedby': id + '-error' } : {})}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           const text = draft.trim()
@@ -646,7 +770,7 @@ function JsonEditor({
         }}
       />
       {error && (
-        <p className="fs-prop-row__error" role="alert">
+        <p id={id + '-error'} className="fs-prop-row__error" role="alert">
           {error}
         </p>
       )}

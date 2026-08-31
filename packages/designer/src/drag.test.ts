@@ -22,7 +22,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { useDrag } from './drag.js'
-import type { DropCommit, DropResolver } from './drag.js'
+import type { DragSource, DropCommit, DropResolver } from './drag.js'
 
 const press = (x: number, y: number): ReactPointerEvent =>
   ({ clientX: x, clientY: y }) as ReactPointerEvent
@@ -143,17 +143,350 @@ describe('the drop zone handshake', () => {
   })
 
   it('reports a real position at the very edge of the viewport', async () => {
-    const resolve = vi.fn<DropResolver>(() => undefined)
-    const { result } = renderHook(() => useDrag(vi.fn()))
+    const onCommit = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const resolve = vi.fn<DropResolver>((x, y) => ({ parentKey: 'root', index: x + y }))
+    const { result } = renderHook(() => useDrag(onCommit))
 
     act(() => {
       result.current.registerZone('canvas', resolve)
     })
-    await drag(() => {
-      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
-    }, [0, 0])
 
-    // A clientX of 0 is the left edge, not a missing coordinate.
-    expect(resolve).toHaveBeenCalledWith(0, 0, 'a')
+    /*
+     * The release is at the edge and the move before it is not.
+     *
+     * This used to move and release at the same coordinates, so the resolver was
+     * called with `(0, 0)` on the move and the assertion was satisfied by that
+     * call whatever the release did -- against a bug that lives in the release,
+     * where a `clientX || fallback` reads the left edge as a missing coordinate
+     * and substitutes the last position. The last call is the one that matters,
+     * and so is the commit that follows it.
+     */
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 40, 40)
+      pointer('pointermove', 5, 5)
+      pointer('pointerup', 0, 0)
+      await Promise.resolve()
+    })
+
+    expect(resolve.mock.lastCall).toEqual([0, 0, 'a'])
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ key: 'a' }), {
+      parentKey: 'root',
+      index: 0,
+    })
+  })
+})
+
+/**
+ * Escape, and the click that must not happen afterwards.
+ *
+ * Abandoning a drag mid-gesture leaves the button still down, so the browser
+ * dispatches a `click` on whatever is under the pointer when it finally comes
+ * up -- on the canvas, that selects a component the user was in the middle of
+ * dragging away from. The controller raises the swallow flag for exactly that
+ * click, and the source comment says so while nothing tested it.
+ */
+describe('a drag abandoned with Escape', () => {
+  it('commits nothing and swallows the click the release would produce', async () => {
+    const onCommit = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const resolve = vi.fn<DropResolver>(() => ({ parentKey: 'root', index: 0 }))
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', resolve)
+    })
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(onCommit, 'Escape dropped the component anyway').not.toHaveBeenCalled()
+    expect(result.current.consumeClick(), 'the abandoned drag read as a click').toBe(true)
+  })
+
+  it('keeps swallowing it until the button actually comes up', async () => {
+    const onCommit = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone(
+        'canvas',
+        vi.fn<DropResolver>(() => undefined),
+      )
+    })
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      // The button is still down when Escape lands, so the release comes after
+      // the drag state has already been torn down.
+      pointer('pointerup', 200, 200)
+      await Promise.resolve()
+    })
+
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(result.current.consumeClick()).toBe(true)
+  })
+
+  it('leaves a press that never moved alone, because that is a click', async () => {
+    /*
+     * The control. Escape before the threshold means nothing was being dragged,
+     * so the button coming up is an ordinary click on whatever was pressed --
+     * and swallowing it would make Escape break selection.
+     */
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+})
+
+/**
+ * Which `onCommit` a release reaches.
+ *
+ * The window listeners are attached once and never reattached, so the handler
+ * they call has to be read through a ref rather than captured. That is the
+ * whole reason the ref exists, and nothing pinned it — so the ref could be
+ * written in the wrong place and every existing test would stay green, because
+ * they all pass the same handler for the life of the hook.
+ */
+describe('a commit handler replaced between renders', () => {
+  it('calls the current one, not the one the listeners were attached with', async () => {
+    const first = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const second = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const resolve = vi.fn<DropResolver>(() => ({ parentKey: 'root', index: 0 }))
+
+    const { result, rerender } = renderHook(({ onCommit }) => useDrag(onCommit), {
+      initialProps: { onCommit: first },
+    })
+
+    act(() => {
+      result.current.registerZone('tree', resolve)
+    })
+
+    // The handler a parent hands down changes on most renders: it closes over
+    // the document, and the document changes on every edit.
+    rerender({ onCommit: second })
+
+    await drag(() => {
+      result.current.begin({ kind: 'move', key: 'heading', label: 'heading' }, press(10, 10))
+    })
+
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(first).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * The click a drag leaves behind.
+ *
+ * A release that moved must not also read as a click on whatever is under the
+ * pointer, so the controller raises a flag and the canvas and the tree lower it
+ * in their own click handlers. That works for a drag that starts and ends
+ * inside one of those two.
+ *
+ * It is not most drags. A palette drag starts on a button in the left pane, and
+ * the `click` the browser then dispatches goes to the nearest common ancestor —
+ * above both readers. Nobody lowered the flag, so it stayed up and ate the next
+ * unrelated click: after every drop from the palette, the first click on a
+ * component silently failed to select it.
+ *
+ * So the controller lowers it itself, once the click it was raised for has been
+ * and gone. On `window` and in the bubble phase, which is after every element
+ * handler that might want to read it.
+ */
+describe('the click that follows a drag', () => {
+  const source: DragSource = { kind: 'move', key: 'heading', label: 'heading' }
+
+  it('is swallowed', async () => {
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    expect(result.current.consumeClick()).toBe(true)
+  })
+
+  it('stops being swallowed once it has happened, even if nobody read the flag', async () => {
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    // The click lands somewhere neither the canvas nor the tree is listening —
+    // which is where a palette drag's click lands, every time.
+    act(() => {
+      window.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+
+  it('starts fresh when a new gesture begins', async () => {
+    // A belt for the click whose propagation something stopped, so it never
+    // reached the window at all. A new press is a new interaction either way.
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    act(() => {
+      window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+
+  it('is not swallowed when the pointer never moved', async () => {
+    // The control. A press that did not become a drag is a click, and
+    // swallowing it would make the palette and the tree unclickable.
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 10, clientY: 10 }))
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+})
+
+/**
+ * Abandoning a drag, and losing the window while one is in flight.
+ */
+describe('a drag that does not finish normally', () => {
+  const source: DragSource = { kind: 'move', key: 'heading', label: 'heading' }
+
+  it('does not let the release after Escape read as a click', async () => {
+    /*
+     * Escape raised the swallow flag and then `cancel()` cleared the state the
+     * flag was about — so the `pointerup` that followed found nothing dragging,
+     * lowered the flag again, and the click selected whatever was under the
+     * pointer. Exactly the behaviour the comment beside it says it prevents.
+     */
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      pointer('pointermove', 40, 40)
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      pointer('pointerup', 200, 200)
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(true)
+  })
+
+  it('commits nothing when the drag was abandoned', async () => {
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      pointer('pointermove', 40, 40)
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      pointer('pointerup', 200, 200)
+      await Promise.resolve()
+    })
+
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('lets go when the window does', async () => {
+    /*
+     * Bare window listeners with no pointer capture: a release outside the
+     * window is never seen, so the drag label stayed glued to the cursor and
+     * the next click in the page committed a drop nobody asked for.
+     */
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin(source, press(10, 10))
+      pointer('pointermove', 40, 40)
+      pointer('pointermove', 200, 200)
+      await Promise.resolve()
+    })
+    expect(result.current.state).toBeDefined()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('blur'))
+      await Promise.resolve()
+    })
+
+    expect(result.current.state).toBeUndefined()
+  })
+
+  it('still commits a drag that ends properly', async () => {
+    // The control. Cancelling on everything would make dropping impossible.
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+    await drag(() => {
+      result.current.begin(source, press(10, 10))
+    })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a drag the browser takes away', () => {
+  it('ends on pointercancel without committing anything', () => {
+    /*
+     * A `pointercancel` is the browser deciding the gesture is no longer a
+     * drag -- a touch becoming a scroll, a pen leaving the digitiser, a system
+     * dialog. The controller listens for it and no test pressed it, so a drag
+     * that ended this way could have left the label glued to the cursor and the
+     * next click committing a drop nobody asked for.
+     */
+    const onCommit = vi.fn<(source: DragSource, target: DropCommit) => void>()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone(
+        'canvas',
+        vi.fn<DropResolver>(() => ({ parentKey: 'r', index: 0 })),
+      )
+    })
+
+    act(() => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 200, 200)
+      window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }))
+    })
+
+    expect(result.current.state, 'the drag label is still on screen').toBeUndefined()
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('carries the source through the state, so the label can name it', () => {
+    const { result } = renderHook(() => useDrag(vi.fn()))
+    const def = { type: 'Field', label: 'Field' } as never
+
+    act(() => {
+      result.current.begin({ kind: 'new', def }, press(10, 10))
+      pointer('pointermove', 200, 200)
+    })
+
+    // What the shell draws beside the cursor comes from here: a palette drag
+    // shows the component's label, a move shows the key.
+    expect(result.current.state?.source).toEqual({ kind: 'new', def })
   })
 })

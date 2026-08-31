@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { contextKeys, contextValues, missingContext } from './context.js'
+import { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
 import { validateForm } from './validation.js'
 import type { ComponentNode, Condition, Operand } from './types.js'
 
@@ -159,6 +159,38 @@ describe('the failure missingContext exists to catch', () => {
   })
 })
 
+describe('what counts as supplied', () => {
+  const root = tree([
+    {
+      key: 'secret',
+      type: 'Field',
+      props: {},
+      renderWhen: { kind: 'condition', condition: isAdmin },
+      schema: required,
+    },
+  ])
+
+  it.each([
+    ['null', null],
+    ['false', false],
+    ['zero', 0],
+    ['empty text', ''],
+  ])('treats %s as supplied, because a host meant to send it', (_label, value) => {
+    /*
+     * `null` is the one a real host produces: a lookup that found nothing, a
+     * column with no value, a session field that is not set. Reporting it as
+     * missing would have every host learn to ignore this report, which is the
+     * only way a boot-time check fails.
+     */
+    expect(missingContext(root, { user: { role: value } })).toEqual([])
+  })
+
+  it('reports a path the context does not hold at all', () => {
+    expect(missingContext(root, { user: {} })).toEqual(['user.role'])
+    expect(missingContext(root, {})).toEqual(['user.role'])
+  })
+})
+
 describe('contextValues, which is how a document declares its flow', () => {
   const step = (name: string): Condition => ({
     op: 'eq',
@@ -205,6 +237,40 @@ describe('contextValues, which is how a document declares its flow', () => {
     expect(contextValues(wizard([shared]), 'step')).toEqual(['a', 'b'])
   })
 
+  it('does not repeat a value two steps spell the same way', () => {
+    /*
+     * The dedupe compares structurally, so two conditions naming the same list
+     * are one step. Only strings were ever tested, which is the one type where
+     * reference equality and structural equality agree, so a `===` dedupe passed
+     * -- and a host running one validation pass per step would have run two for
+     * the same one.
+     */
+    const shared: Condition = {
+      op: 'in',
+      value: ctx('step'),
+      options: [['a', 'b']],
+    }
+    const other: Condition = {
+      op: 'in',
+      value: ctx('step'),
+      options: [['a', 'b']],
+    }
+
+    expect(contextValues(wizard([shared, other]), 'step')).toEqual([['a', 'b']])
+  })
+
+  it('skips a context operand with an empty path', () => {
+    // An empty path reads nothing, so collecting it would offer a host a step
+    // called "" and `readPath` refuses it anyway.
+    const empty: Condition = {
+      op: 'eq',
+      left: { kind: 'context', path: '' },
+      right: lit('one'),
+    }
+    expect(contextValues(wizard([empty]), '')).toEqual([])
+    expect([...contextKeys(wizard([empty]))]).toEqual([])
+  })
+
   it('does not repeat a value two steps share', () => {
     expect(contextValues(wizard([step('one'), step('one')]), 'step')).toEqual(['one'])
   })
@@ -218,6 +284,34 @@ describe('contextValues, which is how a document declares its flow', () => {
     }
     expect(contextValues(wizard([other, againstAField]), 'phase')).toEqual([])
     expect(contextValues(wizard([againstAField]), 'step')).toEqual([])
+  })
+
+  it('reads a step out of a property binding and a rule guard, not only renderWhen', () => {
+    /*
+     * `contextValues` sweeps all three places a document holds a condition, and
+     * every test here built its wizard out of `renderWhen`, so two thirds of
+     * what it sweeps was unexercised. The consequence is not cosmetic: the step
+     * list is what `validateAcross` walks, so a step reachable only from a
+     * property or a rule guard would drop out of it and never be validated on
+     * the server.
+     */
+    const fromProp: ComponentNode = {
+      key: 'byProp',
+      type: 'Box',
+      props: { disabled: { kind: 'condition', condition: step('review') } },
+      children: [],
+    }
+    const fromGuard: ComponentNode = {
+      key: 'byGuard',
+      type: 'Field',
+      props: {},
+      schema: {
+        type: 'string',
+        validations: [{ key: 'required', when: { kind: 'condition', condition: step('confirm') } }],
+      },
+    }
+
+    expect(contextValues(tree([fromProp, fromGuard]), 'step')).toEqual(['review', 'confirm'])
   })
 
   it('finds a step nested inside a group', () => {
@@ -246,5 +340,222 @@ describe('contextValues collects broadly on purpose', () => {
     ])
 
     expect(contextValues(root, 'step')).toEqual(['two'])
+  })
+})
+
+/**
+ * What a document needs an evaluator for, asked once at startup.
+ *
+ * `missingContext` exists because a condition reading a path the host never
+ * supplies quietly hides its component and takes it out of validation. A
+ * `computed` binding with no evaluator does exactly the same thing and had no
+ * matching question: `isVisible` returns false for one, so the node and its
+ * whole subtree leave `validateForm` — on the server, where nobody is looking.
+ *
+ * It is worse than the context case in one way. A host may inject an evaluator
+ * in the browser and not on the server, and then the two disagree: the browser
+ * shows a business-only section and validates it, the server validates nothing
+ * beneath it and answers `{ok: true}`.
+ */
+describe('evaluatorKeys', () => {
+  const doc = (children: ComponentNode[]): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children,
+  })
+
+  it('names a node whose visibility is an expression', () => {
+    const root = doc([
+      {
+        key: 'business',
+        type: 'Field',
+        props: {},
+        renderWhen: { kind: 'computed', expression: 'data.kind === "business"' },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['business'])
+  })
+
+  it('names a node whose rule is guarded by an expression', () => {
+    const root = doc([
+      {
+        key: 'vat',
+        type: 'Field',
+        props: {},
+        schema: {
+          type: 'string',
+          validations: [{ key: 'required', when: { kind: 'computed', expression: 'x' } }],
+        },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['vat'])
+  })
+
+  it('names a node carrying a custom rule, which is an expression by definition', () => {
+    const root = doc([
+      {
+        key: 'confirm',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [{ key: 'custom', expression: 'a === b' }] },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['confirm'])
+  })
+
+  it('names a node with a computed property', () => {
+    const root = doc([
+      { key: 'label', type: 'Field', props: { text: { kind: 'computed', expression: 'x' } } },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['label'])
+  })
+
+  it('names each node once, however many expressions it holds', () => {
+    const root = doc([
+      {
+        key: 'busy',
+        type: 'Field',
+        props: { text: { kind: 'computed', expression: 'x' } },
+        renderWhen: { kind: 'computed', expression: 'y' },
+        schema: { type: 'string', validations: [{ key: 'custom', expression: 'z' }] },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual(['busy'])
+  })
+
+  it('says nothing about a document that needs no evaluator', () => {
+    /*
+     * The control, and the reason the structured condition vocabulary exists: a
+     * form with conditional visibility and guarded rules works in a host that
+     * injected nothing at all.
+     */
+    const root = doc([
+      {
+        key: 'spouse',
+        type: 'Field',
+        props: { text: { kind: 'static', value: 'Spouse' } },
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } },
+        },
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      },
+    ])
+
+    expect(evaluatorKeys(root)).toEqual([])
+  })
+
+  it('is total on a document that never passed the gate', () => {
+    // Same obligation as `contextKeys`: a host is told to call this at startup,
+    // which is before anything else has had a chance to refuse the document.
+    const broken = {
+      key: 'root',
+      type: 'Screen',
+      props: 5,
+      children: 7,
+    } as unknown as ComponentNode
+
+    expect(evaluatorKeys(broken)).toEqual([])
+  })
+})
+
+/**
+ * The three exported functions are told to run at a host's startup, which is
+ * before anything has had a chance to refuse the document.
+ */
+describe('the boot-time questions, on a document nobody checked', () => {
+  const broken = (patch: Record<string, unknown>): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    ...patch,
+  })
+
+  it.each([
+    ['children that are not an array', { children: 5 }],
+    ['props that are not an object', { props: 'nope' }],
+    ['validations that are not iterable', { schema: { type: 'string', validations: 5 } }],
+    ['a child that is not a node', { children: [null] }],
+  ])('answers rather than throwing on %s', (_what, patch) => {
+    expect(() => contextKeys(broken(patch))).not.toThrow()
+    expect(() => missingContext(broken(patch), {})).not.toThrow()
+    expect(() => contextValues(broken(patch), 'step')).not.toThrow()
+  })
+
+  it('still reads a document that is fine', () => {
+    // The control: a guard that answered nothing for everything would pass the
+    // whole block above and make the boot-time check useless.
+    const good: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'vat',
+          type: 'Field',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'user.role' },
+              right: { kind: 'literal', value: 'admin' },
+            },
+          },
+        },
+      ],
+    }
+
+    expect([...contextKeys(good)]).toEqual(['user.role'])
+    expect(missingContext(good, {})).toEqual(['user.role'])
+  })
+})
+
+/**
+ * How much work a document can ask a server to do.
+ *
+ * `contextValues(root, 'step')` is how the reference server discovers a form's
+ * steps, and it runs one full validation pass per value it returns. A hundred
+ * thousand distinct literals is a few seconds to author in the JSON editor and
+ * a hundred thousand passes to submit against.
+ *
+ * A cap rather than a refusal: the answer stays useful for every real document,
+ * and a document that exceeds it is one no host should be running anyway.
+ */
+describe('contextValues and a document that asks for too much', () => {
+  const many = (n: number): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: Array.from({ length: n }, (_, i) => ({
+      key: 'step' + String(i),
+      type: 'Screen',
+      props: {},
+      renderWhen: {
+        kind: 'condition' as const,
+        condition: {
+          op: 'eq' as const,
+          left: { kind: 'context' as const, path: 'step' },
+          right: { kind: 'literal' as const, value: 'step' + String(i) },
+        },
+      },
+    })),
+  })
+
+  it('stops collecting well before it becomes a denial of service', () => {
+    expect(contextValues(many(50_000), 'step').length).toBeLessThanOrEqual(1000)
+  })
+
+  it('still returns every step a real form has', () => {
+    // The control. A cap low enough to truncate a genuine flow would make the
+    // server validate fewer steps than the document has, which is the silent
+    // permissive failure this whole area is about.
+    expect(contextValues(many(40), 'step')).toHaveLength(40)
   })
 })

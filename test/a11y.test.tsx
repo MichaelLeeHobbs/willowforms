@@ -82,8 +82,21 @@ function makeDocument(): FormDocument {
       ],
     },
     actions: {},
-    languages: [{ code: 'en', name: 'English', bidi: 'ltr' }],
-    defaultLanguage: 'en',
+    // `en-US`, which is what `createDocument` produces. A dialect-free
+    // fixture makes a bundle keyed by tag and one keyed by bare code the
+    // same string, which is Trap 5 in the write-tests skill and the shape
+    // that made the language filter green here and broken for real
+    // documents.
+    /*
+     * Two languages, because the toolbar hides its language select below two --
+     * so with one the audited states never contained it, and the control most
+     * likely to be a bare unlabelled `<select>` was the one axe never saw.
+     */
+    languages: [
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'fr', name: 'French', bidi: 'ltr' },
+    ],
+    defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   }
@@ -148,7 +161,7 @@ describe('axe audit of the designer', () => {
     const container = renderDesigner()
 
     await user.click(screen.getByRole('tab', { name: 'Tree' }))
-    const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
 
@@ -160,7 +173,7 @@ describe('axe audit of the designer', () => {
     const container = renderDesigner()
 
     await user.click(screen.getByRole('tab', { name: 'Tree' }))
-    const row = container.querySelector<HTMLElement>('[data-fs-row="email"]')
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
     if (!row) throw new Error('no tree row')
     await user.click(row)
     await user.click(screen.getByRole('tab', { name: 'Rules' }))
@@ -198,6 +211,45 @@ describe('axe audit of the designer', () => {
     await user.click(screen.getByRole('button', { name: /Hide Components and structure/ }))
     await user.click(screen.getByRole('button', { name: /Hide Component properties/ }))
 
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+
+  it('has none on the Style tab', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner()
+
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await user.click(row)
+    await user.click(screen.getByRole('tab', { name: 'Style' }))
+
+    /*
+     * One of the two most ARIA-dense panels in the designer and neither was
+     * audited: seven inputs, a colour swatch paired with a text box, a
+     * disclosure holding more of the same, and a warning that turns into
+     * `aria-invalid`. Every state axe knows how to fail lives here.
+     */
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+
+  it('has none with a condition being edited', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner()
+
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await user.click(row)
+    await user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    /*
+     * The other one. No audited state ever set a condition, so the editor's
+     * hidden labels, its operator selects and its nested Remove buttons were
+     * never seen by axe -- in the panel where a control is most likely to end
+     * up with no accessible name of its own, which is a defect this repository
+     * has already had twice.
+     */
     expect(await audit(container)).toEqual([])
   }, 20000)
 

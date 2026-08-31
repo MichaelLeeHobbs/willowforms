@@ -1,7 +1,8 @@
 # Canvas
 
-**Status: partial.** Selection, hover, drag and drop, and the keyboard path are built. There is no
-selection toolbar, no empty state, and no way to select the canvas by keyboard.
+**Status: partial.** Selection, hover, drag and drop, the selection toolbar and the keyboard path are
+built. What is missing is an empty state and any way to select on the canvas without a pointer, both
+listed under [Gaps](#gaps).
 
 The canvas renders the real runtime renderer, not a design-time approximation. What is on screen is
 literally what ships, which is the only way a WYSIWYG builder stays honest as a kit evolves.

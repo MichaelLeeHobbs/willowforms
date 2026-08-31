@@ -16,9 +16,21 @@ test('desktop is the default and constrains nothing', async ({ designer }) => {
   const box = designer.page.locator(frame)
   await expect(box).toHaveAttribute('data-fs-viewport', 'desktop')
 
-  // The form keeps whatever width its own Screen gives it. A frame that
-  // narrowed the desktop canvas would be simulating a device nobody chose.
+  /*
+   * The form keeps whatever width its own Screen gives it. A frame that narrowed
+   * the desktop canvas would be simulating a device nobody chose.
+   *
+   * The measured width as well as the inline style: a frame constrained by a
+   * class rather than by `style.width` passed a test named "constrains nothing"
+   * without constraining nothing at all.
+   */
   expect((await box.evaluate((el) => el.style.width)) || '').toBe('')
+
+  const frameBox = await box.boundingBox()
+  const surface = await designer.page.locator('.fs-canvas__surface').boundingBox()
+  if (!frameBox || !surface) throw new Error('nothing to measure')
+  // Inside the surface's padding, and not narrower than that.
+  expect(surface.width - frameBox.width).toBeLessThanOrEqual(64)
 
   const pressed = designer.page.getByRole('button', { name: 'Desktop' })
   await expect(pressed).toHaveAttribute('aria-pressed', 'true')

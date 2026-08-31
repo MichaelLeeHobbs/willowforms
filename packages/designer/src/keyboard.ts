@@ -21,6 +21,18 @@ export interface MoveTarget {
   index: number
 }
 
+/**
+ * Where this key is in the flattened tree — the first place, if it is in two.
+ *
+ * `validateDocument` reports a duplicate key and the panel refuses a rename
+ * that would make one, but reporting is not preventing and a host can render a
+ * document it never validated. So this answers the first, which is what
+ * `findNode`, `findParent` and `pathTo` in core all deliberately answer and
+ * what the three tree mutators were changed to answer. Focus, the move and the
+ * announcement then agree with each other and with the rest of the project,
+ * which is the property that matters — whichever of the two the user meant, all
+ * four say the same thing about it.
+ */
 const at = (rows: FlatNode[], key: string): number => rows.findIndex((r) => r.node.key === key)
 
 /**
@@ -30,6 +42,14 @@ const at = (rows: FlatNode[], key: string): number => rows.findIndex((r) => r.no
  * Right steps into the first child, left steps out to the parent. Returns
  * undefined at the ends rather than wrapping: a tree is not a carousel, and
  * wrapping loses the sense of where the boundaries are.
+ *
+ * "Every node is expanded" is a premise, not a guarantee: `rows` is whatever the
+ * panel flattened, and nothing enforces that it holds the whole tree. Adding a
+ * collapse affordance to the tree without revisiting this makes Right a silent
+ * no-op -- the child it names is not in `rows`, `at` returns -1 for it, and
+ * focus stays where it was with nothing to explain why. `Tree.tsx` says
+ * `aria-expanded="true"` on every row for the same reason, which is the other
+ * half of this promise.
  */
 export function focusTarget(
   rows: FlatNode[],
@@ -38,6 +58,9 @@ export function focusTarget(
 ): string | undefined {
   const index = at(rows, key)
   if (index === -1) return undefined
+  // `noUncheckedIndexedAccess` asks for this, and it cannot fire: `at` returned
+  // an index it found in this same array. It stays because the alternative is a
+  // non-null assertion, which is the same claim with no check behind it.
   const row = rows[index]
   if (!row) return undefined
 
