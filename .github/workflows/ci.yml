@@ -68,11 +68,10 @@ jobs:
           retention-days: 7
 
       # dist is what consumers actually get, so prove it exists and carries types.
+      #
+      # A script rather than a shell block, because a check written inline here
+      # is a check nobody can run. This one had drifted: its package list named
+      # four of the five, and the one it left out was `kit-html`, which is the
+      # package the second-kit claim rests on.
       - name: Check build output
-        run: |
-          for pkg in core renderer designer kit-mui; do
-            test -f "packages/$pkg/dist/index.js" || { echo "missing dist/index.js in $pkg"; exit 1; }
-            test -f "packages/$pkg/dist/index.d.ts" || { echo "missing types in $pkg"; exit 1; }
-          done
-          test -f packages/designer/dist/designer.css || { echo "designer.css was not copied"; exit 1; }
-          echo "all packages built with types"
+        run: node scripts/check-dist.mjs

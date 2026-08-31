@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 4, the designer CSS guard. Item 5 is next.
+- **Last completed:** item 5, the lint and CI guardrails. Item 6 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/04-css-guard`
+- **Last pushed item branch:** `build-out/b/05-lint-ci-guards`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -115,7 +115,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a mutation proof. Add `:where(.fs-shell) input { border: 0 }` to
       `designer.css`, watch invariant 3 go red, revert.
 
-- [ ] **5. Repair the lint and CI guardrails.** HIGH plus MEDIUMs, area 10 and area 15's eslint slice.
+- [x] **5. Repair the lint and CI guardrails.** HIGH plus MEDIUMs, area 10 and area 15's eslint slice.
       `no-restricted-imports` has no `ImportExpression` visitor, so `await import('@mui/material')` in the
       designer breaks invariant 2 and lints clean. `eslint .` never lints `aliases.ts`, the file `CLAUDE.md`
       calls load-bearing. `eslint.config.test.ts:69-80` exercises invariant 2 only against a `.ts` file

@@ -17,7 +17,13 @@ Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`; first-pass en
 
 ## Second pass (from 2026-08-31)
 
-_Nothing yet._
+## `eslint .` does lint `aliases.ts` — area 10, item 5
+
+**MEDIUM, refuted.** The finding says the file `CLAUDE.md` calls load-bearing is never linted. It is.
+Measured twice while doing item 5: a deliberate unused variable in `aliases.ts` fails `pnpm lint` and is
+reported against that path, and a deliberate `any` there fires four type-aware rules, which also settles
+the narrower reading -- the file is in `tsconfig.eslint.json`'s `include`, so the project service covers
+it. Nothing to change.
 
 ---
 
