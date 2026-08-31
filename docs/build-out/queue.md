@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 30, the core and cross-cutting suite LOW/NOTEs. Item 31 is next.
+- **Last completed:** item 31, the designer, renderer and Playwright suite LOW/NOTEs. Item 32 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/30-core-guard-low`
+- **Last pushed item branch:** `build-out/b/31-designer-suites-low`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -294,7 +294,7 @@ handling one. It is the only honest way to close out three hundred findings.
       engines drift between the root, the five packages and `CLAUDE.md`, and the CI job having no
       `timeout-minutes`.
 - [x] **30. core and cross-cutting test suites.** Areas 11, 12 and 15, 23 findings.
-- [ ] **31. designer, renderer and Playwright suites.** Areas 13, 14 and 16, 58 findings.
+- [x] **31. designer, renderer and Playwright suites.** Areas 13, 14 and 16, 58 findings.
 - [ ] **32. the spec, the guides and the working notes.** Areas 17 and 18, 41 findings. Includes the
       `SKILL.md` e2e count saying 65 against 68 actual, and the policy call already made:
       `apps/playground/src/sample.ts:51-52` loses the competitor's name and keeps the engineering point.

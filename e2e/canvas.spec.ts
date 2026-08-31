@@ -105,6 +105,15 @@ test('selecting a field does not type into it, and the keystrokes reach the shel
 test('clicking a select does not open its dropdown', async ({ designer }) => {
   await designer.node('topic').click()
 
+  /*
+   * The dropdown is asked for after the click has been given time to open one.
+   *
+   * `toHaveCount(0)` on something that is not there yet resolves the instant it
+   * is true, which for a negative assertion is immediately -- so this passed
+   * whether or not the click was swallowed. Waiting for the selection frame
+   * first is what makes the absence mean something: the click has been handled,
+   * and no menu came of it.
+   */
   await expect(designer.page.locator('.fs-selection--active')).toBeVisible()
   await expect(designer.page.locator('.MuiPopover-root, .MuiMenu-root')).toHaveCount(0)
 })

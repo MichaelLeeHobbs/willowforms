@@ -134,6 +134,7 @@ because each drives its own fixture rather than sweeping every component.
 | An image with an ordinary address still renders                              | Refusing every address would satisfy the rule above                              |
 | A text prop cleared to empty falls back to the default                       | An empty string is a value; a cleared prop is an absence                         |
 | A component whose options a document got wrong still renders                 | An option list is a document's list, and a document is data                      |
+| Every icon the kit declares draws a glyph                                    | A palette entry with a blank square reads as a broken build                      |
 | A heading whose document names no rank renders at the same rank in both kits | The rank is the outline a screen reader navigates by, not a size                 |
 | A control holding a value that is not a string still shows it                | `String(value)` answered `''` for a number, so a stored answer rendered as blank |
 | A select still shows an option it can read                                   | Dropping every entry would satisfy the rule above                                |

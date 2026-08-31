@@ -19,12 +19,14 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps, ReactElement } from 'react'
 import { prop } from '@formsmith/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { IconName } from '@formsmith/core'
 import type { ComponentDef, ComponentNode, FormDocument, JsonValue, Kit } from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
 import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
 import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+import { Icon } from '../packages/designer/src/Icon.js'
 
 const KITS: { name: string; kit: Kit; renderers: RendererKit }[] = [
   { name: '@formsmith/kit-mui', kit: muiKit, renderers: muiRendererKit },
@@ -1520,5 +1522,30 @@ describe('a heading whose document names no rank', () => {
       : element?.querySelector('h1, h2, h3, h4, h5, h6')
 
     expect(heading?.tagName.toLowerCase(), 'no heading element was rendered').toBe('h2')
+  })
+})
+
+/**
+ * Every icon a kit declares reaches a glyph the designer can draw.
+ *
+ * The vocabulary is a union in core and `GLYPHS` is a `Record<IconName, …>`, so
+ * a missing glyph is a compile error and a kit's `icon:` field is type-checked
+ * against the same union. What neither of those can say is that the glyph
+ * *draws* -- an entry mapped to an empty fragment satisfies both -- and the
+ * designer cannot check it against a kit, because invariant 2 forbids it from
+ * importing one. This file imports both.
+ */
+describe('the icons the kits ask for', () => {
+  it.each(KITS)('$name declares only icons that draw something', ({ kit }) => {
+    const declared = [...new Set(kit.components.map((def) => def.icon).filter(Boolean))]
+    expect(declared.length, 'no icons were declared, so this checked nothing').toBeGreaterThan(5)
+
+    const blank = declared.filter((name) => {
+      const { container } = render(<Icon name={name as IconName} />)
+      const svg = container.querySelector('svg')
+      return !svg || svg.children.length === 0
+    })
+
+    expect(blank).toEqual([])
   })
 })

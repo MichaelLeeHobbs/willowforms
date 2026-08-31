@@ -518,6 +518,10 @@ describe('the colour editor', () => {
      * green. What can fail, and is the actual contract, is the other half: the
      * text and the document still say `transparent`, because a swatch that owned
      * the value would have rewritten it to the nearest hex on first paint.
+     *
+     * So the `#000000` assertion is gone rather than kept as a comment saying
+     * it cannot fail: a line that always passes is a line a reader has to
+     * re-derive the uselessness of every time they meet it.
      */
     const { user, latest } = await open()
     const text = screen.getByLabelText('Tint')
@@ -525,7 +529,6 @@ describe('the colour editor', () => {
 
     expect(text).toHaveProperty('value', 'transparent')
     expect(latest()?.props['tint']).toEqual({ kind: 'static', value: 'transparent' })
-    expect(screen.getByLabelText('Pick a colour')).toHaveProperty('value', '#000000')
   })
 
   it('writes the hex through when somebody uses the swatch', async () => {
@@ -1161,8 +1164,15 @@ describe('the condition editor survives a hand-edited document', () => {
   it.each(malformed.map((c) => [JSON.stringify(c), c] as const))(
     'renders %s without crashing',
     async (_label, condition) => {
+      /*
+       * `await harness.select()`, not `expect(...).resolves.toBeUndefined()`.
+       *
+       * That asserted the return value of `user.click`, which is `undefined` on
+       * every path that resolves -- so it read as "selecting worked" while
+       * saying nothing at all. What the test is about is the row below.
+       */
       const harness = setup(withRenderWhen(condition))
-      await expect(harness.select()).resolves.toBeUndefined()
+      await harness.select()
 
       // The row is on screen, so the author can pick a different operator and
       // repair it rather than being left with a blank panel.

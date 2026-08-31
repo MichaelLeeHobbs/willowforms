@@ -161,7 +161,14 @@ export async function stableBox(
   throw new Error(
     previous
       ? 'An element never stopped moving, so it cannot be dragged reliably.'
-      : 'Cannot drag something that is not on screen.',
+      : /*
+         * Not "not on screen": `boundingBox()` answers for an element below the
+         * fold as readily as for one in view, and returns `null` only when the
+         * element has no box at all -- `display: none`, detached, or never
+         * rendered. The message used to advertise a guard this function does
+         * not have, which is `dragFrom`'s job.
+         */
+        'That element has no box at all, so it was never rendered.',
   )
 }
 

@@ -83,9 +83,18 @@ test('a rule authored in the panel fails a real submit with its own message', as
   await designer.node('email').locator('input').fill('a@b.co')
   await designer.page.getByRole('button', { name: 'Validate' }).click()
 
-  await expect(designer.page.locator('.fs-canvas__data')).toContainText(
-    'Needs at least 12 characters.',
-  )
+  /*
+   * The Errors block, not the whole pane.
+   *
+   * `.fs-canvas__data` holds both the Data and the Errors `<pre>`, so a message
+   * that somehow reached the *data* would satisfy this -- the assertion names
+   * the panel and means one section of it.
+   */
+  const errors = designer.page
+    .locator('.fs-canvas__data section')
+    .filter({ has: designer.page.getByRole('heading', { name: 'Errors' }) })
+
+  await expect(errors.locator('pre')).toContainText('Needs at least 12 characters.')
 })
 
 test('a field hidden by a condition does not fail the submit', async ({ designer }) => {
@@ -174,8 +183,9 @@ test('a computed property renders nothing rather than throwing', async ({ design
    * text must not appear on the canvas -- printing the source of an unevaluated
    * expression to the person filling in the form is the other way this fails.
    */
+  // Not `.fs-shell` again: the fixture already waits for it before any test
+  // body runs, so asserting it here cannot fail and reads as a check.
   await expect(designer.node('email')).toBeVisible()
-  await expect(designer.page.locator('.fs-shell')).toBeVisible()
   await expect(designer.node('email')).not.toContainText('data.firstName')
   await expect(designer.node('email')).not.toContainText('null')
 })

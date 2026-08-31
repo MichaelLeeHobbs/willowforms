@@ -209,11 +209,32 @@ test('the html kit wires up its own accessibility', async ({ designer }) => {
   const input = designer.node('firstName').locator('input')
   await expect(input).toHaveAttribute('aria-invalid', 'true')
 
+  /*
+   * A token list, not an id.
+   *
+   * `aria-describedby` is space-separated, and this built a selector out of the
+   * whole attribute -- so the day the kit describes a field by a hint *and* its
+   * message, `#a b` is a descendant selector that matches nothing and the
+   * assertions below quietly stop being about the message. Every token is
+   * resolved, and the message has to be among them.
+   */
   const describedBy = await input.getAttribute('aria-describedby')
   expect(describedBy).toBeTruthy()
-  const message = designer.page.locator('#' + String(describedBy))
-  await expect(message).toHaveAttribute('role', 'alert')
-  await expect(message).toHaveText('This field is required.')
+
+  const described = (describedBy ?? '').split(/\s+/).filter(Boolean)
+  expect(described.length).toBeGreaterThan(0)
+
+  const texts = await Promise.all(
+    described.map(async (id) => {
+      const element = designer.page.locator('#' + id)
+      return {
+        role: await element.getAttribute('role'),
+        text: (await element.textContent())?.trim() ?? '',
+      }
+    }),
+  )
+
+  expect(texts).toContainEqual({ role: 'alert', text: 'This field is required.' })
 })
 
 test('an edit survives switching the kit', async ({ designer }) => {

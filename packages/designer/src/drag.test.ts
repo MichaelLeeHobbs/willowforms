@@ -141,6 +141,55 @@ describe('the drop zone handshake', () => {
     expect(tree).not.toHaveBeenCalled()
   })
 
+  it('treats exactly the threshold as a drag', async () => {
+    /*
+     * The boundary. The threshold was checked at 2px and at 42px, so `<` could
+     * become `<=` -- or the constant could move by one -- with nothing red, and
+     * the difference is whether a 4px twitch selects a component or starts
+     * moving it.
+     */
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 14, 10)
+      await Promise.resolve()
+    })
+
+    expect(result.current.state, 'four pixels is a drag').toBeDefined()
+
+    await act(async () => {
+      pointer('pointerup', 14, 10)
+      await Promise.resolve()
+    })
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats one pixel short of it as a click', async () => {
+    // The other side of the same line.
+    const onCommit = vi.fn()
+    const { result } = renderHook(() => useDrag(onCommit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      pointer('pointermove', 13, 10)
+      pointer('pointerup', 13, 10)
+      await Promise.resolve()
+    })
+
+    expect(result.current.state).toBeUndefined()
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
   it('commits nothing when no zone claims the release', async () => {
     const onCommit = vi.fn()
     const { result } = renderHook(() => useDrag(onCommit))

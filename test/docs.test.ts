@@ -400,7 +400,7 @@ const CONTRACT_RULES = 25
  * nowhere, so the spec presented the first table as the whole obligation set
  * while the suite ran nearly twice that.
  */
-const CONTRACT_RULES_PER_KIT = 16
+const CONTRACT_RULES_PER_KIT = 17
 
 /**
  * The describes that are about this repository rather than about a kit.

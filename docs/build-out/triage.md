@@ -814,3 +814,36 @@ rather than a run.
 - `test/setup.ts` patches `Element.prototype.scrollIntoView` globally and never restores it. Every test
   file in the worker sees the stub whether it opted in or not -- which is what a setup file is for, and
   the alternative is every file installing its own.
+
+## The rest of areas 13, 14 and 16, in groups
+
+**Forty-odd LOW and NOTE findings about the designer, renderer and Playwright suites.** The ones fixed in
+this item are in the commit message; these are the rest, grouped by why they stay:
+
+**Branches that are unreachable rather than untested.** `dnd.ts`'s `anchor === -1` fallback, `keyboard.ts`'s
+`position === -1` arm, the coalescing branch's `future: []` with a non-empty future, and the empty-container
+drop reached by dragging out a container's only child. Each is a guard that runs if a caller ever changes,
+and a test for an unreachable branch is a test that pins the call graph rather than the behaviour. Three of
+them are already documented at the site.
+
+**Fixtures the product does not produce.** `renderHook(() => useDesigner(doc()))` builds a fresh document
+per render, which `Designer.tsx` never does; the repeater fixtures use `type: 'Screen'` with an array
+schema, which no kit declares; `renderers.test.tsx` makes a `Box` the root; three panel fixtures declare no
+root component. All four are fixtures that are _more_ permissive than the product, so a test passing
+against them is not weaker -- and correcting them means touching every test in four files to prove nothing
+new.
+
+**Tests that are true for a reason other than the one they name.** The design-mode click test passes
+because `user-event` implements focus-on-mousedown; `node()` is `.first()`, so a `data-fs-row` assertion
+through it is partly guaranteed by the locator; `openTab` matches a tab name across both tablists with
+Playwright's substring matching. Each is a real fragility and each fix is a rewrite of a helper that a
+dozen tests share -- worth doing as one pass over the harness, not scattered.
+
+**Duplication.** Two describes in `renderer.test.tsx` carry byte-identical fixtures and three duplicated
+tests; `Icon.test.tsx`'s size describe renders a known icon under a heading about unknown ones. Both are
+tidying with no behavioural question in them.
+
+**Nesting and parsing.** `designer.css.test.ts`'s reader cannot parse CSS nesting, which the stylesheet
+does not use and Prettier would reformat if it did; `kit-mui/renderers.test.tsx` matches emitted class
+names by substring. Both are the same shape as the guards this run has already rewritten twice, and both
+are worth the same treatment when the stylesheet or the kit next needs it.
