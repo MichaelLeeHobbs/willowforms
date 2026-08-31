@@ -40,7 +40,7 @@ export {
   valueOf,
 } from './json.js'
 
-export { MAX_CONDITION_DEPTH, evaluateCondition } from './condition.js'
+export { MAX_CONDITION_DEPTH, evaluateCondition, same } from './condition.js'
 
 export { unreadableTag } from './exhaustive.js'
 

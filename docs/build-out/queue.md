@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 20, the renderer and kit MEDIUMs. Item 21 is next.
+- **Last completed:** item 21, the designer shell and panel MEDIUMs. Item 22 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/20-renderer-kit-mediums`
+- **Last pushed item branch:** `build-out/b/21-designer-mediums`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -271,7 +271,7 @@ slice either fixed or in `triage.md` with a one-line reason.
       `json.ts:84`'s dropped bare-string labels.
 - [x] **20. renderer and both kits, MEDIUMs.** Areas 4 and 5, 17 findings. Includes the unverified
       `inputProps` deprecation on MUI 7, which needs `@mui/material@7` installed and the assertion re-run.
-- [ ] **21. designer shell, store, left pane, remaining panels and stylesheet, MEDIUMs.** Areas 6 and 9,
+- [x] **21. designer shell, store, left pane, remaining panels and stylesheet, MEDIUMs.** Areas 6 and 9,
       20 findings. Includes `designer.css:855`'s `revert` where `initial` was meant, which needs
       `getComputedStyle` in a real browser to settle, and the duplicate `.fs-tree__row` blocks the file's own
       comment says were eliminated.

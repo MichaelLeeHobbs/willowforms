@@ -97,8 +97,32 @@ export function moveTarget(
   const row = rows[index]
   if (!row?.parentKey) return undefined
 
-  const siblings = rows.filter((r) => r.parentKey === row.parentKey)
-  const position = siblings.findIndex((r) => r.node.key === key)
+  /*
+   * Siblings of *this* node, taken from the run it sits in rather than by
+   * matching a key string.
+   *
+   * `flatten` is depth-first, so one parent's children are a contiguous run at
+   * the same depth, broken by any row shallower than they are. Two nodes can
+   * share a key -- `validateDocument` reports that and cannot prevent it,
+   * because a host may render a document it never validated -- and matching on
+   * `parentKey` alone collected the children of *every* parent with that name,
+   * so an Alt+Arrow move counted a position in a list the document does not
+   * have and landed the node somewhere else entirely.
+   *
+   * The run is what identifies this parent, and it needs no key at all.
+   */
+  const siblings: FlatNode[] = []
+  for (let i = index; i >= 0; i -= 1) {
+    const each = rows[i]
+    if (!each || each.depth < row.depth) break
+    if (each.depth === row.depth) siblings.unshift(each)
+  }
+  for (let i = index + 1; i < rows.length; i += 1) {
+    const each = rows[i]
+    if (!each || each.depth < row.depth) break
+    if (each.depth === row.depth) siblings.push(each)
+  }
+  const position = siblings.indexOf(row)
 
   if (direction === 'up') {
     if (position <= 0) return undefined

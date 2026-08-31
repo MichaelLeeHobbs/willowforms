@@ -119,9 +119,21 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
           key={node.key + ':' + device + ':' + control.name}
           control={control}
           value={readDeclaration(text, control.name)}
-          onCommit={(next) =>
-            api.setNodeCss(node.key, device, setDeclaration(text, control.name, next))
-          }
+          onCommit={(next) => {
+            /*
+             * Through the same refusal the raw box enforces.
+             *
+             * `RawCss` refuses a block `safeDeclarations` will not emit and says
+             * so, and these controls wrote straight past it -- so a brace typed
+             * into the Radius field was stored, the renderer then dropped the
+             * whole block, and the component lost every other declaration on
+             * that layer with nothing on screen explaining why. One sink, one
+             * rule.
+             */
+            const written = setDeclaration(text, control.name, next)
+            if (written && !safeDeclarations(written)) return
+            api.setNodeCss(node.key, device, written)
+          }}
         />
       ))}
 

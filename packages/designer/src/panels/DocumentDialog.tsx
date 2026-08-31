@@ -99,8 +99,22 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   }, [draft, onClose, onReplace])
 
   const copy = useCallback((text: string, what: string) => {
-    // Clipboard access can be denied. Say so rather than appearing to work.
-    navigator.clipboard?.writeText(text).then(
+    /*
+     * Clipboard access can be denied, and the API can be absent entirely.
+     *
+     * The comment said "Say so rather than appearing to work" and the optional
+     * chain did the opposite: with no `navigator.clipboard` -- any page not on a
+     * secure origin, which includes a plain-HTTP host and some embedded
+     * webviews -- the expression evaluated to `undefined`, no handler ran, and
+     * the button did nothing at all. Silence is the one outcome the comment
+     * ruled out.
+     */
+    const clipboard = navigator.clipboard
+    if (!clipboard) {
+      setNote('This browser offers no clipboard here. Select the text and copy it instead.')
+      return
+    }
+    clipboard.writeText(text).then(
       () => setNote(what + ' copied to the clipboard.'),
       () => setNote('The browser refused clipboard access. Select the text and copy it instead.'),
     )

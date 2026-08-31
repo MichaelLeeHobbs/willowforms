@@ -15,10 +15,12 @@ import type {
   Device,
   FieldSchema,
   FormDocument,
+  JsonValue,
   Language,
   PropValue,
 } from '@formsmith/core'
 import {
+  same,
   duplicateNode,
   findNode,
   findParent,
@@ -229,7 +231,19 @@ function writeNode(
     doc,
     updateNode(doc.root, key, (node) => {
       const next = update(node)
-      return JSON.stringify(next) === JSON.stringify(node) ? node : next
+      /*
+       * `same`, which is core's deep equality, not `JSON.stringify` on both
+       * sides.
+       *
+       * A `ComponentNode` is built by spreading -- `{ ...node, dataKey }` puts
+       * the new key last, `{ dataKey, ...node }` puts it first -- so two nodes
+       * that are equal in every value could serialise differently, and a no-op
+       * edit then took an undo slot and rebuilt every ancestor. `stringify` also
+       * drops `undefined` values, so it cannot tell an absent property from one
+       * holding `undefined`, which `exactOptionalPropertyTypes` makes a real
+       * distinction in this codebase.
+       */
+      return same(next as unknown as JsonValue, node as unknown as JsonValue) ? node : next
     }),
   )
 }
@@ -333,7 +347,22 @@ export function useDesigner(initial: FormDocument): DesignerApi {
      */
     if (root === doc.root) return
 
-    setHistory((h) => commit(h, { ...doc, root }))
+    /*
+     * Committed against the version it was decided on, not against whatever the
+     * updater is handed.
+     *
+     * `commit(h, { ...doc, root })` reads `h` for the history and `doc` for the
+     * content, so a second edit arriving between the read of `latest.current`
+     * and the updater running was silently overwritten -- the new component
+     * landed and the other edit did not, with no sign either way. React batches,
+     * and `latest.current` is a ref updated on render, so the two are not the
+     * same document as often as this shape assumes.
+     *
+     * Refused rather than merged: if the document has moved, the insert was
+     * decided against a tree that no longer exists and its index means something
+     * else. Doing nothing is recoverable; writing the wrong thing is not.
+     */
+    setHistory((h) => (h.present === doc ? commit(h, { ...doc, root }) : h))
     setSelectedKey(node.key)
   }, [])
 

@@ -668,3 +668,57 @@ describe('a right-press on a tree row', () => {
     })
   })
 })
+
+/**
+ * Backspace is not Delete.
+ *
+ * Delete is unambiguous. Backspace is what somebody presses expecting to correct
+ * a typo, and in some browser settings it is the back gesture -- and this fired
+ * whenever focus was on *any* chrome button. Tabbing to Undo and pressing
+ * Backspace deleted the selected component: a destructive edit from a key nobody
+ * aimed at the canvas.
+ */
+describe('Backspace and where it is aimed', () => {
+  it('does not delete when focus is on a toolbar button', () => {
+    const harness = setup()
+    const before = harness.keys()
+
+    fireEvent.click(harness.row('first'))
+    const undo = screen.getByRole('button', { name: 'Undo' })
+    act(() => {
+      undo.focus()
+    })
+    fireEvent.keyDown(undo, { key: 'Backspace', bubbles: true })
+
+    expect(harness.keys(), 'Backspace on a toolbar button deleted a component').toEqual(before)
+  })
+
+  it('still deletes from a tree row, where it can only mean one thing', () => {
+    // The control, and the gesture this shortcut exists for. A tree row takes no
+    // text and is about the selection, so Backspace there is unambiguous.
+    const harness = setup()
+
+    const row = harness.row('first')
+    act(() => {
+      row.focus()
+    })
+    fireEvent.keyDown(row, { key: 'Backspace', bubbles: true })
+
+    expect(harness.keys()).not.toContain('first')
+  })
+
+  it('still deletes with Delete from a toolbar button', () => {
+    // The other control: only Backspace is ambiguous, and only Backspace is
+    // narrowed.
+    const harness = setup()
+
+    fireEvent.click(harness.row('first'))
+    const undo = screen.getByRole('button', { name: 'Undo' })
+    act(() => {
+      undo.focus()
+    })
+    fireEvent.keyDown(undo, { key: 'Delete', bubbles: true })
+
+    expect(harness.keys()).not.toContain('first')
+  })
+})

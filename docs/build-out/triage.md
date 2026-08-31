@@ -17,6 +17,62 @@ Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`; first-pass en
 
 ## Second pass (from 2026-08-31)
 
+## `renameKey` leaves every other reference dangling — `store.ts:437-493`, area 6, item 21
+
+**MEDIUM, already open.** Renaming a component repoints only that node's own `renderWhen`, so a sibling
+whose condition names the old data key silently starts reading a key nothing writes: the condition is
+false, the sibling is hidden, and its rules never run.
+
+This is the same finding the _first_ pass recorded in `docs/build-out/found.md` under "Renaming a
+component key leaves every condition that named its answer dangling", with four defensible answers
+written out and the observation that choosing between them changes what renaming means. Two review passes
+reaching it independently is worth knowing; it does not make it smaller. Left where it is, with the
+options, rather than answered in a MEDIUM sweep.
+
+## The store re-validates the whole document on every commit — `store.ts:297-305`, area 6, item 21
+
+**MEDIUM.** The "checked once" validation re-runs `validateDocument` over the whole tree and re-emits its
+problems, so a form with a few hundred nodes walks the entire document on every keystroke that commits.
+
+Left because it is a performance observation with no measurement behind it and no defect: the walk is
+correct, and `MAX_TREE_DEPTH` bounds it. The fix is either memoising on the document's identity -- which
+`commit` already gives, since an unchanged document keeps its reference -- or moving the check off the
+commit path entirely, and choosing needs a profile of a form somebody says is slow. Recorded with the
+five other perf notes the first pass triaged for the same reason.
+
+## Hard-coded ids in `FormSettings` — `FormSettings.tsx:104,144,186,199,204,217`, area 9, item 21
+
+**MEDIUM.** The panel uses fixed element ids and, worse, a fixed radio group `name`, so two designers on
+one page share a radio group: choosing a default language in one moves it in the other.
+
+Left because two designers on one page is not a configuration this project supports or tests, and the
+change touches every control in the panel. `useId` is the fix and it is mechanical; what makes it not
+worth doing inside a MEDIUM sweep is that the same pattern appears in several panels and doing one of
+them is the half-fix this run exists to stop. Worth doing as one pass over the designer, with a test that
+renders two shells.
+
+## `DocumentDialog` computes its JSON in the render body — `DocumentDialog.tsx:72-74`, area 9, item 21
+
+**MEDIUM.** `documentJson`, `schemaJson` and `lossy` are recomputed on every render of the dialog body,
+including every keystroke in the textarea beside them.
+
+Left, and it is the same call the first pass made about this file: a `JSON.stringify` of a document
+nobody types a whole document into is not on a frame budget, and a `useMemo` here has to stay correct
+across an edit. Worth doing on evidence rather than before it.
+
+## The mode picker shows no selection for a kind it does not know — `Binding.tsx:88,138-148`, area 9, item 21
+
+**MEDIUM, partly covered.** A `PropValue.kind` outside the four the picker offers renders it with nothing
+selected, so the control reads as unset while the document holds a binding.
+
+The `renderWhen` row already handles exactly this: it offers an "Always (unrecognised rule)" option when
+the document holds a `kind` it cannot draw, so the row can let go of it deliberately. The same treatment
+belongs on the general mode picker, and it is not a two-line change -- the option's label has to say what
+is being replaced, and the picker is shared by every property row.
+
+Left as a known gap rather than half-done. `validateDocument` refuses such a document, so reaching it
+takes a paste that bypassed the gate.
+
 ## The HTML kit writes layout props as inline styles — `kit-html/renderers.tsx`, area 5, item 20
 
 **MEDIUM.** Every layout and display prop lands in a `style` attribute, which a strict

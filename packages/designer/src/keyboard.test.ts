@@ -172,3 +172,51 @@ describe('describeMove', () => {
     expect(describeMove('email', direction)).toBe(sentence)
   })
 })
+
+/**
+ * Two nodes with the same key, which a document can hold.
+ *
+ * `validateDocument` reports a duplicate key and cannot prevent one, because a
+ * host may render a document it never validated -- and `findNode`, `findParent`
+ * and `pathTo` in core all deliberately answer about the *first*. `moveTarget`
+ * matched siblings by `parentKey` string, so it collected the children of every
+ * parent with that name and counted a position in a list the document does not
+ * have.
+ */
+describe('moveTarget when two parents share a key', () => {
+  const leaf = (key: string): ComponentNode => ({ key, type: 'Field', props: {} })
+
+  const twoStacks = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      { key: 'stack', type: 'Stack', props: {}, children: [leaf('a'), leaf('b')] },
+      { key: 'stack', type: 'Stack', props: {}, children: [leaf('c'), leaf('d')] },
+    ],
+  })
+
+  const isContainer = (type: string): boolean => type === 'Stack' || type === 'Screen'
+
+  it('counts a position among this parent children, not every namesake parent', () => {
+    const rows = flatten(twoStacks())
+
+    /*
+     * `d` is the last child of the second stack, so it cannot move down. With
+     * the siblings gathered by key string the list held four entries and `d`
+     * sat at position 3 of 4 -- which is not the end, so the move was offered
+     * and landed the node at an index its parent does not have.
+     */
+    expect(moveTarget(rows, 'd', 'down', isContainer)).toBeUndefined()
+
+    // And `c` is the first, so it cannot move up.
+    expect(moveTarget(rows, 'c', 'up', isContainer)).toBeUndefined()
+  })
+
+  it('still reorders within one parent', () => {
+    // The control. A sibling list that came back empty would refuse every move.
+    const rows = flatten(twoStacks())
+    expect(moveTarget(rows, 'a', 'down', isContainer)).toEqual({ parentKey: 'stack', index: 1 })
+    expect(moveTarget(rows, 'd', 'up', isContainer)).toEqual({ parentKey: 'stack', index: 0 })
+  })
+})

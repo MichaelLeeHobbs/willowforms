@@ -105,3 +105,29 @@ test('CSS that would escape the component is not applied', async ({ designer }) 
   // And the component still has the styling that was accepted.
   expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
 })
+
+test('the canvas does not draw the form in the designer own typeface', async ({ designer }) => {
+  /*
+   * `.fs-canvas__frame` resets the three inherited properties that would
+   * otherwise come from the shell, and it used `revert` -- which rolls back to
+   * the user-agent origin, and for an inherited property with no UA rule that
+   * computes to `inherit`. So the reset did nothing, and an author judged
+   * wrapping and spacing against the builder's font rather than a form's.
+   *
+   * Only a browser can settle this: jsdom has no cascade to roll back through,
+   * which is why the review could not decide it and why this test is here rather
+   * than beside the stylesheet.
+   */
+  const seen = await designer.page.evaluate(() => {
+    const read = (selector: string): { font: string; size: string } => {
+      const element = document.querySelector(selector)
+      if (!element) throw new Error('no ' + selector)
+      const style = getComputedStyle(element)
+      return { font: style.fontFamily, size: style.fontSize }
+    }
+    return { shell: read('.fs-shell'), frame: read('.fs-canvas__frame') }
+  })
+
+  expect(seen.frame.font).not.toBe(seen.shell.font)
+  expect(seen.frame.size).not.toBe(seen.shell.size)
+})
