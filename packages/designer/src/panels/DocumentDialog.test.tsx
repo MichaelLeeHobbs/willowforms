@@ -13,7 +13,7 @@
 
 import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 import type { FormDocument, JsonSchema, Kit } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
@@ -267,7 +267,7 @@ describe('the JSON dialog', () => {
     user: ReturnType<typeof userEvent.setup>,
     file: File,
   ): Promise<HTMLInputElement> => {
-    const input = screen.getByLabelText('Import file') as HTMLInputElement
+    const input = screen.getByLabelText<HTMLInputElement>('Import file')
     await user.upload(input, file)
     return input
   }

@@ -488,6 +488,61 @@ describe('form settings', () => {
     expect(languageTag(latest().languages[1] as Language)).toBe('pt-BR')
   })
 
+  it('refuses a script subtag by name rather than truncating it', async () => {
+    /*
+     * The reason the parser is a grammar and not a `split('-')`. That split
+     * took the first two subtags and dropped the rest, so `zh-Hans-CN` was
+     * stored as the language `zh` with dialect `HANS` -- and every translation
+     * authored for it went into a bundle keyed `zh-HANS`, which the renderer
+     * never looks up, because the tag it looks up is the one this panel wrote.
+     *
+     * No test in this file typed a three-subtag code, so reverting the grammar
+     * to a split left the whole describe green. Saying "not yet" is a smaller
+     * failure than storing text nobody will find.
+     */
+    const { user, openTab, latest } = setup()
+    await openTab('Settings')
+
+    await user.type(screen.getByLabelText('Code'), 'zh-Hans-CN')
+    await user.type(screen.getByLabelText('Name'), 'Chinese')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    expect(screen.getByRole('alert').textContent).toMatch(/script subtag/)
+    expect(latest().languages).toHaveLength(1)
+  })
+
+  it('refuses a code that is not a tag at all', async () => {
+    // The other half the split could not see: it checked nothing, so `en US`
+    // became a bundle key nothing can ever resolve.
+    const { user, openTab, latest } = setup()
+    await openTab('Settings')
+
+    await user.type(screen.getByLabelText('Code'), 'en US')
+    await user.type(screen.getByLabelText('Name'), 'English')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(latest().languages).toHaveLength(1)
+  })
+
+  it('takes a numeric region, which is a tag as much as a lettered one', async () => {
+    // The control for both refusals: a grammar that refused everything would
+    // pass them, and `es-419` is Latin American Spanish rather than a typo.
+    const { user, openTab, latest } = setup()
+    await openTab('Settings')
+
+    await user.type(screen.getByLabelText('Code'), 'es-419')
+    await user.type(screen.getByLabelText('Name'), 'Spanish')
+    await user.click(screen.getByRole('button', { name: 'Add language' }))
+
+    expect(latest().languages[1]).toEqual({
+      code: 'es',
+      dialect: '419',
+      name: 'Spanish',
+      bidi: 'ltr',
+    })
+  })
+
   it('refuses a duplicate that differs only in case', async () => {
     const { user, openTab, latest } = setup([
       { code: 'pt', dialect: 'BR', name: 'PT', bidi: 'ltr' },
