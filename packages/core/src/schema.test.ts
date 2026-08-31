@@ -131,6 +131,30 @@ describe('toJsonSchema', () => {
     expect(schema.properties['email']).not.toHaveProperty('required')
   })
 
+  it('leaves a guarded required off the object', () => {
+    /*
+     * A rule with a `when` applies sometimes, and JSON Schema's `required` is
+     * unconditional, so exporting it rejects payloads the form itself accepts.
+     * No fixture had a guard on the rule, only a `renderWhen` on the node, so
+     * `&& !rule.when` could be deleted and every schema test stayed green.
+     */
+    const guarded = field('vat', 'string', [
+      { key: 'required', when: { kind: 'static', value: true } },
+    ])
+    const schema = toJsonSchema(doc([guarded, field('email', 'string', [{ key: 'required' }])]))
+
+    expect(schema.required).toEqual(['email'])
+  })
+
+  it('reports that guarded rule as lost rather than exporting it as absolute', () => {
+    // The other half: dropping it from `required` is only honest if the caller
+    // is told the export no longer says everything the form does.
+    const guarded = field('vat', 'string', [
+      { key: 'required', when: { kind: 'static', value: true } },
+    ])
+    expect(unexportableRules(doc([guarded]))).toEqual([{ key: 'vat', rule: 'required' }])
+  })
+
   it('omits required entirely when no field demands it', () => {
     const schema = toJsonSchema(doc([field('note', 'string')]))
     expect(schema.required).toBeUndefined()

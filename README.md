@@ -66,7 +66,7 @@ Hono server so the demo can persist a document and prove server-side validation 
 pnpm install
 pnpm dev          # playground at http://localhost:5180
 pnpm test         # 1299 tests
-pnpm e2e          # 67 more, in a real browser
+pnpm e2e          # 68 more, in a real browser
 pnpm build        # tsc --build across all packages
 ```
 

@@ -428,3 +428,32 @@ JSONForms had to bolt on is, here, one optional field on one member.
 - **Reversal:** Free today. `setContext` is a sketch in `09-actions.md`, not code. It gets expensive the
   moment an action vocabulary ships against the looser reading.
 - **When:** 2026-08-28, on `feat/context`.
+
+## A condition follows a copy only when it reads the context
+
+`repointBinding` rewrote every literal equal to the old key. `duplicateNode`'s own comment said it did
+not, and gave the reason: a condition testing an answer whose value happens to spell the copied key is
+about the answer, not the node. The function had been doing the opposite since it was written, and the
+designer's rename inherited it, so renaming a component quietly rewrote conditions about answers.
+
+A literal names a node when it is compared against the host context, which is the shape a `Step` ships
+with (`context.step == 'welcome'`). It names a value when it is compared against a `ref`. So the rewrite
+now happens only inside a comparison with a `context` operand in it.
+
+Found by writing the test the review said was missing, which is the second half of the rule failing
+against the code that claimed to implement it.
+
+## A row-scoped ref to a form-level answer is reported at boot
+
+`rowScopeProblems` reported two mismatches: a form-scoped ref to a key that only exists in a row, and a
+row-scoped ref on a node outside every repeater. The third is a row-scoped ref *inside* a repeater
+naming a key no node in that row writes while a node outside every repeater does -- what you get by
+dragging a conditional field into a repeater. It reads nothing, the condition is false, the component is
+hidden, and its rules never run.
+
+Conservative in the same way as the other two: reported only when the key demonstrably lives at the
+other scope. A row's data can carry keys no component authors, so a ref naming a key nothing in the
+document writes is left alone rather than guessed at.
+
+This closes the loop under `rows.test.ts`'s "does not fall back to the form when the row has no such
+field", which asserted the silent-permissive outcome and stopped there.

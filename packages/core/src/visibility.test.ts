@@ -78,6 +78,39 @@ describe('validateForm and visibility', () => {
     expect(validateForm(root, { visible: 'filled' })).toEqual({})
   })
 
+  it('validates nothing at all when the root it was given is itself hidden', () => {
+    /*
+     * `validateForm(stepNode, data)` is the documented way to validate one step
+     * of a wizard, and a `Step` carries a `renderWhen` comparing `context.step`
+     * against its own key. Hand it no context and the root is hidden, so the
+     * whole form reports zero errors and a submit sails through.
+     *
+     * That is the silent-permissive answer this library takes deliberately over
+     * a crash, and no test gave the root a condition of its own, so nothing
+     * pinned it. It is pinned here in both directions: hidden root, nothing
+     * checked; the same root with the context it wanted, everything checked.
+     */
+    const step: ComponentNode = {
+      key: 'who',
+      type: 'Step',
+      props: {},
+      renderWhen: {
+        kind: 'condition',
+        condition: {
+          op: 'eq',
+          left: { kind: 'context', path: 'step' },
+          right: { kind: 'literal', value: 'who' },
+        },
+      },
+      children: [field('name')],
+    }
+
+    expect(validateForm(step, {}), 'a form nobody can see reports nothing').toEqual({})
+    expect(validateForm(step, {}, { context: { step: 'who' } })).toEqual({
+      name: 'This field is required.',
+    })
+  })
+
   it('starts validating a field once its condition turns true', () => {
     const conditional: ComponentNode = {
       key: 'root',

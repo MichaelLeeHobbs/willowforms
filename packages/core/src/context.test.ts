@@ -220,6 +220,34 @@ describe('contextValues, which is how a document declares its flow', () => {
     expect(contextValues(wizard([againstAField]), 'step')).toEqual([])
   })
 
+  it('reads a step out of a property binding and a rule guard, not only renderWhen', () => {
+    /*
+     * `contextValues` sweeps all three places a document holds a condition, and
+     * every test here built its wizard out of `renderWhen`, so two thirds of
+     * what it sweeps was unexercised. The consequence is not cosmetic: the step
+     * list is what `validateAcross` walks, so a step reachable only from a
+     * property or a rule guard would drop out of it and never be validated on
+     * the server.
+     */
+    const fromProp: ComponentNode = {
+      key: 'byProp',
+      type: 'Box',
+      props: { disabled: { kind: 'condition', condition: step('review') } },
+      children: [],
+    }
+    const fromGuard: ComponentNode = {
+      key: 'byGuard',
+      type: 'Field',
+      props: {},
+      schema: {
+        type: 'string',
+        validations: [{ key: 'required', when: { kind: 'condition', condition: step('confirm') } }],
+      },
+    }
+
+    expect(contextValues(tree([fromProp, fromGuard]), 'step')).toEqual(['review', 'confirm'])
+  })
+
   it('finds a step nested inside a group', () => {
     const guarded: Condition = {
       op: 'and',

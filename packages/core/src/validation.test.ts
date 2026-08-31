@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ComponentNode, Condition, FormData, ValidationRule } from './types.js'
 import { contextValues } from './context.js'
-import type { EvalOptions } from './validation.js'
+import type { EvalOptions, Evaluator } from './validation.js'
 import {
   DEFAULT_MESSAGES,
   UNREADABLE_RULE,
@@ -76,6 +76,29 @@ describe('format rules', () => {
     expect(check({ key: 'url' }, 'not a url')).toBe(DEFAULT_MESSAGES.url)
   })
 
+  it.each([
+    ['javascript:alert(1)'],
+    ['JavaScript:alert(1)'],
+    ['data:text/html,<script>alert(1)</script>'],
+    ['vbscript:msgbox(1)'],
+    ['//evil.example.com'],
+  ])('refuses %s, which parses as a URL and is not one anybody should follow', (value) => {
+    /*
+     * The rule was tested against `not a url` only, so what it did with a
+     * scheme was unmeasured — and this rule is what a host trusts before it
+     * writes an answer into an `href`. `javascript:` parses perfectly well.
+     * `isUrl` asks `safeHref` for exactly this reason and nothing said so.
+     */
+    expect(check({ key: 'url' }, value)).toBe(DEFAULT_MESSAGES.url)
+  })
+
+  it('accepts the schemes a link can safely carry', () => {
+    // The control. A rule that refused everything would pass the rows above.
+    expect(check({ key: 'url' }, 'http://example.com/x?y=1')).toBeUndefined()
+    expect(check({ key: 'url' }, 'mailto:someone@example.com')).toBeUndefined()
+    expect(check({ key: 'url' }, 'tel:+441234567890')).toBeUndefined()
+  })
+
   it('validates uuid case-insensitively', () => {
     expect(check({ key: 'uuid' }, '3f2504e0-4f89-11d3-9a0c-0305e82c3301')).toBeUndefined()
     expect(check({ key: 'uuid' }, '3F2504E0-4F89-11D3-9A0C-0305E82C3301')).toBeUndefined()
@@ -122,6 +145,23 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
   it('skips a computed guard when no evaluator is injected', () => {
     const rule: ValidationRule = { key: 'required', when: { kind: 'computed', expression: 'true' } }
     expect(check(rule, '')).toBeUndefined()
+  })
+
+  it('runs a computed guard in both directions once one is', () => {
+    /*
+     * Only the no-evaluator direction was tested, so a guard that answered
+     * "skip" whatever the expression said would have passed: the permissive
+     * half was pinned and the half that makes a rule apply was not. This is
+     * `required` on an empty value, so the guard alone decides the outcome.
+     */
+    const evaluate: Evaluator = (expression) => expression === 'true'
+    const guarded = (expression: string): ValidationRule => ({
+      key: 'required',
+      when: { kind: 'computed', expression },
+    })
+
+    expect(applyRule(guarded('true'), '', NO_DATA, { evaluate })).toBe(DEFAULT_MESSAGES.required)
+    expect(applyRule(guarded('false'), '', NO_DATA, { evaluate })).toBeUndefined()
   })
 
   it('honours a static guard', () => {
@@ -226,9 +266,24 @@ describe('required on a boolean', () => {
   })
 
   it('does not make false empty for every other rule', () => {
-    // Requiredness is one rule's job; nothing else changes meaning.
-    const node = box([{ key: 'minLength', value: 3 }])
-    expect(validateField(node, { terms: false })).toBeUndefined()
+    /*
+     * Requiredness is one rule's job; nothing else changes meaning.
+     *
+     * `minLength` on a boolean used to be the fixture here, and it passes under
+     * either reading: a rule that skipped `false` as empty and a rule that ran
+     * and found nothing to measure both answer "fine". A custom rule tells them
+     * apart, because every rule but `required` short-circuits on an empty value
+     * — so if `false` were empty this expression would never run and the
+     * assertion would flip.
+     */
+    const evaluate: Evaluator = () => false
+    const node = box([{ key: 'custom', expression: 'never' }])
+
+    expect(validateField(node, { terms: false }, { evaluate })).toBe(DEFAULT_MESSAGES.custom)
+    // And the empty answer really is skipped, which is what makes that a test.
+    expect(
+      validateField(box([{ key: 'custom', expression: 'never' }]), {}, { evaluate }),
+    ).toBeUndefined()
   })
 })
 

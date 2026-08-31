@@ -177,7 +177,19 @@ function baseOf(key: string): string {
  * returned as it stands rather than throwing. Only literals are touched, and
  * only ones equal to the old key — a `ref` names a data key, which the copy
  * shares deliberately.
+ *
+ * And only inside a comparison that reads the host context, which is the part
+ * this got wrong. A literal equal to a node key means "this node" when it is
+ * being compared against `context.step`; in `chosen == 'panel'` the same string
+ * is an answer's value, and rewriting it changed which answer reveals the copy.
+ * `duplicateNode` said as much in a comment while calling a function that did
+ * the opposite, and `renameKey` in the designer inherited it: renaming a
+ * component silently rewrote every condition comparing an answer to a value
+ * that happened to match the old key.
  */
+/** The three places an operand can sit in a condition. */
+const SIDES = ['left', 'right', 'value'] as const
+
 export function repointBinding(value: PropValue, from: string, to: string): PropValue {
   if (value.kind !== 'condition') return value
 
@@ -190,19 +202,32 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
     const shape = condition as unknown as Record<string, unknown>
     const next: Record<string, unknown> = { ...shape }
 
-    for (const name of ['left', 'right', 'value'] as const) {
-      if (shape[name] !== undefined) next[name] = operand(shape[name] as Operand)
+    /*
+     * Does this comparison read the context? That is what tells a key from a
+     * value: `context.step == 'welcome'` is about the component named `welcome`,
+     * `chosen == 'welcome'` is about an answer that happens to spell the same
+     * string, and only the first should follow a copy or a rename.
+     */
+    const readsContext = SIDES.some(
+      (name) => (shape[name] as Operand | undefined)?.kind === 'context',
+    )
+
+    if (readsContext) {
+      for (const name of SIDES) {
+        if (shape[name] !== undefined) next[name] = operand(shape[name] as Operand)
+      }
+      if (Array.isArray(shape['options'])) {
+        next['options'] = (shape['options'] as unknown[]).map((option) =>
+          option === from ? to : option,
+        )
+      }
     }
+
     if (Array.isArray(shape['conditions'])) {
       next['conditions'] = (shape['conditions'] as Condition[]).map(inCondition)
     }
     if (shape['condition'] !== undefined) {
       next['condition'] = inCondition(shape['condition'] as Condition)
-    }
-    if (Array.isArray(shape['options'])) {
-      next['options'] = (shape['options'] as unknown[]).map((option) =>
-        option === from ? to : option,
-      )
     }
 
     return next as unknown as Condition
@@ -233,9 +258,11 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
      * after the key for exactly this reason, and duplication is the same moment
      * arriving by a different route.
      *
-     * Only a literal equal to the old key, and only in `renderWhen`. Rewriting
-     * every literal that happens to match would corrupt a condition testing an
-     * unrelated field whose value is the copied key.
+     * Only a literal equal to the old key, only in `renderWhen`, and only where
+     * the comparison reads the context. Rewriting every literal that happens to
+     * match corrupts a condition testing an answer whose value is the copied
+     * key, which is what it used to do: this comment described the rule the
+     * function did not have until a test asked it for one.
      */
     if (node.renderWhen) next.renderWhen = repointBinding(node.renderWhen, node.key, nextKey)
     if (node.schema) next.schema = { ...node.schema, validations: [...node.schema.validations] }

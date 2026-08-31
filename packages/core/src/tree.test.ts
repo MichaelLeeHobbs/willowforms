@@ -213,52 +213,105 @@ describe('validateDocument against malformed input', () => {
     return validateDocument(doc as unknown as FormDocument)
   }
 
+  /*
+   * The control. Every row below mutates this fixture and asserts an error, so
+   * a fixture that was already invalid would make the whole table pass without
+   * the mutations doing anything. That is not hypothetical: the language row
+   * did exactly this on its own, reported below.
+   */
+  it('accepts the fixture the table mutates', () => {
+    expect(judge(() => undefined)).toEqual([])
+  })
+
+  /*
+   * Each row names the message it expects, not just that something was
+   * reported.
+   *
+   * "A language with no code" already produced two errors: the missing code and
+   * `defaultLanguage en is not in languages`, which follows from it. Deleting
+   * the code check left the row green on the consequence — a check with no test
+   * behind it, in the function that stands between a pasted document and the
+   * builder. The other twelve rows were sound and are pinned so they stay that
+   * way.
+   */
   it.each([
     [
       'a number for children',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['children'] = 5),
+      'root.children must be an array.',
     ],
     [
       'a string for children',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['children'] = 'abc'),
+      'root.children must be an array.',
     ],
-    ['a null root', (d: Record<string, unknown>) => (d['root'] = null)],
-    ['a missing root', (d: Record<string, unknown>) => delete d['root']],
+    [
+      'a null root',
+      (d: Record<string, unknown>) => (d['root'] = null),
+      'root is not a component node.',
+    ],
+    [
+      'a missing root',
+      (d: Record<string, unknown>) => delete d['root'],
+      'root is not a component node.',
+    ],
     [
       'a number for a key',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['key'] = 7),
+      'root needs a string key.',
     ],
     [
       'a missing type',
       (d: Record<string, unknown>) => delete (d['root'] as Record<string, unknown>)['type'],
+      'root needs a string type.',
     ],
     [
       'a string for events',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['events'] = 'go'),
+      'root.events must be an object.',
     ],
     [
       'a non-array event list',
       (d: Record<string, unknown>) =>
         ((d['root'] as Record<string, unknown>)['events'] = { onClick: 1 }),
+      'root.events must map each event to an array.',
     ],
     [
       'a null in an event list',
       (d: Record<string, unknown>) =>
         ((d['root'] as Record<string, unknown>)['events'] = { onClick: [null] }),
+      'root.events contains an entry that is not an action reference.',
     ],
-    ['a number for languages', (d: Record<string, unknown>) => (d['languages'] = 3)],
-    ['a language with no code', (d: Record<string, unknown>) => (d['languages'] = [{ name: 'X' }])],
-    ['a null for actions', (d: Record<string, unknown>) => (d['actions'] = null)],
+    [
+      'a number for languages',
+      (d: Record<string, unknown>) => (d['languages'] = 3),
+      'languages must be an array.',
+    ],
+    [
+      'a language with no code',
+      (d: Record<string, unknown>) => (d['languages'] = [{ name: 'X' }]),
+      'every language needs a string code.',
+    ],
+    [
+      'a null for actions',
+      (d: Record<string, unknown>) => (d['actions'] = null),
+      'actions must be an object.',
+    ],
     [
       'a nested non-node child',
       (d: Record<string, unknown>) => ((d['root'] as Record<string, unknown>)['children'] = [42]),
+      'root.children[0] is not a component node.',
     ],
-  ])('reports rather than throws on %s', (_label, mutate) => {
+  ])('reports rather than throws on %s', (_label, mutate, expected) => {
     let errors: StructuralError[] = []
     expect(() => {
       errors = judge(mutate)
     }).not.toThrow()
     expect(errors.length, 'malformed input was accepted silently').toBeGreaterThan(0)
+    expect(
+      errors.map((error) => error.message),
+      'reported, but not for the reason this row is about',
+    ).toContain(expected)
   })
 
   it('survives values that are not objects at all', () => {
@@ -411,6 +464,80 @@ describe('duplicateNode', () => {
     // Duplicate keys are the failure this whole function exists to avoid, and
     // validateDocument is what would report them.
     expect(validateDocument(document)).toEqual([])
+  })
+
+  it('re-points a condition that named the copied node at the copy', () => {
+    /*
+     * A Step is a Step because its `renderWhen` compares `context.step` against
+     * its own key. Copied by reference, the duplicate was shown by the
+     * original's name: both steps render at once, and the copy can never be
+     * reached by asking for it. Nothing tested this, and the run that found it
+     * confirmed it by execution.
+     */
+    const original: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'step',
+          type: 'Step',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'context', path: 'step' },
+              right: { kind: 'literal', value: 'step' },
+            },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(original, 'step')
+    expect(copy?.key).toBe('step2')
+    expect(copy?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: 'step2' },
+      },
+    })
+  })
+
+  it('leaves a literal that merely matches the copied key alone', () => {
+    /*
+     * The other half of the rule, and the reason this is not a blanket rewrite:
+     * a condition on an answer whose value happens to equal the copied key is
+     * about that answer, not about the node. Rewriting it would change what the
+     * copy is asking.
+     */
+    const original: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'panel',
+          type: 'Stack',
+          props: {},
+          renderWhen: {
+            kind: 'condition',
+            condition: {
+              op: 'eq',
+              left: { kind: 'ref', dataKey: 'chosen' },
+              right: { kind: 'literal', value: 'panel' },
+            },
+          },
+        },
+      ],
+    }
+
+    const copy = duplicateNode(original, 'panel')
+    expect(copy?.key).toBe('panel2')
+    expect(copy?.renderWhen).toEqual(original.children?.[0]?.renderWhen)
   })
 
   it('copies props and rules without sharing the records that hold them', () => {

@@ -48,6 +48,37 @@ describe('equality', () => {
   it('is false for a field the data does not have', () => {
     expect(check({ op: 'eq', left: ref('missing'), right: lit('x') })).toBe(false)
   })
+
+  it('is false in both directions when neither operand can be read', () => {
+    /*
+     * Two operands of a shape nobody designed, which is what a hand-edited
+     * document can hold. Equality between them used to be `true` — they are
+     * both "nothing", after all — and `ne` was therefore `false`, so a
+     * malformed condition either revealed a component or hid one depending on
+     * which way round it was written.
+     *
+     * Unreadable is not a value. Both directions answer false, and false means
+     * hidden, which is the invariant this file is about.
+     */
+    const junk = { kind: 'nonsense' } as unknown as Operand
+
+    expect(check({ op: 'eq', left: junk, right: junk })).toBe(false)
+    expect(check({ op: 'ne', left: junk, right: junk })).toBe(false)
+    expect(check({ op: 'eq', left: ref('country'), right: junk })).toBe(false)
+    expect(check({ op: 'ne', left: ref('country'), right: junk })).toBe(false)
+  })
+
+  it('does not let a negation turn an unreadable comparison into a reason to show', () => {
+    const junk = { kind: 'nonsense' } as unknown as Operand
+    expect(check({ op: 'not', condition: { op: 'eq', left: junk, right: junk } })).toBe(false)
+  })
+
+  it('still reads two unanswered fields as equal, which is a value and not a failure', () => {
+    // The control beside the rows above: `undefined` is a reading. Both fields
+    // are unanswered, so they hold the same answer, and `ne` says so.
+    expect(check({ op: 'eq', left: ref('missingA'), right: ref('missingB') })).toBe(true)
+    expect(check({ op: 'ne', left: ref('missingA'), right: ref('missingB') })).toBe(false)
+  })
 })
 
 describe('ordering', () => {

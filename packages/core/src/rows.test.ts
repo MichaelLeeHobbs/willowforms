@@ -140,6 +140,29 @@ describe('validating a repeater', () => {
     ])
   })
 
+  it.each([
+    ['a string', 'nope'],
+    ['a number', 7],
+    ['an object', { line1: 'a' }],
+    ['null', null],
+  ])('reads %s in a repeater as no rows rather than throwing', (_label, stored) => {
+    /*
+     * A repeater's value arrives from a request body, so it can be anything.
+     * Nothing drove one of these through `validateForm` before, and the
+     * function walks it to decide how many rows to check.
+     *
+     * No rows means the rules inside the repeater do not run, which is the
+     * permissive answer this codebase takes deliberately over a crash. The
+     * repeater's own rules still apply, and `email` outside it still reports,
+     * so a broken list does not take the rest of the form down with it.
+     */
+    let errors: Record<string, string> = {}
+    expect(() => {
+      errors = validateForm(form, { addresses: stored })
+    }).not.toThrow()
+    expect(errors).toEqual({ email: DEFAULT_MESSAGES.required })
+  })
+
   it('reports a field outside the repeater under its bare key', () => {
     expect(validateForm(form, { addresses: [] })).toEqual({ email: DEFAULT_MESSAGES.required })
   })
@@ -198,6 +221,32 @@ describe('a condition scoped to its row', () => {
      * is always another flavour of path.
      */
     expect(validateForm(form('row'), { business: true, orders: [{}] })).toEqual({})
+  })
+
+  it('and says so at boot rather than leaving it quiet', () => {
+    /*
+     * The other half, which this file used to leave out: the assertion above is
+     * a required answer going unchecked because a condition read nothing, and a
+     * test that certifies that as correct and stops there is a test that blesses
+     * the silent-permissive ending. It is only acceptable because the document
+     * carrying it is refused before anyone submits.
+     *
+     * The fixture has to say which form key it means for that to fire, since
+     * `rowScopeProblems` reports a ref that demonstrably belongs to the other
+     * scope and not one naming a key nothing in the document writes.
+     */
+    const document = { ...createDocument('Rows', 'rows'), root: form('row') }
+    document.root.children?.unshift({
+      key: 'business',
+      type: 'Checkbox',
+      props: {},
+      schema: { type: 'boolean', validations: [] },
+    })
+
+    const errors = validateDocument(document)
+    expect(errors.map((error) => error.code)).toEqual(['row-scope'])
+    expect(errors[0]?.key).toBe('vat')
+    expect(errors[0]?.message).toContain('only the form has that answer')
   })
 })
 
@@ -519,6 +568,94 @@ describe('a repeater whose two names differ', () => {
     expect(submittedData(root, data)).toEqual({
       addresses: [{ line1: '1 High Street', postcode: 'SW1A 1AA' }, { postcode: 'X' }],
     })
+  })
+})
+
+/**
+ * Two repeaters deep, which is where an address stops being decoration.
+ *
+ * Every repeater fixture in this file had one level, so `addresses[1].postcode`
+ * and a single-frame row context produced the same answer as any number of
+ * simpler schemes would have. The design says a row coordinate is a path, not a
+ * pair, and nothing drove a nested one through the three functions that have to
+ * agree about it: `validateForm` reports at an address, `applyChange` writes at
+ * one, and `submittedData` reads the tree back out.
+ */
+describe('a repeater inside a repeater', () => {
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'orders',
+        type: 'Repeater',
+        props: {},
+        dataKey: 'orders',
+        schema: { type: 'array', validations: [] },
+        children: [
+          {
+            key: 'reference',
+            type: 'TextField',
+            props: {},
+            schema: { type: 'string', validations: [{ key: 'required' }] },
+          },
+          {
+            key: 'lines',
+            type: 'Repeater',
+            props: {},
+            dataKey: 'lines',
+            schema: { type: 'array', validations: [] },
+            children: [
+              {
+                key: 'sku',
+                type: 'TextField',
+                props: {},
+                schema: { type: 'string', validations: [{ key: 'required' }] },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+
+  const data: FormData = {
+    orders: [{ reference: 'A1', lines: [{ sku: 'x' }, {}] }, { lines: [{}] }],
+  }
+
+  it('reports each missing answer at its full address', () => {
+    expect(validateForm(root, data)).toEqual({
+      'orders[0].lines[1].sku': DEFAULT_MESSAGES.required,
+      'orders[1].reference': DEFAULT_MESSAGES.required,
+      'orders[1].lines[0].sku': DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('writes a keystroke into the inner row it was typed in', () => {
+    const next = applyChange(data, 'orders[0].lines[1].sku', 'y')
+    const orders = next['orders'] as FormData[]
+
+    expect((orders[0]?.['lines'] as FormData[])[1]).toEqual({ sku: 'y' })
+    // The sibling row and the sibling order are untouched, and identically so.
+    expect((orders[0]?.['lines'] as FormData[])[0]).toBe(
+      ((data['orders'] as FormData[])[0]?.['lines'] as FormData[])[0],
+    )
+    expect(orders[1]).toBe((data['orders'] as FormData[])[1])
+  })
+
+  it('collects both levels under their answer names', () => {
+    expect(submittedData(root, data)).toEqual({
+      orders: [{ reference: 'A1', lines: [{ sku: 'x' }, {}] }, { lines: [{}] }],
+    })
+  })
+
+  it('keeps a row coordinate readable in both directions', () => {
+    const address = 'orders[1].lines[0].sku'
+    const decoded = decodeAddress(address)
+    expect(decoded?.name).toBe('sku')
+    expect(encodeRow(decoded?.path ?? NO_ROWS)).toBe('orders[1].lines[0]')
+    expect(addressOf(decoded?.path ?? NO_ROWS, 'sku')).toBe(address)
   })
 })
 

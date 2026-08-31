@@ -100,7 +100,7 @@ test('a stored draft that is not a document loads the sample instead', async ({ 
     window.localStorage.setItem(
       key,
       JSON.stringify({
-        version: 1,
+        version: '1',
         id: 'broken',
         name: 'Broken draft',
         languages: [{ code: 'en', region: 'US', name: 'English' }],

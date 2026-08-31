@@ -325,6 +325,47 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
       }
     }
 
+    /*
+     * The third mismatch, and the last one that can be told apart from a
+     * deliberate choice: a `scope: 'row'` ref, inside a repeater, naming a key
+     * no node in this row writes while a node outside every repeater does. The
+     * read is undefined, the condition is false, the component is hidden and its
+     * rules never run — the same silent-permissive ending as the other two,
+     * reached by moving a conditional field *into* a repeater instead of out of
+     * one.
+     *
+     * Conservative in the same way as the check above it: reported only when the
+     * key demonstrably lives at the other scope. A row's data can carry keys no
+     * component authors, so a ref naming a key that exists nowhere in the
+     * document is left alone rather than guessed at.
+     */
+    if (enclosing) {
+      const props =
+        node.props && typeof node.props === 'object' && !Array.isArray(node.props)
+          ? Object.values(node.props)
+          : []
+      const guards = Array.isArray(node.schema?.validations)
+        ? node.schema.validations.map((rule) => rule?.when)
+        : []
+
+      for (const value of [node.renderWhen, ...props, ...guards]) {
+        if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
+        for (const ref of rowScopedRefs(value.condition)) {
+          if (!enclosing.has(ref) && formKeys.has(ref)) {
+            problems.push({
+              key: node.key,
+              problem:
+                node.key +
+                ' tests ' +
+                ref +
+                " as this row's answer, and only the form has that answer. " +
+                'That reads nothing, so the component is hidden and never validated.',
+            })
+          }
+        }
+      }
+    }
+
     const scope = isRowScopeNode(node) ? rowKeys(node) : enclosing
     for (const child of kids(node)) visit(child, scope, depth + 1)
   }

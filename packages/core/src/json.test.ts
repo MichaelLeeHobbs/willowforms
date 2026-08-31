@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isEmpty, jsonToString, optionValue, readPath, safeHref } from './json.js'
+import { isEmpty, jsonToString, optionValue, readPath, safeHref, valueOf } from './json.js'
 
 describe('jsonToString', () => {
   it('passes strings through and renders primitives', () => {
@@ -219,5 +219,81 @@ describe('isEmpty and objects', () => {
     // is a `false` somebody chose, and `0` is a number somebody typed.
     expect(isEmpty(false)).toBe(false)
     expect(isEmpty(0)).toBe(false)
+  })
+})
+
+/**
+ * The rest of "empty", and the read that decides whether there is an answer at
+ * all.
+ *
+ * The describe above covers objects, which is where the defect was. These cover
+ * the other branches, none of which had a test of their own, and `valueOf`,
+ * which had none anywhere: it is the own-property read that stands between a
+ * request body and every rule in the library.
+ */
+describe('isEmpty over the rest of the shapes', () => {
+  it.each([
+    ['nothing at all', undefined],
+    ['a null', null],
+    ['empty text', ''],
+    ['text that is only whitespace', ' ' + String.fromCharCode(9, 10)],
+    ['an empty list', []],
+  ])('reads %s as no answer', (_label, value) => {
+    expect(isEmpty(value as never)).toBe(true)
+  })
+
+  it.each([
+    ['text', 'a'],
+    ['text that is only punctuation', '.'],
+    ['a list with something in it', ['a']],
+    ['a list holding a null', [null]],
+    ['zero', 0],
+    ['false', false],
+  ])('reads %s as an answer', (_label, value) => {
+    expect(isEmpty(value as never)).toBe(false)
+  })
+
+  it('counts own keys only', () => {
+    // An inherited key is not an answer anybody gave, and a request body can
+    // carry one. `Object.keys` is the reason this holds; a `for...in` would not.
+    const inherited = Object.create({ role: 'admin' }) as Record<string, never>
+    expect(isEmpty(inherited)).toBe(true)
+  })
+})
+
+describe('valueOf', () => {
+  it('reads what a field holds, including the falsy answers', () => {
+    expect(valueOf({ a: 'x' }, 'a')).toBe('x')
+    expect(valueOf({ a: false }, 'a')).toBe(false)
+    expect(valueOf({ a: 0 }, 'a')).toBe(0)
+    expect(valueOf({ a: null }, 'a')).toBe(null)
+  })
+
+  it('is nothing for a field the data does not have', () => {
+    expect(valueOf({}, 'missing')).toBeUndefined()
+  })
+
+  it.each(['toString', 'constructor', 'hasOwnProperty', 'valueOf'])(
+    'is nothing for %s, which every object inherits',
+    (dataKey) => {
+      /*
+       * A plain lookup finds the prototype, so a field whose data key is
+       * `toString` came back holding a function: present, truthy, and not an
+       * answer anyone gave. `required` would have been satisfied by it.
+       */
+      expect(valueOf({}, dataKey)).toBeUndefined()
+    },
+  )
+
+  it('reads an own key that shadows an inherited one', () => {
+    expect(valueOf({ toString: 'typed by a person' }, 'toString')).toBe('typed by a person')
+  })
+
+  it('does not walk into a polluted prototype from a request body', () => {
+    // JSON.parse gives `__proto__` as an own key rather than assigning through
+    // it, which is why this is data and not an attack -- but `role` must still
+    // be nothing, because no field was answered.
+    const body = JSON.parse('{"__proto__":{"role":"admin"}}') as Record<string, never>
+    expect(valueOf(body, 'role')).toBeUndefined()
   })
 })
