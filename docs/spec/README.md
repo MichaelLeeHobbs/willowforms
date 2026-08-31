@@ -33,7 +33,7 @@ by anything.
 | [00-product.md](00-product.md)               | Purpose, users, scope, non-goals                         | —       |
 | [01-document-model.md](01-document-model.md) | `FormDocument`, `ComponentNode`, `PropValue`, versioning | Partial |
 | [02-kit-contract.md](02-kit-contract.md)     | The two halves of a kit and the one obligation           | Built   |
-| [03-components.md](03-components.md)         | The component catalogue                                  | Built   |
+| [03-components.md](03-components.md)         | The component catalogue                                  | Partial |
 | [04-shell.md](04-shell.md)                   | Layout, panels, toolbar, viewport, keyboard              | Built   |
 | [05-canvas.md](05-canvas.md)                 | Selection, drag and drop, drop resolution                | Partial |
 | [06-inspector.md](06-inspector.md)           | Properties, Style, Actions, Rules, and the editors       | Partial |
@@ -55,7 +55,7 @@ opens with. A reader scanning this table for what is safe to depend on is asking
 question, and an index that answers Partial over a file reading Built answers a third question nobody
 asked.
 
-`05`, `06`, `07`, `08`, `11` and `12` read Partial because each has a named gap in it, and each of those
+`03`, `05`, `06`, `07`, `08`, `11` and `12` read Partial because each has a named gap in it, and each of those
 files says which one in its own preamble. `09` is Planned because actions are a design with no code.
 
 ## Vocabulary

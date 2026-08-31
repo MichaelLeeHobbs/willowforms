@@ -4,6 +4,23 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### `rowScopeProblems` stays internal; the spec names `validateDocument` instead
+
+- **Decided:** the document, not the export. `docs/spec/12-api.md` told hosts to call `rowScopeProblems`
+  at boot; it is not exported from `@formsmith/core` and now the page says `validateDocument`, which is
+  what actually reports those problems, under the `row-scope` code.
+- **Why:** `validateDocument` already calls it. A host has one boot-time gate to call, and exporting a
+  second entry point for a subset of what the first one returns is two ways to ask one question -- with
+  the usual consequence that one of them drifts.
+- **Rejected: exporting it.** It would be a public function whose whole output is a strict subset of
+  `validateDocument`'s, and a host that called only it would miss every other structural problem. The
+  cheap thing to add is the wrong shape to add.
+- **What it costs:** nothing today, because nothing could have called it. If a host ever wants row-scope
+  problems without the rest, that is a filter on `validateDocument`'s result by `code`, which is already
+  how the errors are typed.
+- **Reversal:** one line in `index.ts`.
+- **When:** 2026-08-31.
+
 ### A length-valued prop is CSS pixels, and kit-mui converts at its edge
 
 - **Decided:** every length a document can author -- `gap`, `padding`, `radius`, `maxWidth`, `width` --

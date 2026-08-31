@@ -197,8 +197,9 @@ lifecycle events are declared only by `Screen`. Settle them when something reads
   Planned as a shared trait instead.
 - **Modal and Dialog layout.** A form builder composes a form; where that form appears is the host's
   layout problem.
-- **A Step or Wizard component.** Absent as a _type_, and the two questions it was waiting on are
-  answered below. The answer turned out to be that it is not a component. See [Steps](#steps).
+- **A Wizard component.** There is no wizard type, and the two questions it was waiting on are answered
+  below. The answer turned out to be that a wizard is not a component: a step is a container with a
+  condition on it, and both kits ship `Step` as exactly that. See [Steps](#steps).
 - **Embedded form and Slot.** These are form composition, which is a feature that needs its own design
   rather than arriving by analogy. See [01-document-model.md](01-document-model.md#one-form-per-document).
 - **Typography as a raw wrapper.** `Heading` and `Text` cover what a form needs. A component whose whole

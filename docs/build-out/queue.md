@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 16, the published READMEs. Item 17 is next.
+- **Last completed:** item 17, the specification's HIGHs. Item 18 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/16-readmes`
+- **Last pushed item branch:** `build-out/b/17-spec-highs`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -234,7 +234,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a test that extracts every fenced `ts`/`tsx` block from every published
       README, typechecks it against the built packages, and fails on an import the install line omits.
 
-- [ ] **17. The specification's HIGHs.** Area 17, plus one export and one line of `CLAUDE.md`.
+- [x] **17. The specification's HIGHs.** Area 17, plus one export and one line of `CLAUDE.md`.
       `docs/spec/12-api.md:239` names `rowScopeProblems` as a boot-time check and it is not exported from
       `@formsmith/core`. Export it, or correct the document, and say which and why.
       `02-kit-contract.md:118,129` understates what is enforced in both directions: it says no test checks

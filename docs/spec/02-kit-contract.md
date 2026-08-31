@@ -137,19 +137,31 @@ and `width` already had.
 The renderer knows nothing about the markup a kit produces, so it cannot supply labels or error wiring.
 A kit must:
 
-- give every field a real `<label for>` pointing at its control
-- set `aria-invalid` on a control whose `error` is set
-- point `aria-describedby` at a message element **that always exists**, so an error appearing later is
-  picked up rather than referring to a node that was not there when the description was read
-- put `role="alert"` on that message when it holds an error
-- leave a visible focus indicator on everything interactive
+| Obligation                                                                | Attribute          | Enforced |
+| ------------------------------------------------------------------------- | ------------------ | -------- |
+| Give every field a real `<label for>` pointing at its control             | —                  | no       |
+| Set `aria-invalid` on a control whose `error` is set                      | `aria-invalid`     | yes      |
+| Mark a control the document requires, so it says so before a submit fails | `aria-required`    | yes      |
+| Point the description at a message element **that always exists**         | `aria-describedby` | yes      |
+| Put `role="alert"` on that message when it holds an error                 | `role="alert"`     | yes      |
+| Leave a visible focus indicator on everything interactive                 | —                  | no       |
 
-`@formsmith/kit-html` is the reference implementation of all five and is deliberately dependency-free, so
+The description has to point at an element that is always in the DOM, so an error appearing later is
+picked up rather than referring to a node that was not there when the description was read.
+
+`@formsmith/kit-html` is the reference implementation of all six and is deliberately dependency-free, so
 it can be read and copied without also reading a component library.
 
-The third and fourth bullets are executed by the contract test. The other three are not: no test checks
-that a label points at its control, that `aria-invalid` is set, or that a focus indicator survives. They
-are obligations a kit author is trusted with, and saying so is better than implying a test is watching.
+**The Enforced column is checked.** `test/docs.test.ts` reads this table and asserts that every attribute
+marked `yes` is asserted in `test/kit-contract.test.tsx`, and that every one marked `no` is not -- so the
+column cannot drift in either direction. It said four bullets and enforcement of two, and both halves
+were wrong: `aria-invalid` is checked against every kit and this said it was not, and `aria-required` is
+checked and was not listed at all. Understating what is enforced is the dangerous direction, because a
+kit author budgets against this table and meets a red build.
+
+The two rows with no attribute are genuinely not checked. A label pointing at its control and a focus
+indicator surviving both need a browser, and they are named in
+[../accessibility.md](../accessibility.md) as what a Playwright pass would cover.
 
 ## Writing your own kit
 

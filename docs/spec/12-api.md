@@ -235,8 +235,12 @@ string of JavaScript reads is the evaluator's business, and core does not parse 
 
 **Status: built.** A condition inside a repeater says which scope it means: `scope: 'row'` reads the
 enclosing row, and the absence of it reads the form, which is what every document written before rows
-existed already meant. `rowScopeProblems` reports the three mismatches at boot rather than letting a
-condition read nothing and quietly hide a component.
+existed already meant. `validateDocument` reports the three mismatches at boot, under the `row-scope`
+code, rather than letting a condition read nothing and quietly hide a component.
+
+The check itself is `rowScopeProblems`, which is internal on purpose: a host has one boot-time gate to
+call and `validateDocument` runs this inside it. An earlier version of this page named that function as
+though a host called it directly, and it is not exported.
 
 Reading "the row above" or an index as a value is still not addressable, and is deliberately left alone.
 See [03-components.md](03-components.md#repeated-scope).
