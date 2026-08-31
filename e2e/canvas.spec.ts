@@ -304,15 +304,24 @@ test('a palette drag released off the canvas adds nothing', async ({ designer })
   const before = await designer.rootChildren()
 
   const item = designer.page.getByRole('button', { name: 'Checkbox', exact: true })
-  const pane = designer.page.locator('.fs-panel').first()
 
-  const start = await stableBox(item)
-  const away = await stableBox(pane)
+  /*
+   * Released over the toolbar, not over the left pane.
+   *
+   * The pane holds the palette this drag starts in, so on a short viewport its
+   * bottom edge can be a few pixels from the press -- and a gesture that never
+   * passes the four-pixel threshold never arms. That is what failed on CI while
+   * passing here, which is the shape Trap 13 is about: a positional test whose
+   * distance came from whatever the layout left over. The toolbar is the full
+   * width of the shell, above everything, and is not a drop zone.
+   */
+  const start = await dragFrom(item)
+  const away = await stableBox(designer.page.locator('.fs-toolbar'))
 
   await designer.page.mouse.move(start.x + 20, start.y + start.height / 2)
   await designer.page.mouse.down()
   await designer.page.mouse.move(start.x + 40, start.y + start.height / 2 + 20, { steps: 4 })
-  await designer.page.mouse.move(away.x + 10, away.y + away.height - 4, { steps: 8 })
+  await designer.page.mouse.move(away.x + away.width / 2, away.y + away.height / 2, { steps: 8 })
 
   // Armed, so the release below is a release from a real drag.
   await expect(designer.page.locator('.fs-drag-label')).toBeVisible()

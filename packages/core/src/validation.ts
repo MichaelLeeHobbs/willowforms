@@ -557,8 +557,12 @@ export function applyRule(
          * `FormData` -- so a custom rule inside a repeater checked a key from
          * outside the row, silently, and reported against the row it never read.
          *
-         * The row's values first and the form's underneath, so an expression can
-         * still reach a form-level answer that no field in the row shadows.
+         * The row's values win, and the form's show through underneath: the
+         * row is spread *last*, so a key the row holds shadows the form's, and
+         * an expression can still reach a form-level answer no field in the row
+         * writes. (The wording here used to say "row's values first", which is
+         * the precedence read as source order and the opposite of what the line
+         * below does.)
          */
         const scoped = options.row ? { ...data, ...options.row.values } : data
         return options.evaluate(rule.expression, scoped, options.context) ? undefined : fail()

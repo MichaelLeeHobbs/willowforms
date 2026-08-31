@@ -21,7 +21,13 @@ const slashes = (path) => path.split(sep).join('/')
 export const ASSETS = readdirSync(resolve(root, 'packages'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .flatMap((pkg) => {
-    const src = resolve(pkg.parentPath, pkg.name, 'src')
+    /*
+     * Built from the root, not from the `Dirent`. `parentPath` exists from Node
+     * 20.12 and is what this needs, but the directory is already known here --
+     * so depending on a field whose name changed once (`path` before it) buys
+     * nothing and dates the script.
+     */
+    const src = resolve(root, 'packages', pkg.name, 'src')
     return readdirSync(src, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith('.css'))
       .map((entry) => {
