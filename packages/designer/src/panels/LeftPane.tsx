@@ -59,8 +59,17 @@ export function LeftPane({
    */
   const [query, setQuery] = useState('')
 
+  /*
+   * The tablist is named for what the tabs are, not for where they are.
+   *
+   * It was "Left pane", so a screen reader announced the enclosing region as
+   * "Components and structure" and then the strip inside it by its position on
+   * the page -- which says nothing about what choosing a tab would do. Not the
+   * region's own name either: two things with one name is a different kind of
+   * unhelpful, and it makes every query for one of them ambiguous.
+   */
   return (
-    <Tabs label="Left pane" tabs={TABS} active={active} onSelect={setActive}>
+    <Tabs label="Palette, structure and settings" tabs={TABS} active={active} onSelect={setActive}>
       {active === 'components' && (
         <Palette
           kit={kit}

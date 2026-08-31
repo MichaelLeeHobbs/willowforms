@@ -13,7 +13,7 @@
  * three named an id that was not in the document.
  */
 
-import { useCallback, useId, useRef } from 'react'
+import { useCallback, useEffect, useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 
 export interface TabDef<Id extends string> {
@@ -53,6 +53,9 @@ export function Tabs<Id extends string>({
   const base = useId()
   const strip = useRef<HTMLDivElement>(null)
 
+  /** The tab a keypress asked for, until the parent has honoured the request. */
+  const wanted = useRef<Id | null>(null)
+
   const tabId = (id: Id): string => base + '-tab-' + id
   const panelId = (id: Id): string => base + '-panel-' + id
 
@@ -65,12 +68,19 @@ export function Tabs<Id extends string>({
     (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
       const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
       if (!keys.includes(event.key)) return
-      event.preventDefault()
 
-      // With one tab there is nowhere to go, and calling `onSelect` with the
-      // tab that is already active re-renders the panel for a keypress that
-      // did nothing.
+      /*
+       * Before `preventDefault`, not after.
+       *
+       * With one tab there is nowhere to go -- and swallowing the key anyway
+       * meant Home and End did nothing at all on a one-tab strip, rather than
+       * scrolling the panel the way they would anywhere else on the page. A
+       * component that takes a key and declines to act on it has to give it
+       * back.
+       */
       if (tabs.length < 2) return
+
+      event.preventDefault()
 
       const last = tabs.length - 1
       const next =
@@ -97,12 +107,38 @@ export function Tabs<Id extends string>({
        * buttons are the strip's element children, in the order they are
        * rendered, so `next` indexes them directly.
        */
-      const buttons = strip.current?.children
-      const element = buttons?.[next]
-      if (element instanceof HTMLButtonElement) element.focus()
+      /*
+       * Asked for, then moved to once the parent has honoured it.
+       *
+       * The parent owns the selection: `onSelect` is a request, and this used
+       * to move focus straight away on the assumption it was granted. A parent
+       * that ignores or remaps the request left focus on a tab rendered with
+       * `tabIndex={-1}` and `aria-selected={false}` -- a roving tabindex whose
+       * rove and selection point at different tabs, which the next arrow key
+       * steps out of the strip entirely.
+       *
+       * The effect below runs when `active` really changes, so a request that
+       * went nowhere leaves focus where it was, which is the honest answer.
+       */
+      wanted.current = target.id
     },
     [tabs, onSelect],
   )
+
+  useEffect(() => {
+    if (wanted.current === null || wanted.current !== active) return
+    wanted.current = null
+
+    /*
+     * By position in the strip rather than by re-querying an id: the id route
+     * depended on `CSS.escape` and on two optional chains, either of which
+     * would leave focus where it was with nothing to say so -- keyboard
+     * navigation that looks like it worked because the panel changed.
+     */
+    const at = tabs.findIndex((tab) => tab.id === active)
+    const element = strip.current?.children[at]
+    if (element instanceof HTMLButtonElement) element.focus()
+  }, [active, tabs])
 
   const tablist = (
     <div className="fs-tabs" role="tablist" aria-label={label} ref={strip}>

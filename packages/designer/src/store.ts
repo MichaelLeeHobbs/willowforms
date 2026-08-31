@@ -73,6 +73,13 @@ function commit(history: History, next: FormDocument, label?: string): History {
 
   const past = [...history.past, history.present]
   return {
+    /*
+     * `MAX_HISTORY` past documents, plus the present one.
+     *
+     * The specification said "the last hundred documents" and this keeps a
+     * hundred *edits* to go back through, which is one more document in memory
+     * and the number a person counts. `12-api.md` says that now.
+     */
     past: past.length > MAX_HISTORY ? past.slice(past.length - MAX_HISTORY) : past,
     present: next,
     future: [],
@@ -616,6 +623,14 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     // Directly after the original, which is where a duplicate belongs and
     // where the eye is already looking.
     const root = insertNode(doc.root, parent.key, copy, index + 1)
+
+    /*
+     * Nothing landed, so nothing is committed, the way every other writer here
+     * guards. An insert that matched no parent still took a slot in a capped
+     * undo stack -- which means a real edit fell off the end of it -- and still
+     * moved the selection onto a key that is not in the document.
+     */
+    if (root === doc.root) return undefined
 
     /*
      * Refused rather than merged if the document has moved underneath, for the

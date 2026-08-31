@@ -562,3 +562,27 @@ stylesheet, no dependencies, about 2,000 lines. These seven all ask it to grow a
 The eleven dark tokens duplicated in two blocks are already checked against each other by
 `test/contrast.test.ts`, which asserts the two dark blocks declare the same tokens -- so the duplication
 cannot drift silently, which was the concern.
+
+## Six designer-shell findings left as they are — area 6
+
+**NOTE and LOW.** Each is true, and each asks for a decision rather than a change:
+
+- The designer renders an `<h1>` (`Designer.tsx:434`). A component embedded in a host's page cannot know
+  its own heading level, and guessing `h2` is as wrong as guessing `h1` for the host that embeds it in a
+  section. The answer is a prop -- `headingLevel`, defaulted -- which is public API and belongs in the
+  spec's embedding contract rather than in a sweep.
+- `useDesigner` is exported and is absent from `12-api.md`'s embedding contract, which names `Designer`
+  as the package's surface. That export also publishes `replaceDocument`, which applies a document with
+  no gate. Both are real; deciding whether the hook is public API is a design call, and the honest fixes
+  point opposite ways (document it, or stop exporting it).
+- `replaceDocument` applies an arbitrary document with no `validateDocument` gate. The designer warns
+  about the document it is mounted with and this path says nothing -- but a gate here has to decide what
+  to do when a host insists, and "refuse" and "warn" are different products.
+- `findNode` walks the tree twice per render for the same key, and the derived value could feed the memo.
+  A real allocation, on a walk of a document-sized tree, in a hook that already memoises everything else.
+  Worth doing with a profile rather than by inspection.
+- `const document = history.present` shadows the global `document` for the body of `useDesigner`. Nothing
+  in that scope touches the DOM today, and renaming it touches every line in a 700-line hook.
+- The `useCallback` around `Tabs`' key handler saves nothing, because each button gets a fresh inline
+  arrow anyway. Removing the memo is right; the inline arrow is what would have to go first, and that is
+  a render-shape change to a component three panels depend on.

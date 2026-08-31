@@ -99,7 +99,16 @@ export function Palette({
       ) : (
         filtered.map((group) => (
           <div key={group.group} className="fs-palette__group">
-            <h3 className="fs-palette__group-title">{GROUP_LABELS[group.group]}</h3>
+            {/*
+             * The group's own name when the vocabulary does not know it.
+             *
+             * `groupKit` copies `component.group` through from the kit, so a
+             * third-party kit naming a group this designer has never heard of
+             * rendered an empty `<h3>` -- a heading with no text above a row of
+             * components, which is the same third-party-kit case `Icon.tsx`
+             * defends against by name in this package.
+             */}
+            <h3 className="fs-palette__group-title">{GROUP_LABELS[group.group] ?? group.group}</h3>
             <div className="fs-palette__items">
               {group.components.map((def) => (
                 <button

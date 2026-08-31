@@ -562,7 +562,12 @@ function useKeyboardShortcuts(
 
   const onKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
+      /*
+       * Narrowed, not asserted. A keydown target is any `EventTarget` -- the
+       * document, the window, a text node from a synthetic event -- and the
+       * cast bought nothing the optional chains below did not already do.
+       */
+      const target = event.target instanceof HTMLElement ? event.target : null
       const tag = target?.tagName
       const typing =
         tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable

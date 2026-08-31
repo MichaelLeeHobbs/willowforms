@@ -307,7 +307,8 @@ nothing is published.
 
 ## Undo
 
-**Status: built.** `MAX_HISTORY` is 100 and is exported. The store keeps the last hundred documents, and
+**Status: built.** `MAX_HISTORY` is 100 and is exported. The store keeps the last hundred documents to go
+back through, plus the one on screen, and
 consecutive edits to one property coalesce into a single entry, so a typed label costs one slot rather
 than thirteen. See [06-inspector.md](06-inspector.md#editing-granularity).
 

@@ -253,9 +253,14 @@ export function Icon({ name, size = 16 }: IconProps): ReactNode {
 /**
  * Every name the vocabulary declares, for tests and for a future icon picker.
  *
- * `Object.keys` types as `string[]` and the cast said otherwise. It is sound
- * here only because `GLYPHS` is a total record, which is a fact about the
- * declaration above rather than about `Object.keys` -- so the cast is replaced
- * by asking the type for its own keys.
+ * `Object.keys` types as `string[]`, and this file's own comment said the cast
+ * had been "replaced by asking the type for its own keys" while the cast was
+ * still on the line -- and `keyof typeof GLYPHS` *is* `IconName`, so it was the
+ * `string[] -> IconName[]` assertion the comment claimed was gone. Asking the
+ * declaration for its keys is what `Object.entries` of a typed record already
+ * gives, and it needs no assertion at all.
+ *
+ * The `.slice()` went with it: it copied an array `Object.keys` had just
+ * allocated for this call and nothing else holds.
  */
-export const ICON_NAMES: IconName[] = (Object.keys(GLYPHS) as (keyof typeof GLYPHS)[]).slice()
+export const ICON_NAMES: IconName[] = Object.entries(GLYPHS).map(([name]) => name as IconName)
