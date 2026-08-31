@@ -106,7 +106,23 @@ export interface Language {
 /** The data-shape contract for a component that participates in form data. */
 export interface FieldSchema {
   type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object' | 'file'
-  validations: ValidationRule[]
+  /**
+   * The rules, which a document may leave out entirely.
+   *
+   * Optional because `validateDocument` accepts a schema without it -- a field
+   * with no rules is an ordinary field, and demanding `validations: []` would
+   * refuse hand-written documents for nothing. The type said it was always
+   * there, so three readers were written as though it were:
+   * `duplicateNode` spread it, and `validateField` and `toJsonSchema` iterated
+   * it, all three throwing a `TypeError` on a document the gate calls valid.
+   *
+   * Ten other readers guarded with `Array.isArray`, which is what made the class
+   * look handled. Saying so in the type is what turns "remember to guard" into
+   * something the compiler asks about. Read it with `validationsOf`, which also
+   * answers for a `validations` that is not an array at all -- a document is
+   * data, so it can be a string.
+   */
+  validations?: ValidationRule[]
   /** Validate on change rather than only on submit. */
   autoValidate?: boolean
 }

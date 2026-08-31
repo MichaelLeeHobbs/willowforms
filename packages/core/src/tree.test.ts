@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { createDocument, emptyRoot, instantiate, prop } from './factory.js'
-import { unexportableRules } from './schema.js'
+import { toJsonSchema, unexportableRules } from './schema.js'
+import { validateForm } from './validation.js'
 import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument } from './types.js'
 import {
@@ -1613,5 +1614,100 @@ describe('toJsonSchema and a shared data key', () => {
 
   it('reports the collapse rather than performing it silently', () => {
     expect(unexportableRules(shared()).map((entry) => entry.key)).toContain('work')
+  })
+})
+
+/**
+ * A schema with no `validations` at all.
+ *
+ * `validateDocument` accepts one -- `validations === undefined` returns early
+ * from its schema check, deliberately, because a field with no rules is an
+ * ordinary field and demanding `validations: []` would refuse hand-written
+ * documents for nothing. The type said `ValidationRule[]`, required, so every
+ * reader was written as though the array were always there.
+ *
+ * Three of them were not guarded. `duplicateNode` spread it, which is the
+ * finding the review made; `validateField` and `toJsonSchema` iterated it, which
+ * are the two twins, and the first of those is the validation path itself. So a
+ * document the gate calls valid threw a `TypeError` out of the duplicate action,
+ * out of `validateForm`, and out of the schema export.
+ *
+ * Ten other readers already guarded with `Array.isArray`, which is what made
+ * this look handled.
+ */
+describe('a field whose schema has no validations', () => {
+  /*
+   * Built as JSON and cast, because that is how it arrives: from a file, a
+   * paste into the JSON dialog, or a request body. A fixture that could only be
+   * built by defeating the type checker is still a fixture the product receives.
+   */
+  const document_ = (): FormDocument =>
+    JSON.parse(
+      JSON.stringify({
+        ...createDocument('No rules', 'no-rules'),
+        root: {
+          key: 'root',
+          type: 'Screen',
+          props: {},
+          children: [{ key: 'email', type: 'TextField', props: {}, schema: { type: 'string' } }],
+        },
+      }),
+    ) as FormDocument
+
+  it('is a document the gate accepts', () => {
+    // The premise. If this ever starts reporting, the three tests below are
+    // about a document nothing can produce and should be re-read rather than
+    // deleted.
+    expect(validateDocument(document_())).toEqual([])
+  })
+
+  it('can be duplicated', () => {
+    const root = document_().root
+    expect(() => duplicateNode(root, 'email')).not.toThrow()
+    expect(duplicateNode(root, 'email')?.key).toBe('email2')
+  })
+
+  it('can be validated', () => {
+    // The worst of the three. A document the gate called valid took the whole
+    // submit down, on the server, with a TypeError.
+    const root = document_().root
+    expect(() => validateForm(root, {})).not.toThrow()
+    expect(validateForm(root, {})).toEqual({})
+  })
+
+  it('can be exported as JSON Schema', () => {
+    const doc = document_()
+    expect(() => toJsonSchema(doc)).not.toThrow()
+    expect(toJsonSchema(doc).properties).toHaveProperty('email')
+  })
+
+  it('is still read as having no rules when the field holds something that is not a list', () => {
+    /*
+     * The other half, and the reason the fix reads the value rather than merely
+     * defaulting it. A document is data, so `validations` can be a string, and
+     * `?? []` would let that through to a `for...of` that throws on it.
+     */
+    const doc = JSON.parse(
+      JSON.stringify({
+        ...createDocument('Not a list', 'not-a-list'),
+        root: {
+          key: 'root',
+          type: 'Screen',
+          props: {},
+          children: [
+            {
+              key: 'email',
+              type: 'TextField',
+              props: {},
+              schema: { type: 'string', validations: 'required' },
+            },
+          ],
+        },
+      }),
+    ) as FormDocument
+
+    expect(() => validateForm(doc.root, {})).not.toThrow()
+    expect(() => toJsonSchema(doc)).not.toThrow()
+    expect(() => duplicateNode(doc.root, 'email')).not.toThrow()
   })
 })

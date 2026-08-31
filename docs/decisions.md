@@ -4,6 +4,51 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### A throwing evaluator fails a custom rule and applies a guarded one
+
+- **Decided:** both bare evaluator calls in `validation.ts` are wrapped. A throw in a `custom` rule's
+  expression fails the rule; a throw in a rule's `when` guard leaves the rule applying. `validations`
+  becomes optional on `FieldSchema`, read everywhere through one `validationsOf` helper.
+- **Why the two answers differ:** they are not the same question. `visibility.ts` already wraps the same
+  call and says a throw reads as hidden, matching what a missing evaluator gets. Here the missing-evaluator
+  answers are deliberate and different from each other -- a `custom` rule passes, a computed guard is
+  skipped -- because a host that supplied no evaluator has made a configuration choice that `evaluatorKeys`
+  reports at boot. A throw is one broken expression in a document, which is a different thing.
+- **Why a throwing `custom` fails:** the same sentence `matchesPattern` makes twenty lines away about a
+  pattern it refuses to run. A rule that cannot be run has not been satisfied.
+- **Why a throwing guard applies:** the `default` case in `guardPasses` already rules on it -- a guard this
+  code cannot read has not said no. The other direction is a required answer quietly becoming optional on
+  the server, over a typo in an expression.
+- **Rejected: making both answer permissively, to match the no-evaluator path.** That reads the
+  configuration choice and the broken expression as one thing, and both of its answers are the silent
+  permissive failure.
+- **What it costs:** a host whose evaluator throws now sees rules fail rather than a 500. That is a
+  behaviour change for anyone relying on the crash, which is nobody.
+- **Reversal:** two `catch` bodies.
+- **When:** 2026-08-31.
+
+### `FieldSchema.validations` is optional, because the gate always said so
+
+- **Decided:** the field is `validations?: ValidationRule[]`, and every reader goes through
+  `validationsOf(node)`, which answers `[]` for absent _and_ for anything that is not an array.
+- **Why:** `validateDocument` accepts a schema with no `validations` -- its own check returns early on
+  `undefined`, deliberately, because a field with no rules is an ordinary field. The type said the array
+  was always there, so three readers were written as though it were: `duplicateNode` spread it, and
+  `validateField` and `toJsonSchema` iterated it. A document the gate calls valid threw a `TypeError` out
+  of the duplicate action, out of `validateForm` and out of the schema export.
+- **Why the type rather than three fixes:** ten other readers already guarded with `Array.isArray`, which
+  is what made the class look handled. Ten call sites each deciding for themselves is the shape that
+  produces three that decide differently. The type is what turns "remember to guard" into something the
+  compiler asks about, and the helper is what makes the answer one answer.
+- **Rejected: requiring `validations` in `validateDocument` instead.** It makes the gate refuse
+  hand-written documents that are perfectly renderable, to spare three call sites a guard.
+- **Rejected: `?? []`.** Absent is not the only thing it can be. A document is data, so `validations` can
+  arrive as a string, and `?? []` hands that straight to a `for...of`.
+- **What it costs:** nothing at the boundary -- a document with `validations: []` and one without both work
+  as before. `duplicateNode` preserves whichever shape it was given rather than normalising.
+- **Reversal:** one `?` and thirteen call sites.
+- **When:** 2026-08-31.
+
 ### The boundary's fallback says it is the fallback
 
 - **Decided:** `NodeBoundary`'s fallback emits `data-fs-failed=""` alongside the three attributes it

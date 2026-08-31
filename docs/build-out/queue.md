@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 7, the symmetry audit. Stage 2 is done; item 8 is next.
+- **Last completed:** item 8, the core HIGHs. Item 9 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/07-symmetry-audit`
+- **Last pushed item branch:** `build-out/b/08-core-highs`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -150,7 +150,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
 
 ## Stage 3 — the remaining HIGHs
 
-- [ ] **8. core HIGHs.** Areas 2 and 3. `tree.ts:282` — `duplicateNode` spreads `node.schema.validations`
+- [x] **8. core HIGHs.** Areas 2 and 3. `tree.ts:282` — `duplicateNode` spreads `node.schema.validations`
       unguarded while `validateDocument` allows it to be absent, so the gate passes a document the duplicate
       action then crashes on. `validation.ts:134-140,228` — the ReDoS guard treats a bounded quantifier
       wrapping an unbounded one as safe, so `(a+){10}b` compiles and runs. `validation.ts:322,416` — the host

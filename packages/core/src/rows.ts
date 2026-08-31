@@ -19,7 +19,7 @@
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
 import { keyProblem } from './keys.js'
-import { dataKeyOf } from './tree.js'
+import { dataKeyOf, validationsOf } from './tree.js'
 import type { ComponentNode, Condition, FormData, JsonValue } from './types.js'
 
 /**
@@ -314,9 +314,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
        * quietly disappearing, it is a rule that never applies — on the server,
        * where nobody is looking.
        */
-      const guards = Array.isArray(node.schema?.validations)
-        ? node.schema.validations.map((rule) => rule?.when)
-        : []
+      const guards = validationsOf(node).map((rule) => rule?.when)
 
       for (const value of [node.renderWhen, ...props, ...guards]) {
         if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
@@ -348,9 +346,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
         node.props && typeof node.props === 'object' && !Array.isArray(node.props)
           ? Object.values(node.props)
           : []
-      const guards = Array.isArray(node.schema?.validations)
-        ? node.schema.validations.map((rule) => rule?.when)
-        : []
+      const guards = validationsOf(node).map((rule) => rule?.when)
 
       for (const value of [node.renderWhen, ...props, ...guards]) {
         if (!value || typeof value !== 'object' || value.kind !== 'condition') continue
@@ -387,9 +383,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
         node.props && typeof node.props === 'object' && !Array.isArray(node.props)
           ? Object.values(node.props)
           : []
-      const guards = Array.isArray(node.schema?.validations)
-        ? node.schema.validations.map((rule) => rule?.when)
-        : []
+      const guards = validationsOf(node).map((rule) => rule?.when)
 
       for (const value of [node.renderWhen, ...props, ...guards]) {
         if (!value || typeof value !== 'object' || value.kind !== 'condition') continue

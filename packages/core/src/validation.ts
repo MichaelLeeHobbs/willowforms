@@ -15,7 +15,7 @@ import { evaluateCondition } from './condition.js'
 import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
-import { dataKeyOf, flatten } from './tree.js'
+import { dataKeyOf, flatten, validationsOf } from './tree.js'
 import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -140,6 +140,39 @@ function unboundedAt(source: string, at: number): boolean {
 }
 
 /**
+ * Whether a quantifier at this position permits two or more repetitions.
+ *
+ * A different question from `unboundedAt`, and the difference is the finding.
+ * The bound on the outside is not what makes `(a+){10}` safe: what an engine
+ * backtracks over is the ways to split the input *between* the repetitions, and
+ * ten non-empty groups over thirty characters is ten million of them. The
+ * exponent is the repeat count, which the author chooses.
+ *
+ * Two is the threshold because one repetition has nothing to split against, and
+ * neither does none-or-one. `(a+){1}` and `(a+)?` are left alone.
+ *
+ * `{n}` repeats n times; `{n,}` is unbounded; `{n,m}` repeats up to m.
+ */
+function repeatsAt(source: string, at: number): boolean {
+  const ch = source[at]
+  if (ch === '*' || ch === '+') return true
+  if (ch !== '{') return false
+
+  const close = source.indexOf('}', at)
+  if (close === -1) return false
+  const body = source.slice(at + 1, close)
+
+  // `{n,}` — unbounded, so certainly two or more.
+  if (/^\d+,\s*$/.test(body)) return true
+  // `{n,m}` — the ceiling decides.
+  const range = /^(\d+),\s*(\d+)$/.exec(body)
+  if (range) return Number(range[2]) >= 2
+  // `{n}` — exactly n.
+  if (/^\d+$/.test(body)) return Number(body) >= 2
+  return false
+}
+
+/**
  * A pattern with an unbounded quantifier inside another one.
  *
  * `(a+)+`, `(a*)*`, `((a+)*)+`. This is the shape that makes a backtracking
@@ -188,6 +221,17 @@ function nestedUnbounded(source: string): boolean {
 
       // `)` may be followed by a quantifier, optionally made lazy with `?`.
       const quantified = unboundedAt(source, i + 1)
+
+      /*
+       * Two or more repetitions of a group holding an unbounded quantifier, not
+       * only unboundedly many. This asked `unboundedAt` on both sides, so
+       * `(a+){10}b` compiled and ran -- and the comment above defending that
+       * said a bounded quantifier "is not the shape that goes exponential,
+       * because there is a fixed amount for the engine to try", which is true of
+       * `a{10}` and false of `(a+){10}`. The code was written to the sentence
+       * rather than to the distinction inside it.
+       */
+      if (repeatsAt(source, i + 1) && group.unbounded) return true
       if (quantified && group.unbounded) return true
 
       // A quantified group is itself an unbounded repetition as far as any
@@ -318,9 +362,26 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       return Boolean(when.value)
     case 'computed':
       // Without a sandbox we cannot know, so skip the rule rather than guess.
-      return options.evaluate
-        ? Boolean(options.evaluate(when.expression, data, options.context))
-        : false
+      if (!options.evaluate) return false
+      /*
+       * A throw is not the same as no sandbox, and gets the opposite answer.
+       *
+       * No evaluator is a host configuration: nothing computed can be evaluated,
+       * failing every guarded rule for it would be wrong, and `evaluatorKeys`
+       * already reports it at boot. A throw is one broken expression, authored
+       * in a document, and it is exactly the case the `default` below already
+       * rules on -- a guard this code cannot read has not said no, so the rule
+       * applies. The other direction is a required answer quietly becoming
+       * optional on the server, over a typo in an expression.
+       *
+       * `visibility.ts` wraps the same call and says why; this call site and the
+       * `custom` rule below were the two that did not.
+       */
+      try {
+        return Boolean(options.evaluate(when.expression, data, options.context))
+      } catch {
+        return true
+      }
     /*
      * A translation key is not a condition, so this reads as "no guard was
      * expressed" and the rule applies -- the same answer `isVisible` gives the
@@ -413,7 +474,21 @@ export function applyRule(
       return UUID.test(asString(value)) ? undefined : fail()
     case 'custom':
       if (!options.evaluate) return undefined
-      return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
+      /*
+       * A throw fails the rule, which is the answer `matchesPattern` gives a
+       * pattern it refuses to run, in this file, for the same reason: a rule
+       * that cannot be run has not been satisfied.
+       *
+       * Not the same as the line above it. No evaluator is a host that declined
+       * to supply one, and failing every custom rule for that would make the
+       * library unusable without a sandbox; a throw is one expression that is
+       * broken, and letting the value through is the silent permissive failure.
+       */
+      try {
+        return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
+      } catch {
+        return fail()
+      }
 
     /*
      * Unreachable: the `KNOWN_RULES` check above has already answered for a key
@@ -444,7 +519,7 @@ export function applyRule(
  * In core rather than in each kit, so the two cannot answer differently.
  */
 export function isRequired(node: ComponentNode): boolean {
-  const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+  const rules = validationsOf(node)
   return rules.some((rule) => rule?.key === 'required' && !rule.when)
 }
 
@@ -457,7 +532,7 @@ export function validateField(
   if (!node.schema) return undefined
   // A field inside a row holds its answer in that row, not at the top level.
   const held = valueOf(options.row?.values ?? data, dataKeyOf(node))
-  for (const rule of node.schema.validations) {
+  for (const rule of validationsOf(node)) {
     const error = applyRule(rule, held, data, options)
     if (error) return error
   }

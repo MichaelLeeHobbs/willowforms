@@ -1207,3 +1207,138 @@ describe('bounds and schemes', () => {
     expect(check({ key: 'url' }, 'not a url')).toBe(DEFAULT_MESSAGES.url)
   })
 })
+
+/**
+ * A bounded quantifier wrapping an unbounded one.
+ *
+ * The ReDoS guard asks whether an *unbounded* quantifier is applied to a group
+ * holding another one, so `(a+)+` is refused and `(a+){10}` is not. The bound on
+ * the outside is not what makes it safe: splitting thirty characters into ten
+ * non-empty groups is ten million ways, and the exponent is the repeat count,
+ * which the author chooses.
+ *
+ * The guard's own comment says a bounded quantifier "is not the shape that goes
+ * exponential, because there is a fixed amount for the engine to try". That is
+ * true of `a{10}` and false of `(a+){10}`, and the code was written to the
+ * sentence rather than to the distinction inside it.
+ */
+describe('a pattern whose outer quantifier is bounded and whose inner is not', () => {
+  /*
+   * Each row supplies a value the pattern *matches*, which is what separates
+   * "refused" from "ran and did not match". Both answer with the same message,
+   * so a helper that fed every pattern a non-matching string would report every
+   * one of them as refused -- including the controls -- and the table would have
+   * proved nothing. That was the first version of this block.
+   */
+  const refused = (pattern: string, matching: string): boolean =>
+    check({ key: 'pattern', value: pattern }, matching) === DEFAULT_MESSAGES.pattern
+
+  it.each([
+    ['(a+){10}b', 'aaaaaaaaaab', 'the shape the review named'],
+    ['(a*){8}b', 'b', 'with a star inside'],
+    ['(a+){2,5}b', 'aab', 'and with a range outside'],
+    ['((a+)*){3}b', 'ab', 'and nested two deep'],
+  ])('refuses %s — %s', (pattern, matching) => {
+    expect(refused(pattern, matching)).toBe(true)
+  })
+
+  it.each([
+    ['(a+){1}b', 'ab', 'one repetition cannot backtrack between groups'],
+    ['(a+)?b', 'b', 'and neither can none-or-one'],
+    ['(\\d{3}-){4}x', '123-456-789-012-x', 'a fixed-length inner group is common'],
+    ['(\\d{1,3}\\.){3}\\d{1,3}', '10.0.0.1', 'and an IP address must keep working'],
+  ])('still runs %s — %s', (pattern, matching) => {
+    // The controls. A guard that refused every quantified group would pass every
+    // assertion above and break patterns people actually write.
+    expect(refused(pattern, matching)).toBe(false)
+  })
+})
+
+/**
+ * The host evaluator throwing, on the two call sites that did not catch it.
+ *
+ * `visibility.ts` wraps the same call in `try`/`catch` and explains why: a throw
+ * out of `isVisible` is an unhandled 500 on submit and a blank form in the
+ * browser. `guardPasses` and the `custom` rule call it bare, so an expression
+ * that throws escapes `validateForm` entirely -- and the expression is authored
+ * in a document while the evaluator belongs to the host, so neither side owns
+ * the failure.
+ *
+ * The two answers differ on purpose, and each matches a decision already written
+ * down one case away.
+ */
+describe('an evaluator that throws', () => {
+  const boom: Evaluator = () => {
+    throw new Error('the host evaluator blew up')
+  }
+
+  const guardedRule = (): ComponentNode => ({
+    key: 'spouse',
+    type: 'TextField',
+    props: {},
+    schema: {
+      type: 'string',
+      validations: [{ key: 'required', when: { kind: 'computed', expression: 'boom()' } }],
+    },
+  })
+
+  const customRule = (): ComponentNode => ({
+    key: 'code',
+    type: 'TextField',
+    props: {},
+    schema: {
+      type: 'string',
+      validations: [{ key: 'custom', expression: 'boom()' }],
+    },
+  })
+
+  const root = (child: ComponentNode): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [child],
+  })
+
+  it('does not escape validateForm from a rule guard', () => {
+    expect(() => validateForm(root(guardedRule()), {}, { evaluate: boom })).not.toThrow()
+  })
+
+  it('leaves the guarded rule applying, because a guard nobody can read has not said no', () => {
+    /*
+     * The same answer the `default` case in `guardPasses` gives an unreadable
+     * guard, and for the same reason. The other direction is a required answer
+     * quietly becoming optional on the server, which is the permissive failure
+     * this project is organised against.
+     */
+    expect(validateForm(root(guardedRule()), {}, { evaluate: boom })).toEqual({
+      spouse: DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('does not escape validateForm from a custom rule', () => {
+    expect(() => validateForm(root(customRule()), { code: 'x' }, { evaluate: boom })).not.toThrow()
+  })
+
+  it('fails the custom rule, because a rule that cannot be run has not been satisfied', () => {
+    /*
+     * The same answer `matchesPattern` gives a pattern it refuses to run, in the
+     * same file. Not the same as a host that supplied no evaluator at all: that
+     * is a configuration the boot-time `evaluatorKeys` check already covers, and
+     * failing every custom rule for it would be wrong.
+     */
+    expect(validateForm(root(customRule()), { code: 'x' }, { evaluate: boom })).toEqual({
+      code: DEFAULT_MESSAGES.custom,
+    })
+  })
+
+  it('still runs a custom rule whose evaluator works', () => {
+    // The control, in both directions.
+    const yes: Evaluator = () => true
+    const no: Evaluator = () => false
+
+    expect(validateForm(root(customRule()), { code: 'x' }, { evaluate: yes })).toEqual({})
+    expect(validateForm(root(customRule()), { code: 'x' }, { evaluate: no })).toEqual({
+      code: DEFAULT_MESSAGES.custom,
+    })
+  })
+})

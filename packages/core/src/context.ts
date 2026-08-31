@@ -19,6 +19,7 @@
 
 import { same } from './condition.js'
 import { readPath } from './json.js'
+import { validationsOf } from './tree.js'
 import type {
   ComponentNode,
   Condition,
@@ -99,7 +100,7 @@ export function contextKeys(root: ComponentNode): Set<string> {
         : []
     for (const value of props) fromPropValue(value, keys)
 
-    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+    const rules = validationsOf(node)
     for (const rule of rules) fromPropValue(rule?.when, keys)
 
     for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
@@ -143,7 +144,7 @@ export function evaluatorKeys(root: ComponentNode): string[] {
         ? Object.values(node.props)
         : []
 
-    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+    const rules = validationsOf(node)
 
     const expression =
       needs(node.renderWhen) ||
@@ -296,7 +297,7 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
         : []
     for (const value of props) collect(value)
 
-    const rules = Array.isArray(node.schema?.validations) ? node.schema.validations : []
+    const rules = validationsOf(node)
     for (const rule of rules) collect(rule?.when)
 
     for (const child of Array.isArray(node.children) ? node.children : []) walkNode(child)

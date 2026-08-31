@@ -299,7 +299,19 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
      * function did not have until a test asked it for one.
      */
     if (node.renderWhen) next.renderWhen = repointBinding(node.renderWhen, node.key, nextKey)
-    if (node.schema) next.schema = { ...node.schema, validations: [...node.schema.validations] }
+    /*
+     * The rules are copied, and only if the document has any.
+     *
+     * `[...node.schema.validations]` threw on a schema without them, which
+     * `validateDocument` accepts. Defaulting to `[]` would fix the throw and
+     * quietly give the copy a field the original did not have -- a duplicate
+     * should be the same document twice, including where it is silent.
+     */
+    if (node.schema) {
+      next.schema = Array.isArray(node.schema.validations)
+        ? { ...node.schema, validations: [...node.schema.validations] }
+        : { ...node.schema }
+    }
     /*
      * `css` and `events` too. Both are records a panel writes into, and the copy
      * shared them by reference: styling the duplicate restyled the original,
@@ -454,6 +466,26 @@ export function moveNode(
  */
 export function dataKeyOf(node: ComponentNode): string {
   return node.dataKey ?? node.key
+}
+
+/**
+ * A node's validation rules, whatever the document actually holds there.
+ *
+ * One helper for the same reason `dataKeyOf` is one: the alternative is thirteen
+ * call sites each deciding for itself, and ten of them had already decided the
+ * same way while three had not. `duplicateNode` spread it, `validateField`
+ * iterated it and `toJsonSchema` iterated it, so a document `validateDocument`
+ * accepts -- a schema with no `validations` at all, which its own check allows
+ * by returning early -- threw a `TypeError` out of the duplicate action, out of
+ * `validateForm`, and out of the schema export.
+ *
+ * `Array.isArray` rather than `?? []`, because absent is not the only thing it
+ * can be. A document is data: `validations` can arrive as a string, and `?? []`
+ * would hand that straight to a `for...of`.
+ */
+export function validationsOf(node: ComponentNode): ValidationRule[] {
+  const rules = node.schema?.validations
+  return Array.isArray(rules) ? rules : []
 }
 
 export interface StructuralError {
