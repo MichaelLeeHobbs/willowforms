@@ -20,7 +20,7 @@ These fail the build, not a review.
 | Arrow-key navigation and keyboard moves                                       | same, plus `packages/designer/src/keyboard.test.ts` |
 | The live region is polite, is a status region, and repeats identical messages | same                                                |
 | Inspector tabs are a real tablist with roving tabindex and arrow keys         | `packages/designer/src/panels/Rules.test.tsx`       |
-| axe-core over the whole designer in six states                                | `test/a11y.test.tsx`                                |
+| axe-core over the whole designer in nine states                               | `test/a11y.test.tsx`                                |
 | Focus really lands where it should, in a real browser                         | `e2e/keyboard.spec.ts`                              |
 
 ## Contrast

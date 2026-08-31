@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { ratio, tokensFrom } from './contrast.js'
+import { contrast, luminance, parseHex, ratio, tokensFrom } from './contrast.js'
 
 const read = (path: string): string =>
   readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
@@ -149,6 +149,22 @@ describe.each(
     expect(on('--fs-primary', '--fs-bg-well')).toBeGreaterThanOrEqual(AA_LARGE)
   })
 
+  it('the designer own controls have a visible boundary', () => {
+    /*
+     * The kit's field borders were measured and the designer's were not, which
+     * is the wrong way round for a builder somebody uses all day. A text field
+     * in a panel is a shade off the panel's own background -- 1.08:1 in light --
+     * so the border is the only thing saying a control is there, and at 1.39:1
+     * it was not saying it. WCAG 1.4.11: a control boundary needs 3:1.
+     *
+     * All three surfaces, because panels, the canvas bar and the preview data
+     * pane each host controls.
+     */
+    expect(on('--fs-control-border', '--fs-bg-panel')).toBeGreaterThanOrEqual(AA_LARGE)
+    expect(on('--fs-control-border', '--fs-bg-app')).toBeGreaterThanOrEqual(AA_LARGE)
+    expect(on('--fs-control-border', '--fs-bg-well')).toBeGreaterThanOrEqual(AA_LARGE)
+  })
+
   it('the drop indicator is distinguishable from the panel it is drawn over', () => {
     expect(on('--fs-accent', '--fs-bg-panel')).toBeGreaterThanOrEqual(AA_LARGE)
   })
@@ -219,5 +235,81 @@ describe.each(
     // An input's boundary is a user interface component, so 3:1.
     expect(on('--fsh-border', '--fsh-field')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fsh-border', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
+  })
+})
+
+/**
+ * The instrument, against values that are not ours to choose.
+ *
+ * Every ratio in this file comes out of twenty lines of arithmetic in
+ * `contrast.ts`, and nothing checked the arithmetic. Change a luminance
+ * coefficient or the `0.03928` branch and every number here moves together,
+ * every threshold is still cleared, and the suite stays green while reporting
+ * fiction.
+ *
+ * So these are fixed points from WCAG 2.2 itself and from the reference values
+ * every contrast tool agrees on. They cannot be satisfied by a formula that has
+ * drifted.
+ */
+describe('the contrast instrument', () => {
+  it('puts black on white at 21:1 and a colour on itself at 1:1', () => {
+    // The two ends of the scale, which the ratio is defined to produce.
+    expect(ratio('#000000', '#ffffff')).toBe(21)
+    expect(ratio('#ffffff', '#ffffff')).toBe(1)
+    expect(ratio('#7c838d', '#7c838d')).toBe(1)
+  })
+
+  it('is symmetric, because a ratio has no direction', () => {
+    expect(ratio('#0b6fa4', '#ffffff')).toBe(ratio('#ffffff', '#0b6fa4'))
+  })
+
+  it.each([
+    ['#767676', '#ffffff', 4.54],
+    ['#595959', '#ffffff', 7.0],
+    ['#949494', '#000000', 6.92],
+    ['#0000ff', '#ffffff', 8.59],
+    ['#ff0000', '#ffffff', 4.0],
+  ])('rates %s on %s at %s to one', (fg, bg, expected) => {
+    /*
+     * The published reference values. `#767676` on white is the canonical
+     * "smallest grey that passes AA for body text" and every checker in the
+     * world puts it at 4.54; `#949494` on black is its counterpart.
+     */
+    expect(ratio(fg, bg)).toBe(expected)
+  })
+
+  it('applies the linear branch below the threshold and the curve above it', () => {
+    /*
+     * The `0.03928` branch, pinned directly. Channel 10 is 10/255 = 0.0392,
+     * just under it, so it stays linear: 0.0392/12.92. Channel 11 is just over
+     * and takes the power curve. A build that dropped the branch would be
+     * wrong here by a hair and nowhere else visibly.
+     */
+    expect(luminance(parseHex('#0a0a0a'))).toBeCloseTo(10 / 255 / 12.92, 12)
+    expect(luminance(parseHex('#0b0b0b'))).toBeCloseTo(
+      Math.pow((11 / 255 + 0.055) / 1.055, 2.4),
+      12,
+    )
+  })
+
+  it('weights green most and blue least, as the coefficients say', () => {
+    // Pure green is the brightest primary and pure blue the darkest. A
+    // transposed coefficient would swap these and nothing else would notice.
+    expect(luminance(parseHex('#00ff00'))).toBeCloseTo(0.7152, 4)
+    expect(luminance(parseHex('#ff0000'))).toBeCloseTo(0.2126, 4)
+    expect(luminance(parseHex('#0000ff'))).toBeCloseTo(0.0722, 4)
+  })
+
+  it('reads a three-digit hex as the six-digit one it stands for', () => {
+    expect(parseHex('#fff')).toEqual(parseHex('#ffffff'))
+    expect(contrast('#fff', '#000')).toBe(contrast('#ffffff', '#000000'))
+  })
+
+  it('refuses anything that is not a colour rather than guessing', () => {
+    // `tokensFrom` hands over whatever the stylesheet said, so a token holding
+    // `var(--other)` or `rgb(0 0 0)` must stop the suite, not score 1:1.
+    expect(() => parseHex('rgb(0 0 0)')).toThrow()
+    expect(() => parseHex('var(--fs-text)')).toThrow()
+    expect(() => parseHex('#12345')).toThrow()
   })
 })

@@ -446,7 +446,7 @@ against the code that claimed to implement it.
 ## A row-scoped ref to a form-level answer is reported at boot
 
 `rowScopeProblems` reported two mismatches: a form-scoped ref to a key that only exists in a row, and a
-row-scoped ref on a node outside every repeater. The third is a row-scoped ref *inside* a repeater
+row-scoped ref on a node outside every repeater. The third is a row-scoped ref _inside_ a repeater
 naming a key no node in that row writes while a node outside every repeater does -- what you get by
 dragging a conditional field into a repeater. It reads nothing, the condition is false, the component is
 hidden, and its rules never run.

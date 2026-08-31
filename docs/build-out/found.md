@@ -98,3 +98,21 @@ document-model question about who owns the button, and a decision about whether 
 preview data. All three are real design work rather than remediation. Bad to leave: `Repeater` is
 described as built in `03-components.md`, and a component whose rows nobody can create is built only in
 the sense that it renders.
+
+## Button.variant is a different vocabulary in each kit
+
+`kit-mui` offers `contained` / `outlined` / `text`; `kit-html` offers `solid` / `outline` / `plain`.
+Every other field of every other property matches. A document authored against one kit therefore carries
+a `variant` the other has never heard of, and the playground's kit switch is the fastest way to see it:
+MUI's Button gets `solid` and ignores it, the HTML kit gets `contained` and drops it into a class name
+nothing styles.
+
+Found while widening the cross-kit comparison for item 23, which previously compared a property's `name`
+and `editor` only. The comparison is strict now with this one pair exempted by name, and the exemption
+has its own test that fails if the two ever agree, so it cannot outlive the divergence.
+
+Out of scope because choosing the surviving vocabulary is a product call: aligning them changes what a
+shipped kit's documents mean, and the alternative — declaring option values kit-local and dropping the
+"a document renders through either kit" claim to "a document renders, with kit-local values reset" — is a
+spec change. This is the same class as the `gap` units entry above: the kits agree on the shape of a
+property and disagree about what its values mean.

@@ -134,6 +134,23 @@ function reachesIntoTheForm(selector: string): boolean {
   return !/\.fs-/.test(target)
 }
 
+/**
+ * Does this selector style something the designer does not own at all?
+ *
+ * The reach check above needs a scope to reach *from*, so it says nothing about
+ * a selector that names no scope: `input { padding: 5px 8px }` at file scope is
+ * invisible to it. That rule is strictly worse than the incident this file was
+ * written about -- it does not merely reach into the canvas, it reaches into
+ * every input on the host's page, and the stylesheet ships with the designer.
+ *
+ * Every piece of markup the designer renders carries an `fs-` class, so a
+ * selector with no `fs-` class anywhere in it is styling somebody else's page.
+ * No such rule exists today, which is the moment to say so.
+ */
+function escapesTheDesigner(selector: string): boolean {
+  return !/\.fs-/.test(selector)
+}
+
 describe('designer.css isolation', () => {
   const all = selectors(withoutComments)
 
@@ -153,6 +170,16 @@ describe('designer.css isolation', () => {
     expect(reaching).toEqual([])
   })
 
+  it('styles nothing outside its own namespace', () => {
+    /*
+     * A stylesheet a host imports has one namespace and no business outside it.
+     * The reach check cannot see this class of mistake at all, because there is
+     * no scope in the selector for it to reach from.
+     */
+    const escaping = all.filter(escapesTheDesigner)
+    expect(escaping).toEqual([])
+  })
+
   describe('the guard itself', () => {
     /*
      * A guard is code, and this one shipped with a hole in the shape of the
@@ -168,6 +195,24 @@ describe('designer.css isolation', () => {
       ['.fs-canvas__frame > *', 'or by wildcard'],
     ])('flags %s — %s', (selector) => {
       expect(reachesIntoTheForm(selector)).toBe(true)
+    })
+
+    it.each([
+      ['input', 'a bare element selector, which the reach check cannot see'],
+      ['*', 'a wildcard reset over the whole page'],
+      ['body', 'or the page itself'],
+      ['[data-fs-key]', 'or every rendered node, wherever it is'],
+      ['button:focus-visible', 'or a state on one'],
+    ])('flags %s at file scope — %s', (selector) => {
+      expect(escapesTheDesigner(selector)).toBe(true)
+    })
+
+    it.each([
+      ['.fs-shell', 'the namespace itself'],
+      ['.fs-panel input', 'a control the designer renders'],
+      ['.fs-shell[data-fs-theme="dark"]', 'a theme override on the namespace'],
+    ])('leaves %s alone — %s', (selector) => {
+      expect(escapesTheDesigner(selector)).toBe(false)
     })
 
     it.each([

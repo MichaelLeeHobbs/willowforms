@@ -56,9 +56,39 @@ function documentOf(root: ComponentNode): FormDocument {
  * drifted once: kit-mui carried icon names kit-html did not, and no palette
  * drew either, so nobody noticed until the vocabulary was closed.
  */
+/**
+ * Where the two kits deliberately, or at least knowingly, do not agree.
+ *
+ * `Button.variant` offers contained/outlined/text in MUI and solid/outline/plain
+ * in the HTML kit, so a document authored against one carries a variant the
+ * other has never heard of. That is a real gap in the claim that a document
+ * travels between kits, it is bigger than a test, and it is written up in the
+ * run's `found.md` rather than papered over here.
+ *
+ * Named so the comparison stays strict everywhere else, and checked below so an
+ * entry cannot outlive the divergence it excuses.
+ */
+const DIVERGENT_VOCABULARY = new Set(['Button.variant'])
+
 describe('the two kits in this repository agree', () => {
   const html = new Map(htmlKit.components.map((c) => [c.type, c]))
   const mui = new Map(muiKit.components.map((c) => [c.type, c]))
+
+  it.each([...DIVERGENT_VOCABULARY])(
+    '%s still diverges, so the exemption still earns its place',
+    (entry) => {
+      const [type, name] = entry.split('.')
+      const a = html.get(type ?? '')?.props.find((prop) => prop.name === name)
+      const b = mui.get(type ?? '')?.props.find((prop) => prop.name === name)
+
+      expect(a, entry + ' is not a property either kit has').toBeDefined()
+      expect(b, entry + ' is not a property either kit has').toBeDefined()
+      expect(
+        a?.options,
+        entry + ' agrees now: delete the exemption rather than keeping a hole open',
+      ).not.toEqual(b?.options)
+    },
+  )
 
   it('offers the same component types', () => {
     expect([...html.keys()].sort()).toEqual([...mui.keys()].sort())
@@ -82,8 +112,32 @@ describe('the two kits in this repository agree', () => {
       expect(a.root ?? false).toBe(b.root ?? false)
       expect(a.dataBound ?? false).toBe(b.dataBound ?? false)
       expect(a.dataType).toBe(b.dataType)
-      expect(a.props.map((prop) => prop.name)).toEqual(b.props.map((prop) => prop.name))
-      expect(a.props.map((prop) => prop.editor)).toEqual(b.props.map((prop) => prop.editor))
+      /*
+       * Every field of a property, not just its name and editor.
+       *
+       * `localizable` is what decides whether an author can bind a label to a
+       * translation at all, `conditional` whether they can bind it to a
+       * condition, and `section` which tab the row appears on. Two kits could
+       * disagree about all six and this said they were described identically --
+       * a document authored against one kit would then offer bindings the other
+       * refuses, which is the drift the whole describe exists to catch.
+       */
+      const described = (def: ComponentDef): unknown[] =>
+        def.props.map((prop) => ({
+          name: prop.name,
+          label: prop.label,
+          editor: prop.editor,
+          options: DIVERGENT_VOCABULARY.has(type + '.' + prop.name)
+            ? 'a divergence named below'
+            : (prop.options ?? null),
+          hint: prop.hint ?? null,
+          computable: prop.computable ?? true,
+          localizable: prop.localizable ?? false,
+          conditional: prop.conditional ?? false,
+          section: prop.section ?? 'main',
+        }))
+
+      expect(described(a)).toEqual(described(b))
       expect([...a.events].sort()).toEqual([...b.events].sort())
     },
   )
@@ -919,6 +973,21 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
      */
     const group = kit.components.find((c) => c.type === 'RadioGroup')
     const item = kit.components.find((c) => c.type === 'RadioItem')
+
+    /*
+     * A kit need not offer a radio group at all, and this used to return
+     * quietly whenever either piece was missing -- so deleting `RadioItem`
+     * turned the obligation off instead of failing it, which is the one thing a
+     * contract suite must never let a kit do.
+     *
+     * Offering the group is the commitment. Offering the child without the
+     * group is a palette entry with nothing to join, which is worth failing on
+     * its own.
+     */
+    expect(
+      { group: Boolean(group), item: Boolean(item) },
+      'a RadioGroup and its RadioItem ship together or not at all',
+    ).toEqual({ group: Boolean(group), item: Boolean(group) })
     if (!group || !item) return
 
     const node: ComponentNode = {

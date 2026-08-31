@@ -12,6 +12,16 @@
   --fs-bg-panel: #ffffff;
   --fs-bg-well: #eef0f3;
   --fs-border: #d7dbe0;
+  /*
+   * The boundary of a control, which is not the same job as a divider.
+   *
+   * `--fs-border` separates panels, and a divider is decoration: WCAG 1.4.11
+   * asks nothing of it. A text field's outline is what tells somebody there is a
+   * text field there -- the field's background is a shade off the panel it sits
+   * on, so at 1.39:1 the border was carrying the whole message and failing to.
+   * This clears 3:1 on all three surfaces in both themes, which is the rule.
+   */
+  --fs-control-border: #7c838d;
   --fs-text: #1c1f23;
   --fs-text-muted: #5b6470;
   --fs-primary: #0b6fa4;
@@ -41,6 +51,7 @@
     --fs-bg-panel: #24272c;
     --fs-bg-well: #15171a;
     --fs-border: #3a3f46;
+    --fs-control-border: #767e8a;
     --fs-text: #e9ebf0;
     --fs-text-muted: #a4a9b3;
     --fs-primary: #2f9fd8;
@@ -56,6 +67,7 @@
   --fs-bg-panel: #24272c;
   --fs-bg-well: #15171a;
   --fs-border: #3a3f46;
+  --fs-control-border: #767e8a;
   --fs-text: #e9ebf0;
   --fs-text-muted: #a4a9b3;
   --fs-primary: #2f9fd8;
@@ -178,7 +190,7 @@
   color: inherit;
   padding: 5px 10px;
   background: var(--fs-bg-panel);
-  border: 1px solid var(--fs-border);
+  border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
   cursor: pointer;
 }
@@ -205,7 +217,7 @@
   width: 100%;
   padding: 5px 8px;
   background: var(--fs-bg-app);
-  border: 1px solid var(--fs-border);
+  border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
 }
 

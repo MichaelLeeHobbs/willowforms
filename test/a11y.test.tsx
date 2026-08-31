@@ -201,6 +201,45 @@ describe('axe audit of the designer', () => {
     expect(await audit(container)).toEqual([])
   }, 20000)
 
+  it('has none on the Style tab', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner()
+
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await user.click(row)
+    await user.click(screen.getByRole('tab', { name: 'Style' }))
+
+    /*
+     * One of the two most ARIA-dense panels in the designer and neither was
+     * audited: seven inputs, a colour swatch paired with a text box, a
+     * disclosure holding more of the same, and a warning that turns into
+     * `aria-invalid`. Every state axe knows how to fail lives here.
+     */
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+
+  it('has none with a condition being edited', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner()
+
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await user.click(row)
+    await user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+
+    /*
+     * The other one. No audited state ever set a condition, so the editor's
+     * hidden labels, its operator selects and its nested Remove buttons were
+     * never seen by axe -- in the panel where a control is most likely to end
+     * up with no accessible name of its own, which is a defect this repository
+     * has already had twice.
+     */
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+
   it('has none with the JSON dialog open', async () => {
     const user = userEvent.setup()
     const container = renderDesigner()

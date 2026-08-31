@@ -195,7 +195,13 @@ describe('the specification index', () => {
    * were, and only those naming a numbered file. Twelve files pointing at each
    * other's headings could all rot without a test noticing.
    */
-  it.each(files)('%s links only to files and headings that exist', (name) => {
+  it.each([...files, 'README.md'])('%s links only to files and headings that exist', (name) => {
+    /*
+     * The index included, which it was not. It is the file with the most links
+     * in it and the one every reader starts from, and it was excluded from the
+     * only check that follows a link anywhere -- its own check reads the link
+     * text and ignores anchors entirely.
+     */
     const text = read('docs/spec/' + name)
     const broken: string[] = []
 
@@ -257,6 +263,54 @@ describe('the kit contract table', () => {
      * here.
      */
     expect(rows, 'a contract rule was added or removed; say so here as well').toBe(CONTRACT_RULES)
+  })
+})
+
+describe('the accessibility document', () => {
+  const doc = read('docs/accessibility.md')
+
+  it('quotes the number of states axe actually audits', () => {
+    /*
+     * It said six while the suite ran seven, and nothing compared them: the one
+     * document in the repository that exists so a reader does not have to take
+     * "we care about accessibility" on trust was itself unchecked.
+     *
+     * Counted inside the axe describe, so a helper or an unrelated test in the
+     * same file cannot inflate it.
+     */
+    const suite = read('test/a11y.test.tsx')
+    const audits = suite.slice(suite.indexOf("describe('axe audit of the designer'"))
+    const states = [...audits.matchAll(/^\s+it\(/gm)].length
+
+    const quoted = doc.match(/axe-core over the whole designer in (\w+) states/)
+    expect(quoted, 'the axe row is gone from the table').not.toBeNull()
+
+    const words: Record<string, number> = {
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+    }
+    expect(words[quoted?.[1] ?? ''], 'the table says ' + String(quoted?.[1])).toBe(states)
+  })
+
+  it.each([
+    ['test/contrast.test.ts'],
+    ['packages/designer/src/panels/Tree.test.tsx'],
+    ['packages/designer/src/keyboard.test.ts'],
+    ['packages/designer/src/panels/Rules.test.tsx'],
+    ['test/a11y.test.tsx'],
+    ['e2e/keyboard.spec.ts'],
+  ])('%s, which the table names as the enforcement, exists', (path) => {
+    // A table of guarantees pointing at a file nobody has is worse than no
+    // table: it reads as enforcement and is prose.
+    expect(() => read(path)).not.toThrow()
   })
 })
 

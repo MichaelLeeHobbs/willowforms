@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config'
 
 import { formsmithAliases } from './aliases.js'
+import DocumentedCountReporter from './test/count-reporter.js'
 
 export default defineConfig({
   resolve: { alias: formsmithAliases },
@@ -23,6 +24,14 @@ export default defineConfig({
     // Component tests opt in per file with an `@vitest-environment jsdom` docblock.
     environment: 'node',
     setupFiles: ['./test/setup.ts'],
+    /*
+     * The default reporter, plus one that compares the suite size the documents
+     * quote with the number of tests that actually ran. No test can do that: the
+     * count is not known until every file has finished, which is where a
+     * reporter stands. It fails the process on a mismatch and skips itself on a
+     * filtered run, saying which it did.
+     */
+    reporters: ['default', new DocumentedCountReporter()],
     coverage: { reporter: ['text', 'html'], include: ['packages/*/src/**'] },
   },
 })
