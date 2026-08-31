@@ -60,21 +60,37 @@ export function inferAxis(children: Candidate[]): Axis {
  * below it. Dropping a subtree into its own descendant detaches the tree.
  */
 export function forbiddenKeys(candidates: Candidate[], key: string | undefined): Set<string> {
+  return closure(candidates, key)
+}
+
+/**
+ * A key and everything under it, from a flat list of `{key, parentKey}`.
+ *
+ * Shared by the canvas and the tree, which had the same loop written twice --
+ * and the copies had drifted in their comments rather than their behaviour,
+ * which is the drift that is hardest to notice.
+ *
+ * Repeated until nothing new is added, not a single pass. The comment on the
+ * canvas copy claimed one pass was enough because candidates arrive
+ * parent-before-child; the loop it sat above did not rely on that, and a
+ * measurement that is not in document order -- a repeater's rows, a kit that
+ * renders children before their container -- would have made a single pass
+ * wrong. The loop is right and the comment was not.
+ */
+function closure(
+  nodes: readonly { key: string; parentKey?: string | undefined }[],
+  key: string | undefined,
+): Set<string> {
   const forbidden = new Set<string>()
   if (!key) return forbidden
 
   forbidden.add(key)
-  // Candidates arrive parent-before-child, so one pass closes over the subtree.
   let grew = true
   while (grew) {
     grew = false
-    for (const candidate of candidates) {
-      if (
-        candidate.parentKey &&
-        forbidden.has(candidate.parentKey) &&
-        !forbidden.has(candidate.key)
-      ) {
-        forbidden.add(candidate.key)
+    for (const node of nodes) {
+      if (node.parentKey && forbidden.has(node.parentKey) && !forbidden.has(node.key)) {
+        forbidden.add(node.key)
         grew = true
       }
     }
@@ -123,6 +139,20 @@ export function resolveDrop(
     .filter((c) => c.parentKey === parent.key && c.key !== draggedKey)
     .sort((a, b) => a.index - b.index)
 
+  /*
+   * The axis is read from every child, including the one being dragged.
+   *
+   * How a container lays out is a fact about the container. Reading it from the
+   * remainder meant that moving one of exactly two children of a row left a
+   * single child, `inferAxis` fell back to `column`, and the drop then compared
+   * the pointer's Y against a row of components -- so dragging the left field of
+   * a two-field row past its neighbour landed it back where it started, every
+   * time, in the smallest row anybody builds.
+   */
+  const siblings = candidates
+    .filter((c) => c.parentKey === parent.key)
+    .sort((a, b) => a.index - b.index)
+
   if (children.length === 0) {
     return {
       parentKey: parent.key,
@@ -138,7 +168,7 @@ export function resolveDrop(
     }
   }
 
-  const axis = inferAxis(children)
+  const axis = inferAxis(siblings)
   const position = axis === 'row' ? x : y
 
   let slot = children.length
@@ -179,7 +209,16 @@ function documentIndex(
   slot: number,
   draggedKey: string | undefined,
 ): number {
-  if (!draggedKey) return slot
+  /*
+   * A palette drop is an insertion, like a move from another parent, so it takes
+   * the same translation. It used to return the raw slot: in a container holding
+   * a node that drew nothing -- a component the kit does not implement, or one
+   * whose renderer returned null -- the drawn list is shorter than the real one,
+   * so dropping from the palette and dragging in from elsewhere put a component
+   * in two different places for the same gesture.
+   */
+  if (!draggedKey) return indexInParent(filtered, slot)
+
   const draggedIsSibling = candidates.some((c) => c.key === draggedKey && c.parentKey === parentKey)
   return draggedIsSibling ? slot : indexInParent(filtered, slot)
 }
@@ -193,14 +232,20 @@ function indexInParent(filtered: Candidate[], slot: number): number {
 
 /** The insertion bar: a thin rect on the boundary between two children. */
 function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Axis): Rect {
-  const first = children[0]
   const last = children[children.length - 1]
   const at = children[slot]
   const previous = children[slot - 1]
 
   if (axis === 'row') {
-    const top = Math.min(parent.rect.top, first?.rect.top ?? parent.rect.top)
-    const height = Math.max(parent.rect.height, ...children.map((c) => c.rect.height))
+    /*
+     * The parent's own span. A child's rectangle is inside its parent's, so the
+     * `min` and the `max` this used to compute could only ever answer the
+     * parent -- arithmetic that reads as though it handles an overflowing child
+     * and does not. If a child ever does overflow, the bar should still be the
+     * parent's height: it marks a position in the parent, not in the child.
+     */
+    const top = parent.rect.top
+    const height = parent.rect.height
     // Midway between the neighbours, so the bar sits in the gap rather than on
     // top of a component's edge.
     const left = at
@@ -211,8 +256,8 @@ function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Ax
     return { top, left: left - BAR / 2, width: BAR, height }
   }
 
-  const left = Math.min(parent.rect.left, first?.rect.left ?? parent.rect.left)
-  const width = Math.max(parent.rect.width, ...children.map((c) => c.rect.width))
+  const left = parent.rect.left
+  const width = parent.rect.width
   const top = at
     ? previous
       ? (previous.rect.top + previous.rect.height + at.rect.top) / 2
@@ -297,19 +342,5 @@ export function resolveTreeDrop(
 
 /** The dragged row and everything under it, which it cannot be dropped into. */
 function treeForbidden(rows: TreeRow[], key: string | undefined): Set<string> {
-  const forbidden = new Set<string>()
-  if (!key) return forbidden
-
-  forbidden.add(key)
-  let grew = true
-  while (grew) {
-    grew = false
-    for (const row of rows) {
-      if (row.parentKey && forbidden.has(row.parentKey) && !forbidden.has(row.key)) {
-        forbidden.add(row.key)
-        grew = true
-      }
-    }
-  }
-  return forbidden
+  return closure(rows, key)
 }

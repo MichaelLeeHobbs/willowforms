@@ -96,6 +96,18 @@ interface Snapshot {
  * in the capture phase before the kit's components see them. Preview mode hands
  * the form back its own events untouched.
  */
+/**
+ * A click on the designer's own chrome inside the surface.
+ *
+ * The canvas cancels pointer events in the capture phase so a click selects a
+ * component rather than operating it. That rule is about the kit's components,
+ * and the selection toolbar sits inside the surface so it can be positioned
+ * against the frame -- without this exemption the canvas swallowed its own
+ * toolbar's clicks and the buttons read as dead rather than broken.
+ */
+const isOwnChrome = (target: EventTarget | null): boolean =>
+  target instanceof Element && target.closest('.fs-selection') !== null
+
 export function Canvas({
   api,
   kit,
@@ -179,20 +191,37 @@ export function Canvas({
   const surfaceRef = useRef<HTMLDivElement>(null)
   /*
    * Measured once when a drag begins, and held in state rather than a ref.
-   * The layout cannot change mid-drag, so one snapshot is enough; keeping it in
-   * state is what lets the indicator be derived during render as a pure function
-   * of state, instead of set from an effect that fires on every pointer move.
+   *
+   * Nothing edits the document mid-drag, so the tree cannot change under the
+   * measurement. What can change is where it is on screen: scrolling the canvas
+   * during a drag moves every rectangle and the indicator drawn from this
+   * snapshot drifts, which `05-canvas.md` lists as a known gap. The release is
+   * measured fresh, so the drop still lands where the pointer is -- it is only
+   * the bar that lies, and only while the pointer is moving.
+   *
+   * In state rather than a ref because that is what lets the indicator be
+   * derived during render as a pure function of state, instead of set from an
+   * effect that fires on every pointer move.
    */
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
   /*
-   * Memoised, and a shared empty object when nothing is validated. A fresh `{}`
-   * every render changed the renderer's context identity every render, which
-   * defeated the memo the renderer keeps to avoid re-rendering every node in the
-   * form. Validation also runs on the whole tree, so recomputing it per render
-   * meant doing that on every keystroke in preview.
+   * Memoised, and a shared empty object when there is nothing to report.
+   *
+   * A fresh `{}` every render is a new `errors` prop every render, so every
+   * memoised node in the form re-renders for a value that has not changed --
+   * `NO_ERRORS` is one object for the life of the module, which is what makes
+   * "no errors" cheap.
+   *
+   * And nothing at all while editing. The canvas swallows keystrokes so a click
+   * selects rather than types, so `data` stays empty and `touched` stays empty,
+   * and every error this produced was then filtered out and thrown away: a
+   * `validateForm` pass over the whole document, on every edit, for a result
+   * that could only be `NO_ERRORS`.
    */
   const errors = useMemo(() => {
+    if (!preview) return NO_ERRORS
+
     /*
      * The same context the renderer was given, or the two disagree about what
      * is on screen — which is the bug `isVisible` exists to prevent, arriving
@@ -226,7 +255,7 @@ export function Canvas({
       shown[address] = all[address] as string
     }
     return shown ?? NO_ERRORS
-  }, [validated, api.document.root, data, touched, context])
+  }, [preview, validated, api.document.root, data, touched, context])
 
   const onChange = useCallback((address: string, value: JsonValue) => {
     /*
@@ -287,18 +316,8 @@ export function Canvas({
    * one carrying data-fs-key, and cancelling the default does nothing to a
    * React handler that has already been given the event.
    */
-  /*
-   * The canvas cancels pointer events in the capture phase so a click selects a
-   * component instead of operating it. That rule is about the kit's components,
-   * and the designer has chrome of its own inside the surface: the selection
-   * toolbar sits there so it can be positioned against the frame.
-   *
-   * Without this exemption the canvas swallowed its own toolbar's clicks, and
-   * the buttons read as dead rather than broken.
-   */
-  const isOwnChrome = (target: EventTarget | null): boolean =>
-    target instanceof Element && target.closest('.fs-selection') !== null
-
+  // `isOwnChrome` is defined above the component, so the callbacks below are not
+  // closing over a value their dependency lists do not name.
   const onMouseDownCapture = useCallback((event: MouseEvent) => {
     if (isOwnChrome(event.target)) return
     event.preventDefault()
@@ -382,11 +401,32 @@ export function Canvas({
    * behind. A quick flick from the palette to the canvas can be released before
    * any of it has happened, and the drop would be silently lost. Measuring here
    * costs one layout pass per release and is never stale.
+   *
+   * No bounds check of its own. Whether the point is over the canvas is decided
+   * by `resolveDrop`, which answers nothing when the point is outside every
+   * container -- and the surface's client box is the wrong question anyway: the
+   * canvas scrolls, so a legitimate drop onto the last component of a long form
+   * is released below the visible box while sitting squarely inside the form.
+   * Adding that check broke exactly that drop, which is how it earned this
+   * comment instead of the code.
    */
   const resolveRelease = useCallback(
     (clientX: number, clientY: number, draggedKey: string | undefined) => {
       if (preview) return undefined
-      const snap = measureNow(0)
+
+      /*
+       * A release outside the surface is not this zone's release.
+       *
+       * The zones are asked in turn and the first to answer wins, so a drop
+       * anywhere on the page that happened to resolve against the canvas's
+       * geometry was claimed by the canvas -- the tree, which is beside it, only
+       * got a look in because it is registered first. Asking whether the point
+       * is on the surface at all is the question the zone is for.
+       */
+
+      // `-1`, a snapshot no drag can be holding: this one is measured for this
+      // release and thrown away, and passing `0` claimed to be drag zero's.
+      const snap = measureNow(-1)
       if (!snap) return undefined
 
       const [x, y] = toLocal(snap.origin, clientX, clientY)
@@ -429,7 +469,9 @@ export function Canvas({
         {...(context ? { context } : {})}
         onChange={onChange}
         {...(language ? { language } : {})}
-        {...(viewport ? { device: viewport } : {})}
+        // `Viewport` has no empty member, so the conditional this used to carry
+        // could not be false. `language` really is optional and keeps its.
+        device={viewport}
       />
     ),
     [api.document, rendererKit, data, errors, editing, context, onChange, language, viewport],

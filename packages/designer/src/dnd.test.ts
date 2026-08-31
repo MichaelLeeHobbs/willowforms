@@ -272,6 +272,14 @@ describe('resolveDrop', () => {
     expect(target?.index).toBe(4)
   })
 
+  it('translates a palette drop the same way as a move from elsewhere', () => {
+    // A palette drop passes no dragged key and used to take the raw slot, so the
+    // same gesture put a component in two different places depending on whether
+    // it came from the palette or from another container.
+    expect(resolveDrop(withHidden(), 200, 105)?.index).toBe(4)
+    expect(resolveDrop(withHidden(), 200, 105, 'fromAnotherParent')?.index).toBe(4)
+  })
+
   it('places it first when it is dropped above every drawn child', () => {
     const target = resolveDrop(withHidden(), 200, 15, 'fromAnotherParent')
     expect(target?.index).toBe(0)
@@ -293,6 +301,25 @@ describe('resolveDrop', () => {
       // remaining children are b, c, and the pointer lands after b.
       const target = resolveDrop(column(), 200, 95, 'a')
       expect(target?.parentKey).toBe('root')
+      expect(target?.index).toBe(1)
+    })
+
+    it('reads the axis from every sibling, including the one being dragged', () => {
+      /*
+       * A row with exactly two children is the smallest row anybody builds, and
+       * moving one of them left a single child behind: `inferAxis` has nothing to
+       * infer from one rectangle and falls back to `column`, so the drop compared
+       * the pointer's Y against a row and every attempt to move the left field
+       * past the right one landed it back where it started.
+       *
+       * The axis is a fact about the container, so it is read from the container's
+       * children rather than from what is left of them.
+       */
+      const target = resolveDrop(nested(), 350, 40, 'left')
+      expect(target?.parentKey).toBe('stack')
+      expect(target?.orientation).toBe('row')
+      // Past `right`, which is the only sibling left, so index 1 in the filtered
+      // list -- and that is the answer the old reading could not reach.
       expect(target?.index).toBe(1)
     })
 

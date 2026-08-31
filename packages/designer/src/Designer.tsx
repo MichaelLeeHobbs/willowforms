@@ -26,6 +26,14 @@ import type { DesignerApi } from './store.js'
 
 export interface DesignerProps {
   /** Starting document. The designer owns it from here; use onChange to observe. */
+  /**
+   * The document to start from, read once at mount.
+   *
+   * The designer owns it afterwards: passing a different one has no effect,
+   * deliberately, because replacing the content under an author's hands throws
+   * away their undo stack with no way to get it back. To load another form,
+   * remount with a different React `key`.
+   */
   initialDocument: FormDocument
   /** Palette metadata. */
   kit: Kit
@@ -61,6 +69,14 @@ export function Designer({
   onChange,
   onSave,
 }: DesignerProps): ReactNode {
+  /*
+   * `initialDocument` is read once, at mount, and the name says so: the designer
+   * owns the document after that, because a builder whose content can be
+   * replaced underneath an edit has no undo stack worth the name. A host that
+   * wants to load a different form remounts with a new `key`, which is the
+   * React idiom for exactly this and what the playground does when it switches
+   * kits. Documented on the prop as well.
+   */
   const api = useDesigner(initialDocument)
 
   /*
@@ -174,8 +190,23 @@ export function Designer({
    * corrected in an effect, so there is no frame where that is on screen.
    */
   const languages = api.document.languages
-  const activeLanguage =
-    language && languages.some((l) => languageTag(l) === language) ? language : undefined
+  const stillThere = language !== undefined && languages.some((l) => languageTag(l) === language)
+  const activeLanguage = stillThere ? language : undefined
+
+  /*
+   * And forgotten once it is gone, rather than masked.
+   *
+   * The line above hides a language the document no longer has, which is right
+   * for the frame it is removed in. Holding on to the name is what is wrong: add
+   * the same language back an hour later and the canvas jumps to it, because a
+   * choice nobody remembers making is still sitting in this state.
+   *
+   * Adjusted during render rather than in an effect. React re-runs this
+   * component immediately with the new state and paints once, where an effect
+   * would paint the stale frame first and then correct it -- and the compiler
+   * rule against `setState` in an effect is pointing at exactly that.
+   */
+  if (language !== undefined && !stillThere) setLanguage(undefined)
 
   return (
     <div
@@ -455,7 +486,17 @@ function Toolbar({
           <select
             id="fs-toolbar-theme"
             value={theme}
-            onChange={(e) => onTheme(e.target.value as Theme)}
+            onChange={(e) => {
+              /*
+               * Checked rather than asserted. `e.target.value` is a DOM string,
+               * and `as Theme` is a promise about markup made by the code that
+               * reads it -- a promise this component keeps today and an
+               * extension's autofill, a userscript or a future option does not
+               * have to.
+               */
+              const chosen = e.target.value
+              if (chosen === 'system' || chosen === 'light' || chosen === 'dark') onTheme(chosen)
+            }}
           >
             <option value="system">System theme</option>
             <option value="light">Light</option>

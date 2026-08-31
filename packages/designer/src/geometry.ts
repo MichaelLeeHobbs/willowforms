@@ -2,9 +2,16 @@
  * Measuring rendered nodes against the canvas.
  *
  * Every rendered node carries `data-fs-key`, because each kit renderer spreads
- * `nodeProps` onto its root element. That attribute is the only thing tying a
- * DOM element back to a document node, and both the selection overlay and the
- * drop indicator are built on looking elements up by it.
+ * `nodeProps` onto its root element. That attribute is what ties a DOM element
+ * back to a document node, and both the selection overlay and the drop indicator
+ * are built on looking elements up by it.
+ *
+ * It is not unique. A repeater draws its subtree once per row, so a key names
+ * one authored node and any number of elements, and `data-fs-row` says which
+ * row each of them is in -- the two attributes together identify an element, and
+ * the key alone identifies the node. Every function below that takes a `row` is
+ * making that distinction; every `querySelector` without one is deliberately
+ * answering "any of them will do".
  *
  * This module touches the DOM. The arithmetic that decides where a drop lands
  * lives in `dnd.ts` and touches nothing, so it can be tested without a browser.
@@ -132,11 +139,15 @@ export function toLocal(origin: Origin, clientX: number, clientY: number): [numb
 /**
  * Walk the document and measure every node that actually rendered.
  *
- * Nodes hidden by `renderWhen` are absent from the DOM and are skipped, along
- * with their subtrees: nothing can be dropped into a container that is not on
- * screen. Measured once when a drag begins rather than on every pointer move,
- * because the layout cannot change mid-drag and per-move measurement would force
- * a layout pass for every node on every frame.
+ * A node with no element is skipped, along with its subtree. On the canvas that
+ * is rarer than it used to be: `revealHidden` draws what `renderWhen` hides, so
+ * a conditional container can be dropped into while it is arranged. What is
+ * still absent is a node whose kit renderer drew nothing at all, and nothing can
+ * be dropped into a container that is not on screen.
+ *
+ * Measured once when a drag begins rather than on every pointer move, because
+ * nothing edits the document mid-drag and per-move measurement would force a
+ * layout pass for every node on every frame.
  */
 export function measureTree(
   surface: HTMLElement,

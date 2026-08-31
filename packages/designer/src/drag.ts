@@ -92,6 +92,16 @@ export function useDrag(
 
   const pending = useRef<{ source: DragSource; x: number; y: number } | undefined>(undefined)
   const zones = useRef(new Map<string, DropResolver>())
+  /*
+   * The last position a move reported, and the press before any move did.
+   *
+   * Only read when a release arrives with a non-finite coordinate, which is a
+   * synthetic or malformed event rather than anything a mouse produces. It used
+   * to start at `{0, 0}`, so in the one case it exists for -- a release with no
+   * usable coordinates and no prior move -- it answered "the top-left corner of
+   * the window", which is a position, and a wrong one. The press is where the
+   * gesture started and is the honest answer.
+   */
   const at = useRef({ x: 0, y: 0 })
   const nextId = useRef(0)
   const moved = useRef(false)
@@ -127,10 +137,21 @@ export function useDrag(
 
   const begin = useCallback((source: DragSource, event: ReactPointerEvent) => {
     pending.current = { source, x: event.clientX, y: event.clientY }
+    // Seeded from the press, so the fallback above has a real position to give
+    // even for a gesture that never moved.
+    at.current = { x: event.clientX, y: event.clientY }
     moved.current = false
     abandoned.current = false
   }, [])
 
+  /*
+   * Zones answer in registration order, and that is a decision rather than a
+   * detail: the first to claim a release wins, so a zone has to say "not mine"
+   * for a point outside itself rather than resolving whatever geometry it
+   * happens to have. The canvas checks its own bounds for exactly this reason.
+   * `Map` preserves insertion order, which is what makes the order predictable
+   * at all.
+   */
   const registerZone = useCallback((name: string, resolve: DropResolver) => {
     zones.current.set(name, resolve)
     return () => {

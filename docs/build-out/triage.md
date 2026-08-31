@@ -104,3 +104,13 @@ is a type error — the direction where the host's own facts would end up in the
 direction still compiles, and closing it needs a nominal brand, which would make every host cast an
 object literal to call `validateForm`. A library that is unpleasant to call is a library people wrap,
 and a wrapper is where the two get swapped for real.
+
+## The canvas zone should not bounds-check a release — `Canvas.tsx:315-326`, area 6
+
+**NOTE.** The finding is that `resolveRelease` never checks the release point is inside the surface. I
+wrote the check, and it broke `dragging a component on the canvas moves it`: the canvas scrolls, so a
+drop onto the last component of a long form is released below the surface's visible box while sitting
+squarely inside the form's own geometry. The client box is the wrong question, and the right one --
+"is this point inside any container?" -- is what `resolveDrop` already answers by returning nothing.
+The guard exists one layer down. The fabricated `dragId` of `0` in the same finding was real and is
+fixed: it is `-1` now, a value no drag can be holding.

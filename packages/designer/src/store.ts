@@ -674,5 +674,12 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   )
 }
 
-/** Exported for tests; the hook wraps these. */
-export const history = { commit, undo, redo }
+/**
+ * The three pure functions, exported for tests; the hook wraps them.
+ *
+ * Named `history` at module scope while the hook holds a state variable also
+ * called `history`, which is legal and reads badly: two different things with
+ * one name in one file. The state is what a reader of the hook means, so the
+ * export is the one that changes.
+ */
+export const historyOps = { commit, undo, redo }
