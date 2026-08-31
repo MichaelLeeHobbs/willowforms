@@ -154,8 +154,13 @@ wrong that day.
 **Fixed in item 27**, which carried a review finding saying the same thing from the other end. The slice
 now ends at the next top-level `describe` rather than at the end of the file, and the row that then had
 no rule -- "A Step's gap default matches the Stack it renders as", which is these two kits agreeing with
-each other rather than an obligation on anybody's kit -- came out of the table. `CONTRACT_RULES` is 19.
-Nothing is left to hand over here.
+each other rather than an obligation on anybody's kit -- came out of the table.
+
+The second pass went further: the guard also missed the fourteen rules driven per kit from _outside_ that
+block, so the spec presented one table as the whole obligation set while the suite ran nearly twice
+that. There are two tables now, both counted, and the count is of the whole file minus the per-kit block
+minus the describes that are about these two kits rather than about kits. Nothing is left to hand over
+here.
 
 ## A repeater's rows cannot be reached in the designer
 
