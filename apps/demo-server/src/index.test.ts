@@ -15,7 +15,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { FormDocument } from '@formsmith/core'
+import type { ComponentNode, FormDocument } from '@formsmith/core'
 
 /*
  * Before the import, and by dynamic import for that reason: `index.ts` reads
@@ -287,10 +287,7 @@ describe('a body larger than the limit', () => {
  * had the same problem and no answer of its own until `submittedAcross`.
  */
 describe('a form with two steps', () => {
-  const step = (
-    name: string,
-    children: FormDocument['root']['children'],
-  ): FormDocument['root'] => ({
+  const step = (name: string, children: ComponentNode[]): ComponentNode => ({
     key: 'step' + name.charAt(0).toUpperCase() + name.slice(1),
     type: 'Box',
     props: {},

@@ -19,7 +19,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps, ReactElement } from 'react'
 import { prop } from '@formsmith/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ComponentDef, ComponentNode, FormDocument, Kit } from '@formsmith/core'
+import type { ComponentDef, ComponentNode, FormDocument, JsonValue, Kit } from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
@@ -780,6 +780,85 @@ describe('a select holding a number', () => {
 })
 
 describe.each(KITS)('$name', ({ kit, renderers }) => {
+  /**
+   * What unit a length-valued prop carries.
+   *
+   * The contract says a document authored against one kit renders against the
+   * other, and it never said what a number means. So `gap` was CSS pixels in
+   * `@formsmith/kit-html` and multiples of `theme.spacing` in
+   * `@formsmith/kit-mui` -- eight times apart for the same document -- and pixels
+   * again on `kit-mui`'s own `Grid`, so that kit disagreed with itself as well.
+   * Neither kit was wrong, because nothing had decided.
+   *
+   * `docs/spec/02-kit-contract.md` decides: **a length-valued prop is CSS
+   * pixels.** This is the rule, run against every kit.
+   *
+   * `getComputedStyle` rather than a measured rectangle, deliberately. Nothing
+   * here asks the browser to lay anything out -- `gap` is not computed from
+   * layout, and what is read back is the declaration the kit emitted, resolved
+   * through the cascade. jsdom does that part faithfully, which the probe that
+   * found this defect confirmed: 32px against 4px for the same authored 4.
+   */
+
+  const drawWith = (type: string, props: Record<string, JsonValue>): HTMLElement => {
+    const node: ComponentNode = {
+      key: 'target',
+      type,
+      props: Object.fromEntries(Object.entries(props).map(([name, value]) => [name, prop(value)])),
+      children: [],
+    }
+    const { container } = render(
+      <FormUnderTest
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
+    )
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error(type + ' drew nothing')
+    return element
+  }
+
+  const has = (type: string, name: string): boolean =>
+    kit.components.some((def) => def.type === type && def.props.some((p) => p.name === name))
+
+  /*
+   * One row per length-valued prop either kit declares, found by reading the
+   * definitions rather than by remembering. A kit that does not have one skips
+   * its row rather than failing, because which components a kit ships is its own
+   * business; what a number means is not.
+   */
+  const LENGTHS: { type: string; name: string; css: string; value: number }[] = [
+    { type: 'Stack', name: 'gap', css: 'gap', value: 4 },
+    { type: 'Container', name: 'gap', css: 'gap', value: 6 },
+    { type: 'Grid', name: 'gap', css: 'gap', value: 12 },
+    { type: 'Box', name: 'padding', css: 'padding-top', value: 9 },
+    { type: 'Box', name: 'radius', css: 'border-radius', value: 7 },
+  ]
+
+  it.each(LENGTHS.map((length) => [length.type + '.' + length.name, length] as const))(
+    '%s is in CSS pixels',
+    (_what, length) => {
+      if (!has(length.type, length.name)) return
+
+      const element = drawWith(length.type, { [length.name]: length.value })
+      const read = getComputedStyle(element).getPropertyValue(length.css)
+
+      expect(read, length.type + '.' + length.name + ' is not in CSS pixels').toBe(
+        String(length.value) + 'px',
+      )
+    },
+  )
+
+  it('reads a different number differently, so the rows above are not a fixed value', () => {
+    // The control. A kit hardcoding 4px would pass the `Stack.gap` row exactly.
+    if (!has('Stack', 'gap')) return
+
+    expect(getComputedStyle(drawWith('Stack', { gap: 24 })).gap).toBe('24px')
+  })
+
   const container = kit.components.find((c) => c.container)
 
   it('names itself the same on both halves', () => {

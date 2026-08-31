@@ -103,12 +103,34 @@ obligation missed.
 | Every palette entry declares an icon                             | Half a palette with icons reads as a bug rather than a choice                |
 | A RadioItem child can be selected in its group                   | A child that looks like an option and answers nothing is worse than no child |
 | The palette index has no colliding types                         | The type is how a node finds its renderer                                    |
+| A length-valued prop is CSS pixels                               | A number that means two things is a document that renders two ways           |
+| Two different lengths render differently                         | A kit hard-coding the tested value would satisfy the rule above              |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two
 accessibility rules caught `@formsmith/kit-mui` failing both: no renderer in it set `role="alert"`, and
 its checkbox built the message element only once there was an error. Those two obligations had been
 written down here, as things a kit must do, for as long as this file has existed. Nothing ran them.
+
+### What a length means
+
+**A length-valued prop is a number of CSS pixels.** `gap`, `padding`, `radius`, `maxWidth` and `width`
+all mean the same thing in every kit: `gap: 16` is sixteen pixels, wherever the document is rendered.
+
+This had never been decided, and the contract's one obligation is that a document authored against one
+kit renders against the other. `@formsmith/kit-html` read `gap` as pixels; `@formsmith/kit-mui` passed it
+to MUI's `gap` prop, which is a multiple of `theme.spacing` and defaults to 8 -- so an authored `gap: 2`
+was 16px in one kit and 2px in the other. `kit-mui`'s own `Grid` used pixels, so that kit disagreed with
+itself as well. Neither kit was wrong, because nothing had said.
+
+A kit built on a design system with its own spacing scale converts at its edge, the way `kit-mui` does
+now. That is the kit's job precisely because the scale is the kit's, and the document belongs to nobody.
+
+**What changed:** `@formsmith/kit-mui` reflows. A document that authored `gap: 2` against it rendered
+16px and now renders 2px. Its _defaults_ are unchanged -- the default was `gap: 2` through MUI's scale,
+which was 16px, and it is 16 pixels now -- so a form that never set a gap looks identical. Only an
+authored value moves, and it moves onto the meaning `kit-html`, `Grid`, `padding`, `radius`, `maxWidth`
+and `width` already had.
 
 ## Accessibility is the kit's job
 

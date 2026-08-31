@@ -4,6 +4,33 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### A length-valued prop is CSS pixels, and kit-mui converts at its edge
+
+- **Decided:** every length a document can author -- `gap`, `padding`, `radius`, `maxWidth`, `width` --
+  is a number of CSS pixels in every kit. `@formsmith/kit-mui` converts to its own spacing scale at its
+  edge. Written into `docs/spec/02-kit-contract.md` and run as two contract rules against every kit.
+- **Why:** the contract's one obligation is that a document authored against one kit renders against the
+  other, and it never said what a number means. `kit-html` read `gap` as pixels; `kit-mui` passed it to
+  MUI's `gap`, which is a multiple of `theme.spacing` and defaults to 8 -- so an authored `gap: 2` was
+  16px in one kit and 2px in the other. Neither kit was wrong. That is what made it a spec defect rather
+  than a bug, and why the fix belongs in the document first.
+- **Why pixels:** it is the only unit both kits can express without a theme, and it is what the other four
+  lengths already meant in both. `kit-mui`'s own `Grid` was already using pixels for the same prop, so
+  that kit disagreed with itself -- the choice was not between two coherent positions.
+- **Rejected: making `gap` kit-relative and documenting it.** It gives up the claim the contract exists to
+  make. A document that lays out differently in each kit is a document that does not travel, and the
+  designer would have to stop pretending one number means one thing.
+- **Rejected: a spacing unit in core.** A scale is a design-system decision, and core has no design
+  system by construction. Converting at the kit's edge puts the knowledge where the scale lives.
+- **What it costs:** `kit-mui` reflows. A document that authored `gap: 2` against it rendered 16px and now
+  renders 2px. Its _defaults_ do not move: the default was `gap: 2` through MUI's scale, which was 16px,
+  and it is `16` pixels now, so a form that never set a gap looks identical. Only an authored value
+  changes, onto the meaning every other length already had. Unpublished at `0.0.0`, so the real cost is
+  the playground's own sample and nothing else.
+- **Reversal:** one constant and five call sites in `kit-mui`, plus the spec section and two contract
+  rules. The rules are what would make a silent reversal fail.
+- **When:** 2026-08-31.
+
 ### A throwing evaluator fails a custom rule and applies a guarded one
 
 - **Decided:** both bare evaluator calls in `validation.ts` are wrapped. A throw in a `custom` rule's

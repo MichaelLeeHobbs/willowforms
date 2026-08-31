@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 14, the demo-server HIGHs. Item 15 is next.
+- **Last completed:** item 15, the unit a length prop carries. Item 16 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/14-demo-server-highs`
+- **Last pushed item branch:** `build-out/b/15-length-units`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -216,7 +216,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a concurrent-write test that loses no update, a body-limit test that
       rejects before buffering, and a two-step submit whose echo carries both steps, each seen red first.
 
-- [ ] **15. Decide what unit a length prop carries, in the kit contract.** The fourth theme of the executive
+- [x] **15. Decide what unit a length prop carries, in the kit contract.** The fourth theme of the executive
       summary, areas 4 and 5. `gap` is CSS pixels in `kit-html` and MUI spacing multiples in `kit-mui`, and
       pixels again on `kit-mui`'s own `Grid`, so every gap is eight times larger across kits. The contract
       says a document authored against one kit renders against the other and never says what unit a length

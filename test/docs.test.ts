@@ -268,7 +268,7 @@ describe('the specification index', () => {
 })
 
 /** How many obligations the kit contract states. See the assertion that uses it. */
-const CONTRACT_RULES = 19
+const CONTRACT_RULES = 21
 
 describe('the kit contract table', () => {
   it('has one row for every rule the contract suite runs', () => {
