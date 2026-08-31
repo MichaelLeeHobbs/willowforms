@@ -24,13 +24,14 @@ import { rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
 import { afterAll, describe, expect, it } from 'vitest'
+import { FIXTURE_PREFIX } from './fixtures.js'
 
 const root = new URL('../', import.meta.url)
 const abs = (path: string): string => fileURLToPath(new URL(path, root))
 
 /** A fixture, named so nobody mistakes one for source if a run is killed. */
 const fixture = (pkg: string, name: string, ext: 'ts' | 'tsx'): string =>
-  'packages/' + pkg + '/src/__guardrail_fixture_' + name + '__.' + ext
+  'packages/' + pkg + '/src/' + FIXTURE_PREFIX + name + '__.' + ext
 
 interface Case {
   /** What the guardrail is supposed to stop. */

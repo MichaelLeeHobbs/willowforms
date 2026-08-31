@@ -588,6 +588,32 @@ function useKeyboardShortcuts(
         redo()
         return
       }
+      /*
+       * `Backspace` only when nothing else has a claim on it.
+       *
+       * Delete is unambiguous. Backspace is not: on a button it is the browser's
+       * back gesture in some settings, and on any control it is what somebody
+       * presses expecting to correct a typo. This fired whenever focus was on
+       * *any* chrome button -- so tabbing to Undo and pressing Backspace deleted
+       * the selected component, which is a destructive edit from a key nobody
+       * aimed at the canvas.
+       *
+       * The shell itself and the tree rows are the two places where Backspace
+       * can only mean "remove what is selected", because neither takes text and
+       * both are about the selection. Anywhere else it is left alone; Delete
+       * still works from everywhere.
+       *
+       * Asked of the element rather than compared with the ref, because a ref is
+       * stable and listing one as a dependency is what
+       * `react-hooks/preserve-manual-memoization` refuses. `fs-shell` is the
+       * class the container carries and nothing else does.
+       */
+      const backspaceIsSafe =
+        target?.classList.contains('fs-shell') === true ||
+        target?.closest('[data-fs-tree-row]') !== null
+
+      if (event.key === 'Backspace' && !backspaceIsSafe) return
+
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedKey) {
         event.preventDefault()
         removeComponent(selectedKey)

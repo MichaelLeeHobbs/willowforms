@@ -10,6 +10,7 @@
 import { Component, createContext, useCallback, useContext, useId, useMemo } from 'react'
 import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import {
+  MAX_ROWS,
   NO_ROWS,
   addressOf,
   dataKeyOf,
@@ -141,6 +142,15 @@ export function resolveProp(
   data: FormData,
   options: EvalOptions = {},
 ): JsonValue {
+  /*
+   * A shape check before the switch, which the docblock's "total over an
+   * untrusted document" already promised. `props` comes straight from JSON, so
+   * a prop holding a string or `null` reached `value.kind` and threw during
+   * render -- and a throw during render is what the boundary exists for, which
+   * is a heavy answer to a prop that is simply not a binding.
+   */
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
   switch (value.kind) {
     case 'static':
       return value.value
@@ -295,11 +305,36 @@ interface NodeBoundaryProps {
   children: ReactNode
 }
 
-class NodeBoundary extends Component<NodeBoundaryProps, { failed: boolean }> {
-  override state = { failed: false }
+class NodeBoundary extends Component<
+  NodeBoundaryProps,
+  { failed: boolean; forKey: string; forType: string }
+> {
+  override state = { failed: false, forKey: this.props.node.key, forType: this.props.node.type }
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true }
+  }
+
+  /**
+   * A different node here is a fresh chance to render.
+   *
+   * `failed` was never cleared, so a component that threw once stayed an error
+   * box for the life of the mount. On the canvas that is the ordinary case
+   * rather than a rare one: an author writes a property value that breaks a
+   * renderer, fixes it, and the box stays -- with nothing to click that would
+   * bring the component back, because the box is what replaced it.
+   *
+   * Keyed on the node's identity rather than on every render, because retrying
+   * on each render is an infinite loop when the cause has not gone away. A key
+   * or a type change means this boundary is being asked about a different
+   * component, which is a different question.
+   */
+  static getDerivedStateFromProps(
+    props: NodeBoundaryProps,
+    state: { failed: boolean; forKey: string; forType: string },
+  ): { failed: boolean; forKey: string; forType: string } | null {
+    if (props.node.key === state.forKey && props.node.type === state.forType) return null
+    return { failed: false, forKey: props.node.key, forType: props.node.type }
   }
 
   override componentDidCatch(error: Error, _info: ErrorInfo): void {
@@ -403,6 +438,18 @@ function Row({
  * expression. `RenderNode` now reads the context and returns the boundary;
  * everything else is here, where a throw is caught.
  */
+/**
+ * A node's children, whatever the document put there.
+ *
+ * `node.children?.map(...)` assumed an array, while core guards the identical
+ * shape everywhere it walks a document -- `Array.isArray(node.children)` appears
+ * in `rows.ts`, `context.ts` and `tree.ts`. A document is data, so `children`
+ * can be a string, and `.map` on one throws during render.
+ */
+function childrenOf(node: ComponentNode): ComponentNode[] {
+  return Array.isArray(node.children) ? node.children : []
+}
+
 function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
   const { scope, revealHidden, kit, data, errors, translations, options, onChange } = ctx
@@ -496,7 +543,20 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
    * from it, on every render, to answer a question only a row scope asks.
    */
   const repeats = isRowScope(node)
-  const rows = repeats ? rowsOf(valueOf(row?.values ?? data, dataKey)) : EMPTY_ROWS
+  /*
+   * The same cap `validateForm` applies, and for the same reason one layer over.
+   *
+   * Validation refuses a repeater past `MAX_ROWS` rather than checking a prefix,
+   * because a row nobody checked passing silently is the permissive failure this
+   * project is organised against. The renderer had no cap at all, so a body with
+   * a hundred thousand rows drew a hundred thousand subtrees -- the browser tab
+   * rather than the server, and from the same request.
+   *
+   * Sliced rather than refused, because a renderer's job is to stay on screen:
+   * the rows past the cap are the ones validation has already declined to check.
+   */
+  const all = repeats ? rowsOf(valueOf(row?.values ?? data, dataKey)) : EMPTY_ROWS
+  const rows = all.length > MAX_ROWS ? all.slice(0, MAX_ROWS) : all
   const drawn = revealHidden && repeats && rows.length === 0 ? [{}] : rows
 
   const children = repeats
@@ -508,12 +568,12 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
           index={index}
           value={value}
         >
-          {node.children?.map((child) => (
+          {childrenOf(node).map((child) => (
             <RenderNode key={child.key} node={child} />
           ))}
         </Row>
       ))
-    : node.children?.map((child) => <RenderNode key={child.key} node={child} />)
+    : childrenOf(node).map((child) => <RenderNode key={child.key} node={child} />)
 
   return (
     <Component

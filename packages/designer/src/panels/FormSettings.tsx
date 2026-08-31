@@ -21,6 +21,19 @@ export interface FormSettingsProps {
   api: DesignerApi
 }
 
+/**
+ * A language's name, whatever the document put there.
+ *
+ * `language.name.trim()` threw on a language with no `name` -- and a `Language`
+ * arrives from a pasted document, so `{ code: 'en' }` is a shape somebody can
+ * type. A throw during render in React 19 unmounts the tree, so a missing name
+ * took the whole designer down and left the JSON dialog, the one place the
+ * document could be repaired, unreachable.
+ */
+function nameOf(language: { name?: unknown }): string {
+  return typeof language.name === 'string' ? language.name.trim() : ''
+}
+
 export function FormSettings({ api }: FormSettingsProps): ReactNode {
   const { document: doc } = api
   const [code, setCode] = useState('')
@@ -127,7 +140,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                  * which for `pt-BR` produced "pt-BR pt-BR" -- the same string
                  * twice, reading as though something had gone wrong.
                  */}
-                {language.name.trim() ? (
+                {nameOf(language) ? (
                   <>
                     {language.name} <code>{tag}</code>
                   </>
@@ -175,7 +188,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                 <button
                   type="button"
                   className="fs-rule__remove"
-                  aria-label={'Remove ' + (language.name.trim() || tag)}
+                  aria-label={'Remove ' + (nameOf(language) || tag)}
                   // A document with no languages renders every translation as its
                   // raw key, so the last one cannot be removed.
                   disabled={doc.languages.length === 1}

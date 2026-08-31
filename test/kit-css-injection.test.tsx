@@ -59,17 +59,17 @@ function documentOf(root: ComponentNode): FormDocument {
   }
 }
 
-const boxWith = (background: string): ComponentNode => ({
+const boxWith = (background: string, padding = 2): ComponentNode => ({
   key: 'target',
   type: 'Box',
-  props: { padding: prop(2), background: prop(background), radius: prop(0) },
+  props: { padding: prop(padding), background: prop(background), radius: prop(0) },
   children: [],
 })
 
-function formOf(kit: RendererKit, background: string): ReactElement {
+function formOf(kit: RendererKit, background: string, padding = 2): ReactElement {
   return (
     <FormRenderer
-      document={documentOf(boxWith(background))}
+      document={documentOf(boxWith(background, padding))}
       kit={kit}
       data={{}}
       revealHidden
@@ -111,9 +111,23 @@ function rulesIn(sheet: string): { selector: string; body: string }[] {
   return rules
 }
 
-/** Every rule emotion emitted for this render, in document order. */
-function emittedRules(background: string): { selector: string; body: string }[] {
-  render(formOf(muiRendererKit, background))
+/**
+ * Every rule emotion emitted for this render, in document order.
+ *
+ * `padding` is per case and it is not decoration. Emotion caches by content
+ * hash and will not re-insert a rule it believes is already on the page, and
+ * `safeStyleValue` refuses both hostile backgrounds identically -- so the
+ * sanitised `sx` for the injection case and the exfiltration case were the same
+ * bytes, the second render inserted nothing, and `beforeEach` had already
+ * removed the tag the first one left. The exfiltration assertion then read an
+ * empty string and passed having seen no CSS at all, which is exactly the shape
+ * of guard this file exists to catch.
+ *
+ * A different padding gives each case its own hash, so every case produces its
+ * own rule and the assertions below can insist on finding one.
+ */
+function emittedRules(background: string, padding = 2): { selector: string; body: string }[] {
+  render(formOf(muiRendererKit, background, padding))
   return Array.from(document.querySelectorAll('style')).flatMap((tag) =>
     rulesIn(tag.textContent ?? ''),
   )
@@ -136,7 +150,7 @@ describe('a document CSS value cannot author a rule', () => {
 
   describe('@formsmith/kit-mui', () => {
     it('emits one rule for a Box, not two', () => {
-      const rules = emittedRules(INJECTION)
+      const rules = emittedRules(INJECTION, 2)
       expect(rules.map((rule) => rule.selector)).not.toContain('html')
       expect(rules).toHaveLength(1)
       expect(rules[0]?.selector).toMatch(/^\.css-/)
@@ -144,18 +158,20 @@ describe('a document CSS value cannot author a rule', () => {
 
     it('keeps a legitimate colour', () => {
       expect(
-        emittedRules('#ff0000')
+        emittedRules('#ff0000', 3)
           .map((rule) => rule.body)
           .join(''),
       ).toContain('#ff0000')
     })
 
     it('refuses a value that fetches', () => {
-      expect(
-        emittedRules(EXFILTRATION)
-          .map((rule) => rule.body)
-          .join(''),
-      ).not.toContain('evil.example')
+      const rules = emittedRules(EXFILTRATION, 4)
+
+      // The floor its sibling above has and this one did not. Without it,
+      // "sanitised" and "nothing was emitted" are the same green.
+      expect(rules).toHaveLength(1)
+      expect(rules[0]?.body).toContain('padding')
+      expect(rules.map((rule) => rule.body).join('')).not.toContain('evil.example')
     })
   })
 

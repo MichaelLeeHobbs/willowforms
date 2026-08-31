@@ -17,6 +17,186 @@ Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`; first-pass en
 
 ## Second pass (from 2026-08-31)
 
+## Drop-zone precedence is registration order, and registration order is not stable — `Canvas.tsx:439` + `Tree.tsx:287`, area 7, item 22
+
+**MEDIUM.** `registerZone` keeps a `Map`, and the comment says the first zone to claim a release wins, so
+precedence is whichever of the canvas and the tree registered first -- which depends on effect order and
+flips when a pane is collapsed and reopened.
+
+Left because it does not currently decide anything: both zones check their own bounds and answer "not
+mine" for a point outside themselves, which the canvas's own comment says is exactly why order need not
+be relied on. Order matters only if two zones ever claim the same point, and today they cannot -- the
+canvas and the tree occupy disjoint rectangles.
+
+Making it explicit means giving a zone a priority, which is a small API with a real question behind it
+(what does a nested drop surface mean?), and doing it while nothing depends on it is a guess about the
+answer. Worth doing when a third zone arrives, which is when the question becomes concrete.
+
+## The tree re-renders on every pointer move of a drag — `Tree.tsx:294-295,343-440`, area 7, item 22
+
+**MEDIUM.** Every move re-renders the whole tree and re-walks the document to rebuild the flattened rows.
+
+Left as a perf observation with no measurement, alongside the five the first pass triaged for the same
+reason. The tree is a form's component list -- dozens of rows, not thousands -- and the walk is
+`flatten`, which is one pass with no allocation per node beyond the row. The fix is memoising on the
+document's identity, which `commit` already provides, and it has to stay correct across an edit. Worth
+doing on a profile of a form somebody says is slow.
+
+## The scroll-into-view effect has no notion of why the selection moved — `SelectionLayer.tsx:160-183`, area 7, item 22
+
+**MEDIUM.** It keys on `selectedKey` and `selectedRow`, so it scrolls whenever either changes -- including
+when the change came from a click on the canvas, where the component is already under the pointer and
+scrolling moves it out from under the cursor.
+
+Left because the fix needs the selection to carry _why_ it moved -- keyboard, tree click, canvas click --
+and that is a change to the shape of the selection state that every panel reads. It is the right change
+and it is not a MEDIUM sweep's to make. The visible cost today is small: a click on a component already
+in view scrolls by nothing, because it is already in view.
+
+## The Rules tab performs no cross-rule consistency check — `Rules.tsx:329-338,41-57`, area 8, item 22
+
+**MEDIUM.** A rule set can contradict itself -- `minLength: 10` beside `maxLength: 5` -- and the panel
+accepts it, so every answer fails and nothing says why.
+
+Left because it is a feature rather than a repair, and a small one with a long tail: the pairs are
+`min`/`max`, `minLength`/`maxLength`, and then it stops being obvious -- a `pattern` that cannot match
+anything a `minLength` allows is the same class and is undecidable. Picking the two easy pairs and
+stopping is defensible, and it is a design decision about what the panel promises rather than a defect to
+fix in a sweep. `unexportableRules` is the precedent for how such a report would be shaped.
+
+## `renameKey` leaves every other reference dangling — `store.ts:437-493`, area 6, item 21
+
+**MEDIUM, already open.** Renaming a component repoints only that node's own `renderWhen`, so a sibling
+whose condition names the old data key silently starts reading a key nothing writes: the condition is
+false, the sibling is hidden, and its rules never run.
+
+This is the same finding the _first_ pass recorded in `docs/build-out/found.md` under "Renaming a
+component key leaves every condition that named its answer dangling", with four defensible answers
+written out and the observation that choosing between them changes what renaming means. Two review passes
+reaching it independently is worth knowing; it does not make it smaller. Left where it is, with the
+options, rather than answered in a MEDIUM sweep.
+
+## The store re-validates the whole document on every commit — `store.ts:297-305`, area 6, item 21
+
+**MEDIUM.** The "checked once" validation re-runs `validateDocument` over the whole tree and re-emits its
+problems, so a form with a few hundred nodes walks the entire document on every keystroke that commits.
+
+Left because it is a performance observation with no measurement behind it and no defect: the walk is
+correct, and `MAX_TREE_DEPTH` bounds it. The fix is either memoising on the document's identity -- which
+`commit` already gives, since an unchanged document keeps its reference -- or moving the check off the
+commit path entirely, and choosing needs a profile of a form somebody says is slow. Recorded with the
+five other perf notes the first pass triaged for the same reason.
+
+## Hard-coded ids in `FormSettings` — `FormSettings.tsx:104,144,186,199,204,217`, area 9, item 21
+
+**MEDIUM.** The panel uses fixed element ids and, worse, a fixed radio group `name`, so two designers on
+one page share a radio group: choosing a default language in one moves it in the other.
+
+Left because two designers on one page is not a configuration this project supports or tests, and the
+change touches every control in the panel. `useId` is the fix and it is mechanical; what makes it not
+worth doing inside a MEDIUM sweep is that the same pattern appears in several panels and doing one of
+them is the half-fix this run exists to stop. Worth doing as one pass over the designer, with a test that
+renders two shells.
+
+## `DocumentDialog` computes its JSON in the render body — `DocumentDialog.tsx:72-74`, area 9, item 21
+
+**MEDIUM.** `documentJson`, `schemaJson` and `lossy` are recomputed on every render of the dialog body,
+including every keystroke in the textarea beside them.
+
+Left, and it is the same call the first pass made about this file: a `JSON.stringify` of a document
+nobody types a whole document into is not on a frame budget, and a `useMemo` here has to stay correct
+across an edit. Worth doing on evidence rather than before it.
+
+## The mode picker shows no selection for a kind it does not know — `Binding.tsx:88,138-148`, area 9, item 21
+
+**MEDIUM, partly covered.** A `PropValue.kind` outside the four the picker offers renders it with nothing
+selected, so the control reads as unset while the document holds a binding.
+
+The `renderWhen` row already handles exactly this: it offers an "Always (unrecognised rule)" option when
+the document holds a `kind` it cannot draw, so the row can let go of it deliberately. The same treatment
+belongs on the general mode picker, and it is not a two-line change -- the option's label has to say what
+is being replaced, and the picker is shared by every property row.
+
+Left as a known gap rather than half-done. `validateDocument` refuses such a document, so reaching it
+takes a paste that bypassed the gate.
+
+## The HTML kit writes layout props as inline styles — `kit-html/renderers.tsx`, area 5, item 20
+
+**MEDIUM.** Every layout and display prop lands in a `style` attribute, which a strict
+`Content-Security-Policy` without `'unsafe-inline'` blocks outright, so a form served under one loses
+its layout entirely.
+
+Not fixed, because the fix is a rewrite of how this kit expresses an authored value rather than a repair.
+The props are per-node and arbitrary -- a gap of 17, a max width of 613 -- so a class cannot carry them;
+the routes are a nonce'd `<style>` element per node, or CSS custom properties set from a nonce'd sheet, or
+a `CSSStyleSheet` built at runtime. `FormRenderer` already takes a `nonce` for the per-node CSS it emits,
+which is where such a design would start.
+
+That is a real piece of work with a design question in it: whether a kit's _layout_ props go down the
+same channel as a document's authored CSS. It belongs to whoever owns the project, and this run's job is
+not to answer it in passing. Bad to leave in the sense that it silently rules out a deployment class, and
+the README does not warn anybody. Recorded rather than hidden.
+
+## An unanswered group and an answer of `''` are the same thing — `kit-html/renderers.tsx:700`, area 5, item 20
+
+**MEDIUM.** `jsonToString(value)` is `''` for `undefined`, `null` and the empty string alike, so a
+`RadioItem` or an option whose value is `''` shows as selected on a group nobody has answered.
+
+Left because closing it means deciding what an empty-string option _means_, and the honest answer is
+probably that it is not an answer -- which is a document-model call, not a kit one. `isEmpty` in core
+already treats `''` as empty, and `required` refuses it, so the two layers agree that an empty string is
+a non-answer; what the kit does is show it as one anyway. Making the kit disagree with core about that
+would be worse than the symptom.
+
+The symptom needs a document that authors an option with an empty value, which the panel does not offer:
+`MembershipOptions` drops blank lines, and an option list is authored through it. Reachable by hand-edited
+JSON only.
+
+## A `custom` rule with no evaluator passes — `validation.ts:415`, area 3, item 19
+
+**MEDIUM.** The finding is that `if (!options.evaluate) return undefined` lets every custom rule through
+on a host that injected no sandbox. That is the documented degradation, stated in this file's own header
+and in `docs/spec/08-validation.md`, and reversing it would make the library unusable without an
+evaluator: every custom rule would fail for a host that has deliberately declined to supply one.
+
+The failure the finding is really about is a host that _needs_ an evaluator and has not noticed, and that
+already has an answer at the right layer: `evaluatorKeys(root)` reports every component whose rules need
+one, and `apps/demo-server` refuses to accept a submit for such a document with a 500 naming the
+components. A boot-time check is where "this host is misconfigured" belongs; a per-rule guess is not.
+
+What did change in item 8 is the case this finding is next to: an evaluator that _throws_ now fails the
+rule, because a broken expression is not a configuration choice.
+
+## `validateAcross` multiplies scopes by rows — `validation.ts:707-711`, area 3, item 19
+
+**MEDIUM.** Each scope walks the whole tree, and `MAX_ROWS` bounds the rows inside one walk, so a
+document with many steps multiplies a bounded quantity by a document-controlled one. Both factors are
+already bounded in practice: the scopes come from `contextValues(root, 'step')`, which is the set of
+distinct literals a document compares `context.step` against, and a document deep enough to matter is
+refused by `MAX_TREE_DEPTH` first.
+
+Left because the honest fix is a work budget across the whole validation pass rather than another
+constant, and that is a design with a number in it that nobody has measured. What made the original
+report worth acting on -- a _request_-controlled multiplier -- is `MAX_ROWS`, which exists. The demo
+server also refuses a body over `MAX_BODY` before any of this runs, and item 14 made that a real limit.
+
+Worth revisiting with a profile rather than by argument.
+
+## `applyChange` and `rowContext` disagree about a row that is not an object — `rows.ts:502`, area 2, item 19
+
+**MEDIUM, partly fixed.** `rowContext` coerces a row that is not a plain object to `{}` so the renderer
+can draw it, and `applyChange` refuses to write into one -- so a row arriving as a string draws as an
+empty row whose keystrokes go nowhere.
+
+Not reconciled here, and the reason is that both halves are right for their own caller. Drawing nothing
+for a malformed row would hide a row the data says exists; writing into it would mean choosing what
+`"nope"` becomes when somebody types into its `line1`, which is inventing an answer. What was missing is
+that nobody is told, and item 18 added the report at the layer that can give one: `validateForm` now
+reports `NOT_A_LIST` for a repeater whose value is not a list, which is the same shape one level up.
+
+A row inside a well-formed list that is itself malformed still draws empty and refuses writes. Closing
+that means deciding whether the renderer may replace a row, which is a document-model question.
+
 ## `eslint .` does lint `aliases.ts` — area 10, item 5
 
 **MEDIUM, refuted.** The finding says the file `CLAUDE.md` calls load-bearing is never linted. It is.
@@ -209,3 +389,82 @@ hook-level tests for five `DesignerApi` writers that are covered through the pan
 Each is a real gap and none of them is a defect: they are tests to write when something touches those
 paths, which is when a test written for them will be checked against a change rather than against the
 code it was copied from.
+
+## eslint does lint the config files — area 10
+
+**Refuted.** The finding says `eslint .` never sees `vitest.config.ts`, `playwright.config.ts` or
+`apps/playground/vite.config.ts`, so a mistake in any of them is unlinted. The `aliases.ts` half of the
+same claim was refuted in item 5; this is the rest of it, measured the same way. Appending
+`const unusedOnPurpose = 1` to each of the three and running `pnpm lint`:
+
+```
+vitest.config.ts                 caught by pnpm lint
+playwright.config.ts             caught by pnpm lint
+apps/playground/vite.config.ts   caught by pnpm lint
+```
+
+All three are linted. `pnpm typecheck`'s second pass covers them too, through `tsconfig.eslint.json`.
+
+## The end-to-end suite still runs against source, not `dist` — `playwright.config.ts:42`, area 10
+
+**MEDIUM, partly fixed, and the rest is honest to leave.** The finding is right that `pnpm e2e` starts
+the Vite dev server, so nothing in the pipeline ever put a built package in front of a browser.
+
+The half worth fixing is fixed: `scripts/check-dist.mjs` now imports every package's `dist/index.js` in
+Node, so a broken `exports` map, a directory import Node refuses, or a dependency that only resolves
+under a bundler fails CI. That is the class of defect this actually catches, and it caught one during
+this run -- `@formsmith/kit-mui` did not load at all under MUI 6.
+
+The other half does not follow. Building the playground and serving it with `vite preview` would not
+exercise `dist` either, because `aliases.ts` maps `@formsmith/*` to `src` for the playground too, on
+purpose, so an in-repo edit needs no rebuild. A genuine build-output end-to-end run means a second
+playground with the aliases off, installing the packed tarballs -- a package-consumer smoke test, which
+is a piece of infrastructure and not a corner of a MEDIUM sweep. Worth doing as its own step.
+
+## `auto-install-peers` stays on — `.npmrc`, area 10
+
+**Fixed in part.** `strict-peer-dependencies=false` is now `true`: it was hiding peer conflicts, and the
+tree satisfies strict mode today, so `pnpm install --frozen-lockfile --strict-peer-dependencies` passes
+unchanged. That is the half of the setting that silences a real error.
+
+`auto-install-peers=true` stays. It is pnpm's default since v8, and turning it off is recorded in the
+lockfile, so flipping it fails `--frozen-lockfile` with `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` until the
+lockfile is regenerated. Regenerating the lockfile to change a default, in the middle of a remediation
+run, would move dependency resolutions no finding asked to move.
+
+## Four area-15 findings that earlier items had already closed
+
+**Refuted, as of this item.** The review is a snapshot of the base, and four of its cross-cutting
+findings name code that has since changed:
+
+- `test/eslint.config.test.ts:44-102`, the guardrail proven only for static imports. Item 5 added
+  `no-restricted-syntax` with a `dynamicImportOf` selector for both invariants, and six CASEs drive it:
+  two for the designer, two for core, and two controls for the imports that stay allowed.
+- `test/docs.test.ts:387-397`, the spec understating what is built. `02-kit-contract.md`'s obligation
+  table now marks `aria-invalid` and `aria-required` enforced, and `docs.test.ts` reads that column and
+  asserts each `yes` is driven and each `no` is not, so it cannot drift in either direction again.
+- `test/docs.test.ts:287-333`, the contrast figures checked only for the existence of the files they
+  name. `contrast.test.ts` records every pair it measures and compares the lowest in each palette against
+  the table, and the wrong row -- 4.83:1 where the warning stripe sat at 4.24:1 -- is corrected.
+- `test/a11y.test.tsx:140-152`, the JSON dialog audited while not modal. Half of this was real and is
+  fixed in this item: three `e2e/document.spec.ts` tests check `:modal`, the focus trap and Escape in a
+  browser, and both documents say where that is checked and why it cannot be checked in jsdom.
+
+## No test with a layout engine draws a repeater with more than one row — area 16
+
+**MEDIUM, and it is the product's gap rather than the suite's.** The finding is right that
+`rowFromEventTarget`, the row-scoped `nodeElement` and the one-candidate-per-drawn-element measurement
+were all written for the bug where the outline, the label and the toolbar appeared around row 0 whichever
+row was clicked -- and that the rectangle half of that is checked nowhere.
+
+It cannot be checked yet. Rows are a projection of the answers, and nothing in the designer can produce a
+second answer: no kit renders an add-row control, edit mode swallows keystrokes so the canvas cannot be
+filled in, and preview starts with empty data. The canvas draws exactly one authored row so the subtree is
+reachable at all. `e2e/repeater.spec.ts` says this in its own comment and `found.md` carries it as the
+gap it is.
+
+What is covered instead: the projection, against supplied data, in `renderer.test.tsx` -- including rows
+added and removed, the re-addressing that follows, and the row coordinate surviving on a failed
+component's fallback. The identity half, `rowFromEventTarget` and `keyFromEventTarget`, is now tested
+directly in `geometry.test.ts`, which needs no layout engine. What is left needs an add-row control to
+exist, and that is a feature rather than a test.

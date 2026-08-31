@@ -14,6 +14,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
+import { flatten } from '@formsmith/core'
 import type { ComponentNode, FormDocument, Kit } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
@@ -53,7 +54,19 @@ const kit: Kit = {
       defaultProps: {},
       props: [
         { name: 'label', label: 'Label', editor: 'string' },
-        { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
+        {
+          name: 'gap',
+          label: 'Gap',
+          editor: 'number',
+          section: 'style',
+          /*
+           * Bindable to a condition, which is the whole reason `StyleTab`
+           * passes `scopes` down to `PropRows`. Without a conditional style
+           * property anywhere in this fixture, that argument could be replaced
+           * with `{ form: [] }` and every test here stayed green.
+           */
+          conditional: true,
+        },
         { name: 'disabled', label: 'Disabled', editor: 'boolean', section: 'advanced' },
       ],
       events: ['onChange'],
@@ -67,7 +80,7 @@ interface Harness {
   openStyle: () => Promise<void>
 }
 
-function setup(node: ComponentNode): Harness {
+function setup(node: ComponentNode, selectKey: string = node.key): Harness {
   const user = userEvent.setup()
   let current: FormDocument = {
     version: '1',
@@ -100,9 +113,11 @@ function setup(node: ComponentNode): Harness {
 
   return {
     user,
-    latest: () => current.root.children?.[0],
+    latest: () => flatten(current.root).find((each) => each.node.key === selectKey)?.node,
     openStyle: async () => {
-      const row = view.container.querySelector<HTMLElement>('[data-fs-tree-row="' + node.key + '"]')
+      const row = view.container.querySelector<HTMLElement>(
+        '[data-fs-tree-row="' + selectKey + '"]',
+      )
       if (!row) throw new Error('no tree row')
       await user.click(row)
       await user.click(screen.getByRole('tab', { name: 'Style' }))
@@ -355,5 +370,85 @@ describe('a value being typed into a structured control', () => {
     await harness.user.tab()
 
     expect(screen.getByLabelText('Margin')).toHaveProperty('value', '99px')
+  })
+})
+
+/**
+ * A style property bound to a condition, inside a repeater.
+ *
+ * `StyleTab` computes `keyScopesFor(api.document.root, node.key)` and hands it
+ * to `PropRows` so a style property authored inside a repeater can name that
+ * row's answers. Nothing here had a repeater or a conditional style property,
+ * so the only test touching `PropRows` on this tab asserted that a Gap row
+ * exists -- and passing `scopes={{ form: [] }}` instead would have left a
+ * condition inside a row with no fields to offer and nothing to seed from,
+ * with the suite green.
+ */
+describe('a style property bound to a condition inside a row', () => {
+  const inRow = (): ComponentNode => ({
+    key: 'addressList',
+    type: 'Field',
+    props: {},
+    // A repeater is recognised from the node: a list schema plus children.
+    schema: { type: 'array', validations: [] },
+    children: [
+      {
+        key: 'street',
+        dataKey: 'line1',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [] },
+      },
+    ],
+  })
+
+  const openStyleFor = async (key: string): Promise<Harness> => {
+    const harness = setup(inRow(), key)
+    await harness.openStyle()
+    return harness
+  }
+
+  it('offers the row own answers as the subject', async () => {
+    const harness = await openStyleFor('street')
+
+    await harness.user.selectOptions(screen.getByLabelText('Gap binding'), 'condition')
+
+    const subject = screen.getByLabelText<HTMLSelectElement>('Subject')
+    const options = [...subject.querySelectorAll('option')].map((option) => option.value)
+
+    // Scoped to the row, and named by the data key: a condition inside a
+    // repeater that names a form-level key reads nothing at all.
+    expect(options).toContain('row:line1')
+  })
+
+  it('seeds the condition against a field in the same row', async () => {
+    const harness = await openStyleFor('street')
+
+    await harness.user.selectOptions(screen.getByLabelText('Gap binding'), 'condition')
+
+    // Seeded on the row, not on the form: a condition inside a repeater that
+    // names a top-level key is false from the moment it is created, and hides
+    // the component it was authored on.
+    expect(harness.latest()?.props['gap']).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'line1', scope: 'row' } },
+    })
+  })
+
+  it('offers the form fields to a component outside every row', async () => {
+    // The control. Row scope everywhere would be as wrong as form scope
+    // everywhere, and would satisfy the two tests above by accident.
+    const harness = setup(
+      { key: 'plain', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+      'plain',
+    )
+    await harness.openStyle()
+
+    await harness.user.selectOptions(screen.getByLabelText('Gap binding'), 'condition')
+
+    expect(harness.latest()?.props['gap']).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'plain' } },
+    })
   })
 })

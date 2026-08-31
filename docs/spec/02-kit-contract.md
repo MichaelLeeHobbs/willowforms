@@ -82,6 +82,12 @@ evaluates an expression — that happens once, in the renderer, for every kit. A
 Each is a test in `test/kit-contract.test.tsx`, run against every registered kit. A failure names the
 obligation missed.
 
+There are two tables. This one is the obligations checked inside the per-kit block; the one after it is
+the rules that are driven per kit from outside that block, which for a long time were written down
+nowhere -- so a third-party kit author budgeted against this table, added their kit as instructed, and
+met a suite naming rules that did not exist on paper. Both counts are checked against the suite by
+`test/docs.test.ts`.
+
 | Rule                                                             | Why                                                                          |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Both halves declare the same `id`                                | A mismatched pairing is otherwise impossible to spot                         |
@@ -105,6 +111,33 @@ obligation missed.
 | The palette index has no colliding types                         | The type is how a node finds its renderer                                    |
 | A length-valued prop is CSS pixels                               | A number that means two things is a document that renders two ways           |
 | Two different lengths render differently                         | A kit hard-coding the tested value would satisfy the rule above              |
+| A radio group carries `role="radiogroup"`                        | A `<fieldset>` maps to `group`, which has no invalid or required state       |
+| A required control is marked where a screen reader reads it      | A marking inside `aria-hidden` reaches nobody                                |
+| A progress value that is not a number is not reported            | `NaN` is a number, and `aria-valuenow="NaN"` is worse than none              |
+| A progress value that is one still is                            | A bar that reported nothing would satisfy the rule above                     |
+
+### And the rules driven per kit from outside that block
+
+Same suite, same kits, same consequence for a kit that fails one. They sit outside the per-kit block
+because each drives its own fixture rather than sweeping every component.
+
+| Rule                                                          | Why                                                                              |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| A failing control is marked invalid                           | A control that looks wrong and does not say so is announced as fine              |
+| A required control is marked required                         | WCAG 3.3.2, and the first anybody heard of it was a rejected submit              |
+| An unrequired control is left unmarked                        | Marking everything required would satisfy the rule above                         |
+| A `Text` variant adds no classes of its own                   | A document's string interpolated into a class name is a document styling the app |
+| Two declared variants still render differently                | Narrowing to nothing would satisfy the rule above                                |
+| An unrecognised `Alert` severity still carries a role         | A typo in a severity drew the banner and announced nothing                       |
+| An `Alert` that really is an error still announces itself     | A kit that announced nothing would satisfy the rule above                        |
+| An `Image` src carries no arbitrary scheme                    | `javascript:` in a document is a document that runs code                         |
+| An image with an ordinary address still renders               | Refusing every address would satisfy the rule above                              |
+| A text prop cleared to empty falls back to the default        | An empty string is a value; a cleared prop is an absence                         |
+| A component whose options a document got wrong still renders  | An option list is a document's list, and a document is data                      |
+| A control holding a value that is not a string still shows it | `String(value)` answered `''` for a number, so a stored answer rendered as blank |
+| A select still shows an option it can read                    | Dropping every entry would satisfy the rule above                                |
+| A select holding a number shows the option the data names     | `str` answers `''` for a number, so a stored answer rendered as nothing          |
+| A select shows nothing when the data names no option          | Showing the first option would satisfy the rule above                            |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two

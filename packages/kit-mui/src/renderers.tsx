@@ -30,7 +30,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { ComponentNode } from '@formsmith/core'
@@ -289,16 +289,32 @@ function CheckboxNode({
         control={
           <Checkbox
             checked={bool(value)}
-            inputProps={{
-              'aria-describedby': messageId,
-              /*
-               * Stated on the input, because that is what a screen reader
-               * announces. `FormControl error` colours the label and says
-               * nothing to anybody not looking at it — which is why this was
-               * missing here and present on all three in the HTML kit.
-               */
-              ...(error ? { 'aria-invalid': true } : {}),
-              ...(isRequired(node) ? { 'aria-required': true } : {}),
+            /*
+             * `slotProps.input`, not `inputProps`.
+             *
+             * `inputProps` is deprecated in MUI 7 and on `Switch` it is simply
+             * dropped, so every one of these attributes vanished -- measured, by
+             * installing `@mui/material@7` and running the contract suite:
+             * `aria-invalid`, `aria-required` and `aria-describedby` all gone
+             * from the Switch, while the Checkbox happened to survive. This
+             * package's peer range claims `^6 || ^7`, so that was a shipped
+             * accessibility regression on half the range nobody had run.
+             *
+             * `slotProps` works on both, which is what makes it the fix rather
+             * than a version bump.
+             */
+            slotProps={{
+              input: {
+                'aria-describedby': messageId,
+                /*
+                 * Stated on the input, because that is what a screen reader
+                 * announces. `FormControl error` colours the label and says
+                 * nothing to anybody not looking at it — which is why this was
+                 * missing here and present on all three in the HTML kit.
+                 */
+                ...(error ? { 'aria-invalid': true } : {}),
+                ...(isRequired(node) ? { 'aria-required': true } : {}),
+              },
             }}
             onChange={(e) => onChange(e.target.checked)}
           />
@@ -341,7 +357,28 @@ function SelectNode({
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
+      /*
+       * The required marking goes on the element a screen reader announces.
+       *
+       * A MUI `select` renders three nested boxes: an `InputBase` root, a
+       * `div[role="combobox"]` inside it, and a hidden native `input` beside
+       * that. `htmlInput` lands on the hidden one, which is `aria-hidden`, so
+       * `aria-required` there reached nobody -- and the contract test passed
+       * because it looked for the attribute anywhere inside the component.
+       *
+       * `slotProps.select` was the first attempt at fixing that and it is not
+       * enough: it lands on the `InputBase` root, which carries no role, so the
+       * attribute still was not on the thing being announced. `aria-invalid`
+       * arrives on the combobox by itself, which is why only half of this was
+       * visible. `SelectDisplayProps` is MUI's own way through to the element
+       * with the role, and the contract test now looks at ARIA widget roles
+       * rather than native elements, so it can see the difference.
+       */
+      slotProps={{
+        formHelperText: alertWhenError(error),
+        htmlInput: requiredProps(node),
+        select: { SelectDisplayProps: requiredProps(node) },
+      }}
       onChange={(e) => onChange(optionValue(options, e.target.value))}
     >
       {/*
@@ -553,10 +590,14 @@ function SwitchNode({
         control={
           <Switch
             checked={bool(value)}
-            inputProps={{
-              'aria-describedby': messageId,
-              ...(error ? { 'aria-invalid': true } : {}),
-              ...(isRequired(node) ? { 'aria-required': true } : {}),
+            // `slotProps.input`, for the reason on the Checkbox above. This is
+            // the control that lost every attribute on MUI 7.
+            slotProps={{
+              input: {
+                'aria-describedby': messageId,
+                ...(error ? { 'aria-invalid': true } : {}),
+                ...(isRequired(node) ? { 'aria-required': true } : {}),
+              },
             }}
             onChange={(e) => onChange(e.target.checked)}
           />
@@ -633,7 +674,16 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <Box {...nodeProps}>
       <FormControlLabel
         value={str(props['value'])}
-        disabled={bool(props['disabled'])}
+        /*
+         * Only when the document says so.
+         *
+         * `bool()` answers `false` for an absent prop, and an explicit
+         * `disabled={false}` blocks MUI's inheritance chain -- so a `RadioItem`
+         * inside a disabled `RadioGroup` re-enabled itself, which is the
+         * opposite of what disabling the group means. Omitting the prop is how
+         * a component says "inherit".
+         */
+        {...(props['disabled'] === undefined ? {} : { disabled: bool(props['disabled']) })}
         control={<Radio />}
         label={str(props['label'])}
       />
@@ -681,6 +731,13 @@ function DatePickerNode({
   )
 }
 
+/** What a file input says when it left something out for being too large. */
+function tooLarge(count: number): string {
+  return count === 1
+    ? 'One file was too large and was not added.'
+    : String(count) + ' files were too large and were not added.'
+}
+
 function FileUploadNode({
   node,
   props,
@@ -689,6 +746,8 @@ function FileUploadNode({
   error,
   onChange,
 }: NodeRendererProps): ReactNode {
+  /** How many files the last choice dropped for being over `maxSize`. */
+  const [dropped, setDropped] = useState(0)
   const id = useId()
   /*
    * The names the document holds, drawn beside the input.
@@ -726,7 +785,10 @@ function FileUploadNode({
        * one element and there is nowhere else to put it without wrapping the
        * component and moving where `nodeProps` is spread.
        */
-      helperText={message(error, filesHeld ? 'Holding ' + filesHeld : str(props['helperText']))}
+      helperText={message(
+        error ?? (dropped > 0 ? tooLarge(dropped) : undefined),
+        filesHeld ? 'Holding ' + filesHeld : str(props['helperText']),
+      )}
       slotProps={{
         formHelperText: alertWhenError(error),
         inputLabel: { shrink: true },
@@ -753,10 +815,16 @@ function FileUploadNode({
          * which is what the label says.
          */
         const limit = num(props['maxSize'], 0) * 1024
-        const files = Array.from(input.files ?? [])
-          .filter((file) => limit <= 0 || file.size <= limit)
-          .map((file) => file.name)
-        onChange(multiple ? files : (files[0] ?? null))
+        const chosen = Array.from(input.files ?? [])
+        const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
+        /*
+         * And somebody is told. The filtering was silent, so choosing a file
+         * over the limit looked exactly like choosing none: the picker closed,
+         * the list did not change, and nothing appeared. A refusal nobody can
+         * see is indistinguishable from a broken picker.
+         */
+        setDropped(chosen.length - kept.length)
+        onChange(multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null))
       }}
     />
   )
@@ -782,8 +850,15 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const circular = props['variant'] === 'circular'
+  /*
+   * `Number.isFinite`, not `typeof === 'number'`. `NaN` is a number, and a
+   * document can hold one -- `JsonValue` admits it, and a computed prop can
+   * produce one -- so it reached MUI as a determinate value and the bar rendered
+   * with `aria-valuenow="NaN"`. The `num()` helper in this file exists for
+   * exactly this and was the only narrowing here that did not use it.
+   */
   const raw = props['value']
-  const determinate = typeof raw === 'number'
+  const determinate = typeof raw === 'number' && Number.isFinite(raw)
   const value = determinate ? Math.min(100, Math.max(0, raw)) : 0
   const shared = {
     'aria-label': str(props['label'], 'Progress'),

@@ -322,7 +322,21 @@ function switchKind(
   if (kind === 'ref') {
     const inRow = rowDataKeys?.[0]
     if (inRow !== undefined) return { kind: 'ref', dataKey: inRow, scope: 'row' }
-    return { kind: 'ref', dataKey: dataKeys[0] ?? '' }
+    const first = dataKeys[0]
+    /*
+     * A ref needs a key to read, and there is not always one to offer.
+     *
+     * `dataKeys[0] ?? ''` minted `{ kind: 'ref', dataKey: '' }` on a document
+     * whose only data-bound component is the one being edited -- which
+     * `validateDocument` refuses, and which reads nothing, so the condition is
+     * false and the component is hidden forever. The panel wrote a document its
+     * own gate rejects.
+     *
+     * A literal instead: it is the one operand kind that needs nothing from the
+     * document, and it is what the picker falls back to everywhere else.
+     */
+    if (first === undefined) return literal('')
+    return { kind: 'ref', dataKey: first }
   }
   if (kind === 'context') return { kind: 'context', path: '' }
   return literal(current.kind === 'literal' ? current.value : '')

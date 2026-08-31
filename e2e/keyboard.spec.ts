@@ -91,7 +91,7 @@ test('a move that cannot happen is announced rather than ignored', async ({ desi
   await designer.page.keyboard.press('Alt+ArrowUp')
 
   await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/cannot move/)
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 test('Delete removes once, and one undo brings it back', async ({ designer }) => {
@@ -176,7 +176,7 @@ test('Control+D refuses the root rather than nesting a screen in itself', async 
   await designer.page.keyboard.press('Control+d')
 
   await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/root cannot be/i)
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 /**
@@ -240,7 +240,7 @@ test('Control+Z undoes after a click on the canvas', async ({ designer }) => {
 
   await designer.page.keyboard.press('Control+z')
 
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 test('Escape clears a selection made by clicking a field on the canvas', async ({ designer }) => {

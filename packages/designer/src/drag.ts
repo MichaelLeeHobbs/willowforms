@@ -202,12 +202,40 @@ export function useDrag(
       let landed: DropCommit | undefined
       if (dragged) {
         for (const resolve of zones.current.values()) {
-          landed = resolve(x, y, draggedKey)
+          /*
+           * A zone that throws must not strand the gesture.
+           *
+           * `cancel()` is at the bottom of this handler, so a resolver throwing
+           * skipped it: the drag state stayed set, the label stayed glued to the
+           * cursor, and every later `pointerup` re-entered the same resolver and
+           * threw again. The controller was permanently dragging, and the only
+           * way out was a reload.
+           *
+           * A zone is code this file does not own -- `Canvas` and `Tree` both
+           * register one, and a third-party surface could -- so "it will not
+           * throw" is not a property this can rely on. The other zones still get
+           * asked, which is the same answer `resolveDrop` gives for a zone that
+           * declines: not mine.
+           */
+          try {
+            landed = resolve(x, y, draggedKey)
+          } catch {
+            landed = undefined
+          }
           if (landed) break
         }
       }
 
-      if (dragged && press && landed) commit.current(press.source, landed)
+      if (dragged && press && landed) {
+        // And a commit that throws must not strand it either. The document is
+        // the host's to change and this cannot know what that costs.
+        try {
+          commit.current(press.source, landed)
+        } catch {
+          // Reported by React's own error handling; swallowing it here would
+          // hide it and re-throwing would take the cancel below with it.
+        }
+      }
       /*
        * A release that moved is never also a click, whether or not it landed —
        * and neither is the release after an abandoned drag, which is why the
@@ -218,13 +246,34 @@ export function useDrag(
       cancel()
     }
 
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape' || !pending.current) return
-      // Abandoning mid-drag must not then read as a click on whatever is under
-      // the pointer when the button finally comes up.
+    /*
+     * Giving up on a gesture while the pointer is still on the page.
+     *
+     * Escape, and the browser taking the pointer away with `pointercancel` --
+     * a touch that became a scroll, a pen off the digitiser, a system dialog.
+     * Both end the drag with the page still under the cursor, so both must stop
+     * the release being read as a click on whatever is underneath.
+     *
+     * `pointercancel` used to be wired straight to `cancel`, which clears the
+     * drag and raises neither flag, and the test that covered it asserted only
+     * that the state cleared. So a cancelled drag's trailing click selected
+     * whatever was under the pointer -- the exact behaviour the Escape handling
+     * exists to prevent, in the one path where no `pointerup` arrives afterwards
+     * to raise the flag late.
+     *
+     * Losing the window is different and keeps its own handler: the click that
+     * follows a blur comes minutes later and belongs to nobody.
+     */
+    const abandon = (): void => {
+      if (!pending.current) return
       swallowClick.current = moved.current
       abandoned.current = moved.current
       cancel()
+    }
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      abandon()
     }
 
     /*
@@ -283,7 +332,7 @@ export function useDrag(
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('pointercancel', abandon)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('click', lowerSwallow)
     window.addEventListener('pointerdown', lowerSwallow)
@@ -292,7 +341,7 @@ export function useDrag(
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', cancel)
+      window.removeEventListener('pointercancel', abandon)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('click', lowerSwallow)
       window.removeEventListener('pointerdown', lowerSwallow)

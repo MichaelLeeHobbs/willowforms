@@ -37,7 +37,7 @@ test('malformed JSON is refused and the form is left alone', async ({ designer }
 
   await expect(designer.page.getByRole('alert')).toBeVisible()
   await expect(designer.page.getByLabel('Form document JSON')).toBeVisible()
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 test('a document with a children field that is not an array is refused, not crashed on', async ({
@@ -55,7 +55,7 @@ test('a document with a children field that is not an array is refused, not cras
   await expect(designer.page.getByRole('alert')).toBeVisible()
   // Still a working builder afterwards, which is the whole point.
   await expect(designer.page.locator('.fs-shell')).toBeVisible()
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 test('every missing field is named at once, not one at a time', async ({ designer }) => {
@@ -238,6 +238,72 @@ test('an edit survives switching the kit', async ({ designer }) => {
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
 
   // The document the new kit is drawing, and the one that was persisted.
-  expect(await designer.rootChildren()).toEqual(before)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
   await expect(designer.node('textField')).toBeVisible()
+})
+
+/**
+ * The dialog is modal, which is a browser behaviour and not a React one.
+ *
+ * `test/a11y.test.tsx` audits the designer with this dialog open, and jsdom has
+ * no `<dialog>` implementation at all -- the suite polyfills `showModal()` as
+ * `this.open = true`. So there is no top layer there, no inert background and
+ * no `::backdrop`, and every property `docs/accessibility.md` credits to the
+ * browser was being claimed in the one environment that cannot provide any of
+ * it. This is that claim, checked where the behaviour actually exists.
+ */
+test('the JSON dialog is modal, not merely open', async ({ designer }) => {
+  await designer.page.getByRole('button', { name: 'JSON' }).click()
+
+  const dialog = designer.page.locator('dialog')
+  await expect(dialog).toBeVisible()
+
+  // `:modal` is true only for a dialog in the top layer, which is what makes
+  // the background inert and draws the backdrop. `open` alone is not that.
+  expect(await dialog.evaluate((element) => element.matches(':modal'))).toBe(true)
+})
+
+test('focus stays inside the open dialog', async ({ designer }) => {
+  await designer.page.getByRole('button', { name: 'JSON' }).click()
+  await expect(designer.page.locator('dialog')).toBeVisible()
+
+  /*
+   * Enough presses to leave any dialog this size and reach the toolbar behind
+   * it. The browser owns this trap; what is being checked is that nothing in
+   * the designer has broken it -- a control rendered outside the dialog, or a
+   * `tabindex` on the background.
+   */
+  const outside: string[] = []
+  for (let i = 0; i < 15; i += 1) {
+    await designer.page.keyboard.press('Tab')
+
+    /*
+     * `body` is not a leak. Tabbing past the last control in a modal dialog
+     * hands focus back to the document while the browser walks its own chrome,
+     * and Chromium reports `body` for that step. What must never happen is
+     * focus landing on a control behind the dialog.
+     */
+    const offender = await designer.page.evaluate(() => {
+      const active = document.activeElement
+      if (!active || active === document.body) return null
+      return active.closest('dialog') ? null : active.outerHTML.slice(0, 80)
+    })
+
+    if (offender) outside.push(offender)
+  }
+
+  expect(outside).toEqual([])
+})
+
+test('Escape closes the dialog and leaves the document alone', async ({ designer }) => {
+  const before = await designer.rootChildren()
+  await designer.page.getByRole('button', { name: 'JSON' }).click()
+  await expect(designer.page.getByLabel('Form document JSON')).toBeVisible()
+
+  // The browser's own close, not a button this project drew. A dialog that
+  // takes Escape and does not close is a keyboard trap.
+  await designer.page.keyboard.press('Escape')
+
+  await expect(designer.page.getByLabel('Form document JSON')).toHaveCount(0)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })

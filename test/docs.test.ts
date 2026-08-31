@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { DOCS, REPORTER_MARK, totals } from './count-reporter.js'
+import { isFixture } from './fixtures.js'
 
 const root = new URL('../', import.meta.url)
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(path, root)), 'utf8')
@@ -72,8 +73,59 @@ function browserTotals(text: string): number[] {
   )
 }
 
+/**
+ * How many end-to-end tests there actually are.
+ *
+ * Counted from the spec files rather than taken from any document, because
+ * "the documents agree with each other" is satisfied by all of them being
+ * equally wrong -- and they were: three said 68 while the suite ran 74.
+ *
+ * `^test(` at the start of a line is every Playwright test in this repository;
+ * none is nested inside a describe or built by a loop, and a `test.skip` or a
+ * `test.each` would not match, which is the conservative direction. The
+ * assertion below that this found something is what keeps a change of style
+ * from turning this into a comparison against zero.
+ */
+function browserTestsThatExist(): number {
+  const dir = fileURLToPath(new URL('e2e/', root))
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.spec.ts'))
+    .reduce((total, name) => total + [...read('e2e/' + name).matchAll(/^test\(/gm)].length, 0)
+}
+
 describe('documented end-to-end counts', () => {
-  const DOCS_WITH_BROWSER_COUNTS = ['README.md', 'CLAUDE.md', 'docs/ROADMAP.md']
+  /*
+   * `SKILL.md` is in this list now. `CLAUDE.md` tells every contributor to read
+   * it before writing a test, and it carried "65 of these checks" while the
+   * three documents this guard did police said 68 -- so the one document a
+   * contributor is sent to was the one nothing checked. Its two figures are
+   * phrased the same way as everybody else's now, so one pattern covers all
+   * four rather than a special case per document.
+   */
+  const DOCS_WITH_BROWSER_COUNTS = [
+    'README.md',
+    'CLAUDE.md',
+    'docs/ROADMAP.md',
+    '.claude/skills/write-tests/SKILL.md',
+  ]
+
+  it('match the number of end-to-end tests there are', () => {
+    const ran = browserTestsThatExist()
+
+    // The control: a walk that found no spec files would compare every document
+    // against zero and report them all wrong, or worse, all right.
+    expect(ran, 'no end-to-end tests were found to count').toBeGreaterThan(50)
+
+    const wrong = DOCS_WITH_BROWSER_COUNTS.map((path) => ({
+      path,
+      counts: browserTotals(read(path)),
+    })).filter((entry) => entry.counts.some((count) => count !== ran))
+
+    expect(
+      wrong.map((entry) => entry.path + ' says ' + entry.counts.join('/')),
+      'a document quotes an end-to-end total that is not ' + String(ran),
+    ).toEqual([])
+  })
 
   it('agree with each other', () => {
     const quoted = DOCS_WITH_BROWSER_COUNTS.map((path) => ({
@@ -335,7 +387,29 @@ describe('the specification index', () => {
 })
 
 /** How many obligations the kit contract states. See the assertion that uses it. */
-const CONTRACT_RULES = 21
+const CONTRACT_RULES = 25
+
+/**
+ * And how many are driven per kit from outside the per-kit block.
+ *
+ * The guard below counted only the `describe.each(KITS)` block, on purpose --
+ * the file also holds checks that are not obligations on a kit at all. But
+ * fifteen cases outside that block *are*: they run against every registered
+ * kit -- directly through `KITS`, or through a table built from `KITS` and a
+ * list of component types -- and fail a kit by name. They were written down
+ * nowhere, so the spec presented the first table as the whole obligation set
+ * while the suite ran nearly twice that.
+ */
+const CONTRACT_RULES_PER_KIT = 15
+
+/**
+ * The describes that are about this repository rather than about a kit.
+ *
+ * `the two kits in this repository agree` is a courtesy these two keep, not a
+ * contract; `a default copied between kits` is the same. Neither belongs in a
+ * document a third-party kit author reads as their obligations.
+ */
+const NOT_OBLIGATIONS = ['the two kits in this repository agree', 'a default copied between kits']
 
 describe('the kit contract table', () => {
   it('has one row for every rule the contract suite runs', () => {
@@ -386,6 +460,47 @@ describe('the kit contract table', () => {
     const cases = [...rules.matchAll(/^\s+it(?:\.each)?\(/gm)].length
 
     expect(rows, 'the rule table and the contract suite disagree').toBe(cases)
+    expect(rows, 'a contract rule was added or removed; say so here as well').toBe(CONTRACT_RULES)
+  })
+
+  it('has a second row for every rule driven per kit outside that block', () => {
+    /*
+     * The other half, and the half nothing checked. `it.each(KITS)` outside the
+     * per-kit block is a rule that runs against every registered kit and fails
+     * it by name -- the same consequence as a row in the first table, and until
+     * now none of them was written down.
+     */
+    const suite = read('test/kit-contract.test.tsx')
+
+    // Everything but the describes that are about these two kits rather than
+    // about kits, so a courtesy is not read as an obligation.
+    let outside = suite.slice(0, suite.indexOf('describe.each(KITS)'))
+    for (const name of NOT_OBLIGATIONS) {
+      const at = outside.indexOf("describe('" + name)
+      if (at === -1) continue
+      const next = outside.indexOf('\ndescribe(', at)
+      outside = outside.slice(0, at) + (next === -1 ? '' : outside.slice(next))
+    }
+
+    // `KITS` directly, or a table built from it: `LIST_CASES` and `VALUE_CASES`
+    // are `KITS.flatMap(...)`, so each of their rows is a kit failing by name.
+    const cases = [...outside.matchAll(/it\.each\((?:KITS|[A-Z_]+_CASES)\)\(/g)].length
+    expect(cases, 'no per-kit rules were found outside the block').toBeGreaterThan(0)
+    expect(
+      cases,
+      'a rule driven per kit was added or removed; say so in 02-kit-contract.md as well',
+    ).toBe(CONTRACT_RULES_PER_KIT)
+
+    const spec = read('docs/spec/02-kit-contract.md')
+    const heading = spec.indexOf('### And the rules driven per kit from outside that block')
+    expect(heading, 'the second obligation table is gone from the spec').toBeGreaterThan(-1)
+
+    const fromRules = spec.slice(spec.indexOf('| Rule', heading))
+    const afterTable = fromRules.search(/\n[ \t]*\n/)
+    const table = afterTable === -1 ? fromRules : fromRules.slice(0, afterTable)
+    const rows = [...table.matchAll(/^\|(?! *-)[^|\n]+\|/gm)].length - 1
+
+    expect(rows, 'the second table and the suite disagree').toBe(cases)
 
     /*
      * And both against a number stated here, because the comparison above is
@@ -398,7 +513,198 @@ describe('the kit contract table', () => {
      * is meant to be a deliberate act in three places: the spec, the suite, and
      * here.
      */
-    expect(rows, 'a contract rule was added or removed; say so here as well').toBe(CONTRACT_RULES)
+  })
+})
+
+/**
+ * The events table in `03-components.md`, against what the kits declare.
+ *
+ * Its own preamble says the right-hand column is what the kits declare today,
+ * and both of its concrete claims were wrong: `onFocus` was said to be missing
+ * from every input but `TextField` while `TextArea` declares it, and
+ * `DatePicker`'s `onBlur` was not listed at all. Whoever eventually builds the
+ * Actions tab reads this table as the inventory of what needs settling.
+ */
+describe('the events table', () => {
+  /** Every component type in a kit definitions file, with the events it declares. */
+  const declared = (path: string): Map<string, string[]> => {
+    const source = read(path)
+    const found = new Map<string, string[]>()
+
+    for (const match of source.matchAll(/type: '(\w+)'/g)) {
+      const after = source.slice(match.index + match[0].length, match.index + 2500)
+      const events = /events: \[([^\]]*)\]/.exec(after)
+      if (!events) continue
+      found.set(
+        match[1] ?? '',
+        [...(events[1] ?? '').matchAll(/'(\w+)'/g)].map((event) => event[1] ?? ''),
+      )
+    }
+
+    return found
+  }
+
+  const mui = declared('packages/kit-mui/src/definitions.ts')
+  const html = declared('packages/kit-html/src/definitions.ts')
+
+  it('found the declarations to check against', () => {
+    // The control for everything below: a reader that matched nothing would
+    // make every comparison a comparison of two empty maps.
+    expect(mui.size).toBeGreaterThan(15)
+    expect([...mui.keys()].sort()).toEqual([...html.keys()].sort())
+  })
+
+  it('the two kits declare the same events for the same component', () => {
+    const differing = [...mui.entries()]
+      .filter(([type, events]) => (html.get(type) ?? []).join() !== events.join())
+      .map(([type]) => type)
+
+    expect(differing).toEqual([])
+  })
+
+  it.each(['onChange', 'onClick', 'onBlur', 'onFocus'])(
+    'lists every component that raises %s',
+    (event) => {
+      const raising = [...mui.entries()]
+        .filter(([, events]) => events.includes(event))
+        .map(([type]) => type)
+        .sort()
+
+      const spec = read('docs/spec/03-components.md')
+      const row = new RegExp('^\\| `' + event + '`[^|]*\\|([^|]*)\\|', 'm').exec(spec)
+      expect(row, event + ' has no row in the events table').not.toBeNull()
+
+      const listed = [...(row?.[1] ?? '').matchAll(/`(\w+)`/g)]
+        .map((match) => match[1] ?? '')
+        .sort()
+      expect(listed, 'the events table and the kits disagree about ' + event).toEqual(raising)
+    },
+  )
+})
+
+/**
+ * The theming document, against the tokens the stylesheets define.
+ *
+ * `11-theming.md` says a host restyles by overriding tokens rather than
+ * fighting specificity, and it is the only place the names are written down --
+ * so a token missing from it is a token nobody can override. Four were:
+ * `--fs-control-border`, and the kit's `--fsh-success`, `--fsh-warning` and
+ * `--fsh-shadow`.
+ */
+describe('the theming document', () => {
+  /** Every custom property a stylesheet declares. */
+  const tokensIn = (path: string): string[] => {
+    const css = read(path).replace(/\/\*[\s\S]*?\*\//g, '')
+    return [
+      ...new Set([...css.matchAll(/(--fsh?-[a-z0-9-]+)\s*:/g)].map((match) => match[1] ?? '')),
+    ]
+  }
+
+  const spec = read('docs/spec/11-theming.md')
+
+  it.each([
+    ['the designer', 'packages/designer/src/designer.css'],
+    ['the HTML kit', 'packages/kit-html/src/kit-html.css'],
+  ])('documents every token %s defines', (_what, path) => {
+    const tokens = tokensIn(path)
+
+    // The control: a reader that found nothing would document nothing and pass.
+    expect(tokens.length, 'no tokens were found in ' + path).toBeGreaterThan(8)
+
+    expect(tokens.filter((token) => !spec.includes(token)).sort()).toEqual([])
+  })
+
+  it('documents no token that has since been removed', () => {
+    /*
+     * The other direction, and the one a reader meets: a name in this table
+     * that no stylesheet defines is an override that silently does nothing.
+     */
+    const defined = new Set([
+      ...tokensIn('packages/designer/src/designer.css'),
+      ...tokensIn('packages/kit-html/src/kit-html.css'),
+    ])
+
+    const mentioned = [
+      ...new Set([...spec.matchAll(/`(--fsh?-[a-z0-9-]+)`/g)].map((m) => m[1] ?? '')),
+    ]
+    expect(mentioned.length).toBeGreaterThan(8)
+    expect(mentioned.filter((token) => !defined.has(token)).sort()).toEqual([])
+  })
+})
+
+/**
+ * The decision log, against the shape it says it has.
+ *
+ * "The field that earns this file is **Reversal**: it says which entries
+ * deserve a second look" -- so an entry with no Reversal line is invisible to
+ * the one use the file claims. Five entries written during this run carried
+ * none of the five fields and used `##` where every other entry uses `###`,
+ * which also took them out of the heading level the rest of the file reads by.
+ */
+describe('the decision log', () => {
+  /*
+   * `**Decided` rather than `**Decided:**`. Two entries carry the field with
+   * the sentence folded into the label -- `**Decided: validateDocument now
+   * reads the whole document**` -- which is the same field written a different
+   * way, and a guard that insisted on the punctuation would be about the
+   * punctuation.
+   */
+  const FIELDS = ['Decided', 'Reversal', 'When']
+
+  /*
+   * Not `Why` and not `Rejected`, and the omission is deliberate.
+   *
+   * Two entries fold the reasoning into a preamble above the list, and two
+   * decisions genuinely had no alternative worth naming -- writing one in to
+   * satisfy a guard would be inventing rationale, which is worse than the gap.
+   * The three above are the ones the file's own stated use depends on: what was
+   * decided, what it would cost to undo, and when.
+   */
+
+  /** Each entry as its heading and the body up to the next one. */
+  const entries = (): { title: string; body: string }[] => {
+    const text = read('docs/decisions.md')
+    const found: { title: string; body: string }[] = []
+    const headings = [...text.matchAll(/^### (.+)$/gm)]
+
+    for (const [index, heading] of headings.entries()) {
+      const from = (heading.index ?? 0) + heading[0].length
+      const to = headings[index + 1]?.index ?? text.length
+      found.push({ title: heading[1] ?? '', body: text.slice(from, to) })
+    }
+
+    return found
+  }
+
+  it('is read as entries at all', () => {
+    // The control: a file that parsed to nothing would satisfy every
+    // assertion below by having no entry to fail.
+    expect(entries().length).toBeGreaterThan(20)
+  })
+
+  it('gives every entry the fields the file is read by', () => {
+    const missing = entries()
+      .flatMap((entry) =>
+        FIELDS.filter((field) => !new RegExp('\\*\\*' + field + '\\b').test(entry.body)).map(
+          (field) => entry.title + ' has no ' + field,
+        ),
+      )
+      .sort()
+
+    expect(missing).toEqual([])
+  })
+
+  it('writes every entry at the same heading level', () => {
+    /*
+     * `##` inside the log is a section, and there are none -- the file is a
+     * flat list under one `#`. An entry written at `##` reads as a section
+     * holding the entries after it, and drops out of any reader that walks
+     * `###`, which is what the check above does.
+     */
+    const text = read('docs/decisions.md')
+    const sections = [...text.matchAll(/^## (?!#)(.+)$/gm)].map((match) => match[1] ?? '')
+
+    expect(sections).toEqual([])
   })
 })
 
@@ -528,6 +834,31 @@ function sourceFiles(): { path: string; text: string }[] {
       // Tests are not the product. A fixture may mention a field the product
       // never touches, which is exactly what a "nothing reads it" claim means.
       if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue
+
+      /*
+       * And not the guardrail fixtures either. `eslint.config.test.ts` writes
+       * those into `packages/core/src` and `packages/designer/src`, lints them
+       * and deletes them, and vitest runs test files in parallel -- so this walk
+       * could list one and then find it gone before reading it, and every
+       * DISPROOF case below would fail on a run where nothing changed.
+       *
+       * Skipped by the name they share with the file that writes them, rather
+       * than by catching the `ENOENT`: a file that vanishes mid-walk is a race
+       * worth not having, not an error worth swallowing.
+       */
+      if (isFixture(entry.name)) continue
+
+      /*
+       * And not the guardrail fixtures either. `eslint.config.test.ts` writes
+       * those into `packages/core/src` and `packages/designer/src`, lints them
+       * and deletes them, and vitest runs test files in parallel -- so this walk
+       * could list one and then find it gone before reading it, and every
+       * DISPROOF case below would fail on a run where nothing changed.
+       *
+       * Skipped by the name they share with the file that writes them, rather
+       * than by catching the `ENOENT`: a file that vanishes mid-walk is a race
+       * worth not having, not an error worth swallowing.
+       */
       found.push({ path, text: read(path) })
     }
   }

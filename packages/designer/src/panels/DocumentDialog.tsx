@@ -99,8 +99,22 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   }, [draft, onClose, onReplace])
 
   const copy = useCallback((text: string, what: string) => {
-    // Clipboard access can be denied. Say so rather than appearing to work.
-    navigator.clipboard?.writeText(text).then(
+    /*
+     * Clipboard access can be denied, and the API can be absent entirely.
+     *
+     * The comment said "Say so rather than appearing to work" and the optional
+     * chain did the opposite: with no `navigator.clipboard` -- any page not on a
+     * secure origin, which includes a plain-HTTP host and some embedded
+     * webviews -- the expression evaluated to `undefined`, no handler ran, and
+     * the button did nothing at all. Silence is the one outcome the comment
+     * ruled out.
+     */
+    const clipboard = navigator.clipboard
+    if (!clipboard) {
+      setNote('This browser offers no clipboard here. Select the text and copy it instead.')
+      return
+    }
+    clipboard.writeText(text).then(
       () => setNote(what + ' copied to the clipboard.'),
       () => setNote('The browser refused clipboard access. Select the text and copy it instead.'),
     )
@@ -230,7 +244,24 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
                   }}
                 />
               </label>
-              <button type="button" onClick={() => setDraft(documentJson)}>
+              {/*
+               * The errors and the note go back with the draft.
+               *
+               * Revert put the stored document into the editor and left
+               * everything else alone, so the `role="alert"` list went on
+               * naming problems with a draft that is no longer on screen --
+               * four complaints about a document the box no longer holds, and
+               * nothing to click to clear them. `onFile` clears both for the
+               * same reason.
+               */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(documentJson)
+                  setErrors([])
+                  setNote('')
+                }}
+              >
                 Revert
               </button>
             </div>

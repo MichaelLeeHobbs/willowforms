@@ -395,12 +395,28 @@ export function Canvas({
    */
   const onKeyDownCapture = useCallback((event: ReactKeyboardEvent) => {
     if (isOwnChrome(event.target)) return
+    /*
+     * The gestures that are navigation rather than typing.
+     *
+     * `event.ctrlKey || event.metaKey` let *every* modifier combination through,
+     * which is far more than the shortcuts this exemption exists for: Ctrl+V
+     * pasted into a field on the canvas, Ctrl+A selected its text, Ctrl+X cut
+     * it. While editing, a keystroke on the canvas is a selection gesture and
+     * nothing else -- that is what the capture handler is for -- and the
+     * exemption was quietly undoing it for the one class of keystroke that
+     * changes a value.
+     *
+     * The shell's own shortcuts are named instead. Undo, redo and duplicate are
+     * what a person expects to work over the canvas; paste into a field they
+     * cannot see the caret in is not.
+     */
+    const shellShortcut =
+      (event.ctrlKey || event.metaKey) && ['z', 'y', 'd'].includes(event.key.toLowerCase())
     const navigational =
       event.key === 'Tab' ||
       event.key === 'Escape' ||
       event.key.startsWith('Arrow') ||
-      event.ctrlKey ||
-      event.metaKey
+      shellShortcut
     if (navigational) return
     event.preventDefault()
     event.stopPropagation()

@@ -60,7 +60,7 @@ const kit: Kit = {
  *   heading
  *   stack     (container)
  *     first
- *   footer
+ *   footer    (holds form data)
  */
 function makeDocument(): FormDocument {
   return {
@@ -79,7 +79,13 @@ function makeDocument(): FormDocument {
           props: {},
           children: [{ key: 'first', type: 'Field', props: {} }],
         },
-        { key: 'footer', type: 'Field', props: {} },
+        /*
+         * `footer` holds form data, so the Rules tab has something to build
+         * controls from. Without a schema anywhere in this fixture, the "on the
+         * Rules tab" state below swept a panel showing one sentence and no
+         * controls at all -- the state named in the label never existed.
+         */
+        { key: 'footer', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
       ],
     },
     actions: {},
@@ -298,6 +304,59 @@ describe('moving a component from the keyboard', () => {
     expect(keys()).not.toContain('footer')
     expect(live()).toMatch(/footer removed/)
   })
+
+  /**
+   * Where focus lands after a delete, which is the half nothing checked.
+   *
+   * `Tree.tsx` measures the neighbouring row *before* the removal and focuses
+   * it in a frame, and its comment says why: deleting from the keyboard used to
+   * drop focus onto `document.body`, so every subsequent arrow key went
+   * nowhere and the tree had to be tabbed back into. The test above asserts the
+   * document and the announcement, and `e2e/keyboard.spec.ts` asserts the same
+   * two, so deleting the restoration was caught by nothing in either suite.
+   */
+  const nextFrame = async (): Promise<void> => {
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+    })
+  }
+
+  it('leaves focus on the next row after a delete', async () => {
+    const { user, row, focused } = setup()
+
+    row('stack').focus()
+    await user.keyboard('{Delete}')
+    await nextFrame()
+
+    // `first` went with its parent, so the row after `stack` is `footer`.
+    expect(focused()).toBe('footer')
+  })
+
+  it('falls back to the previous row when the last one is deleted', async () => {
+    const { user, row, focused } = setup()
+
+    row('footer').focus()
+    await user.keyboard('{Delete}')
+    await nextFrame()
+
+    expect(focused()).toBe('first')
+  })
+
+  it('keeps focus somewhere in the tree, never on the body', async () => {
+    /*
+     * The claim in the source, stated as itself. A restoration that focused the
+     * wrong row would still be better than this, and this is what shipped.
+     */
+    const { user, row } = setup()
+
+    row('heading').focus()
+    await user.keyboard('{Delete}')
+    await nextFrame()
+
+    expect(document.activeElement).not.toBe(document.body)
+  })
 })
 
 describe('the live region', () => {
@@ -410,8 +469,18 @@ describe('landmarks and names', () => {
     [
       'on the Rules tab, with a rule on the field',
       async ({ user, row }) => {
-        await user.click(row('heading'))
+        /*
+         * `footer`, which holds form data, and a rule actually added.
+         *
+         * This drove `heading`, which has no schema, so the Rules panel showed
+         * one sentence and no controls -- the state in the label never existed,
+         * and the rule editors it claims to sweep were never rendered. The
+         * comment above says the tab "builds its controls from whatever rule was
+         * added", so a state that adds none is a state with nothing to sweep.
+         */
+        await user.click(row('footer'))
         await user.click(screen.getByRole('tab', { name: 'Rules' }))
+        await user.selectOptions(screen.getByLabelText('Add a rule'), 'pattern')
       },
     ],
     [
@@ -451,12 +520,49 @@ describe('landmarks and names', () => {
     expect(unnamed.map((b) => b.outerHTML)).toEqual([])
   })
 
-  it.each(STATES)('labels every form control in the shell, %s', async (_label, drive) => {
+  /** Every form control the shell is currently rendering. */
+  const controlsIn = (harness: Harness): Element[] =>
+    Array.from(harness.view.container.querySelectorAll('input, select, textarea'))
+
+  /**
+   * How many controls the shell renders having done nothing.
+   *
+   * Measured with its own mount, taken down again before the state under test
+   * is driven: two designers in one document make every `screen` query
+   * ambiguous, and the drivers all use `screen`.
+   */
+  const atRestCount = (): number => {
+    const harness = setup()
+    const count = controlsIn(harness).length
+    harness.view.unmount()
+    return count
+  }
+
+  it.each(STATES)('labels every form control in the shell, %s', async (label, drive) => {
+    const atRest = atRestCount()
+
     const harness = setup()
     await drive(harness)
 
-    const controls = Array.from(harness.view.container.querySelectorAll('input, select, textarea'))
-    expect(controls.length, 'a state with no controls sweeps nothing').toBeGreaterThan(0)
+    const controls = controlsIn(harness)
+
+    /*
+     * More than the toolbar, for a state that claims to have opened something.
+     *
+     * The guard here was `controls.length > 0`, which cannot fail: the toolbar
+     * renders the theme `<select>` in every state, whatever the driver did or
+     * did not do. It reported green for a driver that navigated nowhere, which
+     * is the shape it was written to prevent -- and it was: the Rules state
+     * above rendered no controls at all and this said the sweep was fine.
+     *
+     * The baseline is measured rather than written down, so a control moving
+     * into or out of the toolbar does not turn this into a wrong number.
+     */
+    const floor = label === 'at rest' ? 0 : atRest
+    expect(
+      controls.length,
+      'this state sweeps nothing it did not already have before the driver ran',
+    ).toBeGreaterThan(floor)
 
     const unlabelled = controls.filter((control) => {
       if (control.getAttribute('aria-label')) return false
@@ -666,5 +772,59 @@ describe('a right-press on a tree row', () => {
         new PointerEvent('pointerup', { clientX: 140, clientY: 160, bubbles: true }),
       )
     })
+  })
+})
+
+/**
+ * Backspace is not Delete.
+ *
+ * Delete is unambiguous. Backspace is what somebody presses expecting to correct
+ * a typo, and in some browser settings it is the back gesture -- and this fired
+ * whenever focus was on *any* chrome button. Tabbing to Undo and pressing
+ * Backspace deleted the selected component: a destructive edit from a key nobody
+ * aimed at the canvas.
+ */
+describe('Backspace and where it is aimed', () => {
+  it('does not delete when focus is on a toolbar button', () => {
+    const harness = setup()
+    const before = harness.keys()
+
+    fireEvent.click(harness.row('first'))
+    const undo = screen.getByRole('button', { name: 'Undo' })
+    act(() => {
+      undo.focus()
+    })
+    fireEvent.keyDown(undo, { key: 'Backspace', bubbles: true })
+
+    expect(harness.keys(), 'Backspace on a toolbar button deleted a component').toEqual(before)
+  })
+
+  it('still deletes from a tree row, where it can only mean one thing', () => {
+    // The control, and the gesture this shortcut exists for. A tree row takes no
+    // text and is about the selection, so Backspace there is unambiguous.
+    const harness = setup()
+
+    const row = harness.row('first')
+    act(() => {
+      row.focus()
+    })
+    fireEvent.keyDown(row, { key: 'Backspace', bubbles: true })
+
+    expect(harness.keys()).not.toContain('first')
+  })
+
+  it('still deletes with Delete from a toolbar button', () => {
+    // The other control: only Backspace is ambiguous, and only Backspace is
+    // narrowed.
+    const harness = setup()
+
+    fireEvent.click(harness.row('first'))
+    const undo = screen.getByRole('button', { name: 'Undo' })
+    act(() => {
+      undo.focus()
+    })
+    fireEvent.keyDown(undo, { key: 'Delete', bubbles: true })
+
+    expect(harness.keys()).not.toContain('first')
   })
 })

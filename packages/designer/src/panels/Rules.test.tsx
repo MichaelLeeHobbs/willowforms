@@ -91,9 +91,9 @@ interface Harness {
   openRules: () => Promise<void>
 }
 
-function setup(validations: ValidationRule[] = []): Harness {
+function setup(validations: ValidationRule[] = [], document?: FormDocument): Harness {
   const user = userEvent.setup()
-  let current = makeDocument(validations)
+  let current = document ?? makeDocument(validations)
   const view = render(
     <Designer
       initialDocument={current}
@@ -428,5 +428,179 @@ describe('rules editor', () => {
     await user.click(screen.getByRole('button', { name: 'Undo' }))
 
     expect(rulesOf(latest(), 'email')).toEqual([])
+  })
+})
+
+/**
+ * A repeater on this tab, which the fixture could not produce.
+ *
+ * `repeats` is `schema.type === 'array'` plus children, and the only data-bound
+ * component the fixture kit offers is a childless `Field` with `dataType:
+ * 'string'` -- so `repeats` was `false` in every test in this file, the
+ * `aria-describedby` wiring never fired, and the note never rendered. That
+ * makes the Data type select the most dangerous control on the tab and the
+ * least covered one: changing it away from `array` stops the subtree repeating
+ * and makes every `scope: 'row'` condition inside read nothing.
+ */
+describe('the data type of a component that repeats', () => {
+  const withRepeater = (): FormDocument => {
+    const base = makeDocument()
+    return {
+      ...base,
+      root: {
+        ...base.root,
+        children: [
+          {
+            key: 'addressList',
+            type: 'Field',
+            props: {},
+            schema: { type: 'array', validations: [] },
+            children: [{ key: 'street', type: 'Field', props: {} }],
+          },
+          ...(base.root.children ?? []),
+        ],
+      },
+    }
+  }
+
+  it('warns that changing it stops the rows repeating', async () => {
+    const { selectRow, openRules } = setup([], withRepeater())
+    await selectRow('addressList')
+    await openRules()
+
+    const select = screen.getByLabelText('Data type')
+    const note = select.getAttribute('aria-describedby')
+
+    expect(note, 'the select points at no explanation').toBe('fs-field-type-note')
+    expect(window.document.getElementById(note ?? '')?.textContent).toMatch(/once per row/)
+  })
+
+  it('says nothing of the kind on a field that does not repeat', async () => {
+    // The control. A note shown always is a note nobody reads, and it would
+    // make the assertion above true for a component it is wrong about.
+    const { selectRow, openRules } = setup([], withRepeater())
+    await selectRow('email')
+    await openRules()
+
+    expect(screen.getByLabelText('Data type').getAttribute('aria-describedby')).toBeNull()
+    expect(screen.queryByText(/once per row/)).toBeNull()
+  })
+
+  it('still changes the type when asked', async () => {
+    // And the control for the control: the select has to work on a repeater,
+    // warning or not. This is the edit the note is warning about.
+    const { user, selectRow, openRules, latest } = setup([], withRepeater())
+    await selectRow('addressList')
+    await openRules()
+
+    await user.selectOptions(screen.getByLabelText('Data type'), 'string')
+
+    expect(schemaOf(latest(), 'addressList')?.type).toBe('string')
+  })
+})
+
+/**
+ * A document nobody gated, opened on this tab.
+ *
+ * `Rules.tsx` reads `Array.isArray(schema.validations) ? ... : []` because a
+ * pasted `"schema": {"type":"string"}` took the whole designer down the moment
+ * this tab was opened -- and the fixture always passed an array, so the guard
+ * could be deleted with nothing red. The condition editor has a fifteen-case
+ * describe for the same hardening; this tab had none.
+ */
+describe('a schema a paste can produce', () => {
+  const malformed = (validations: unknown): FormDocument => {
+    const base = makeDocument()
+    return {
+      ...base,
+      root: {
+        ...base.root,
+        children: [
+          {
+            key: 'email',
+            type: 'Field',
+            props: {},
+            schema: { type: 'string', validations },
+          } as unknown as ComponentNode,
+        ],
+      },
+    }
+  }
+
+  it.each([
+    ['missing entirely', undefined],
+    ['an object', { required: true }],
+    ['a string', 'required'],
+    ['a number', 5],
+    ['null', null],
+  ])('opens the tab with validations %s', async (_what, validations) => {
+    const { selectRow, openRules } = setup([], malformed(validations))
+    await selectRow('email')
+    await openRules()
+
+    // The tab is the place somebody goes to repair such a document, so it has
+    // to draw its controls rather than take the designer down.
+    expect(screen.getByLabelText('Data type')).toBeTruthy()
+    expect(screen.getByLabelText('Add a rule')).toBeTruthy()
+  })
+
+  it('adds a rule to a schema whose validations were not a list', async () => {
+    const { user, selectRow, openRules, latest } = setup([], malformed('required'))
+    await selectRow('email')
+    await openRules()
+
+    await user.selectOptions(screen.getByLabelText('Add a rule'), 'required')
+
+    // Repaired, not appended to: whatever was there was not rules.
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'required' }])
+  })
+})
+
+/**
+ * A rule's number, after the document moves underneath it.
+ *
+ * `NumberField` holds a draft and re-reads the value when the document changes
+ * -- undo, redo, a JSON swap -- and no test in this file ever entered that
+ * block: every case either committed and then matched, or cleared without
+ * committing, or reverted through `commit` itself. With the re-sync deleted the
+ * box keeps showing `8` while the document holds `3`, and the next blur writes
+ * `8` back, which is the undo-reversal the data key field has its own describe
+ * for.
+ */
+describe('a rule number and undo', () => {
+  const box = (): HTMLInputElement => screen.getByLabelText<HTMLInputElement>('Value')
+
+  it('shows the number the document holds after an undo', async () => {
+    const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
+    await selectRow('email')
+    await openRules()
+
+    await user.clear(box())
+    await user.type(box(), '8')
+    await user.tab()
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 8 }])
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 3 }])
+    expect(box()).toHaveProperty('value', '3')
+  })
+
+  it('does not write the stale number back on the next blur', async () => {
+    // The failure that makes it worth fixing: the box kept the old number, and
+    // blurring it committed that number, so the undo undid itself.
+    const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
+    await selectRow('email')
+    await openRules()
+
+    await user.clear(box())
+    await user.type(box(), '8')
+    await user.tab()
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    await user.click(box())
+    await user.tab()
+
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 3 }])
   })
 })

@@ -210,6 +210,57 @@ describe('the key field', () => {
     expect(node('emailField')).toBeUndefined()
   })
 
+  it('keeps focus in the field it renamed from', async () => {
+    /*
+     * `<KeyField key={node.key}>` made a successful rename change the key this
+     * field is keyed on, so React unmounted it and mounted a new one -- taking
+     * the focus with it. `document.body` is also outside `.fs-shell`, so the
+     * shell's keyboard shortcuts stopped firing as well: one rename and the
+     * keyboard was gone until something was clicked.
+     *
+     * Nothing in this file looked at focus, so the fix that removed the `key`
+     * had nothing holding it in place. Focus is checkable in jsdom.
+     */
+    const { user, select } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email{Enter}')
+
+    expect(document.activeElement).toBe(keyBox())
+  })
+
+  it('is gone rather than stale after the rename is undone', async () => {
+    /*
+     * The other half of removing that `key`, and it is not the half it looks
+     * like. This field holds a draft and has no re-sync, so a key changing
+     * underneath it would leave the box showing text the document does not
+     * have -- and the next blur would commit that text, silently redoing the
+     * rename the undo had just taken back. That is the failure `DataKeyField`
+     * has its own describe for, further down this file.
+     *
+     * It cannot happen here, and this is why: undo restores a document in which
+     * `email` does not exist, the store refuses to leave the selection on a node
+     * that is gone, and the whole panel unmounts with it. Written down as a test
+     * because the safety comes from two components agreeing, and the agreement
+     * is invisible from either one.
+     */
+    const { user, select, node } = setup(dataField())
+    await select()
+
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'email{Enter}')
+    expect(node('email')).toBeDefined()
+
+    // The toolbar button, not the shortcut: the shortcut deliberately does not
+    // fire while a text field has focus, and focus is in this one.
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(node('emailField'), 'the undo did not take the rename back').toBeDefined()
+    expect(node('email')).toBeUndefined()
+    expect(screen.queryByRole('textbox', { name: /^Key/ })).toBeNull()
+  })
+
   it('renames on blur as well, since leaving the field is a commit', async () => {
     const { user, select, node } = setup(dataField())
     await select()
@@ -604,6 +655,151 @@ describe('the visibility row', () => {
     expect(harness.latest()?.renderWhen).toEqual({
       kind: 'condition',
       condition: { op: 'empty', value: { kind: 'ref', dataKey: 'firstName' } },
+    })
+  })
+
+  /**
+   * Every arm of the operator picker, not just the unary one.
+   *
+   * `morph` has five arms -- comparison, unary, membership, group and `not` --
+   * and one `selectOptions` on the Comparison picker in the whole file, which
+   * drove one of them. The arms it did not drive are where the carrying logic
+   * lives: what a group turns into when it becomes a scalar, and what a scalar
+   * turns into when it becomes a group. Its own docblock records the regression
+   * that logic exists for -- changing a group to a scalar used to discard the
+   * group outright, and the store coalesces by label, so one undo went back to
+   * before the whole condition was authored.
+   */
+  const morphTo = async (harness: Harness, ops: string[]): Promise<void> => {
+    await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
+    for (const op of ops) {
+      /*
+       * The outermost picker, which is the first in the DOM. A group draws a
+       * Comparison select of its own for every condition inside it, so once
+       * the operator is `and` there is more than one on screen and the
+       * unqualified query is ambiguous -- Trap 4, in the panel it keeps
+       * happening in.
+       */
+      const pickers = screen.getAllByLabelText('Comparison')
+      const outer = pickers[0]
+      if (!outer) throw new Error('no operator picker')
+      await harness.user.selectOptions(outer, op)
+    }
+  }
+
+  it('carries the subject into a comparison, which needs a second operand', async () => {
+    const harness = await withSibling()
+    await morphTo(harness, ['eq'])
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'ref', dataKey: 'firstName' },
+        right: { kind: 'literal', value: '' },
+      },
+    })
+  })
+
+  it('carries it into a membership test, which starts with no options', async () => {
+    const harness = await withSibling()
+    await morphTo(harness, ['in'])
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'in', value: { kind: 'ref', dataKey: 'firstName' }, options: [] },
+    })
+  })
+
+  it('wraps the condition when it becomes a group, rather than dropping it', async () => {
+    const harness = await withSibling()
+    await morphTo(harness, ['and'])
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        op: 'and',
+        conditions: [{ op: 'truthy', value: { kind: 'ref', dataKey: 'firstName' } }],
+      },
+    })
+  })
+
+  it('wraps it in a not the same way', async () => {
+    const harness = await withSibling()
+    await morphTo(harness, ['not'])
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: {
+        condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'firstName' } },
+        op: 'not',
+      },
+    })
+  })
+
+  it('carries the first inner condition back out when a group becomes a scalar', async () => {
+    /*
+     * The regression the carrying logic was written for. Delete it and the
+     * group's contents go with the change of operator -- and because the store
+     * coalesces edits by label, the one undo available goes back to before the
+     * condition was authored at all rather than restoring the group.
+     */
+    const harness = await withSibling()
+    await morphTo(harness, ['and', 'empty'])
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'empty', value: { kind: 'ref', dataKey: 'firstName' } },
+    })
+  })
+
+  it('carries the subject out of a not as well', async () => {
+    const harness = await withSibling()
+    await morphTo(harness, ['not', 'empty'])
+
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'empty', value: { kind: 'ref', dataKey: 'firstName' } },
+    })
+  })
+
+  it('shows a subject the document names but the form no longer has', async () => {
+    /*
+     * A hand-edited document, or a field renamed after the condition was
+     * authored. The select offers the fields that exist, so a ref to a missing
+     * one has nothing to match -- and a `<select>` with no matching option
+     * shows its first, which would mean the panel displaying a different
+     * subject than the document holds. Quietly re-pointing a rule at another
+     * field is worse than showing an unfamiliar name, which is what the extra
+     * option is for.
+     *
+     * Every ref fixture in this file named a key that is in the list, and the
+     * malformed ones all degrade to literals, so this option could be deleted
+     * with nothing red.
+     */
+    const node = pair()
+    const harness = setup(
+      {
+        ...node,
+        renderWhen: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'renamedAway' } },
+        },
+      },
+      [{ key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } }],
+    )
+    await harness.select()
+
+    const subject = screen.getByLabelText<HTMLSelectElement>('Subject')
+    expect(subject.value).toBe('form:renamedAway')
+    expect([...subject.querySelectorAll('option')].map((o) => o.textContent)).toContain(
+      'renamedAway',
+    )
+
+    // And the document is untouched by having been looked at.
+    expect(harness.latest()?.renderWhen).toEqual({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'renamedAway' } },
     })
   })
 
@@ -1862,5 +2058,61 @@ describe('a data key that breaks the key grammar', () => {
     await user.clear(dataKeyInput())
     await user.tab()
     expect(latest()?.dataKey).toBeUndefined()
+  })
+})
+
+/**
+ * Editing on the canvas, and what the panel does around it.
+ */
+describe('the Rules tab and a pattern nobody can run', () => {
+  const withPattern = (): ComponentNode => ({
+    key: 'field',
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'pattern', value: '' }] },
+  })
+
+  it('says so under the field, where it can still be fixed', async () => {
+    /*
+     * The engine refuses a pattern with an unbounded repeat inside another, and
+     * refusing means the rule *fails* -- so an author who typed one saw an
+     * ordinary rule here and every answer rejected on the server.
+     */
+    const { user, select } = setup(withPattern())
+    await select()
+    await user.click(screen.getByRole('tab', { name: 'Rules' }))
+
+    /*
+     * By id suffix, not by label text. The row's label is the rule's own hint,
+     * which differs per rule key, and a loose pattern matches the `<label>`
+     * element as well as the input it names.
+     */
+    const field = document.querySelector('input[id$="-value"]')
+    if (!(field instanceof HTMLInputElement)) throw new Error('no pattern field')
+    await user.clear(field)
+    await user.type(field, '(a+)+$')
+
+    expect(screen.getByRole('alert').textContent).toMatch(/unbounded repeat/i)
+  })
+
+  it('says nothing about a pattern the engine will run', async () => {
+    // The control, and it includes a half-typed one: an error under the field
+    // before the first character is finished would be worse than none.
+    const { user, select } = setup(withPattern())
+    await select()
+    await user.click(screen.getByRole('tab', { name: 'Rules' }))
+
+    /*
+     * By id suffix, not by label text. The row's label is the rule's own hint,
+     * which differs per rule key, and a loose pattern matches the `<label>`
+     * element as well as the input it names.
+     */
+    const field = document.querySelector('input[id$="-value"]')
+    if (!(field instanceof HTMLInputElement)) throw new Error('no pattern field')
+    await user.clear(field)
+    // No brackets or braces: `userEvent.type` reads those as its own key syntax.
+    await user.type(field, '^abc')
+
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

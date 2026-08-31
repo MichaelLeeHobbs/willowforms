@@ -30,6 +30,46 @@ describe('isVisible', () => {
     )
   })
 
+  it('hands the host context to the evaluator', () => {
+    /*
+     * The three evaluators in this file pin the expression and the data and
+     * never read the third parameter, so it could be dropped at the call site
+     * in `runs` and nothing here would say so. A `renderWhen` reading
+     * `context.user.role` would then evaluate against `undefined`, come back
+     * falsy, and take the node and its whole subtree out of `validateForm` --
+     * a required answer becoming optional on the server, which is the failure
+     * this module's header names.
+     */
+    const evaluate: Evaluator = (expression, _data, context) =>
+      expression === 'admin' &&
+      (context?.['user'] as { role?: string } | undefined)?.role === 'admin'
+
+    const node = field('a', { kind: 'computed', expression: 'admin' })
+
+    expect(isVisible(node, {}, { evaluate, context: { user: { role: 'admin' } } })).toBe(true)
+    expect(isVisible(node, {}, { evaluate, context: { user: { role: 'guest' } } })).toBe(false)
+  })
+
+  it('keeps a hidden subtree out of validateForm when the context is what hid it', () => {
+    // The consequence, spelled out where it lands: this is the reason the
+    // argument above matters at all.
+    const evaluate: Evaluator = (expression, _data, context) =>
+      expression === 'admin' &&
+      (context?.['user'] as { role?: string } | undefined)?.role === 'admin'
+
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [field('vat', { kind: 'computed', expression: 'admin' })],
+    }
+
+    expect(validateForm(root, {}, { evaluate, context: { user: { role: 'admin' } } })).toEqual({
+      vat: 'This field is required.',
+    })
+    expect(validateForm(root, {}, { evaluate, context: { user: { role: 'guest' } } })).toEqual({})
+  })
+
   it('hides a computed condition when no evaluator is injected', () => {
     // The renderer resolves a computed binding to null without a sandbox, and a
     // null condition renders nothing. Validation has to agree with that.

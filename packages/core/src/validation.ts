@@ -285,15 +285,41 @@ function nestedUnbounded(source: string): boolean {
  * server validates against disagree about the same document, silently. The spec
  * says so where an author reads it, and `^...$` is two characters to type.
  */
+/**
+ * Why this pattern will not be run, or nothing if it will.
+ *
+ * Exported because the Rules tab has to say the same thing, and saying it twice
+ * is how the two come to disagree. A refused pattern makes the rule *fail*, so
+ * an author who typed one saw a perfectly ordinary rule in the panel and every
+ * answer rejected on the server. This is the sentence the panel shows while it
+ * can still be fixed, and it is the same sentence because it is the same
+ * function.
+ *
+ * An empty pattern is not a problem here. It compiles, it matches everything,
+ * and it is what a half-typed rule looks like -- reporting it would put an error
+ * under the field before anybody had finished the first character.
+ */
+export function patternProblem(pattern: string): string | undefined {
+  if (nestedUnbounded(pattern)) {
+    return (
+      'This pattern has an unbounded repeat inside another one, which can take ' +
+      'exponential time to match. Bound the inner one, or rewrite it without the nesting.'
+    )
+  }
+  try {
+    new RegExp(pattern)
+  } catch {
+    return 'This is not a valid regular expression.'
+  }
+  return undefined
+}
+
 function matchesPattern(pattern: string, value: string): boolean {
   if (value.length > PATTERN_INPUT_LIMIT) return false
-  if (nestedUnbounded(pattern)) return false
+  // One decision, shared with the panel. See `patternProblem`.
+  if (patternProblem(pattern)) return false
 
-  try {
-    return new RegExp(pattern).test(value)
-  } catch {
-    return false
-  }
+  return new RegExp(pattern).test(value)
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -475,6 +501,15 @@ export function applyRule(
       return held === undefined || held > rule.value ? fail() : undefined
     }
     case 'pattern':
+      /*
+       * A pattern with no pattern fails rather than throwing. A document is
+       * data, so `{ key: 'pattern' }` with no `value` reaches here from a paste,
+       * and `nestedUnbounded(undefined)` reads `.length` off it -- out of
+       * `validateForm`, which is a 500 on submit. The same answer a pattern this
+       * refuses to run already gets: what cannot be checked has not been
+       * satisfied.
+       */
+      if (typeof rule.value !== 'string') return fail()
       return matchesPattern(rule.value, asString(value)) ? undefined : fail()
     case 'email':
       return EMAIL.test(asString(value)) ? undefined : fail()
@@ -503,7 +538,18 @@ export function applyRule(
        * broken, and letting the value through is the silent permissive failure.
        */
       try {
-        return options.evaluate(rule.expression, data, options.context) ? undefined : fail()
+        /*
+         * The row's answers when there is a row, like every other read on this
+         * path. `validateField` already resolves the *value* from
+         * `options.row?.values`, and this handed the expression top-level
+         * `FormData` -- so a custom rule inside a repeater checked a key from
+         * outside the row, silently, and reported against the row it never read.
+         *
+         * The row's values first and the form's underneath, so an expression can
+         * still reach a form-level answer that no field in the row shadows.
+         */
+        const scoped = options.row ? { ...data, ...options.row.values } : data
+        return options.evaluate(rule.expression, scoped, options.context) ? undefined : fail()
       } catch {
         return fail()
       }

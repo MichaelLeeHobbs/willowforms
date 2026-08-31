@@ -136,13 +136,22 @@ that only shows up in a long authoring session.
 
 ## CSS isolation
 
-The designer's chrome CSS is scoped to `.fs-toolbar`, `.fs-panel`, and `.fs-canvas__bar`. It is never
-scoped to `.fs-shell`.
+Every selector in the designer's stylesheet names a class the designer itself renders -- there are about
+forty of them, `.fs-toolbar`, `.fs-panel`, `.fs-tree__row` and the rest -- and no selector that descends
+from a scope containing the form may end on anything else.
 
-This is not stylistic fussiness. The first build used `.fs-shell input { padding: 5px 8px; ... }`, which
-reached straight into the MUI components on the canvas, overrode their padding, and broke the notched
-outline so every field label sat on top of its own border. The canvas hosts the kit's components and
-must inherit nothing from the builder.
+`.fs-shell` is one of those scopes and is not forbidden: it carries the theme tokens and the shell's own
+layout, which is what a scope is for. What is forbidden is reaching _through_ it. `.fs-shell input` is
+the rule the invariant was written about: the first build used `.fs-shell input { padding: 5px 8px; ... }`,
+which reached straight into the MUI components on the canvas, overrode their padding, and broke the
+notched outline so every field label sat on top of its own border. The canvas hosts the kit's components
+and must inherit nothing from the builder.
+
+Three scopes under `.fs-canvas` are the designer's own chrome rather than the form -- `.fs-canvas__bar`,
+`.fs-canvas__data` and what is inside them -- and `designer.css.test.ts` holds them as an allowlist. A
+fourth cannot arrive without somebody adding it there, which is the direction that matters: a guard that
+lists the scopes containing the form stops noticing when the form moves into a new wrapper, and that is
+exactly how `.fs-canvas__frame input` once passed every assertion in the file.
 
 There are two deliberate exceptions, and neither sets a visual property. Both are allowlisted in
 `designer.css.test.ts`, pinned to the exact declarations they may carry, so a third one cannot arrive

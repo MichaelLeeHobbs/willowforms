@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 18, the test suites' HIGHs. Stage 3 is done; item 19 is next.
+- **Last completed:** item 26, the spec and guide MEDIUMs. Stage 4 is done; item 27 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/18-test-highs`
+- **Last pushed item branch:** `build-out/b/26-spec-guides`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -265,22 +265,22 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
 174 findings. Each item is a slice of the review; the check is the standing gate plus every finding in the
 slice either fixed or in `triage.md` with a one-line reason.
 
-- [ ] **19. core MEDIUMs.** Review areas 1, 2 and 3, 22 findings across `types.ts`, `factory.ts`, `keys.ts`,
+- [x] **19. core MEDIUMs.** Review areas 1, 2 and 3, 22 findings across `types.ts`, `factory.ts`, `keys.ts`,
       `kit.ts`, `language.ts`, `json.ts`, `schema.ts`, `tree.ts`, `rows.ts`, `validation.ts`, `condition.ts`,
       `visibility.ts`, `context.ts` and `css.ts`. Includes `schema.ts:238`'s `__proto__` accumulator and
       `json.ts:84`'s dropped bare-string labels.
-- [ ] **20. renderer and both kits, MEDIUMs.** Areas 4 and 5, 17 findings. Includes the unverified
+- [x] **20. renderer and both kits, MEDIUMs.** Areas 4 and 5, 17 findings. Includes the unverified
       `inputProps` deprecation on MUI 7, which needs `@mui/material@7` installed and the assertion re-run.
-- [ ] **21. designer shell, store, left pane, remaining panels and stylesheet, MEDIUMs.** Areas 6 and 9,
+- [x] **21. designer shell, store, left pane, remaining panels and stylesheet, MEDIUMs.** Areas 6 and 9,
       20 findings. Includes `designer.css:855`'s `revert` where `initial` was meant, which needs
       `getComputedStyle` in a real browser to settle, and the duplicate `.fs-tree__row` blocks the file's own
       comment says were eliminated.
-- [ ] **22. designer drag, canvas, selection, tree and editors, MEDIUMs.** Areas 7 and 8, 15 findings.
-- [ ] **23. apps, build, lint config and CI, MEDIUMs.** Area 10, 13 findings. Includes nothing in CI ever
+- [x] **22. designer drag, canvas, selection, tree and editors, MEDIUMs.** Areas 7 and 8, 15 findings.
+- [x] **23. apps, build, lint config and CI, MEDIUMs.** Area 10, 13 findings. Includes nothing in CI ever
       loading a `dist`, and `copy-assets.mjs`'s hand-maintained asset list tied to nothing.
-- [ ] **24. core and cross-cutting test suites, MEDIUMs.** Areas 11, 12 and 15, 30 findings.
-- [ ] **25. designer, renderer and Playwright suites, MEDIUMs.** Areas 13, 14 and 16, 34 findings.
-- [ ] **26. spec and guides, MEDIUMs.** Areas 17 and 18, 23 findings.
+- [x] **24. core and cross-cutting test suites, MEDIUMs.** Areas 11, 12 and 15, 30 findings.
+- [x] **25. designer, renderer and Playwright suites, MEDIUMs.** Areas 13, 14 and 16, 34 findings.
+- [x] **26. spec and guides, MEDIUMs.** Areas 17 and 18, 23 findings.
 
 ## Stage 5 — the LOW and NOTE findings
 

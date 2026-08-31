@@ -199,6 +199,28 @@ describe('styleSheetFor', () => {
     expect(sheet).toContain('\\00003c')
   })
 
+  it('escapes a backslash, which would otherwise escape the quote that follows it', () => {
+    /*
+     * The last member of the escape class with no fixture: the keys used across
+     * this file cover the quote, the `<` and the control range, and never a
+     * backslash. Drop it from the class and a node keyed `a\` emits
+     * `[data-fs-key="a\"]{…}`, where `\"` is an escaped quote rather than the
+     * end of the string -- so the attribute value runs on past the closing
+     * bracket and swallows the next rule's selector and declarations. One
+     * node's styling lands under another's, which is the failure the header of
+     * this module describes.
+     */
+    const sheet = styleSheetFor(
+      root([node('a\\', { any: 'color: red' }), node('b', { any: 'color: blue' })]),
+    )
+
+    expect(sheet).toContain('[data-fs-key="a\\00005c "]{color: red}')
+    expect(sheet).toContain('[data-fs-key="b"]{color: blue}')
+    // And nowhere is there a backslash sitting immediately before the quote
+    // that is supposed to close the attribute value.
+    expect(sheet).not.toContain('\\"')
+  })
+
   it('escapes a newline in a key, which would end the string on its own', () => {
     const sheet = styleSheetFor(root([node('a\n{}', { any: 'color: red' })]))
     expect(sheet).not.toContain('\n')
@@ -464,5 +486,91 @@ describe('declaration names and case', () => {
   it('reads a custom property back only by its exact name', () => {
     expect(readDeclaration('--brandColor: red', '--brandcolor')).toBe('')
     expect(readDeclaration('--brandColor: red', '--brandColor')).toBe('red')
+  })
+})
+
+/**
+ * Three ways a declaration block reached the page unchecked.
+ *
+ * `safeDeclarations` refuses a literal brace, a comment marker and an at-rule,
+ * and its whole purpose is that a component's styling affects that component.
+ * Three shapes walked past it.
+ */
+describe('a raw declaration block this will not emit', () => {
+  it.each([
+    ['an unterminated double quote', 'content: "'],
+    ['an unterminated single quote', "content: '"],
+    ['a quote that hides a brace', 'content: "} body { display: none'],
+  ])('refuses %s', (_what, text) => {
+    /*
+     * `FORBIDDEN` cannot see a `}` inside an unterminated string, and the
+     * browser can: the block swallows its own closing brace and every rule after
+     * it until the next quote, so a third component's declarations land under
+     * this one's selector. The same breakage the brace check exists to stop,
+     * arriving by a route it does not look at.
+     */
+    expect(safeDeclarations(text)).toBeUndefined()
+  })
+
+  it('refuses a block that fetches, which the single-value sink already refused', () => {
+    /*
+     * `safeStyleValue` refuses `url(...)` by name and calls it an exfiltration
+     * channel: a request keyed off a field, from a page collecting answers, to
+     * an address the document chose. There are two sinks for author-supplied CSS
+     * and only one of them was asked.
+     */
+    expect(safeDeclarations('background: url(https://evil.example/p.png)')).toBeUndefined()
+    expect(safeDeclarations('background-image: image-set("https://evil.example/p.png" 1x)')).toBe(
+      undefined,
+    )
+  })
+
+  it('refuses an entry that is not text at all', () => {
+    // A document is data, so `css.mobile` can be a number. `.trim()` on one
+    // throws out of `styleSheetFor`, which the renderer calls during render.
+    expect(safeDeclarations(7 as unknown as string)).toBeUndefined()
+    expect(safeDeclarations({ colour: 'red' } as unknown as string)).toBeUndefined()
+    expect(() => styleSheetFor(root([node('card', { any: 7 as unknown as string })]))).not.toThrow()
+  })
+
+  it('still emits an ordinary block, including one with a balanced quote', () => {
+    // The controls. A check that refused everything would pass every row above,
+    // and a quoted string is legitimate CSS.
+    expect(safeDeclarations('color: red')).toBe('color: red')
+    expect(safeDeclarations('content: "hello"')).toBe('content: "hello"')
+    expect(safeDeclarations("font-family: 'Segoe UI'")).toBe("font-family: 'Segoe UI'")
+  })
+})
+
+/**
+ * Editing one declaration leaves the others where they were.
+ *
+ * `setDeclaration`'s own docblock says order is preserved. It filtered the
+ * property out and pushed it back on the end, so every structured control in the
+ * Style tab reordered the raw text under the author's cursor -- and where two
+ * properties overlap, the cascade with it.
+ */
+describe('setDeclaration and the order of a block', () => {
+  /** How `printDeclarations` joins, kept in one place rather than escaped inline. */
+  const SEP = ';' + String.fromCharCode(10)
+
+  it('replaces a declaration in place', () => {
+    expect(setDeclaration('color: red; padding: 8px', 'color', 'blue').split(SEP)).toEqual([
+      'color: blue',
+      'padding: 8px',
+    ])
+  })
+
+  it('appends one the block does not have', () => {
+    expect(setDeclaration('color: red', 'padding', '8px').split(SEP)).toEqual([
+      'color: red',
+      'padding: 8px',
+    ])
+  })
+
+  it('removes one without disturbing the rest', () => {
+    expect(setDeclaration('color: red; padding: 8px; margin: 0', 'padding', '').split(SEP)).toEqual(
+      ['color: red', 'margin: 0'],
+    )
   })
 })

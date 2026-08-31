@@ -29,6 +29,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { FormDocument } from '@formsmith/core'
 import { Designer } from '@formsmith/designer'
 import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
+import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
 
 /** Rules that need a layout engine, which jsdom does not have. */
 const NEEDS_LAYOUT = ['color-contrast', 'target-size', 'scrollable-region-focusable']
@@ -125,12 +126,12 @@ async function audit(element: HTMLElement): Promise<Violation[]> {
   }))
 }
 
-function renderDesigner(): HTMLElement {
+function renderDesigner(kit = htmlKit, rendererKit = htmlRendererKit): HTMLElement {
   const { container } = render(
     <Designer
       initialDocument={makeDocument()}
-      kit={htmlKit}
-      rendererKit={htmlRendererKit}
+      kit={kit}
+      rendererKit={rendererKit}
       onChange={() => undefined}
     />,
   )
@@ -150,6 +151,27 @@ beforeAll(() => {
     this.dispatchEvent(new Event('close'))
   }
 })
+
+/**
+ * The state a case says it reached, before the state is audited.
+ *
+ * Four of these cases clicked a tab and then asserted only that axe found no
+ * violations. `getByRole('tab', ...)` throws when the *tab* is missing and says
+ * nothing about whether the panel rendered, so a regression that left a panel
+ * unmounted would have re-audited the previous DOM under the new test's name
+ * and reported it clean. An audit of the wrong tree is worse than no audit: it
+ * is a green tick against a state nobody looked at.
+ *
+ * Each anchor is an element only that panel draws.
+ */
+function showing(id: string): HTMLElement {
+  const element = document.getElementById(id)
+  if (!element) throw new Error('the panel never rendered: no #' + id)
+
+  const panel = element.closest('[role="tabpanel"], dialog')
+  if (!panel) throw new Error('#' + id + ' is not inside the panel it belongs to')
+  return element
+}
 
 describe('axe audit of the designer', () => {
   it('has no violations at rest', async () => {
@@ -178,6 +200,8 @@ describe('axe audit of the designer', () => {
     await user.click(row)
     await user.click(screen.getByRole('tab', { name: 'Rules' }))
 
+    // The Rules panel, not the Properties panel it replaced.
+    showing('fs-field-type')
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -187,6 +211,7 @@ describe('axe audit of the designer', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Settings' }))
 
+    showing('fs-form-name')
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -230,6 +255,7 @@ describe('axe audit of the designer', () => {
      * disclosure holding more of the same, and a warning that turns into
      * `aria-invalid`. Every state axe knows how to fail lives here.
      */
+    showing('fs-style-device')
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -259,6 +285,56 @@ describe('axe audit of the designer', () => {
 
     await user.click(screen.getByRole('button', { name: 'JSON' }))
 
+    /*
+     * The dialog is open and holds a tabpanel of its own.
+     *
+     * Open, not modal: the `beforeAll` polyfill above defines `showModal()` as
+     * `this.open = true`, because jsdom has none. There is no top layer, no
+     * inert background and no `::backdrop` here, so what
+     * `docs/accessibility.md` credits to the browser -- focus trapping, Escape,
+     * the background going inert -- is not what this audit is looking at.
+     * `e2e/dialog.spec.ts` is where that is checked, in a browser that has it.
+     */
+    const dialog = document.querySelector('dialog')
+    expect(dialog?.open, 'the JSON dialog never opened').toBe(true)
+    expect(dialog?.querySelector('[role="tabpanel"]')).not.toBeNull()
+
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+})
+
+/**
+ * The same audit with the MUI kit drawing the form.
+ *
+ * `renderDesigner()` hard-coded the HTML kit, and nothing else in the repository
+ * renders a MUI form under axe -- so the kit most consumers will actually use
+ * was covered only by the hand-written rules in `test/kit-contract.test.tsx`,
+ * which are by definition the ones somebody thought of. `02-kit-contract.md`
+ * records that `kit-mui` had failed both of its written accessibility
+ * obligations for as long as that file existed, which is the argument for not
+ * taking this kit on trust.
+ *
+ * Two states rather than all nine: the designer's own chrome is identical
+ * whichever kit is mounted, so what these add is the kit's markup at rest and
+ * the kit's markup with every error showing. Error wiring is where form
+ * accessibility usually breaks, and it is the state a kit has most of its own
+ * say in.
+ */
+describe('axe audit with the MUI kit on the canvas', () => {
+  it('has no violations at rest', async () => {
+    expect(await audit(renderDesigner(muiKit, muiRendererKit))).toEqual([])
+  }, 20000)
+
+  it('has none in preview with every field failing', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner(muiKit, muiRendererKit)
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    await user.click(screen.getByRole('button', { name: 'Validate' }))
+
+    // The state that proves the kit is drawing, not merely that axe ran: an
+    // empty canvas has no violations either.
+    expect(container.querySelectorAll('[role="alert"]').length).toBeGreaterThan(0)
     expect(await audit(container)).toEqual([])
   }, 20000)
 })

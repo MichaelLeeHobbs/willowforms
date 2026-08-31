@@ -59,18 +59,25 @@ filling in a form.
 import { FormRenderer } from '@formsmith/renderer'
 ```
 
-| Prop           | Type                                          | Required | Meaning                                                     |
-| -------------- | --------------------------------------------- | -------- | ----------------------------------------------------------- |
-| `document`     | `FormDocument`                                | yes      | The form                                                    |
-| `kit`          | `RendererKit`                                 | yes      | Renderers                                                   |
-| `data`         | `FormData`                                    | yes      | Current values, keyed by node; rows nest under the repeater |
-| `onChange`     | `(address: string, value: JsonValue) => void` | yes      | One field changed, at an address                            |
-| `errors`       | `FormErrors`                                  | no       | Messages to display, keyed by address                       |
-| `language`     | `string`                                      | no       | BCP 47 tag; defaults to the document                        |
-| `evaluate`     | `Evaluator`                                   | no       | Sandbox for computed props                                  |
-| `device`       | `Device`                                      | no       | Render `css` for one device, not by media query             |
-| `context`      | `FormContext`                                 | no       | What the host knows and does not submit                     |
-| `revealHidden` | `boolean`                                     | no       | Draw what `renderWhen` hides. Authoring surfaces only       |
+| Prop           | Type                                          | Required | Meaning                                                       |
+| -------------- | --------------------------------------------- | -------- | ------------------------------------------------------------- |
+| `document`     | `FormDocument`                                | yes      | The form                                                      |
+| `kit`          | `RendererKit`                                 | yes      | Renderers                                                     |
+| `data`         | `FormData`                                    | yes      | Current values, keyed by node; rows nest under the repeater   |
+| `onChange`     | `(address: string, value: JsonValue) => void` | yes      | One field changed, at an address                              |
+| `errors`       | `FormErrors`                                  | no       | Messages to display, keyed by address                         |
+| `language`     | `string`                                      | no       | BCP 47 tag; defaults to the document                          |
+| `evaluate`     | `Evaluator`                                   | no       | Sandbox for computed props                                    |
+| `device`       | `Device`                                      | no       | Render `css` for one device, not by media query               |
+| `context`      | `FormContext`                                 | no       | What the host knows and does not submit                       |
+| `revealHidden` | `boolean`                                     | no       | Draw what `renderWhen` hides. Authoring surfaces only         |
+| `onError`      | `(error: Error, key: string) => void`         | no       | A component threw while rendering; the rest of the form stays |
+| `nonce`        | `string`                                      | no       | CSP nonce for the per-component `<style>` element             |
+
+`nonce` is the one on that list a host cannot discover by its absence. The renderer emits one `<style>`
+element for everything `node.css` authored, and a host serving `style-src 'self'` drops it with no error
+of any kind: the element is in the DOM, the rules are in it, and none of them applies. Pass the same
+nonce the page's policy names.
 
 ### The host owns the data
 

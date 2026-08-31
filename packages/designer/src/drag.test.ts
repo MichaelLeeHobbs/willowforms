@@ -91,6 +91,56 @@ describe('the drop zone handshake', () => {
     expect(onCommit.mock.calls[0]?.[1]).toEqual<DropCommit>({ parentKey: 'stack', index: 2 })
   })
 
+  it('asks the zones in registration order, and stops at the first answer', async () => {
+    /*
+     * The test above has one zone answering and one declining, so it holds
+     * whichever order the zones are asked in -- and order is the whole point.
+     * `drag.ts` says registration order "is a decision rather than a detail":
+     * in the product the canvas and the tree can both answer for a point, and
+     * the tree is reachable only because it registers first.
+     *
+     * Two zones that both answer, so the commit names which one was asked
+     * first, plus the call counts to show the other was not asked at all.
+     */
+    const commitWith = async (zones: [string, DropResolver][]): Promise<DropCommit | undefined> => {
+      const onCommit = vi.fn()
+      const { result } = renderHook(() => useDrag(onCommit))
+
+      act(() => {
+        for (const [id, resolve] of zones) result.current.registerZone(id, resolve)
+      })
+      await drag(() => {
+        result.current.begin({ kind: 'move', key: 'a', label: 'a' }, press(10, 10))
+      })
+
+      return onCommit.mock.calls[0]?.[1] as DropCommit | undefined
+    }
+
+    const tree = vi.fn<DropResolver>(() => ({ parentKey: 'tree', index: 1 }))
+    const canvas = vi.fn<DropResolver>(() => ({ parentKey: 'canvas', index: 9 }))
+
+    expect(
+      await commitWith([
+        ['tree', tree],
+        ['canvas', canvas],
+      ]),
+    ).toEqual<DropCommit>({ parentKey: 'tree', index: 1 })
+    expect(canvas).not.toHaveBeenCalled()
+
+    // And the other way round, or "the first zone wins" could be "the tree
+    // wins", which is a different claim and not the one being made.
+    tree.mockClear()
+    canvas.mockClear()
+
+    expect(
+      await commitWith([
+        ['canvas', canvas],
+        ['tree', tree],
+      ]),
+    ).toEqual<DropCommit>({ parentKey: 'canvas', index: 9 })
+    expect(tree).not.toHaveBeenCalled()
+  })
+
   it('commits nothing when no zone claims the release', async () => {
     const onCommit = vi.fn()
     const { result } = renderHook(() => useDrag(onCommit))
@@ -476,6 +526,45 @@ describe('a drag the browser takes away', () => {
     expect(onCommit).not.toHaveBeenCalled()
   })
 
+  it('marks the gesture abandoned, so its trailing click is not a selection', async () => {
+    /*
+     * `pointercancel` used to be wired straight to `cancel`, which clears the
+     * drag and raises nothing -- while Escape and window loss both mark the
+     * gesture abandoned so the click that may follow is not read as a click.
+     * A cancel is the same situation: the pointer is gone mid-drag, and there
+     * is no `pointerup` afterwards to raise the flag late, which is precisely
+     * the case `abandoned` was added for.
+     *
+     * The test that was here asserted the state cleared and nothing committed,
+     * so this half was invisible: the trailing click selected whatever was under
+     * the pointer, which is the behaviour the Escape tests exist to prevent.
+     */
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0))
+      pointer('pointermove', 80, 80)
+      window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(true)
+  })
+
+  it('swallows nothing when the cancelled press never moved', async () => {
+    // The control, matching the one the other two abandonment paths have: a
+    // press that never travelled is a click, cancelled or not.
+    const { result } = renderHook(() => useDrag(vi.fn()))
+
+    await act(async () => {
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0))
+      window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(result.current.consumeClick()).toBe(false)
+  })
+
   it('carries the source through the state, so the label can name it', () => {
     const { result } = renderHook(() => useDrag(vi.fn()))
     const def = { type: 'Field', label: 'Field' } as never
@@ -567,5 +656,77 @@ describe('a drag abandoned by losing the window', () => {
     })
 
     expect(result.current.consumeClick()).toBe(false)
+  })
+})
+
+/**
+ * A drop zone that throws.
+ *
+ * `cancel()` is at the bottom of the release handler, so a resolver throwing
+ * skipped it: the drag state stayed set, the label stayed glued to the cursor,
+ * and every later `pointerup` re-entered the same resolver and threw again. The
+ * controller was permanently dragging and the only way out was a reload.
+ *
+ * A zone is code this file does not own -- the canvas and the tree each register
+ * one, and a third-party surface could -- so "it will not throw" is not a
+ * property this can rely on.
+ */
+describe('a zone that throws on release', () => {
+  it('ends the gesture rather than staying stuck', async () => {
+    const { result } = renderHook(() => useDrag(() => undefined))
+
+    act(() => {
+      result.current.registerZone('hostile', () => {
+        throw new Error('this zone blew up')
+      })
+    })
+
+    await drag(() =>
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
+    )
+
+    expect(result.current.state, 'the drag never ended').toBeUndefined()
+  })
+
+  it('asks the other zones, which is what a zone declining already means', async () => {
+    const commits: DropCommit[] = []
+    const { result } = renderHook(() =>
+      useDrag((_source, target) => {
+        commits.push(target)
+      }),
+    )
+
+    act(() => {
+      result.current.registerZone('hostile', () => {
+        throw new Error('this zone blew up')
+      })
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await drag(() =>
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
+    )
+
+    expect(commits).toEqual([{ parentKey: 'root', index: 0 }])
+  })
+
+  it('ends the gesture when the commit itself throws', async () => {
+    // The other half. The document is the host's to change, and this cannot know
+    // what that costs -- but it must not leave the pointer holding a label.
+    const { result } = renderHook(() =>
+      useDrag(() => {
+        throw new Error('the host refused')
+      }),
+    )
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+    })
+
+    await drag(() =>
+      result.current.begin({ kind: 'move', key: 'email', label: 'email' }, press(0, 0)),
+    )
+
+    expect(result.current.state).toBeUndefined()
   })
 })

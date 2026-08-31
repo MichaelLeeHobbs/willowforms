@@ -7,7 +7,7 @@
  * the real thing lands where the user aimed.
  */
 
-import { dragOnto, expect, stableBox, test } from './harness.js'
+import { dragFrom, dragOnto, expect, stableBox, test } from './harness.js'
 
 test('clicking a component on the canvas selects it and shows its properties', async ({
   designer,
@@ -167,9 +167,11 @@ test('a plain click is still a click, not a swallowed drag', async ({ designer }
 
 test('Escape abandons a drag without changing the document', async ({ designer }) => {
   const before = await designer.rootChildren()
-  const from = await designer.node('heading').boundingBox()
-  const to = await designer.node('submit').boundingBox()
-  if (!from || !to) throw new Error('nothing to measure')
+  // `dragFrom` for the source, which scrolls it into view before measuring:
+  // a box read off screen is a press that lands nowhere. `stableBox` for the
+  // target, which only has to stop moving.
+  const from = await dragFrom(designer.node('heading'))
+  const to = await stableBox(designer.node('submit'))
 
   await designer.page.mouse.move(from.x + 40, from.y + from.height / 2)
   await designer.page.mouse.down()
@@ -181,7 +183,18 @@ test('Escape abandons a drag without changing the document', async ({ designer }
   await designer.page.mouse.up()
 
   await expect(designer.page.locator('.fs-drag-label')).toHaveCount(0)
-  expect(await designer.rootChildren()).toEqual(before)
+
+  /*
+   * Polled, not read once.
+   *
+   * `rootChildren()` reads what the playground has persisted, and it persists
+   * from a passive effect: React schedules those after commit, while
+   * Playwright's `press()` resolves on event dispatch. A single read can
+   * therefore be of the value from before the gesture -- which is exactly the
+   * value this assertion expects, so the test was biased towards passing
+   * whether or not the escape worked.
+   */
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
 test('the palette does not offer the root component', async ({ designer }) => {
@@ -265,4 +278,38 @@ test('the toolbar removes the selected component', async ({ designer }) => {
   await toolbar.getByRole('button', { name: 'Remove website' }).click()
 
   expect(await designer.rootChildren()).not.toContain('website')
+})
+
+test('a palette drag released off the canvas adds nothing', async ({ designer }) => {
+  /*
+   * The half jsdom cannot check. `Canvas.test.tsx` drives this gesture and can
+   * only assert that the label appeared and went away again: every rectangle
+   * there is zero, so no point is inside anything and an unchanged document is
+   * also what a canvas with its whole release path deleted would produce.
+   *
+   * Here the rectangles are real, so a release over the left pane is genuinely
+   * outside every drop zone the canvas offers -- and the document being
+   * unchanged means the drop was refused rather than unreachable.
+   */
+  await designer.openTab('Components')
+  const before = await designer.rootChildren()
+
+  const item = designer.page.getByRole('button', { name: 'Checkbox', exact: true })
+  const pane = designer.page.locator('.fs-panel').first()
+
+  const start = await stableBox(item)
+  const away = await stableBox(pane)
+
+  await designer.page.mouse.move(start.x + 20, start.y + start.height / 2)
+  await designer.page.mouse.down()
+  await designer.page.mouse.move(start.x + 40, start.y + start.height / 2 + 20, { steps: 4 })
+  await designer.page.mouse.move(away.x + 10, away.y + away.height - 4, { steps: 8 })
+
+  // Armed, so the release below is a release from a real drag.
+  await expect(designer.page.locator('.fs-drag-label')).toBeVisible()
+
+  await designer.page.mouse.up()
+
+  await expect(designer.page.locator('.fs-drag-label')).toHaveCount(0)
+  await expect.poll(() => designer.rootChildren()).toEqual(before)
 })

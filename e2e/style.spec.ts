@@ -20,6 +20,24 @@ const styleOf = async (designer: { page: Page }, key: string, property: string):
     [key, property],
   )
 
+/**
+ * The same reading, polled.
+ *
+ * Every assertion in this file used to be `expect(await styleOf(...)).toBe(...)`
+ * taken straight after `press('Enter')` -- a plain assertion, read once, on a
+ * value that needs a React commit and a `<style>` insertion to be true.
+ * `press()` resolves when the event is dispatched, not when the page has
+ * finished reacting to it, so those were races that happened to win.
+ *
+ * `expect.poll` retries until the timeout, which is what every other assertion
+ * in this suite gets from Playwright's own matchers.
+ */
+const expectStyle = (
+  designer: { page: Page },
+  key: string,
+  property: string,
+): ReturnType<typeof expect.poll> => expect.poll(() => styleOf(designer, key, property))
+
 test('a structured control styles the component on the canvas', async ({ designer }) => {
   await designer.select('website')
   await designer.openTab('Style')
@@ -34,8 +52,8 @@ test('a structured control styles the component on the canvas', async ({ designe
   await designer.page.getByLabel('Radius').fill('9px')
   await designer.page.getByLabel('Radius').press('Enter')
 
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
-  expect(await styleOf(designer, 'website', 'border-top-left-radius')).toBe('9px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('24px')
+  await expectStyle(designer, 'website', 'border-top-left-radius').toBe('9px')
 })
 
 test('a device rule overrides the base layer when that device is shown', async ({ designer }) => {
@@ -51,10 +69,10 @@ test('a device rule overrides the base layer when that device is shown', async (
 
   // Choosing a device in the Style tab moves the canvas to it, so what is on
   // screen is the rule being edited.
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('4px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('4px')
 
   await designer.page.getByRole('button', { name: 'Desktop' }).click()
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('24px')
 })
 
 test('CSS that would escape the component is not applied', async ({ designer }) => {
@@ -103,5 +121,31 @@ test('CSS that would escape the component is not applied', async ({ designer }) 
   expect(rules).toContain('padding')
   expect(rules).not.toContain('body')
   // And the component still has the styling that was accepted.
-  expect(await styleOf(designer, 'website', 'padding-top')).toBe('24px')
+  await expectStyle(designer, 'website', 'padding-top').toBe('24px')
+})
+
+test('the canvas does not draw the form in the designer own typeface', async ({ designer }) => {
+  /*
+   * `.fs-canvas__frame` resets the three inherited properties that would
+   * otherwise come from the shell, and it used `revert` -- which rolls back to
+   * the user-agent origin, and for an inherited property with no UA rule that
+   * computes to `inherit`. So the reset did nothing, and an author judged
+   * wrapping and spacing against the builder's font rather than a form's.
+   *
+   * Only a browser can settle this: jsdom has no cascade to roll back through,
+   * which is why the review could not decide it and why this test is here rather
+   * than beside the stylesheet.
+   */
+  const seen = await designer.page.evaluate(() => {
+    const read = (selector: string): { font: string; size: string } => {
+      const element = document.querySelector(selector)
+      if (!element) throw new Error('no ' + selector)
+      const style = getComputedStyle(element)
+      return { font: style.fontFamily, size: style.fontSize }
+    }
+    return { shell: read('.fs-shell'), frame: read('.fs-canvas__frame') }
+  })
+
+  expect(seen.frame.font).not.toBe(seen.shell.font)
+  expect(seen.frame.size).not.toBe(seen.shell.size)
 })

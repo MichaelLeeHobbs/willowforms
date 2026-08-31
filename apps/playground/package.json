@@ -16,7 +16,7 @@
     "@formsmith/kit-html": "workspace:*",
     "@formsmith/kit-mui": "workspace:*",
     "@formsmith/renderer": "workspace:*",
-    "@mui/material": "^6.3.0",
+    "@mui/material": "^7.3.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   }

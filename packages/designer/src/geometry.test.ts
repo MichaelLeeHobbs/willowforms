@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ComponentNode } from '@formsmith/core'
 
-import { measureTree, nodeElement } from './geometry.js'
+import { keyFromEventTarget, measureTree, nodeElement, rowFromEventTarget } from './geometry.js'
 
 /** A canvas holding one repeater whose subtree is drawn twice. */
 function surfaceWithRows(): HTMLElement {
@@ -107,5 +107,80 @@ describe('measuring a canvas that repeats a node', () => {
     expect(measureTree(surfaceWithRows(), hidden, () => true).some((c) => c.key === 'ghost')).toBe(
       false,
     )
+  })
+})
+
+/**
+ * Which node a click landed on, and which of its drawn copies.
+ *
+ * Both functions are pure DOM traversal, need no layout engine, and had no test
+ * of their own -- they were exercised only through Canvas tests that never
+ * varied where the attributes sit. `Canvas.tsx` feeds `rowFromEventTarget`
+ * straight into `selectedRow`, so what it answers is what the selection frame,
+ * the label and the row toolbar are drawn around.
+ */
+describe('reading a click', () => {
+  const clicked = (html: string, selector: string): Element => {
+    const surface = document.createElement('div')
+    surface.innerHTML = html
+    const target = surface.querySelector(selector)
+    if (!target) throw new Error('no ' + selector + ' in the fixture')
+    return target
+  }
+
+  const ROW = [
+    '<div data-fs-key="addressList" data-fs-type="Repeater">',
+    '  <div data-fs-key="street" data-fs-row="addresses[1]">',
+    '    <label><span class="inner">Street</span><input /></label>',
+    '  </div>',
+    '</div>',
+  ].join('')
+
+  it('reads the key off the nearest keyed ancestor, not the element hit', () => {
+    // A click lands on whatever the kit drew innermost -- a span inside a label
+    // inside the field -- and the node it belongs to is above it.
+    expect(keyFromEventTarget(clicked(ROW, '.inner'))).toBe('street')
+    expect(keyFromEventTarget(clicked(ROW, 'input'))).toBe('street')
+  })
+
+  it('reads the row off that same ancestor', () => {
+    expect(rowFromEventTarget(clicked(ROW, '.inner'))).toBe('addresses[1]')
+  })
+
+  it('answers nothing for a click outside every rendered node', () => {
+    expect(keyFromEventTarget(clicked('<div class="bare"></div>', '.bare'))).toBeUndefined()
+    expect(rowFromEventTarget(clicked('<div class="bare"></div>', '.bare'))).toBeUndefined()
+  })
+
+  it('answers nothing for a target that is not an element at all', () => {
+    // An event target can be the document, the window, or a text node picked up
+    // by a synthetic event. All three reach here from real handlers.
+    for (const target of [null, document, window]) {
+      expect(keyFromEventTarget(target as EventTarget | null)).toBeUndefined()
+      expect(rowFromEventTarget(target as EventTarget | null)).toBeUndefined()
+    }
+  })
+
+  it('answers no row when the row attribute is on a wrapper that is not the node', () => {
+    /*
+     * The shape worth knowing about. Both functions look at the nearest
+     * `[data-fs-key]` and read `data-fs-row` off *that* element, so a kit that
+     * puts the row marker on an unkeyed wrapper gets `undefined` -- the click
+     * knows which row it was in and the answer is thrown away, which is the bug
+     * `rowFromEventTarget` was written to fix, in a new spelling.
+     *
+     * Written down rather than fixed by widening the search: the renderer emits
+     * `data-fs-row` on the same element as `data-fs-key` (`renderer/index.tsx`,
+     * the node boundary), so this is a contract between the two, and a guard
+     * that quietly accepted either placement would hide the day it broke.
+     */
+    const stray = [
+      '<div data-fs-row="addresses[1]">',
+      '  <div data-fs-key="street"><input /></div>',
+      '</div>',
+    ].join('')
+
+    expect(keyFromEventTarget(clicked(stray, 'input'))).toBe('street')
+    expect(rowFromEventTarget(clicked(stray, 'input'))).toBeUndefined()
   })
 })

@@ -377,6 +377,54 @@ describe('forbiddenKeys', () => {
   it('covers a leaf as just itself', () => {
     expect(forbiddenKeys(nested(), 'below')).toEqual(new Set(['below']))
   })
+
+  it('covers a subtree measured out of document order', () => {
+    /*
+     * Every fixture in this file lists parents before children, and `dnd.ts`
+     * says in as many words that the loop exists because "a measurement that is
+     * not in document order -- a repeater's rows, a kit that renders children
+     * before their container -- would have made a single pass wrong".
+     *
+     * This is that order, and on its own it is not enough to prove the loop:
+     * the dragged key seeds the set, so one pass still catches its direct
+     * children whichever way round they are listed. What it does pin is that
+     * order does not matter, which is the claim being made. The test below is
+     * the one a single pass fails.
+     */
+    const upsideDown = [...nested()].reverse()
+    expect(upsideDown.map((candidate) => candidate.key)).toEqual([
+      'below',
+      'right',
+      'left',
+      'stack',
+      'root',
+    ])
+
+    expect(forbiddenKeys(upsideDown, 'stack')).toEqual(new Set(['stack', 'left', 'right']))
+  })
+
+  it('covers a chain three deep, whatever order it arrives in', () => {
+    /*
+     * Two levels is one extra pass, which a loop that ran exactly twice would
+     * also satisfy. Three levels, listed leaf first, needs the loop to keep
+     * going until nothing changes.
+     */
+    const chain = [
+      { key: 'leaf', parentKey: 'inner' },
+      { key: 'inner', parentKey: 'outer' },
+      { key: 'outer', parentKey: 'root' },
+      { key: 'root', parentKey: undefined },
+    ].map((node, index) => ({
+      ...node,
+      index,
+      container: true,
+      depth: 0,
+      row: undefined,
+      rect: { top: 0, left: 0, width: 10, height: 10 },
+    })) as Candidate[]
+
+    expect(forbiddenKeys(chain, 'outer')).toEqual(new Set(['outer', 'inner', 'leaf']))
+  })
 })
 
 /**

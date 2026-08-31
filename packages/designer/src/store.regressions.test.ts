@@ -12,7 +12,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ComponentDef, FormDocument, Language } from '@formsmith/core'
-import { validateDocument } from '@formsmith/core'
+import { collectKeys as collect, validateDocument } from '@formsmith/core'
 
 import { useDesigner } from './store.js'
 
@@ -268,6 +268,44 @@ describe('language identity', () => {
     expect(validateDocument(result.current.document)).toEqual([])
   })
 
+  it('makes the language the caller names the default', () => {
+    /*
+     * The second argument, which nothing in the repository ever passed. Its one
+     * caller in the product is the "make this the default" control in
+     * `FormSettings.tsx`, and there is no test for that panel and no e2e
+     * covering it -- so `const preferred = doc.defaultLanguage`, which makes
+     * choosing a default a silent no-op, kept every test green.
+     */
+    const languages: Language[] = [
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+      { code: 'fr', name: 'French', bidi: 'ltr' },
+    ]
+    const { result } = renderHook(() => useDesigner(doc(languages)))
+
+    act(() => {
+      result.current.setLanguages(languages, 'fr')
+    })
+
+    expect(result.current.document.defaultLanguage).toBe('fr')
+    expect(validateDocument(result.current.document)).toEqual([])
+  })
+
+  it('refuses a default the list does not offer, rather than storing it', () => {
+    /*
+     * The control. A document whose `defaultLanguage` names no language in its
+     * own list fails `validateDocument`, so accepting whatever was asked for
+     * would be a write that breaks the document from inside the designer.
+     */
+    const languages: Language[] = [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }]
+    const { result } = renderHook(() => useDesigner(doc(languages)))
+
+    act(() => {
+      result.current.setLanguages(languages, 'de')
+    })
+
+    expect(result.current.document.defaultLanguage).toBe('en-US')
+  })
+
   it('moves the default only when the language it names is removed', () => {
     const { result } = renderHook(() =>
       useDesigner(
@@ -438,6 +476,48 @@ describe('the store and edits that changed nothing', () => {
     })
 
     expect(result.current.document).toBe(after)
+  })
+
+  it('never gives two duplicates the same key, however they are batched', () => {
+    /*
+     * `duplicateComponent` read `history.present` out of the render closure --
+     * a render behind whenever two edits land in one tick -- and
+     * `duplicateNode` derives the copy's key from the root it is handed. Two
+     * duplications resolved against the same stale root produced two nodes with
+     * the same generated key, which is the duplicate-key state that makes every
+     * later tree operation edit the first match, silently. The one thing this
+     * callback exists to do is hand back a key nothing else is using.
+     *
+     * The eight cases in this describe covered every writer except this one,
+     * which is the only writer that was still reading the closure.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.duplicateComponent('email')
+      result.current.duplicateComponent('email')
+    })
+
+    const keys = collect(result.current.document.root)
+    expect(new Set(keys).size, 'two components share a key: ' + keys.join(', ')).toBe(keys.length)
+    expect(validateDocument(result.current.document)).toEqual([])
+  })
+
+  it('still duplicates twice when the two are a tick apart', () => {
+    // The control. Refusing the second duplication outright would satisfy the
+    // test above by never producing a second copy at all.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.duplicateComponent('email')
+    })
+    act(() => {
+      result.current.duplicateComponent('email')
+    })
+
+    const keys = collect(result.current.document.root)
+    expect(keys.filter((key) => key.startsWith('email'))).toHaveLength(3)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 
   it('still records an edit that changes something', () => {

@@ -264,7 +264,14 @@ function evaluate(
      */
     case 'in':
     case 'notIn': {
-      if (!Array.isArray(condition.options)) return false
+      /*
+       * Unreadable, not false. Every other branch here answers `undefined` for a
+       * shape it cannot read, and `not` passes that through rather than
+       * inverting it -- which is the whole reason the distinction exists, three
+       * comments up. This one answered `false`, so `not(in(x, "oops"))` was
+       * `true` and a component whose rule nobody can read was *shown*.
+       */
+      if (!Array.isArray(condition.options)) return undefined
       const value = read(condition.value)
       if (unreadable(value)) return undefined
       /*

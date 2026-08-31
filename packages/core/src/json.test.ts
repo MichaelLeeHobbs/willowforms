@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { isEmpty, jsonToString, optionValue, readPath, safeHref, valueOf } from './json.js'
+import {
+  isEmpty,
+  jsonToString,
+  optionEntry,
+  optionValue,
+  readPath,
+  safeHref,
+  valueOf,
+} from './json.js'
 
 describe('jsonToString', () => {
   it('passes strings through and renders primitives', () => {
@@ -170,6 +178,57 @@ describe('safeHref', () => {
     expect(safeHref('file:///etc/passwd')).toBeUndefined()
   })
 
+  it('refuses a hostile scheme that the URL parser cannot read either', () => {
+    /*
+     * The other half of the decision, and the half no fixture reached.
+     *
+     * Every hostile string above parses, so `URL.parse` answers and the scheme
+     * check on the parsed protocol refuses it. The fallback below that -- the
+     * scheme read off the raw text -- runs only when the parse fails, and it is
+     * the branch a runtime without `URL.parse` takes for everything. Replace it
+     * with `return raw` and this file stays green while an unparseable
+     * `javascript:` URL is handed straight to an `href`.
+     *
+     * These strings were measured rather than assumed: an unterminated IPv6
+     * host is what the WHATWG parser actually rejects, while the more obvious
+     * `javascript:alert(1)#[` parses without complaint.
+     */
+    expect(URL.parse('javascript://[')).toBeNull()
+
+    expect(safeHref('javascript://[')).toBeUndefined()
+    expect(safeHref('vbscript://[')).toBeUndefined()
+    expect(safeHref('data://[')).toBeUndefined()
+  })
+
+  it('still allows a safe scheme the parser cannot read', () => {
+    // The control. The fallback refuses by scheme, not by parseability, or a
+    // link a browser would follow would vanish from the form.
+    expect(URL.parse('https://[')).toBeNull()
+    expect(safeHref('https://[')).toBe('https://[')
+  })
+
+  it('decides by scheme on a runtime with no URL.parse', () => {
+    /*
+     * Node before 22.1 and Safari before 18. The whole function then runs
+     * through the fallback, so this is the one arrangement where the allowlist
+     * below is the only thing standing between a document and an href.
+     */
+    // Put back exactly what was there; it is never called detached.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const parse = URL.parse
+    try {
+      // @ts-expect-error -- deleting an optional static is the point of the test
+      delete URL.parse
+
+      expect(safeHref('https://example.com/a')).toBe('https://example.com/a')
+      expect(safeHref('mailto:someone@example.com')).toBe('mailto:someone@example.com')
+      expect(safeHref('javascript:alert(1)')).toBeUndefined()
+      expect(safeHref('data:text/html,<script>alert(1)</script>')).toBeUndefined()
+    } finally {
+      URL.parse = parse
+    }
+  })
+
   it('treats an empty or non-text value as no link at all', () => {
     expect(safeHref('')).toBeUndefined()
     expect(safeHref('   ')).toBeUndefined()
@@ -337,5 +396,42 @@ describe('valueOf', () => {
     // be nothing, because no field was answered.
     const body = JSON.parse('{"__proto__":{"role":"admin"}}') as Record<string, never>
     expect(valueOf(body, 'role')).toBeUndefined()
+  })
+})
+
+/**
+ * A bare string option is its own value.
+ *
+ * `options: ['Yes', 'No']` is the shortest list an author writes and the shape
+ * every JSON Schema `enum` has. `optionEntry` used the *position* whenever no
+ * `value` was declared, and a plain string declares one by being one -- so both
+ * kits drew a select reading `0`, `1`, `2`, and the answer stored was the index.
+ */
+describe('an option that is a plain string', () => {
+  it('uses itself as its value and its label', () => {
+    expect(optionEntry('Yes', 0)).toEqual({ value: 'Yes', label: 'Yes' })
+    expect(optionEntry('No', 1)).toEqual({ value: 'No', label: 'No' })
+  })
+
+  it('uses itself when it is a number or a boolean too', () => {
+    expect(optionEntry(18, 0)).toEqual({ value: '18', label: '18' })
+    expect(optionEntry(true, 3)).toEqual({ value: 'true', label: 'true' })
+  })
+
+  it('still reads a declared value and label off an object', () => {
+    // The control for the shape that always worked.
+    expect(optionEntry({ label: 'Two', value: 2 }, 0)).toEqual({ value: '2', label: 'Two' })
+    expect(optionEntry({ label: 'Two' }, 5)).toEqual({ value: '5', label: 'Two' })
+  })
+
+  it('still falls back to the position for an option that names nothing', () => {
+    /*
+     * The other control. An option carrying neither a value nor anything a value
+     * could be read from has only its position to be named by, and inventing a
+     * name for it would be worse.
+     */
+    expect(optionEntry({}, 4)).toEqual({ value: '4', label: '4' })
+    expect(optionEntry(null, 2)).toEqual({ value: '2', label: '2' })
+    expect(optionEntry(undefined, 7)).toEqual({ value: '7', label: '7' })
   })
 })

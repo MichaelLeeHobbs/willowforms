@@ -1,20 +1,37 @@
 // tsc does not emit non-TS files, so every stylesheet is copied into dist here.
-import { copyFileSync, mkdirSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
+import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
+import { relative, resolve, sep } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const root = fileURLToPath(new URL('../', import.meta.url))
+const slashes = (path) => path.split(sep).join('/')
 
 /**
- * Exported so `check-dist.mjs` can assert these arrived.
+ * Every stylesheet under a package's `src`, found rather than listed.
  *
- * One list. The CI step that proved the build shipped its stylesheets named
- * `designer.css` and stopped there, while this file had grown `kit-html.css` --
- * a file that package's own `exports` map publishes, so a broken build would
- * have shipped a kit with no styles and passed. A second list is a second thing
- * to remember, and this is what happens when somebody does not.
+ * This was a literal array, and the CI step that proved the build shipped its
+ * stylesheets was a second literal array. They disagreed: this one had grown
+ * `kit-html.css` and the check still named only `designer.css`, so a build that
+ * shipped a kit with no styles would have passed. Exporting the list fixed the
+ * disagreement; deriving it fixes the reason there could be one. Add a third
+ * stylesheet tomorrow and both the copy and the check pick it up with no edit.
+ *
+ * Exported so `check-dist.mjs` asserts these arrived.
  */
-export const ASSETS = [
-  ['packages/designer/src/designer.css', 'packages/designer/dist/designer.css'],
-  ['packages/kit-html/src/kit-html.css', 'packages/kit-html/dist/kit-html.css'],
-]
+export const ASSETS = readdirSync(resolve(root, 'packages'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .flatMap((pkg) => {
+    const src = resolve(pkg.parentPath, pkg.name, 'src')
+    return readdirSync(src, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.css'))
+      .map((entry) => {
+        const from = resolve(entry.parentPath, entry.name)
+        return [
+          slashes(relative(root, from)),
+          'packages/' + pkg.name + '/dist/' + slashes(relative(src, from)),
+        ]
+      })
+  })
 
 /*
  * Only when this file is the thing that was run, so importing the list above
@@ -24,7 +41,7 @@ const entry = process.argv[1]
 if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
   for (const [from, to] of ASSETS) {
     mkdirSync(to.slice(0, to.lastIndexOf('/')), { recursive: true })
-    copyFileSync(from, to)
+    copyFileSync(resolve(root, from), resolve(root, to))
     console.log('copied ' + from.slice(from.lastIndexOf('/') + 1))
   }
 }

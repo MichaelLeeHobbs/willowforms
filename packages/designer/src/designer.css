@@ -294,6 +294,19 @@
   opacity: 0.75;
 }
 
+/*
+ * Less faded on the row that is selected.
+ *
+ * The type label is 12px, so AA asks 4.5:1 of it. Against the panel at 0.75 it
+ * is 7.25:1 and fine; on a selected row the background is `--fs-primary` and the
+ * text is `--fs-primary-text`, and the same 0.75 lands at 3.82:1 light. 0.9
+ * clears it in both palettes -- 4.79:1 light and 5.66:1 dark -- and still reads
+ * as secondary to the key beside it.
+ */
+.fs-tree__row.is-selected .fs-tree__type {
+  opacity: 0.9;
+}
+
 .fs-tree__remove {
   margin-inline-start: auto;
   padding: 0 6px;
@@ -493,7 +506,7 @@
   color: var(--fs-text);
   padding: 8px;
   background: var(--fs-bg-well);
-  border: 1px solid var(--fs-border);
+  border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
   resize: vertical;
 }
@@ -522,7 +535,13 @@
   color: inherit;
   padding: 5px 10px;
   background: var(--fs-bg-panel);
-  border: 1px solid var(--fs-border);
+  /*
+   * `--fs-control-border`, which exists for exactly this. These rules kept
+   * `--fs-border`, the panel divider, at 1.39:1 -- so the dialog's buttons and
+   * the language form's had no boundary a viewer could see, while the
+   * identically-shaped buttons in the toolbar and the panels did.
+   */
+  border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
   cursor: pointer;
 }
@@ -653,7 +672,13 @@
   color: inherit;
   padding: 5px 10px;
   background: var(--fs-bg-panel);
-  border: 1px solid var(--fs-border);
+  /*
+   * `--fs-control-border`, which exists for exactly this. These rules kept
+   * `--fs-border`, the panel divider, at 1.39:1 -- so the dialog's buttons and
+   * the language form's had no boundary a viewer could see, while the
+   * identically-shaped buttons in the toolbar and the panels did.
+   */
+  border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
   cursor: pointer;
 }
@@ -854,9 +879,26 @@
  */
 .fs-canvas__frame {
   margin-inline: auto;
-  font-family: revert;
-  font-size: revert;
-  color: revert;
+  /*
+   * `initial`, not `revert`, and the difference is the whole point.
+   *
+   * `revert` rolls a property back to the user-agent origin, and for an
+   * inherited property with no UA rule that computes to `inherit` -- so these
+   * three did nothing at all. Measured in a browser rather than argued:
+   * `getComputedStyle` on the frame returned exactly the shell's values,
+   * `system-ui … | 14px | rgb(28, 31, 35)`, while the host page's body was
+   * `Roboto … | 16px`. The canvas was drawing the form in the designer's own
+   * typeface, so an author judged wrapping and spacing against a font the form
+   * will never use.
+   *
+   * `initial` stops the inheritance, which is what this rule exists to do. It
+   * cannot make the form look like the host's page -- nothing here knows what
+   * that is -- and it is not trying to: it is refusing to make it look like the
+   * builder.
+   */
+  font-family: initial;
+  font-size: initial;
+  color: initial;
 }
 
 /*

@@ -186,6 +186,24 @@ describe('toJsonSchema', () => {
     expect(toJsonSchema(doc([node])).properties['agree']?.title).toBe('Terms')
   })
 
+  it('exports a document whose props are not an object at all', () => {
+    /*
+     * `props` is required on `ComponentNode`, so only a cast reaches this, and
+     * a cast is exactly how it happens: the JSON dialog is where somebody looks
+     * at a pasted document, and a pasted document has been through no gate.
+     * `validateDocument` reports a malformed `props` and reporting is not
+     * refusing. Delete the guard at `schema.ts:204` and `toJsonSchema` throws a
+     * `TypeError` in the one place a person is deliberately holding something
+     * broken.
+     */
+    for (const props of [null, 'nope', 42, ['label']]) {
+      const node = { ...field('email', 'string'), props } as unknown as ComponentNode
+      const schema = toJsonSchema(doc([node]))
+
+      expect(schema.properties['email'], JSON.stringify(props)).toEqual({ type: 'string' })
+    }
+  })
+
   it('leaves the title off when the label is a binding rather than static text', () => {
     const node = field('email', 'string')
     node.props['label'] = { kind: 'i18n', key: 'email_label' }
@@ -204,6 +222,46 @@ describe('toJsonSchema', () => {
 describe('unexportableRules', () => {
   it('reports nothing for a form JSON Schema can express', () => {
     expect(unexportableRules(doc([field('email', 'string', [{ key: 'email' }])]))).toEqual([])
+  })
+
+  it('reports the second of two format rules, which the export silently drops', () => {
+    /*
+     * `email`, `url` and `uuid` all write `format`, and a property has one, so
+     * a field carrying two of them exports only the last. Every fixture in this
+     * file put one format rule on a field, so the branch that reports the
+     * collapse was never executed: delete `schema.ts:111-117` and the suite
+     * stayed green while the dialog called a lossy export lossless, which is
+     * the single thing this function exists to prevent.
+     *
+     * The rule reported is the one being discarded -- the earlier one -- not
+     * the one that survives.
+     */
+    const document = doc([field('id', 'string', [{ key: 'email' }, { key: 'uuid' }])])
+
+    expect(unexportableRules(document)).toEqual([{ key: 'id', rule: 'email' }])
+    expect(toJsonSchema(document).properties['id']?.format).toBe('uuid')
+  })
+
+  it('reports every format rule but the last when a field carries three', () => {
+    const document = doc([
+      field('id', 'string', [{ key: 'email' }, { key: 'url' }, { key: 'uuid' }]),
+    ])
+
+    expect(unexportableRules(document)).toEqual([
+      { key: 'id', rule: 'email' },
+      { key: 'id', rule: 'url' },
+    ])
+  })
+
+  it('reports nothing for one format rule beside rules of other kinds', () => {
+    // The control: `slice(0, -1)` on a one-element list is empty, and the
+    // neighbouring `minLength` is not a format rule and must not be counted as
+    // one. Without this, reporting every format rule would also pass.
+    expect(
+      unexportableRules(
+        doc([field('email', 'string', [{ key: 'email' }, { key: 'minLength', value: 3 }])]),
+      ),
+    ).toEqual([])
   })
 
   it('names the fields whose rules will be lost', () => {
@@ -581,5 +639,96 @@ describe('a rule that applies only sometimes', () => {
 
     expect(unexportableRules(plain)).toEqual([])
     expect(toJsonSchema(plain).required).toEqual(['vat'])
+  })
+})
+
+/**
+ * What the export does with a document nobody gated.
+ *
+ * `toJsonSchema` runs on whatever a host hands it, and a server validating a
+ * payload against its output is trusting it -- so a constraint the form enforces
+ * and the export drops is accepted where the form refused. Silently, which is
+ * the direction that matters.
+ */
+describe('the exported schema and a document that is data', () => {
+  const withField = (node: ComponentNode): FormDocument => ({
+    ...createDocument('Export', 'export'),
+    root: { key: 'root', type: 'Screen', props: {}, children: [node] },
+  })
+
+  it('keeps a property whose data key is a name on Object.prototype', () => {
+    /*
+     * `properties[name] = property` for a `dataKey` of `__proto__` runs the
+     * inherited setter and adds no own property, so the field vanished from the
+     * export -- and a server checking a payload against it then had no
+     * constraint for that answer at all. The twin item 1 named and left here.
+     */
+    const schema = toJsonSchema(
+      withField({
+        key: 'sneaky',
+        dataKey: '__proto__',
+        type: 'TextField',
+        props: {},
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      }),
+    )
+
+    expect(Object.hasOwn(schema.properties, '__proto__')).toBe(true)
+    expect(schema.required).toContain('__proto__')
+  })
+
+  it('does not put a length keyword on a type that has no length', () => {
+    /*
+     * `minLength` is defined for strings, and every validator ignores it on a
+     * number -- so the form enforced the rule and the export dropped it. The
+     * choice was made by asking whether the type is `array`, which answers the
+     * wrong question for everything that is neither a list nor a string.
+     */
+    const schema = toJsonSchema(
+      withField({
+        key: 'age',
+        type: 'NumberField',
+        props: {},
+        schema: { type: 'number', validations: [{ key: 'minLength', value: 3 }] },
+      }),
+    )
+
+    expect(schema.properties['age']).not.toHaveProperty('minLength')
+    expect(schema.properties['age']).not.toHaveProperty('minItems')
+  })
+
+  it('still puts one on a string and on a list', () => {
+    // The controls. A rule that dropped every length keyword would pass the row
+    // above and export nothing useful.
+    const text = toJsonSchema(
+      withField({
+        key: 'name',
+        type: 'TextField',
+        props: {},
+        schema: { type: 'string', validations: [{ key: 'minLength', value: 3 }] },
+      }),
+    )
+    expect(text.properties['name']).toHaveProperty('minLength', 3)
+
+    const list = toJsonSchema(
+      withField({
+        key: 'tags',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [{ key: 'minLength', value: 3 }] },
+        children: [],
+      }),
+    )
+    expect(list.properties['tags']).toHaveProperty('minItems', 3)
+  })
+
+  it('does not overflow on a document nested deeper than the gate walks', () => {
+    // Built with a loop, because building it recursively would overflow first.
+    let node: ComponentNode = { key: 'leaf', type: 'Box', props: {} }
+    for (let i = 0; i < 50_000; i += 1) {
+      node = { key: 'box' + String(i), type: 'Box', props: {}, children: [node] }
+    }
+
+    expect(() => toJsonSchema(withField(node))).not.toThrow()
   })
 })

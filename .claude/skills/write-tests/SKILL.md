@@ -170,7 +170,7 @@ partial edit and an undo all survive.
 
 Every repeater fixture in the repository set `key` and `dataKey` to the same string. So the
 row-addressing design and its opposite produced **byte-identical output across all 911 unit tests
-and 65 end-to-end tests** — a patched build of the alternative design was run and the whole suite
+and 78 tests in a real browser** — a patched build of the alternative design was run and the whole suite
 stayed green. The suite could not have caught the defect that prompted the question: a repeater
 whose two names differ silently discarded every keystroke in its rows.
 
@@ -191,14 +191,23 @@ swap the two and the test still passes, the test is not about them.
 
 ## Trap 12 — the guard that checks the wrong ancestor
 
-`designer.css.test.ts` enforces invariant 3 by testing whether a selector reaches past
+`designer.css.test.ts` used to enforce invariant 3 by testing whether a selector reached past
 `.fs-shell` or `.fs-canvas__surface`. The form is rendered inside `.fs-canvas__frame`, one level
 below the surface. So `.fs-canvas__frame input { padding: 5px 8px }` — the exact rule that broke
-MUI's notched outline and caused the invariant to be written — contains neither base string, and
-all four assertions stay green.
+MUI's notched outline and caused the invariant to be written — contained neither base string, and
+all four assertions stayed green.
 
 The guard was correct when the DOM had one fewer wrapper. Nothing failed when the wrapper was
 added, because a guard that names its scopes as strings cannot notice that the scopes moved.
+
+**It is the other way round now**, which is the shape to copy rather than the hole to re-fix: the
+file holds an allowlist of the scopes under the canvas that are _not_ the form, and flags any
+selector whose rightmost compound carries no `fs-` class under any `.fs-shell` or `.fs-canvas`
+scope. `.fs-canvas__frame input` is one of a dozen cases asserting the guard flags it, including
+the scope wrapped in `:where()` and written as a list inside `:is()`. Both readers walk braces
+rather than matching a regex, because the two that matched regexes each had a hole: one could not
+tell a rule inside `@media` from one beside it, and the other split a prelude on a comma that was
+inside a functional pseudo.
 
 **Rule:** a guard written against a DOM shape has to be re-derived when the shape changes, and
 the cheapest way to force that is to make it fail loudly on an unknown ancestor rather than pass
@@ -236,7 +245,7 @@ just buys the same failure twice.
 
 - [ ] **Break the fix and watch the right test fail.** Not the suite — the specific test that
       names the behaviour. This is the only step that distinguishes a test from a comment.
-- [ ] **Run `pnpm e2e` too.** 65 of these checks are the only ones that see layout, real event
+- [ ] **Run `pnpm e2e` too.** 78 tests in a real browser are the only ones that see layout, real event
       capture, and focus. jsdom will not tell you.
 - [ ] **Check the counts.** `pnpm test` and `pnpm e2e` totals appear in `README.md`,
       `CLAUDE.md` and `docs/ROADMAP.md`, and `test/docs.test.ts` compares them.

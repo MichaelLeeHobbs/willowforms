@@ -71,6 +71,33 @@ export const DEVICE_QUERY: Record<Exclude<Device, 'any'>, string> = {
 const FORBIDDEN = /[{}<@]|\/\*|\*\//
 
 /**
+ * Whether every quote in a declaration block is closed.
+ *
+ * `FORBIDDEN` refuses a literal `}`, and a `}` inside an unterminated string is
+ * not one it can see: `content: "` swallows the closing brace of its own rule
+ * and every rule after it until the next quote, so a third component's
+ * declarations land under this one's selector. The same breakage the brace check
+ * exists to stop, arriving by a route it does not look at.
+ *
+ * Balance rather than parsing: a declaration block with an odd number of either
+ * quote is refused, which is a rule an author can predict and a check that
+ * cannot be talked around.
+ */
+function quotesBalanced(text: string): boolean {
+  let single = 0
+  let double = 0
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '\\') {
+      i += 1
+      continue
+    }
+    if (text[i] === "'" && double % 2 === 0) single += 1
+    if (text[i] === '"' && single % 2 === 0) double += 1
+  }
+  return single % 2 === 0 && double % 2 === 0
+}
+
+/**
  * The declarations, or nothing if the text is not only declarations.
  *
  * Returning nothing rather than a cleaned-up version is deliberate: silently
@@ -79,9 +106,29 @@ const FORBIDDEN = /[{}<@]|\/\*|\*\//
  */
 export function safeDeclarations(text: string | undefined): string | undefined {
   if (!text) return undefined
+  /*
+   * A document is data, so `css.mobile` can be a number or an object, and
+   * `.trim()` on one throws out of `styleSheetFor` -- which the renderer calls
+   * during render, so the whole form goes. Refused rather than coerced: a
+   * stylesheet is text, and something that is not text is not a stylesheet.
+   */
+  if (typeof text !== 'string') return undefined
   const trimmed = text.trim()
   if (!trimmed) return undefined
-  return FORBIDDEN.test(trimmed) ? undefined : trimmed
+  if (FORBIDDEN.test(trimmed)) return undefined
+  if (!quotesBalanced(trimmed)) return undefined
+  /*
+   * And the raw block may not fetch either.
+   *
+   * `safeStyleValue` refuses `url(...)` by name, calling it an exfiltration
+   * channel: a request keyed off a field, from a page collecting answers, to an
+   * address the document chose. The raw Style tab block reached the page through
+   * a `<style>` element and was never asked. Two sinks for author-supplied CSS,
+   * one of them checked, and the unchecked one is the one that takes arbitrary
+   * text.
+   */
+  if (FETCHING.test(trimmed)) return undefined
+  return trimmed
 }
 
 /**
@@ -339,9 +386,26 @@ export function setDeclaration(
   value: string | undefined,
 ): string {
   const wanted = normaliseName(name)
-  const declarations = parseDeclarations(text).filter(([key]) => key !== wanted)
+  const declarations = parseDeclarations(text)
   const trimmed = value?.trim()
-  if (trimmed) declarations.push([wanted, trimmed])
+  const at = declarations.findIndex(([key]) => key === wanted)
+
+  /*
+   * In place, which is what this function's docblock already claimed.
+   *
+   * It filtered the property out and pushed it back on the end, so editing
+   * `color` in `color: red; padding: 8px` produced `padding: 8px; color: red` --
+   * every structured control in the Style tab reordering the raw text under the
+   * author's cursor, and the cascade with it where two properties overlap.
+   */
+  if (at === -1) {
+    if (trimmed) declarations.push([wanted, trimmed])
+  } else if (trimmed) {
+    declarations[at] = [wanted, trimmed]
+  } else {
+    declarations.splice(at, 1)
+  }
+
   return printDeclarations(declarations)
 }
 
