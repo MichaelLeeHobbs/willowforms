@@ -856,7 +856,7 @@ describe('duplicateNode', () => {
         kind: 'condition',
         condition: {
           op: 'in',
-          left: { kind: 'context', path: 'step' },
+          value: { kind: 'context', path: 'step' },
           options: ['welcome', 'step', 'done'],
         },
       }),
@@ -867,7 +867,7 @@ describe('duplicateNode', () => {
       kind: 'condition',
       condition: {
         op: 'in',
-        left: { kind: 'context', path: 'step' },
+        value: { kind: 'context', path: 'step' },
         options: ['welcome', 'step2', 'done'],
       },
     })
@@ -884,7 +884,7 @@ describe('duplicateNode', () => {
       kind: 'condition' as const,
       condition: {
         op: 'in' as const,
-        left: { kind: 'ref' as const, dataKey: 'chosen' },
+        value: { kind: 'ref' as const, dataKey: 'chosen' },
         options: ['welcome', 'step', 'done'],
       },
     }

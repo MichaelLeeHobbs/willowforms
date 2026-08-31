@@ -213,6 +213,8 @@ describe('safeHref', () => {
      * through the fallback, so this is the one arrangement where the allowlist
      * below is the only thing standing between a document and an href.
      */
+    // Put back exactly what was there; it is never called detached.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     const parse = URL.parse
     try {
       // @ts-expect-error -- deleting an optional static is the point of the test
