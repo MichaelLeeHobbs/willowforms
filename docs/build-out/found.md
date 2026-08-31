@@ -13,6 +13,29 @@ the second review re-derived five of those independently, which is worth knowing
 
 ## Second pass (from 2026-08-31)
 
+## The JSON-dialog case in the axe suite audits one rule out of twenty
+
+`test/a11y.test.tsx` — the ninth of its nine states opens the JSON dialog and audits the shell. With the
+dialog open, axe errors internally and returns nineteen of its twenty rules as `incomplete` rather than as
+passes or failures. `incomplete` is not a violation, so the assertion compares an empty array with an
+empty array and the test passes.
+
+Measured in item 7 by instrumenting the suite's own `audit()` helper. The other eight states inspect
+between 172 and 545 nodes across 16 to 20 rules; this one inspects 20 nodes across 1 rule. The rules that
+go missing include `button-name`, `label`, `aria-required-attr` and `nested-interactive` — which is most of
+what a modal dialog needs checking for. Proved by injecting an unlabelled `<input>` into the shell
+toolbar: eight of the nine states went red and this one did not.
+
+The mechanism is jsdom's `<dialog>`. `showModal` is a stub, and `DocumentDialog.test.tsx` patches it onto
+the prototype to make the dialog testable at all; axe errors on the resulting tree and says so —
+"Axe encountered an error; test the page for this type of problem manually".
+
+Out of scope because item 7 is an audit and the queue is frozen, and because the fix is not a patch: it is
+the same Playwright axe pass already triaged for `target-size` and `scrollable-region-focusable`. This is
+the third rule class jsdom cannot answer, and the argument for that pass is now three findings strong
+rather than two. Bad to leave: the state with the most complex markup in the product — a modal, a tablist,
+a textarea and a focus trap — is the one state nothing checks, and it reads as covered.
+
 ## Every tree walker outside `validateDocument` is unbounded, and the gate is what protects them
 
 Item 2 bounded the six walkers that cross a _condition_. There are about a dozen more that walk the

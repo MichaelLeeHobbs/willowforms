@@ -24,15 +24,49 @@ import vitest from '@vitest/eslint-plugin'
 import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 
-/** Packages that must never reach a component library. */
-const COMPONENT_LIBRARIES = [
-  { group: ['@mui/*', '@emotion/*'], message: '' },
-  // `antd` covers `antd/es/button` too: these patterns use gitignore semantics,
-  // where a bare name matches the path and everything under it.
-  { group: ['antd', '@chakra-ui/*', '@radix-ui/*'], message: '' },
-]
+/**
+ * Packages that must never reach core or the designer, as bare names.
+ *
+ * Bare, because these are gitignore patterns: `antd` matches `antd/es/button`
+ * and does not match `antdesign-clone`, and `@mui` behaves exactly as `@mui/*`
+ * does. Measured with the linter rather than assumed, because the two spellings
+ * look interchangeable and only one of them can also be turned into the regex
+ * below.
+ */
+const COMPONENT_LIBRARIES = ['@mui', '@emotion', 'antd', '@chakra-ui', '@radix-ui']
 
-const noComponentLibrary = (why) => COMPONENT_LIBRARIES.map((entry) => ({ ...entry, message: why }))
+/** React and its DOM half, which core may not reach either. */
+const REACT = ['react', 'react-dom']
+
+const noComponentLibrary = (why) => [{ group: COMPONENT_LIBRARIES, message: why }]
+
+/**
+ * The same names as an `ImportExpression` selector.
+ *
+ * `no-restricted-imports` visits `ImportDeclaration` and the two export forms
+ * and nothing else, so `await import('@mui/material')` in the designer linted
+ * clean. Measured before this was written: the static import reported invariant
+ * 2, the dynamic one reported only an unrelated `no-unsafe-assignment`. A
+ * dynamic import is the form somebody writes precisely when they are working
+ * around a restriction, so it was the one form not restricted.
+ *
+ * Derived from the list above rather than written out again. Two lists naming
+ * one rule is how a fix lands on one side of a symmetry, which is the whole
+ * subject of the remediation run this came from.
+ *
+ * `[/]` rather than an escaped slash: a bare `/` ends an esquery regex literal.
+ */
+const dynamicImportOf = (names) => {
+  const alternatives = names.map((name) => name.replace(/\//g, '[/]')).join('|')
+  return `ImportExpression[source.value=/^(${alternatives})([/]|$)/]`
+}
+
+/** The same, for a prefix rather than a package name. */
+const dynamicImportUnder = (prefix) =>
+  `ImportExpression[source.value=/^${prefix.replace(/\//g, '[/]')}/]`
+
+const KIT_MESSAGE =
+  'Invariant 2: the designer must not depend on a specific kit. Take a Kit and a RendererKit as props instead.'
 
 export default tseslint.config(
   {
@@ -133,16 +167,31 @@ export default tseslint.config(
            */
           patterns: [
             {
-              group: ['react', 'react/*'],
+              group: REACT,
               message:
                 'Invariant 1: @formsmith/core runs in Node. Server-side validation depends on it staying React-free.',
             },
-            {
-              group: ['react-dom', 'react-dom/*'],
-              message: 'Invariant 1: @formsmith/core runs in Node and imports no React.',
-            },
             ...noComponentLibrary('Invariant 1: @formsmith/core imports no component library.'),
           ],
+        },
+      ],
+      /*
+       * The same invariant against the import form the rule above cannot see.
+       * Both halves, not one: `await import('react')` in core is the same
+       * defect as `await import('@mui/material')` in the designer, and fixing
+       * only the one the review named would be this run's own failure mode.
+       */
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: dynamicImportOf(REACT),
+          message:
+            'Invariant 1: @formsmith/core runs in Node. A dynamic import of React is still an import.',
+        },
+        {
+          selector: dynamicImportOf(COMPONENT_LIBRARIES),
+          message:
+            'Invariant 1: @formsmith/core imports no component library, dynamically or otherwise.',
         },
       ],
     },
@@ -165,10 +214,21 @@ export default tseslint.config(
             ),
             {
               group: ['@formsmith/kit-*'],
-              message:
-                'Invariant 2: the designer must not depend on a specific kit. Take a Kit and a RendererKit as props instead.',
+              message: KIT_MESSAGE,
             },
           ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: dynamicImportOf(COMPONENT_LIBRARIES),
+          message:
+            'Invariant 2: @formsmith/designer consumes ComponentDef metadata only. A dynamic import of a component library leaks the kit abstraction just as a static one does.',
+        },
+        {
+          selector: dynamicImportUnder('@formsmith/kit-'),
+          message: KIT_MESSAGE,
         },
       ],
     },

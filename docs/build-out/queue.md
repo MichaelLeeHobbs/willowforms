@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 3, the kit-contract suite. Stage 1 is done; item 4 is next.
+- **Last completed:** item 7, the symmetry audit. Stage 2 is done; item 8 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/03-kit-contract`
+- **Last pushed item branch:** `build-out/b/07-symmetry-audit`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -104,7 +104,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
 
 ## Stage 2 — the guards that cannot fail
 
-- [ ] **4. Repair the designer CSS guard.** HIGH plus the guard hole, areas 13 and 10.
+- [x] **4. Repair the designer CSS guard.** HIGH plus the guard hole, areas 13 and 10.
       `designer.css.test.ts:259-288` — the guard-of-the-guard written to stop `declarationsFor` reading only
       a selector's first block never calls `declarationsFor`. It re-implements the scan inline over a
       synthetic sheet with a different algorithm, and its only call site is the other test. And
@@ -115,7 +115,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a mutation proof. Add `:where(.fs-shell) input { border: 0 }` to
       `designer.css`, watch invariant 3 go red, revert.
 
-- [ ] **5. Repair the lint and CI guardrails.** HIGH plus MEDIUMs, area 10 and area 15's eslint slice.
+- [x] **5. Repair the lint and CI guardrails.** HIGH plus MEDIUMs, area 10 and area 15's eslint slice.
       `no-restricted-imports` has no `ImportExpression` visitor, so `await import('@mui/material')` in the
       designer breaks invariant 2 and lints clean. `eslint .` never lints `aliases.ts`, the file `CLAUDE.md`
       calls load-bearing. `eslint.config.test.ts:69-80` exercises invariant 2 only against a `.ts` file
@@ -126,7 +126,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       lint, a deliberate error in `aliases.ts` fails lint, and deleting `packages/kit-html/dist/index.js`
       fails the CI artefact step, run locally.
 
-- [ ] **6. Repair the counting, documentation and contrast guards.** HIGHs and MEDIUMs, area 15.
+- [x] **6. Repair the counting, documentation and contrast guards.** HIGHs and MEDIUMs, area 15.
       `test/count-reporter.ts` — the base already walks `apps/`, so confirm rather than re-fix, then handle
       the rest: the `\d{2,4}` capture silently covers nothing past 9 999 tests, `onFinished` is the vitest 2
       API, and `ran === 0` makes the reporter inert on a run that executed nothing.
@@ -138,7 +138,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus: a document in `DOCS_WITH_COUNTS` that quotes no total fails the run, and
       every border token in `designer.css` is either asserted or listed with a reason.
 
-- [ ] **7. The symmetry and guard-recheck audit.** The process finding, and the highest-value item here.
+- [x] **7. The symmetry and guard-recheck audit.** The process finding, and the highest-value item here.
       All four CRITICALs and several HIGHs are the same mistake: a fix applied to one of two twins, or a
       guard not re-checked against the code the fix changed. Cross-cutting theme 1 names ten pairs; theme 2
       names four comments that describe an intent the code does not carry out. Walk the first remediation

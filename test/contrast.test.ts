@@ -100,6 +100,43 @@ describe("the designer's two dark blocks", () => {
   })
 })
 
+/**
+ * Every pair this file measured, recorded as it measures it.
+ *
+ * `docs/accessibility.md` quotes the lowest ratio in each palette, and nothing
+ * checked those figures -- `docs.test.ts` verified that the files the table
+ * names exist and stopped there. One row was already wrong: the HTML kit's light
+ * row claimed 4.83:1 as the lowest pair the suite asserts, while this file
+ * asserts `--fsh-warning` `#b26a00` on `--fsh-surface` `#ffffff`, which is
+ * 4.24:1 by the repository's own formula.
+ *
+ * A written-down measurement of a stylesheet goes stale the first time somebody
+ * changes a token in a way that stays above the floor, and the document exists
+ * so a reader need not take the claim on trust. So the table is computed from
+ * what actually ran rather than transcribed, and the check at the bottom of this
+ * file compares.
+ */
+interface Measured {
+  palette: string
+  fg: string
+  bg: string
+  ratio: number
+}
+
+const MEASURED: Measured[] = []
+
+/** A palette's `on`, recording every pair it is asked about. */
+function measurer(palette: string, tokens: Record<string, string>) {
+  return (fg: string, bg: string): number => {
+    const foreground = tokens[fg]
+    const background = tokens[bg]
+    if (!foreground || !background) throw new Error('Missing token: ' + fg + ' or ' + bg)
+    const value = ratio(foreground, background)
+    MEASURED.push({ palette, fg, bg, ratio: value })
+    return value
+  }
+}
+
 describe.each(
   palettes(
     designerCss,
@@ -107,13 +144,8 @@ describe.each(
     ".fs-shell[data-fs-theme='dark']",
     ".fs-shell:where(:not([data-fs-theme='light']))",
   ),
-)('designer chrome, $name theme', ({ tokens }) => {
-  const on = (fg: string, bg: string): number => {
-    const foreground = tokens[fg]
-    const background = tokens[bg]
-    if (!foreground || !background) throw new Error('Missing token: ' + fg + ' or ' + bg)
-    return ratio(foreground, background)
-  }
+)('designer chrome, $name theme', ({ name, tokens }) => {
+  const on = measurer('Designer, ' + (name === 'light' ? 'light' : 'dark'), tokens)
 
   it.each([
     ['--fs-text', '--fs-bg-app'],
@@ -200,13 +232,8 @@ describe.each(
     ".fsh-screen[data-fsh-theme='dark']",
     ".fsh-screen:where(:not([data-fsh-theme='light']))",
   ),
-)('html kit, $name theme', ({ tokens }) => {
-  const on = (fg: string, bg: string): number => {
-    const foreground = tokens[fg]
-    const background = tokens[bg]
-    if (!foreground || !background) throw new Error('Missing token: ' + fg + ' or ' + bg)
-    return ratio(foreground, background)
-  }
+)('html kit, $name theme', ({ name, tokens }) => {
+  const on = measurer('HTML kit, ' + (name === 'light' ? 'light' : 'dark'), tokens)
 
   it('field text clears AA on the field background', () => {
     expect(on('--fsh-text', '--fsh-field')).toBeGreaterThanOrEqual(AA_TEXT)
@@ -324,5 +351,128 @@ describe('the contrast instrument', () => {
     expect(() => parseHex('rgb(0 0 0)')).toThrow()
     expect(() => parseHex('var(--fs-text)')).toThrow()
     expect(() => parseHex('#12345')).toThrow()
+  })
+})
+
+/**
+ * Border tokens the suite deliberately does not measure, each with its reason.
+ *
+ * A border token nobody measures is how `--fs-control-border` came to exist: the
+ * kit's field borders were measured and the designer's were not, and the one
+ * carrying the whole "there is a control here" message sat at 1.39:1. The answer
+ * is not to measure every border -- some are decoration -- it is that a border
+ * left unmeasured has to be a decision somebody wrote down.
+ */
+const UNMEASURED_BORDERS: Record<string, string> = {
+  '--fs-border':
+    'A panel divider is decoration, and WCAG 1.4.11 asks nothing of decoration. ' +
+    'The boundary of a control is --fs-control-border, which is measured on all three surfaces.',
+}
+
+describe('the contrast figures the documents quote', () => {
+  /*
+   * Declared last on purpose. These read `MEASURED`, which every block above
+   * fills as it runs, and vitest runs a file's tests in declaration order.
+   */
+
+  /** The lowest ratio recorded in each palette. */
+  const lowest = (): Map<string, Measured> => {
+    const best = new Map<string, Measured>()
+    for (const entry of MEASURED) {
+      const held = best.get(entry.palette)
+      if (!held || entry.ratio < held.ratio) best.set(entry.palette, entry)
+    }
+    return best
+  }
+
+  it('measured something in all four palettes', () => {
+    // The control for everything below. An empty recording would make the table
+    // check compare nothing against nothing and pass.
+    expect([...lowest().keys()].sort()).toEqual([
+      'Designer, dark',
+      'Designer, light',
+      'HTML kit, dark',
+      'HTML kit, light',
+    ])
+    expect(MEASURED.length).toBeGreaterThan(50)
+  })
+
+  it('quotes the lowest pair this suite actually asserts, in docs/accessibility.md', () => {
+    /*
+     * The table was written by hand and checked for nothing but the existence of
+     * the files it names, and one row was wrong: the HTML kit's light row said
+     * 4.83:1, while the lowest pair asserted in that palette is `--fsh-warning`
+     * on `--fsh-surface` at 4.24:1. Half a point, in the one document written so
+     * a reader need not take accessibility on trust.
+     *
+     * Computed rather than transcribed, so a token change that stays above the
+     * floor cannot silently invalidate the figures. Compared to two decimals,
+     * which is how the table is written.
+     */
+    const table = read('../docs/accessibility.md')
+    const rows = new Map<string, number>()
+    for (const match of table.matchAll(/^\| (Designer|HTML kit), (light|dark) +\| +([\d.]+):1/gm)) {
+      rows.set((match[1] ?? '') + ', ' + (match[2] ?? ''), Number(match[3]))
+    }
+
+    // The row reader is a guard too: a table somebody reformatted would parse to
+    // nothing and every comparison below would pass vacuously.
+    expect([...rows.keys()].sort(), 'the contrast table could not be read').toEqual([
+      'Designer, dark',
+      'Designer, light',
+      'HTML kit, dark',
+      'HTML kit, light',
+    ])
+
+    const wrong: string[] = []
+    for (const [palette, measured] of lowest()) {
+      const quoted = rows.get(palette)
+      const actual = Math.round(measured.ratio * 100) / 100
+      if (quoted !== actual) {
+        wrong.push(
+          palette +
+            ': the document says ' +
+            String(quoted) +
+            ':1, the suite asserts ' +
+            String(actual) +
+            ':1 for ' +
+            measured.fg +
+            ' on ' +
+            measured.bg,
+        )
+      }
+    }
+
+    expect(wrong).toEqual([])
+  })
+
+  it('measures every border token in designer.css, or says why not', () => {
+    /*
+     * A border is what tells somebody a control is there, and the only reason
+     * `--fs-control-border` exists is that nobody had measured the one doing
+     * that job. A new border token added later would be in exactly that
+     * position, so the list of what is measured is derived from the stylesheet
+     * rather than from memory.
+     */
+    const declared = [
+      ...new Set(
+        [...designerCss.matchAll(/(--fs-[a-z0-9-]*border[a-z0-9-]*)\s*:/g)].map(
+          (match) => match[1] ?? '',
+        ),
+      ),
+    ].sort()
+
+    expect(declared.length, 'no border tokens found, so this checked nothing').toBeGreaterThan(0)
+
+    const measured = new Set(MEASURED.map((entry) => entry.fg))
+    const unaccounted = declared.filter(
+      (token) => !measured.has(token) && !(token in UNMEASURED_BORDERS),
+    )
+
+    expect(
+      unaccounted,
+      'these border tokens are neither asserted for contrast nor listed in ' +
+        'UNMEASURED_BORDERS with a reason',
+    ).toEqual([])
   })
 })
