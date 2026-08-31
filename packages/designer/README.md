@@ -6,20 +6,21 @@ Every comparable product opens its runtime and paywalls the builder.
 [Formsmith](https://github.com/MichaelLeeHobbs/formsmith) opens both.
 
 ```bash
-npm install @formsmith/designer @formsmith/core @formsmith/renderer
+npm install @formsmith/designer @formsmith/core @formsmith/renderer @formsmith/kit-mui
 ```
 
 ```tsx
 import { Designer } from '@formsmith/designer'
 import '@formsmith/designer/styles.css'
 import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+import type { FormDocument } from '@formsmith/core'
 
-;<Designer
-  initialDocument={document}
-  kit={muiKit}
-  rendererKit={muiRendererKit}
-  onChange={setDocument}
-/>
+declare const form: FormDocument
+declare const setForm: (next: FormDocument) => void
+
+export const builder = (
+  <Designer initialDocument={form} kit={muiKit} rendererKit={muiRendererKit} onChange={setForm} />
+)
 ```
 
 ## No component library

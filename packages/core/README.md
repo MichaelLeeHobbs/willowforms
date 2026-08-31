@@ -12,8 +12,12 @@ npm install @formsmith/core
 
 ```ts
 import { validateForm } from '@formsmith/core'
+import type { FormData, FormDocument } from '@formsmith/core'
 
-const errors = validateForm(document.root, submittedData)
+declare const form: FormDocument
+declare const answers: FormData
+
+export const errors = validateForm(form.root, answers)
 ```
 
 ## What is in here

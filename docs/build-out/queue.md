@@ -12,9 +12,9 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 a status line in a file that calls itself repo facts only is a status line nobody updates.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 15, the unit a length prop carries. Item 16 is next.
+- **Last completed:** item 16, the published READMEs. Item 17 is next.
 - **Run branch:** `build-out/review-b`, cut from `origin/main` at `a7ada7f`, which contains the prep (PR #25)
-- **Last pushed item branch:** `build-out/b/15-length-units`
+- **Last pushed item branch:** `build-out/b/16-readmes`
 - **Work list:** `docs/reviews/2026-08-30-second-pass.md`, committed, so a worktree or a fresh clone has it
 
 Keep all five current as items are ticked off.
@@ -225,7 +225,7 @@ the fix changed.** Fix the instance, then look for the twin before ticking the i
       _Check:_ standing gate, plus a contract test asserting the unit for every length-valued prop in both
       kits, and the spec section that states it.
 
-- [ ] **16. Make the four published READMEs work.** HIGHs and MEDIUMs, area 18.
+- [x] **16. Make the four published READMEs work.** HIGHs and MEDIUMs, area 18.
       `packages/renderer/README.md:22` ships `{ ...data, [key]: value }`, the anti-pattern the source warns
       against by name, which inside a repeater creates a literal property called `addresses[1].line1` and
       drops every row answer. The designer and renderer READMEs import `@formsmith/kit-mui` from an install
