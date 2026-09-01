@@ -119,8 +119,6 @@ export function Designer({
     setAnnouncement((previous) => (previous === message ? message + '​' : message))
   }, [])
 
-  useKeyboardShortcuts(api, shellRef, announce)
-
   const commitDrop = useCallback(
     (source: DragSource, target: DropCommit) => {
       if (source.kind === 'new') {
@@ -151,6 +149,14 @@ export function Designer({
   const canvasApi = useMemo(() => ({ ...api, select: selectFromCanvas }), [api, selectFromCanvas])
 
   const drag = useDrag(commitDrop)
+
+  /*
+   * Below `useDrag`, because Escape has to know whether a drag is in progress:
+   * the spec says it clears the selection *or* abandons a drag, and both
+   * handlers were running. Still unconditional and still in a fixed order, so
+   * the hook rules hold.
+   */
+  useKeyboardShortcuts(api, shellRef, announce, drag.state !== undefined)
 
   /*
    * A view preference, so it lives here and never in the document. Two people
@@ -557,8 +563,30 @@ function useKeyboardShortcuts(
   api: DesignerApi,
   shell: RefObject<HTMLDivElement | null>,
   announce: (message: string) => void,
+  /**
+   * Whether a drag is in progress right now.
+   *
+   * Passed in rather than read here, because the drag module owns the answer
+   * and a second one in this file is the shape this run keeps finding. Escape
+   * is the only shortcut that needs it: the spec says it clears the selection
+   * *or* abandons a drag, and both handlers were running.
+   */
+  isDragging: boolean,
 ): void {
   const { undo, redo, removeComponent, select, selectedKey } = api
+
+  /*
+   * Whether a drag is in progress, readable from the handler without listing it
+   * as a dependency.
+   *
+   * A ref because `onKeyDown` is memoised and re-creating it on every drag state
+   * change would re-register the native listener mid-gesture, which is the
+   * thing the listener's own comment says it is bound to the shell to avoid.
+   */
+  const dragging = useRef(isDragging)
+  useEffect(() => {
+    dragging.current = isDragging
+  }, [isDragging])
 
   const onKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -567,10 +595,26 @@ function useKeyboardShortcuts(
        * document, the window, a text node from a synthetic event -- and the
        * cast bought nothing the optional chains below did not already do.
        */
-      const target = event.target instanceof HTMLElement ? event.target : null
+      /*
+       * `Element`, not `HTMLElement`, and the difference is what closed three
+       * guards at once.
+       *
+       * `closest` and `tagName` live on `Element`; only `isContentEditable` is
+       * `HTMLElement`-only. Narrowing to `HTMLElement` made `target` null for
+       * anything else -- and `Icon` renders SVG, whose elements are
+       * `SVGElement` -- so with focus on one, `target?.closest('dialog[open]')`
+       * was undefined and the modal guard did not fire, and
+       * `backspaceIsSafe`'s `!== null` read undefined as *safe* and deleted the
+       * selected component.
+       *
+       * The three guards failed open together, and the destructive one failed
+       * open in the direction that destroys work.
+       */
+      const target = event.target instanceof Element ? event.target : null
+      const editable = event.target instanceof HTMLElement ? event.target : null
       const tag = target?.tagName
       const typing =
-        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable
+        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || editable?.isContentEditable
       if (typing) return
 
       /*
@@ -587,6 +631,15 @@ function useKeyboardShortcuts(
        * cancels the native close request, so the dialog took two presses.
        */
       if (target?.closest('dialog[open]')) return
+
+      /*
+       * A keystroke this handler cannot attribute to an element is not one it
+       * should act on. Every guard above reads the target, so with none there is
+       * nothing to say the key was not aimed at a dialog, a text field or
+       * something else with a claim on it -- and the branches below are
+       * destructive.
+       */
+      if (!target) return
 
       const mod = event.ctrlKey || event.metaKey
 
@@ -621,9 +674,18 @@ function useKeyboardShortcuts(
        * `react-hooks/preserve-manual-memoization` refuses. `fs-shell` is the
        * class the container carries and nothing else does.
        */
+      /*
+       * `Boolean`, not `!== null`.
+       *
+       * `target?.closest(...)` is `undefined` when there is no target to ask,
+       * and `undefined !== null` is `true` -- so a keystroke this handler could
+       * not attribute to anything was read as *safe* and removed the selected
+       * component. The clause on the line above guards the same case correctly
+       * with `=== true`, which is what made this one easy to miss.
+       */
       const backspaceIsSafe =
         target?.classList.contains('fs-shell') === true ||
-        target?.closest('[data-fs-tree-row]') !== null
+        Boolean(target?.closest('[data-fs-tree-row]'))
 
       if (event.key === 'Backspace' && !backspaceIsSafe) return
 
@@ -636,6 +698,22 @@ function useKeyboardShortcuts(
         return
       }
       if (event.key === 'Escape' && selectedKey) {
+        /*
+         * "Escape clears the selection, *or* abandons a drag if one is in
+         * progress" -- `04-shell.md:159`, and it did both.
+         *
+         * `drag.ts` registers its own `keydown` on `window` and this one is on
+         * `.fs-shell`, which is below `window` in the bubble path, so both ran:
+         * the drag was abandoned *and* the selection was cleared, in one press.
+         * A drag is the more recent gesture and the one the key is aimed at, so
+         * it wins and this does nothing.
+         *
+         * Read from `drag.state` rather than duplicated: the drag module owns
+         * whether a drag is in progress, and a second answer here is the shape
+         * this run keeps finding.
+         */
+        if (dragging.current) return
+
         event.preventDefault()
         select(undefined)
         announce('Selection cleared.')
