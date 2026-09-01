@@ -22,7 +22,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormLabel from '@mui/material/FormLabel'
 import Radio from '@mui/material/Radio'
-import RadioGroup from '@mui/material/RadioGroup'
+import RadioGroup, { useRadioGroup } from '@mui/material/RadioGroup'
 import Switch from '@mui/material/Switch'
 import LinearProgress from '@mui/material/LinearProgress'
 import Link from '@mui/material/Link'
@@ -135,11 +135,31 @@ const message = (error: string | undefined, helper: string): string => error ?? 
 const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
   error ? { role: 'alert' } : {}
 
+/**
+ * The same, for a helper line that carries a notice which is not an error.
+ *
+ * `FileUploadNode` produced its "too large" message only when `error` was
+ * undefined and asked for `role="alert"` only when `error` was set -- two
+ * conditions that cannot both hold, so the string it built was never announced
+ * and the comment at the call site saying "And somebody is told" was wrong. A
+ * refusal nobody can see is indistinguishable from a broken picker, which is
+ * the whole reason that message exists.
+ */
+const alertWhenSaying = (notice: string | undefined): { role?: 'alert' } =>
+  notice ? { role: 'alert' } : {}
+
 function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // Children need spacing of their own: MUI's outlined label sits on the border
   // and collides with the next field when siblings are flush against each other.
   return (
-    <Box {...nodeProps} sx={{ maxWidth: num(props['maxWidth'], 640), mx: 'auto', p: 2 }}>
+    /*
+     * `px()`, like every other length in this file. This was the one that
+     * skipped it, and MUI's sizing transform reads a value at or below 1 as a
+     * *percentage* -- which `ImageNode`'s own comment already documents as the
+     * reason `width` converts. So `maxWidth: 1` was 100% here and 1px on
+     * `kit-html`: one document, two layouts.
+     */
+    <Box {...nodeProps} sx={{ maxWidth: px(num(props['maxWidth'], 640)), mx: 'auto', p: 2 }}>
       <Stack gap={px(num(props['gap'], GAP))}>{children}</Stack>
     </Box>
   )
@@ -168,9 +188,19 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
  * already expanded them, so a kit never counts rows, never sees an index, and
  * never learns what an address is.
  */
-function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps): ReactNode {
+function RepeaterNode({ node, props, nodeProps, children, error }: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
+  /*
+   * A name for the group below, because an unnamed one is announced as "group"
+   * and tells a listener nothing about which list they have entered.
+   *
+   * The answer's name is the only author-written string a repeater has --
+   * `Repeater` declares one property, `gap` -- so it is what the group is called.
+   * A `label` property on both kits would be better and is a contract change;
+   * it is written up in the run's `found.md` rather than smuggled in here.
+   */
+  const name = node.dataKey ?? node.key
   return (
     <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
       {/*
@@ -186,6 +216,7 @@ function RepeaterNode({ props, nodeProps, children, error }: NodeRendererProps):
        */}
       <Stack
         role="group"
+        aria-label={name}
         direction="column"
         gap={px(num(props['gap'], GAP))}
         aria-describedby={messageId}
@@ -456,7 +487,11 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
         // `columns` caps how many can ever fit, which is what makes it mean
         // something alongside auto-fit. Ignoring it here made the same document
         // lay out differently in the two kits.
-        maxWidth: columns > 0 ? columns * (minWidth + gap) : undefined,
+        // `px()`, for the reason `Screen`'s own comment gives: MUI reads a
+        // bare number at or below 1 as a percentage. This one cannot reach that
+        // range today -- `minWidth` floors it -- and it is the same length in
+        // the same unit either way, so it is written the same way.
+        maxWidth: columns > 0 ? px(columns * (minWidth + gap)) : undefined,
       }}
     >
       {children}
@@ -489,7 +524,15 @@ function CardNode({ props, nodeProps, children }: NodeRendererProps): ReactNode 
         <CardHeader
           {...(title ? { title } : {})}
           {...(subtitle ? { subheader: subtitle } : {})}
-          titleTypographyProps={{ variant: 'h6', component: 'h3' }}
+          /*
+           * `slotProps.title`, not `titleTypographyProps`. The latter is
+           * deprecated across the upper half of the declared peer range and
+           * still honoured by the installed 7.3.11, so this is drift rather
+           * than a defect today -- and it is the same hazard the `Checkbox`
+           * comment in this file records for `inputProps`, where a silent drop
+           * cost the `Switch` every ARIA attribute it had.
+           */
+          slotProps={{ title: { variant: 'h6', component: 'h3' } }}
         />
       )}
       <CardContent>{children}</CardContent>
@@ -544,7 +587,17 @@ function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <Box
       {...nodeProps}
       component="img"
-      src={safeHref(props['src']) ?? ''}
+      /*
+       * Omitted when refused, not emptied.
+       *
+       * `src=""` is a request for the current page in several browsers and a
+       * broken-image glyph in the rest, and this and `LinkNode` read the same
+       * allowlist: one refusal, two behaviours, where the link degrades to plain
+       * text and says why. Without the attribute the element falls back to its
+       * `alt`, which is the platform's own answer and the nearest thing to what
+       * the link does.
+       */
+      {...(safeHref(props['src']) ? { src: safeHref(props['src']) } : {})}
       alt={str(props['alt'])}
       /*
        * `px(width)`, not the bare number.
@@ -598,7 +651,15 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
       {...nodeProps}
       role="group"
       direction={vertical ? 'column' : 'row'}
-      gap={1}
+      /*
+       * `px()`, like every other length. This was a bare number, which MUI
+       * multiplies by `theme.spacing` -- so a host that set spacing to 4 got a
+       * 4px button gap and one that set 16 got 64px, from a document that said
+       * nothing. `renderers.test.tsx` states the rule as "a length the document
+       * authored is not the host theme's to rescale" and tested it on
+       * `Box.padding` and `Box.radius` only; this was the length it missed.
+       */
+      gap={px(8)}
       sx={{ alignItems: vertical ? 'stretch' : 'center' }}
     >
       {children}
@@ -698,14 +759,30 @@ function RadioGroupNode({
 
 function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   /*
-   * Deliberately not wired to the group's value. A RadioItem is a slot for an
-   * option that needs its own layout, and the group owns selection; making this
-   * self-controlling would give one question two sources of truth.
+   * Wired to the group's value, which it always was.
+   *
+   * The comment here used to say the opposite -- "deliberately not wired ...
+   * making this self-controlling would give one question two sources of truth"
+   * -- and it was false. MUI's `Radio` reads `useRadioGroup()` from context
+   * whatever is wrapped around it, so this has never been an uncontrolled slot,
+   * and the contract's "A RadioItem child can be selected in its group" rule
+   * requires that it is not. A wrong comment is plausibly why the guard below
+   * was never written.
+   *
+   * `RadioItem` ships with `value: ''` and an unanswered group's value is `''`
+   * too, so `'' === ''` rendered a freshly dropped item pre-checked -- and every
+   * other one, all at once, since they all matched. An empty value is a control
+   * that cannot answer anything. `kit-html` fixed exactly this and its comment
+   * says so; this is the same guard on the other kit.
    */
+  const group = useRadioGroup()
+  const value = str(props['value'])
+
   return (
     <Box {...nodeProps}>
       <FormControlLabel
-        value={str(props['value'])}
+        value={value}
+        checked={group ? value !== '' && group.value === value : false}
         /*
          * Only when the document says so.
          *
@@ -780,6 +857,11 @@ function FileUploadNode({
 }: NodeRendererProps): ReactNode {
   /** How many files the last choice dropped for being over `maxSize`. */
   const [dropped, setDropped] = useState(0)
+  /*
+   * Whichever of the two the helper line is carrying. An error wins, because a
+   * field that is invalid is a bigger fact than a file that was skipped.
+   */
+  const notice = error ?? (dropped > 0 ? tooLarge(dropped) : undefined)
   const id = useId()
   /*
    * The names the document holds, drawn beside the input.
@@ -818,7 +900,7 @@ function FileUploadNode({
        * component and moving where `nodeProps` is spread.
        */
       helperText={message(
-        error ?? (dropped > 0 ? tooLarge(dropped) : undefined),
+        notice,
         /*
          * The authored helper text, not a hard-coded English sentence.
          *
@@ -831,7 +913,8 @@ function FileUploadNode({
         filesHeld || str(props['helperText']),
       )}
       slotProps={{
-        formHelperText: alertWhenError(error),
+        // The notice, not the error: a dropped file is announced too.
+        formHelperText: alertWhenSaying(notice),
         inputLabel: { shrink: true },
         htmlInput: {
           ...requiredProps(node),

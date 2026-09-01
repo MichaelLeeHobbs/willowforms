@@ -378,7 +378,7 @@ Every item, without exception:
       **Check:** the rename test moves to an `en-US` fixture and fails against `language.code`; a nameless
       language has a labelled input; a collision is refused or reported.
 
-- [ ] **29. `StyleTab.tsx`, `FormSettings.tsx`, `DocumentDialog.tsx`.** `StyleTab.tsx:132-146, 195-199`
+- [x] **29. `StyleTab.tsx`, `FormSettings.tsx`, `DocumentDialog.tsx`.** `StyleTab.tsx:132-146, 195-199`
       (MEDIUM, a refused structured value snaps back with no message while the raw box beside it
       explains), `:283-291` (LOW, the refusal adds `role="alert"` to a live element);
       `FormSettings.tsx:89, 126, 130` (MEDIUM, `doc.languages` read as an array three times unguarded —
@@ -399,7 +399,7 @@ Every item, without exception:
       **Check:** deleting the `safeDeclarations` check in `StyleTab.tsx` turns a test red; reverting
       `copy(draft, …)` to `copy(documentJson, …)` turns a test red.
 
-- [ ] **31. `designer.css.test.ts`, the invariant-3 guard, before the stylesheet it guards.**
+- [x] **31. `designer.css.test.ts`, the invariant-3 guard, before the stylesheet it guards.**
       `:265` (HIGH, the guard names the form's scopes as two literal strings and misses `.fs-body`, a
       real wrapper — `.fs-body input { … }`, the exact rule that broke MUI's notched outline, passes it),
       `:517` (MEDIUM, the two sanctioned exceptions are pinned by property name only, so
@@ -409,7 +409,7 @@ Every item, without exception:
       either sanctioned exception fails it; the scope set is derived rather than listed, or a test proves
       every `fs-` wrapper between `.fs-shell` and `.fs-canvas` is covered.
 
-- [ ] **32. `designer.css`.** `:195-231` (MEDIUM, `.fs-panel button` and `.fs-panel input,…` are `(0,1,1)`
+- [x] **32. `designer.css`.** `:195-231` (MEDIUM, `.fs-panel button` and `.fs-panel input,…` are `(0,1,1)`
       and beat every later single-class rule, so `.fs-tabs__tab`, `.fs-color__swatch`, `.fs-code__area`,
       `.fs-binding__expression` and five more never apply — including the mono font `11-theming.md`
       documents for the raw CSS box), `:384` (MEDIUM, `touch-action: pan-y` disables pinch-zoom over the
@@ -424,7 +424,7 @@ Every item, without exception:
 
 ### Block 4 — the renderer and the kits
 
-- [ ] **33. `renderer/src/index.tsx`.** `:196` (MEDIUM, a `computed` prop is evaluated against top-level
+- [x] **33. `renderer/src/index.tsx`.** `:196` (MEDIUM, a `computed` prop is evaluated against top-level
       `data` only, so inside a repeater row it resolves the same wrong value in every row, while the
       `condition` branch twelve lines up passes `options.row` and both other evaluator call sites merge
       and say why), `:340` (MEDIUM, the boundary's retry fires on key or type change only, so the case its
@@ -631,7 +631,7 @@ Every item, without exception:
 
 ### Block 9 — the documents
 
-- [ ] **50. `CLAUDE.md`, the guides and the working notes.** `CLAUDE.md:74-76` (MEDIUM, the sentence a
+- [x] **50. `CLAUDE.md`, the guides and the working notes.** `CLAUDE.md:74-76` (MEDIUM, the sentence a
       contributor reads before adding a test file is true of four packages of five), `:66-69` (LOW, CI's
       real order and the playground build it does not mention), `:62` (LOW);
       `docs/ARCHITECTURE.md:141-142` (LOW, "about forty" `fs-` classes against 102);
@@ -649,7 +649,7 @@ Every item, without exception:
       **Check:** `pnpm test` (`test/docs.test.ts`, `count-reporter.ts`), and every figure this item
       touches is either guarded by a test or removed.
 
-- [ ] **51. The spec index and the contract files.** `docs/spec/README.md:36` (MEDIUM, the index gives
+- [x] **51. The spec index and the contract files.** `docs/spec/README.md:36` (MEDIUM, the index gives
       `03-components.md` **Partial** where the file opens **Built**, which the index's own rule forbids,
       and `:58` compounds it), `:116` (LOW, the section that says which claims are machine-checked names
       the wrong documents); `01-document-model.md:101-102` (MEDIUM, `dataKey` is held to the full key
@@ -666,7 +666,7 @@ Every item, without exception:
       **Check:** a new `test/docs.test.ts` rule asserts each spec file's opening status matches the
       index; `pnpm test`.
 
-- [ ] **52. `docs/spec/12-api.md`.** `:282-285` (HIGH, the Keys section publishes `RESERVED_KEYS` as three
+- [x] **52. `docs/spec/12-api.md`.** `:282-285` (HIGH, the Keys section publishes `RESERVED_KEYS` as three
       names where the export has thirteen, and the ten missing ones include `toString`, whose omission the
       code's own docblock ties to a form with a missing required answer submitting clean),
       `:274-296` (MEDIUM, `MAX_KEY_LENGTH` is never mentioned), whole file (MEDIUM, four exported core
