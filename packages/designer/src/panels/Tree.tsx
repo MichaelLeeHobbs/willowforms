@@ -78,10 +78,26 @@ export function Tree({
       const origin = originOf(list)
       const rows: TreeRow[] = []
 
+      /*
+       * One sweep, bucketed by key, rather than one `querySelector` per node.
+       *
+       * This issued a query over the whole list for every node in the document,
+       * so measuring was O(n*m) -- and it runs on the first pointer move of
+       * every drag. `geometry.ts` had the same shape and the same fix.
+       *
+       * A `Map` keyed on the attribute also removes the `CSS.escape` call
+       * entirely, which is worth saying because that call was untested: no
+       * fixture uses a key that needs escaping, and a host-supplied document is
+       * not gated.
+       */
+      const byKey = new Map<string, HTMLElement>()
+      for (const each of list.querySelectorAll<HTMLElement>('[data-fs-tree-row]')) {
+        const key = each.getAttribute('data-fs-tree-row')
+        if (key !== null && !byKey.has(key)) byKey.set(key, each)
+      }
+
       const visit = (node: ComponentNode, parentKey: string | undefined, index: number): void => {
-        const element = list.querySelector<HTMLElement>(
-          `[data-fs-tree-row="${CSS.escape(node.key)}"]`,
-        )
+        const element = byKey.get(node.key)
         if (element) {
           const box = element.getBoundingClientRect()
           rows.push({
@@ -175,11 +191,23 @@ export function Tree({
    * mouse. WAI-ARIA has no standard pattern for that, so this follows the
    * outliner convention people already know from editors and file trees.
    */
+  /*
+   * One walk per document, not one per render and one per keystroke.
+   *
+   * `flatten(root)` ran in the component body -- so on every render of the
+   * whole designer, including every render caused by a pointer move anywhere,
+   * allocating an array of every node per pointer event -- and again inside the
+   * key handler, including for keys the handler goes on to ignore. `indexKit`
+   * was built per keystroke beside it.
+   *
+   * Both answers depend only on the document and the kit, so both are memoised
+   * on exactly that.
+   */
+  const rows = useMemo(() => flatten(root), [root])
+  const defs = useMemo(() => indexKit(kit), [kit])
+
   const onRowKeyDown = useCallback(
     (node: ComponentNode, event: ReactKeyboardEvent<HTMLDivElement>) => {
-      const rows = flatten(root)
-      const defs = indexKit(kit)
-
       const DIRECTIONS: Record<string, Direction> = {
         ArrowUp: 'up',
         ArrowDown: 'down',
@@ -275,7 +303,12 @@ export function Tree({
         if (after) focusRowSoon(after.node.key)
       }
     },
-    [announce, focusRow, focusRowSoon, kit, onDuplicate, onMove, onRemove, onSelect, root],
+    /*
+     * `rows` and `defs` rather than `root` and `kit`: the memos above are
+     * derived from exactly those, so listing the derived values keeps this
+     * callback stable for the same inputs and lets the rule check it honestly.
+     */
+    [announce, defs, focusRow, focusRowSoon, onDuplicate, onMove, onRemove, onSelect, root, rows],
   )
 
   /*
@@ -342,7 +375,7 @@ export function Tree({
    * a long form buries the rest of the page behind dozens of them.
    */
   const tabStop =
-    selectedKey && flatten(root).some((r) => r.node.key === selectedKey) ? selectedKey : root.key
+    selectedKey && rows.some((r) => r.node.key === selectedKey) ? selectedKey : root.key
 
   return (
     <section className="fs-tree">
