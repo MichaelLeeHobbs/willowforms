@@ -827,3 +827,158 @@ describe('a repeater at the root', () => {
     expect(Object.keys(toJsonSchema(rooted()).properties)).not.toContain('orderList')
   })
 })
+
+/** `doc()` takes children; these fixtures own their whole root. */
+const documentOf = (root: ComponentNode): FormDocument => ({ ...doc([]), root })
+
+describe('the two branches the deep test never took', () => {
+  /*
+   * "does not overflow on a document nested deeper than the gate walks"
+   * exercises the one branch that was bounded and misses the two that were not.
+   *
+   * Its fixture is 50 000 nested `Box` nodes with no schema, which take the
+   * `visit(child, depth + 1)` path. The schema-carrying branch recursed as
+   * `visit(child)` with depth defaulting to 0, so the bound reset on every
+   * data-bound node; and the nested-repeater path re-entered `objectFor`,
+   * starting a fresh counter. Neither had any effective ceiling, and the test
+   * reported the document safe.
+   *
+   * Built with loops. Building either recursively would overflow before the
+   * assertion could run.
+   */
+  const DEEP = 50_000
+
+  const schemaChain = (n: number): ComponentNode => {
+    let node: ComponentNode = {
+      key: 'leaf',
+      type: 'Field',
+      props: {},
+      schema: { type: 'string', validations: [] },
+    }
+    for (let i = 0; i < n; i += 1) {
+      node = {
+        key: 'field' + String(i),
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [] },
+        children: [node],
+      }
+    }
+    return { key: 'root', type: 'Screen', props: {}, children: [node] }
+  }
+
+  const repeaterChain = (n: number): ComponentNode => {
+    let node: ComponentNode = {
+      key: 'leaf',
+      type: 'Field',
+      props: {},
+      schema: { type: 'string', validations: [] },
+    }
+    for (let i = 0; i < n; i += 1) {
+      node = {
+        key: 'list' + String(i),
+        dataKey: 'rows' + String(i),
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [node],
+      }
+    }
+    return { key: 'root', type: 'Screen', props: {}, children: [node] }
+  }
+
+  it('does not overflow on a chain of schema-carrying nodes', () => {
+    expect(() => toJsonSchema(documentOf(schemaChain(DEEP)))).not.toThrow()
+  })
+
+  it('does not overflow on nested repeaters', () => {
+    expect(() => toJsonSchema(documentOf(repeaterChain(DEEP)))).not.toThrow()
+  })
+
+  it('still exports a document nobody would call deep', () => {
+    // The control. Bounding by exporting nothing would pass both rows above
+    // while emptying every schema this function exists to produce.
+    const schema = toJsonSchema(documentOf(schemaChain(2)))
+
+    expect(Object.keys(schema.properties).length).toBeGreaterThan(0)
+  })
+
+  it('survives children that are not an array, like unexportableRules does', () => {
+    /*
+     * The "document that is data" block varies props and depth and never
+     * varies children, so `children: 7` was a TypeError out of `toJsonSchema`
+     * while `unexportableRules` in the same file survived it by borrowing the
+     * hardened `walk` -- two exports of one module disagreeing about the same
+     * document. `context.test.ts` and `css.test.ts` both carry this row.
+     */
+    for (const children of [7, {}, 'ab', [null]]) {
+      const root = {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children,
+      } as unknown as ComponentNode
+
+      expect(() => toJsonSchema(documentOf(root)), JSON.stringify(children)).not.toThrow()
+      expect(() => unexportableRules(documentOf(root)), JSON.stringify(children)).not.toThrow()
+    }
+  })
+
+  it('does not throw on a document with no root', () => {
+    // `isRowScope(document.root)` reads `node.schema?.type`; the optional chain
+    // protects `schema`, not `node`. Every other entry point in the package is
+    // total on a rootless document.
+    const rootless = { ...documentOf({ key: 'x', type: 'Screen', props: {} }), root: undefined }
+
+    expect(() => toJsonSchema(rootless as unknown as FormDocument)).not.toThrow()
+  })
+})
+
+describe('keywords a validator would ignore', () => {
+  const field = (type: string, rule: unknown): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'x',
+        type: 'Field',
+        props: {},
+        schema: { type, validations: [rule] },
+      } as unknown as ComponentNode,
+    ],
+  })
+
+  it('does not put minimum on a string', () => {
+    /*
+     * `minimum` and `maximum` are JSON Schema keywords for numbers only.
+     * `minLength`/`maxLength` were refused on a type with no length and
+     * `min`/`max` were exported onto anything -- so the export stated a keyword
+     * every validator ignores while the form enforced the rule, and
+     * `unexportableRules` reported the export as lossless.
+     *
+     * The mirror cases the existing test leaves untested: it covers `minLength`
+     * on a number and no fixture puts `min`/`max` on a string.
+     */
+    const schema = toJsonSchema(documentOf(field('string', { key: 'min', value: 3 })))
+    const property = schema.properties['x'] as Record<string, unknown>
+
+    expect(property['minimum'], 'minimum was exported onto a string').toBeUndefined()
+  })
+
+  it('reports it as a loss rather than exporting it silently', () => {
+    // The direction. Dropping the keyword and saying nothing would be the same
+    // silent-permissive failure one step later.
+    expect(
+      unexportableRules(documentOf(field('string', { key: 'min', value: 3 }))).length,
+    ).toBeGreaterThan(0)
+  })
+
+  it('still puts minimum on a number', () => {
+    // The control.
+    const schema = toJsonSchema(documentOf(field('number', { key: 'min', value: 3 })))
+    const property = schema.properties['x'] as Record<string, unknown>
+
+    expect(property['minimum']).toBe(3)
+  })
+})
