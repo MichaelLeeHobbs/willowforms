@@ -416,13 +416,22 @@ export function Canvas({
        * control is stopped whether or not it becomes a drag.
        *
        * `preventDefault` only, where `onMouseDownCapture` beside it also calls
-       * `stopPropagation` -- and the asymmetry is deliberate. `preventDefault`
-       * is what stops a control opening, which is the whole job here.
-       * `stopPropagation` on *this* event additionally keeps it from the
-       * shell's own listeners, and the shell needs it: with both, pressing a
-       * component and then Escape no longer cleared the selection, because the
-       * shortcut never saw the press that should have put focus in the shell.
-       * Measured -- the Escape test in this file's own suite is what said so.
+       * `stopPropagation` -- and the asymmetry is deliberate.
+       *
+       * `preventDefault` cancels the browser's *default action* for the press:
+       * focusing the control, starting a text selection, beginning a native
+       * drag. It does not stop a JavaScript handler, which is what
+       * `stopPropagation` is for and what `onMouseDownCapture` uses it for. The
+       * earlier comment here said `preventDefault` "is what stops a control
+       * opening", which conflates the two -- a control that opens from its own
+       * `onMouseDown` is unaffected by this line, and a kit that wants to
+       * cooperate reads `event.defaultPrevented`.
+       *
+       * `stopPropagation` is deliberately *not* added on this event, because
+       * the shell needs to see the press: with both, pressing a component and
+       * then Escape no longer cleared the selection, because the shortcut never
+       * saw the press that should have put focus in the shell. Measured -- the
+       * Escape test in this file's own suite is what said so.
        */
       event.preventDefault()
 
@@ -554,7 +563,12 @@ export function Canvas({
       const resolved = resolveDrop(snap.candidates, x, y, draggedKey)
 
       /*
-       * And the drag's snapshot goes with the drag.
+       * And the drag's snapshot goes with a drag that ends in a release.
+       *
+       * Not with every drag, which is what the first line here used to say and
+       * what the paragraph further down exists to correct. A reader who takes
+       * the opening sentence and stops -- which is what an opening sentence is
+       * for -- was told the opposite of the truth.
        *
        * It holds a measured rectangle for every drawn element in the form --
        * one per row of every repeater -- and nothing released it, so the last
