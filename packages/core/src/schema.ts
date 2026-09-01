@@ -13,7 +13,7 @@
  * survives, because its rows are.
  */
 
-import { MAX_TREE_DEPTH, dataKeyOf, validationsOf, walk } from './tree.js'
+import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, validationsOf, walk } from './tree.js'
 import { isRowScope } from './validation.js'
 import type {
   ComponentNode,
@@ -104,6 +104,42 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
        */
       if (rule.when || node.renderWhen !== undefined) {
         lossy.push({ key: node.key, rule: rule.key })
+        continue
+      }
+
+      /*
+       * A measuring rule on a type whose keyword does not exist.
+       *
+       * `propertyFor` refuses `minLength`/`maxLength` on a type with no length
+       * and now refuses `min`/`max` on a type that is not a number -- because
+       * `minimum` and `maximum` are JSON Schema keywords for numbers only, so
+       * exporting one onto a string stated a constraint every validator
+       * ignores. Dropping it silently would be the same permissive failure one
+       * step later: the form enforces the rule and the schema does not, and the
+       * function whose whole job is to be believed about losses says nothing.
+       *
+       * Asked here rather than inside `propertyFor` so the two answers cannot
+       * drift: this is the list a reader is shown, and it has to name every
+       * rule that did not survive.
+       */
+      /*
+       * Asked on the *property* type, the way `propertyFor` asks it, not on the
+       * declared one. `date` and `file` are declared as themselves and export
+       * as `string`, so a question phrased on the declared type would report a
+       * loss `propertyFor` did not make -- the two answers have to come from
+       * one place or they drift, which is the whole shape this run keeps
+       * finding.
+       */
+      const exported = node.schema ? baseType(node.schema.type).type : undefined
+      const lengthy = exported === 'string' || exported === 'array'
+      const numeric = exported === 'number'
+
+      if ((rule.key === 'minLength' || rule.key === 'maxLength') && !lengthy) {
+        lossy.push({ key: node.key, rule: rule.key })
+        continue
+      }
+      if ((rule.key === 'min' || rule.key === 'max') && !numeric) {
+        lossy.push({ key: node.key, rule: rule.key })
       }
     }
 
@@ -184,6 +220,19 @@ function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchem
    */
   const measurable = property.type === 'array' || property.type === 'string'
 
+  /*
+   * `minimum` and `maximum` are JSON Schema keywords for numbers only.
+   *
+   * `minLength`/`maxLength` were refused on a type that has no length and
+   * `min`/`max` were exported onto anything, so a `min` rule on a `string` or a
+   * `date` field emitted a keyword every validator ignores -- and
+   * `unexportableRules` reported the export as lossless. The same
+   * silent-permissive direction the guard above exists for, on the other axis:
+   * the form enforces the rule and the schema says nothing, while the note that
+   * exists to say so stays quiet.
+   */
+  const comparable = property.type === 'number' || property.type === 'integer'
+
   switch (rule.key) {
     case 'minLength':
       if (!measurable) return property
@@ -196,8 +245,10 @@ function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchem
         ? { ...property, maxItems: rule.value }
         : { ...property, maxLength: rule.value }
     case 'min':
+      if (!comparable) return property
       return { ...property, minimum: rule.value }
     case 'max':
+      if (!comparable) return property
       return { ...property, maximum: rule.value }
     case 'pattern':
       return { ...property, pattern: rule.value }
@@ -259,6 +310,20 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
    * The root is always a container and a repeater is a container, so this is
    * reachable from any imported document.
    */
+  /*
+   * A document with no root at all.
+   *
+   * `isRowScope(document.root)` reads `node.schema?.type`, and the optional
+   * chain protects `schema`, not `node` -- so this threw where every other
+   * entry point in the package is total on a rootless document. A host that
+   * did not gate its document reaches this through the JSON dialog's schema
+   * tab, which is the one place somebody is looking at a broken document on
+   * purpose.
+   */
+  if (!document.root || typeof document.root !== 'object') {
+    return { $schema: DRAFT, type: 'object', properties: {} }
+  }
+
   if (isRowScope(document.root)) {
     const row = objectFor(document.root)
     const items: JsonSchemaProperty = { type: 'object', properties: row.properties }
@@ -296,7 +361,18 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
  * at the top level, so a server validating a real payload against the exported
  * schema would reject every submission or accept anything.
  */
-function objectFor(root: ComponentNode): {
+function objectFor(
+  root: ComponentNode,
+  /**
+   * How deep this walk already is, carried in from an enclosing `objectFor`.
+   *
+   * A nested repeater re-entered this function to build its row object, which
+   * started a fresh counter at zero -- so the bound below reset on every level
+   * of nesting and there was no effective ceiling at all on that path. The
+   * depth travels with the recursion now.
+   */
+  from = 0,
+): {
   properties: Record<string, JsonSchemaProperty>
   required: string[]
 } {
@@ -321,17 +397,17 @@ function objectFor(root: ComponentNode): {
   >
   const required: string[] = []
 
-  const visit = (node: ComponentNode, depth = 0): void => {
+  const visit = (node: ComponentNode, depth: number): void => {
     // The same bound `validateDocument` walks a tree with. An export runs on a
     // document a host may never have gated, and a `RangeError` out of it is a
     // 500 on a route whose whole job is to hand over a schema.
-    if (depth > MAX_TREE_DEPTH) return
+    if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
 
     // Only data-bound components carry a schema, and only they appear in the
     // submitted data. Layout and display components are not in the projection.
     const field = node.schema
     if (!field) {
-      for (const child of node.children ?? []) visit(child, depth + 1)
+      for (const child of childNodesOf(node)) visit(child, depth + 1)
       return
     }
 
@@ -368,7 +444,7 @@ function objectFor(root: ComponentNode): {
     }
 
     if (isRowScope(node)) {
-      const row = objectFor(node)
+      const row = objectFor(node, depth + 1)
       const items: JsonSchemaProperty = { type: 'object', properties: row.properties }
       if (row.required.length > 0) items.required = row.required
       properties[name] = { ...property, items }
@@ -376,7 +452,17 @@ function objectFor(root: ComponentNode): {
     }
 
     properties[name] = property
-    for (const child of node.children ?? []) visit(child)
+    /*
+     * `depth + 1`, and it was `visit(child)` -- so on the schema-carrying
+     * branch the parameter fell back to its default of 0 and the bound reset to
+     * zero on every data-bound node. The sibling recursion twenty lines up
+     * passes it correctly, which is what made this hard to see: the bound was
+     * present, tested, and defeated on one of the two branches.
+     *
+     * The deep test in `schema.test.ts` used 50 000 nested `Box` nodes with no
+     * schema, which take the branch that always worked.
+     */
+    for (const child of childNodesOf(node)) visit(child, depth + 1)
   }
 
   /*
@@ -387,8 +473,10 @@ function objectFor(root: ComponentNode): {
    * doubled the work and made the "two components claim one answer" check below
    * report a node as colliding with itself.
    */
-  if (root.schema && !isRowScope(root)) visit(root)
-  else for (const child of root.children ?? []) visit(child)
+  // Seeded from the caller's depth, so a nested repeater's row object counts
+  // from where the outer walk had already reached rather than from zero.
+  if (root.schema && !isRowScope(root)) visit(root, from)
+  else for (const child of childNodesOf(root)) visit(child, from)
 
   // Spread on the way out, so a caller gets an ordinary object that still
   // holds a key named after something on `Object.prototype`.
