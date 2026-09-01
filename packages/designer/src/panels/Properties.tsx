@@ -13,6 +13,7 @@ import type {
 import { dataKeyOf, indexKit, jsonToString, keyScopesFor, optionValue } from '@formsmith/core'
 
 import { Icon, ICON_NAMES } from '../Icon.js'
+import { languagesOf } from '../language.js'
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
 import { ConditionEditor, emptyCondition } from './ConditionEditor.js'
 import type { DesignerApi, RenameResult } from '../store.js'
@@ -523,7 +524,17 @@ export function PropRows({
           componentKey={node.key}
           dataKeys={dataKeys}
           {...(scopes.row ? { rowDataKeys: scopes.row } : {})}
-          languages={api.document.languages}
+          /*
+           * The guarded list. `Binding` maps this prop to draw one row per
+           * language, so a `languages` that is not an array, or an entry with
+           * no `name`, threw from a prop row the moment a property was bound to
+           * a translation -- taking the inspector down with it, in a designer
+           * whose whole job at that moment is repairing the document.
+           *
+           * Three panels read this list and two of them guarded it. This was
+           * the third.
+           */
+          languages={languagesOf(api.document)}
           defaultLanguage={api.document.defaultLanguage}
           translations={api.document.translations}
           onChange={(next) => api.setProp(node.key, schema.name, next)}

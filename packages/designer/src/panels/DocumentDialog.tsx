@@ -343,8 +343,23 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   )
 }
 
-/** A filename stem from the form's name. */
-function slugify(name: string): string {
+/**
+ * A filename stem from the form's name.
+ *
+ * Takes `unknown`, because it is called on an unvalidated document during the
+ * render of the dialog body. `validateDocument` requires `name` to be text and
+ * `store.ts:333-341` only *warns* for a host-supplied `initialDocument`, so a
+ * document whose `name` is a number reached `name.trim()` and threw -- taking
+ * the designer down on the one panel this file's own docblock calls the place
+ * for "getting JSON out and putting edited JSON back in". It is the repair
+ * surface for exactly the documents that arrive that way.
+ *
+ * The `'form'` fallback already existed for an empty slug and now covers a name
+ * that is not a string at all, which is the same answer: a file has to be
+ * called something.
+ */
+function slugify(name: unknown): string {
+  if (typeof name !== 'string') return 'form'
   const slug = name
     .trim()
     .toLowerCase()

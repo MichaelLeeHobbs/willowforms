@@ -18,6 +18,7 @@ import type { ComponentNode, FormDocument, Kit, Language } from '@formsmith/core
 import { languageTag } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
+import { isLanguage } from '../language.js'
 import { Designer } from '../Designer.js'
 import { modesFor, translationKey } from './Binding.js'
 
@@ -65,7 +66,13 @@ function makeDocument(
     root: { key: 'root', type: 'Screen', props: {}, children: [field] },
     actions: {},
     languages,
-    defaultLanguage: languages[0] ? languageTag(languages[0]) : 'en',
+    /*
+     * Guarded, because this fixture is handed malformed `languages` on purpose
+     * by the describe at the end of this file -- and a fixture that throws
+     * while building a bad document cannot test what the panel does with one.
+     */
+    defaultLanguage:
+      Array.isArray(languages) && isLanguage(languages[0]) ? languageTag(languages[0]) : 'en',
     translations: {},
     settings: {},
   }
@@ -715,5 +722,206 @@ describe('two languages sharing a tag', () => {
 
     expect(latest().languages[1]?.bidi).toBe('rtl')
     expect(latest().languages[0]?.bidi).toBe('ltr')
+  })
+})
+
+describe('a document whose languages are not languages', () => {
+  /*
+   * `FormSettings` filtered `doc.languages` to "a non-null object", and
+   * `languageTag` reads `.code` without guarding it: `languageTag({})` is
+   * `undefined` and `languageTag({ code: 5 })` is `5`, and the duplicate check
+   * calls `.toLowerCase()` on the result. So `{"languages":[{}]}` took the
+   * settings tab down -- the failure that filter exists to prevent, through the
+   * half of the shape it was not looking at.
+   *
+   * `typeof [] === 'object'`, which is why "a non-null object" is never enough
+   * on its own, and this file's own fixtures are the place a host's JSON
+   * arrives from.
+   */
+  const junk = (languages: unknown): ReturnType<typeof setup> =>
+    setup(languages as Language[] | undefined)
+
+  it.each([
+    ['an empty object', [{}]],
+    ['a code that is a number', [{ code: 5 }]],
+    ['an array', [[]]],
+    ['null', [null]],
+    ['a string', ['en']],
+  ])('opens the settings tab for %s', async (_what, languages) => {
+    const view = junk([...languages, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    // The tab is up, and the one real language beside the junk is drawn.
+    expect(screen.getAllByRole('checkbox', { name: 'Right to left' })).toHaveLength(1)
+  })
+
+  /*
+   * The third panel that reads the language list, and the one that did not
+   * guard it.
+   *
+   * `Properties` passed `api.document.languages` straight into the prop row,
+   * where `Binding` maps it to draw one box per language. So the settings tab
+   * and the toolbar survived a malformed document and the inspector did not:
+   * binding a property to a translation threw during render, and the designer
+   * went down at the moment its job was repairing that document.
+   *
+   * Driven through `Properties` rather than by rendering `Binding` with a bad
+   * prop. `Binding` declares `Language[]` and is entitled to believe it; the
+   * question is what fills it.
+   */
+  it.each([
+    ['null', [null]],
+    ['not an array at all', 'de'],
+  ])('draws a translated property when languages are %s', async (_what, languages) => {
+    /*
+     * The two shapes that actually threw: `languageTag(null)` reads `.dialect`
+     * off null, and a `languages` that is not an array has no `.map`. Restoring
+     * the raw read fails both.
+     */
+    const view = junk(
+      Array.isArray(languages)
+        ? [...languages, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }]
+        : languages,
+    )
+    await view.select()
+
+    await view.user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+
+    expect(
+      screen.getAllByRole('textbox', { name: 'Translation key' }),
+      'the inspector did not survive the document',
+    ).toHaveLength(1)
+    expect(screen.queryAllByLabelText('English')).toHaveLength(Array.isArray(languages) ? 1 : 0)
+  })
+
+  it.each([
+    ['no name', [{ code: 'de' }]],
+    ['a name that is an object', [{ code: 'de', name: {}, bidi: 'ltr' }]],
+  ])('draws one box per language when an entry has %s', async (_what, languages) => {
+    /*
+     * Controls, and worth saying so: these two pass with the raw read as well.
+     * `Binding` labels each box `nameOf(language) || tag`, which was written for
+     * a nameless language and absorbs an unreadable one for free.
+     *
+     * They are here because they are the shapes somebody would assume this
+     * guard is for, and a reader who assumes that and deletes the guard should
+     * find out from the rows above rather than from a bug report. What these
+     * pin is that the guarded list drops the junk entry rather than drawing an
+     * unnamed box beside the real one.
+     */
+    const view = junk([
+      ...(languages as unknown[]),
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+    ])
+    await view.select()
+
+    await view.user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+
+    expect(screen.getAllByLabelText('English')).toHaveLength(1)
+    expect(
+      screen.queryAllByLabelText('de'),
+      'an entry the panel cannot read was drawn',
+    ).toHaveLength(0)
+  })
+
+  it('counts what it can draw rather than what the array holds', async () => {
+    /*
+     * The heading read `doc.languages.length`, so a document with three entries
+     * and one usable one said "3" over a list of one -- which reads as a panel
+     * that lost something, and sends somebody looking for the two rows it did
+     * not draw.
+     */
+    const view = junk([{}, null, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    expect(screen.getByText('Languages').textContent).toContain('1')
+  })
+
+  it.each([
+    ['not an array at all', 'en'],
+    ['a number', 5],
+    ['null', null],
+  ])('opens the settings tab when languages is %s', async (_what, languages) => {
+    /*
+     * The Remove button read `doc.languages.length` for its `disabled`, three
+     * lines after the filter added to survive a malformed document -- so a
+     * `languages` that is not an array threw during render, in the panel that
+     * exists to survive exactly that.
+     *
+     * `Array.isArray` in the filter answers `[]`, so the panel draws nothing
+     * and stays up. Which is the right answer: a document with no readable
+     * languages has none to show.
+     */
+    const view = junk(languages)
+    await view.openTab('Settings')
+
+    expect(screen.queryAllByRole('checkbox', { name: 'Right to left' })).toHaveLength(0)
+    // And the tab really is open, rather than the assertion above holding
+    // because nothing rendered.
+    expect(screen.getByText('Languages')).toBeTruthy()
+  })
+
+  it.each([
+    ['no name', { code: 'en', bidi: 'ltr' }],
+    ['a name that is not a string', { code: 'en', name: {}, bidi: 'ltr' }],
+    ['no bidi', { code: 'en', name: 'English' }],
+    ['a bidi outside the union', { code: 'en', name: 'English', bidi: 'sideways' }],
+    ['a dialect that is not a string', { code: 'en', dialect: 5, name: 'English', bidi: 'ltr' }],
+    ['an empty code', { code: '', name: 'English', bidi: 'ltr' }],
+  ])('does not treat %s as a language', async (_what, entry) => {
+    /*
+     * `isLanguage` is written `language is Language`, which is a promise to the
+     * compiler, and checking `code` alone made it a false one: `{ code: 'en' }`
+     * went on as a `Language`, the toolbar rendered `entry.name` as nothing,
+     * and `api.setLanguages` -- typed `Language[]` -- took it back. After that
+     * the compiler has no reason to question `.name` or `.bidi` anywhere
+     * downstream, which is worse than having no predicate.
+     *
+     * The dialect case is the one with a recorded history: `{"code":"en",
+     * "dialect":5}` builds the tag `en-5`, which `findLanguage` matches against
+     * nothing, and `languageTag`'s own docblock in core records fixing exactly
+     * that once already.
+     */
+    const view = junk([entry, { code: 'fr', name: 'French', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    // Only the real one is drawn.
+    expect(screen.getAllByRole('checkbox', { name: 'Right to left' })).toHaveLength(1)
+  })
+
+  it('refuses to remove the last language it can draw', async () => {
+    /*
+     * The Remove button read `doc.languages.length`, so a document with one
+     * usable language and one unusable one counted two and offered to remove
+     * the only one there is -- leaving a document whose every translation
+     * renders as its raw key, which is the state the button is disabled to
+     * prevent.
+     *
+     * Not a crash: the row that reads it only renders when `doc.languages` is
+     * an array, so the raw read never threw. It was simply counting something
+     * other than what the panel had drawn.
+     */
+    const view = junk([{}, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    const remove = screen.getByRole('button', { name: /^Remove / })
+    expect(remove.hasAttribute('disabled'), 'the only drawable language can still be removed').toBe(
+      true,
+    )
+  })
+
+  it('leaves an entry it cannot draw in the document', async () => {
+    /*
+     * Dropped from the panel, never from the document. Opening a tab must not
+     * delete data, and "the panel ignores it" and "the panel ate it" look the
+     * same from the tab.
+     */
+    const view = junk([{}, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    expect(view.latest().languages).toEqual([
+      {},
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+    ])
   })
 })

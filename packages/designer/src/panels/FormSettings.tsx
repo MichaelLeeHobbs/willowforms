@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { languagesOf } from '../language.js'
 import { languageTag } from '@formsmith/core'
 import type { Language } from '@formsmith/core'
 
@@ -36,6 +37,37 @@ function nameOf(language: { name?: unknown }): string {
 
 export function FormSettings({ api }: FormSettingsProps): ReactNode {
   const { document: doc } = api
+
+  /*
+   * The list's shape is guarded, and the shape of each language already was.
+   *
+   * `nameOf` exists precisely because "a `Language` arrives from a pasted
+   * document", and its docblock states that a throw during render in React 19
+   * unmounts the whole designer -- so every language in this list was defended
+   * and the list itself was not. `doc.languages` was read as an array three
+   * times, and the Form tab is the tab the left pane can open, so
+   * `doc.languages.map` threw and took the designer with it, including the JSON
+   * dialog that would repair the document. `store.ts` only warns about a host's
+   * `initialDocument`, which is the path such a document arrives by.
+   */
+  /*
+   * Every write in this panel sends this list back, not `doc.languages`.
+   *
+   * Passing the raw array would write whatever the document held -- including
+   * the entries this panel refused to draw -- through an API typed
+   * `Language[]`, handing a malformed entry on as though something had read it.
+   *
+   * Sending the guarded list does drop those entries, and that is right for an
+   * edit: adding a language, removing one, choosing a default and ticking
+   * "Right to left" are all the author acting on what the panel showed them, so
+   * what the panel showed them is what gets written. It is not right for a
+   * read, which is why nothing here quietly repairs the document on mount.
+   *
+   * This note said the default-language radio was "the one place in this panel
+   * where dropping is right", which was never true of one place -- `add`,
+   * `remove` and the checkbox write the same list for the same reason.
+   */
+  const languages = languagesOf(doc)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
@@ -86,12 +118,12 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
       bidi: 'ltr',
     }
     const tag = languageTag(language)
-    if (doc.languages.some((l) => languageTag(l).toLowerCase() === tag.toLowerCase())) {
+    if (languages.some((l) => languageTag(l).toLowerCase() === tag.toLowerCase())) {
       setError(tag + ' is already in the list.')
       return
     }
 
-    api.setLanguages([...doc.languages, language])
+    api.setLanguages([...languages, language])
     setCode('')
     setName('')
     setError('')
@@ -106,8 +138,8 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
    * tell which of the two they had lost.
    */
   const remove = (at: number): void => {
-    if (doc.languages.length === 1) return
-    api.setLanguages(doc.languages.filter((_, index) => index !== at))
+    if (languages.length === 1) return
+    api.setLanguages(languages.filter((_, index) => index !== at))
   }
 
   return (
@@ -123,11 +155,16 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
       </div>
 
       <h3 className="fs-rules__heading">
-        Languages <span className="fs-rules__count">{doc.languages.length}</span>
+        {/*
+          The count of what this panel can draw, not of what the array holds.
+          A document with three entries and one usable one said "3" over a list
+          of one, which reads as a panel that lost something.
+        */}
+        Languages <span className="fs-rules__count">{languages.length}</span>
       </h3>
 
       <ul className="fs-languages">
-        {doc.languages.map((language, at) => {
+        {languages.map((language, at) => {
           const tag = languageTag(language)
           const isDefault = tag === doc.defaultLanguage
           return (
@@ -155,7 +192,9 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                     type="radio"
                     name="fs-default-language"
                     checked={isDefault}
-                    onChange={() => api.setLanguages(doc.languages, tag)}
+                    // The guarded list, like every write in this panel. See
+                    // `languages` above for why an edit writes what was drawn.
+                    onChange={() => api.setLanguages(languages, tag)}
                   />
                   Default
                 </label>
@@ -176,7 +215,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                      */
                     onChange={(e) =>
                       api.setLanguages(
-                        doc.languages.map((l, i) =>
+                        languages.map((l, i) =>
                           i === at ? { ...l, bidi: e.target.checked ? 'rtl' : 'ltr' } : l,
                         ),
                       )
@@ -191,7 +230,20 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                   aria-label={'Remove ' + (nameOf(language) || tag)}
                   // A document with no languages renders every translation as its
                   // raw key, so the last one cannot be removed.
-                  disabled={doc.languages.length === 1}
+                  /*
+                   * `languages`, the guarded list, not `doc.languages`.
+                   *
+                   * This read the raw array for its length, so a document whose
+                   * `languages` is not one threw here -- during render, in the
+                   * panel that exists to survive exactly that, three lines after
+                   * the filter that was added for it.
+                   *
+                   * The rule is unchanged: a document with no languages renders
+                   * every translation as its raw key, so the last one cannot be
+                   * removed. It is now the last one this panel can *draw*, which
+                   * is the only one a person can act on anyway.
+                   */
+                  disabled={languages.length === 1}
                   onClick={() => remove(at)}
                 >
                   &times;
