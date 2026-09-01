@@ -24,11 +24,18 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useDrag } from './drag.js'
 import type { DragSource, DropCommit, DropResolver } from './drag.js'
 
-const press = (x: number, y: number): ReactPointerEvent =>
-  ({ clientX: x, clientY: y }) as ReactPointerEvent
+/*
+ * `pointerId` on both, defaulting to the primary pointer.
+ *
+ * `useDrag` ignores a move or a release from a pointer that did not start the
+ * drag, so a fixture that models one physical gesture has to carry one id
+ * through it. The default keeps every existing case reading as a single mouse.
+ */
+const press = (x: number, y: number, pointerId = 0): ReactPointerEvent =>
+  ({ clientX: x, clientY: y, pointerId }) as ReactPointerEvent
 
-function pointer(type: string, x: number, y: number): void {
-  window.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true }))
+function pointer(type: string, x: number, y: number, pointerId = 0): void {
+  window.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, pointerId, bubbles: true }))
 }
 
 /** Down, past the threshold, and up, which is the shortest real drag. */
@@ -799,5 +806,112 @@ describe('a zone that throws on release', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('two pointers at once', () => {
+  /*
+   * Nothing filtered events by `pointerId`, so ANY pointer's `pointerup` ended
+   * and committed a drag another pointer started -- at the second pointer's
+   * coordinates.
+   *
+   * On touch, which `05-canvas.md` calls a supported target: finger A drags a
+   * palette entry onto the canvas, finger B taps Preview and lifts, and finger
+   * B's release resolves the zones at finger B's position and commits an
+   * insertion there -- while finger A is still down and the drag label still
+   * follows it.
+   */
+  /** The shape every `kind: 'new'` source in this file uses. */
+  const def = { type: 'Field', label: 'Field' } as never
+  const otherDef = { type: 'Other', label: 'Other' } as never
+
+  it('ignores a release from a pointer that did not start the drag', () => {
+    const commit = vi.fn()
+    const { result } = renderHook(() => useDrag(commit))
+    const zone = vi.fn(() => ({ parentKey: 'root', index: 0 }))
+
+    act(() => {
+      result.current.registerZone('canvas', zone)
+      result.current.begin({ kind: 'new', def }, press(10, 10, 1))
+    })
+    act(() => {
+      pointer('pointermove', 80, 80, 1)
+    })
+
+    // Finger B lifts somewhere else entirely.
+    act(() => {
+      pointer('pointerup', 300, 300, 2)
+    })
+
+    expect(commit, 'a second pointer committed the drag another one started').not.toHaveBeenCalled()
+    expect(result.current.state, 'the drag ended on the wrong pointer').toBeDefined()
+  })
+
+  it('ignores a move from a pointer that did not start the drag', () => {
+    const commit = vi.fn()
+    const { result } = renderHook(() => useDrag(commit))
+
+    act(() => {
+      result.current.begin({ kind: 'new', def }, press(10, 10, 1))
+    })
+    act(() => {
+      pointer('pointermove', 80, 80, 1)
+    })
+
+    const before = result.current.state
+    act(() => {
+      pointer('pointermove', 300, 300, 2)
+    })
+
+    expect(result.current.state?.x, 'the label followed the wrong finger').toBe(before?.x)
+  })
+
+  it('still ends on the pointer that started it', () => {
+    // The control. Ignoring every release would pass both rows above while
+    // making the whole gesture inert.
+    const commit = vi.fn()
+    const { result } = renderHook(() => useDrag(commit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+      result.current.begin({ kind: 'new', def }, press(10, 10, 1))
+    })
+    act(() => {
+      pointer('pointermove', 80, 80, 1)
+    })
+    act(() => {
+      pointer('pointerup', 80, 80, 1)
+    })
+
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(result.current.state).toBeUndefined()
+  })
+
+  it('does not let a second press retarget a drag in flight', () => {
+    /*
+     * The same root cause from the other end: `begin` overwrote
+     * `pending.current` with no in-flight check, so a second press mid-drag
+     * silently changed what was being dragged. A drag owns the gesture until it
+     * ends.
+     */
+    const commit = vi.fn()
+    const { result } = renderHook(() => useDrag(commit))
+
+    act(() => {
+      result.current.registerZone('canvas', () => ({ parentKey: 'root', index: 0 }))
+      result.current.begin({ kind: 'new', def }, press(10, 10, 1))
+    })
+    act(() => {
+      pointer('pointermove', 80, 80, 1)
+    })
+    act(() => {
+      result.current.begin({ kind: 'new', def: otherDef }, press(200, 200, 2))
+    })
+    act(() => {
+      pointer('pointerup', 80, 80, 1)
+    })
+
+    const source = commit.mock.calls[0]?.[0] as { def?: { type?: string } } | undefined
+    expect(source?.def?.type, 'the second press retargeted the drag').toBe('Field')
   })
 })
