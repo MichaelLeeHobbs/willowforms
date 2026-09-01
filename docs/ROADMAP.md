@@ -57,7 +57,7 @@ See [docs/spec/06-inspector.md](spec/06-inspector.md#style).
 
 ## Verification
 
-`pnpm test` runs 1967 tests; `pnpm e2e` runs 78 in a real browser. Both gate CI, along with lint,
+`pnpm test` runs 1969 tests; `pnpm e2e` runs 78 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
 computed from the stylesheets and axe runs over the designer in nine states. See
 [accessibility.md](accessibility.md).
