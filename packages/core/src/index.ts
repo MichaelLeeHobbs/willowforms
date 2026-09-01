@@ -42,6 +42,15 @@ export {
 
 export { MAX_CONDITION_DEPTH, evaluateCondition, same } from './condition.js'
 
+/*
+ * `MAX_TREE_DEPTH`, whose sibling `MAX_CONDITION_DEPTH` is exported one line
+ * up, and `validationsOf`, which `FieldSchema`'s own JSDoc names as the
+ * prescribed way to read `validations` -- and that comment ships in the
+ * published `.d.ts`, so a consumer following the type's own instruction got a
+ * resolution error and hand-rolled the guard the helper exists to centralise.
+ */
+export { MAX_TREE_DEPTH, validationsOf } from './tree.js'
+
 export { unreadableTag } from './exhaustive.js'
 
 export {
@@ -60,7 +69,15 @@ export type { StyleSheetOptions } from './css.js'
 
 export { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
 
-export { KEY_PATTERN, RESERVED_KEYS, keyProblem } from './keys.js'
+/*
+ * `MAX_KEY_LENGTH` beside the two it belongs with, and it was missing.
+ *
+ * `KEY_PATTERN` and `RESERVED_KEYS` were both public and the length bound was
+ * not, so a server-side consumer checking a key against the published grammar
+ * passed one this package then refuses as `invalid-key`. Two thirds of a rule
+ * is not a rule.
+ */
+export { KEY_PATTERN, MAX_KEY_LENGTH, RESERVED_KEYS, keyProblem } from './keys.js'
 
 export type { KeyScopes, RowContext, RowFrame, RowPath } from './rows.js'
 export type { ParsedAddress } from './rows.js'

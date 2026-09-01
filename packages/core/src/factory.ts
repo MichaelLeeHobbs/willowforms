@@ -53,7 +53,7 @@ export function createDocument(name: string, id: string): FormDocument {
  * Instantiate a palette entry as a tree node, assigning a free key and seeding
  * props from the definition's defaults.
  */
-export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNode {
+export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNode | undefined {
   /*
    * Built on a null prototype and then copied into a plain object, the way
    * `submittedData` does it. A kit is third-party code by design, and a
@@ -82,6 +82,22 @@ export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNo
   }
 
   const props: Record<string, PropValue> = { ...built }
+
+  /*
+   * The third thing this function reads off a third-party definition, and the
+   * one it did not harden.
+   *
+   * `defaultProps` is shape-checked above and `defaultRenderWhen` is wrapped in
+   * a `try` below, both with comments about a kit "compiled loosely or built at
+   * runtime from JSON". `def.type` went straight to `generateKey`, whose first
+   * statement is `type.charAt(0).toLowerCase()` -- so a kit built from JSON
+   * with a missing `type` threw inside the designer's drop handler.
+   *
+   * A definition with no usable type cannot be instantiated into anything a
+   * renderer could draw, so this refuses rather than inventing a name: the drop
+   * does nothing, which is what a drop of an unusable component should do.
+   */
+  if (typeof def.type !== 'string' || def.type.length === 0) return undefined
 
   const node: ComponentNode = {
     key: generateKey(root, def.type),

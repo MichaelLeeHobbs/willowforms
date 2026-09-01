@@ -181,6 +181,16 @@ function requires(kit: Kit, type: string): boolean {
   return offered
 }
 
+/**
+ * `instantiate`, narrowed. It answers `undefined` for a definition with no
+ * usable `type`, which no fixture here supplies.
+ */
+const made = (def: ComponentDef, root: ComponentNode): ComponentNode => {
+  const node = instantiate(def, root)
+  if (!node) throw new Error('instantiate refused a definition this test expects it to accept')
+  return node
+}
+
 describe('the two kits in this repository agree', () => {
   const html = new Map(htmlKit.components.map((c) => [c.type, c]))
   const mui = new Map(muiKit.components.map((c) => [c.type, c]))
@@ -398,7 +408,7 @@ describe('what a data-bound control has to say about itself', () => {
     extra: Partial<ComponentNode>,
   ): HTMLElement {
     const node: ComponentNode = {
-      ...instantiate(def, { key: 'r', type: 'r', props: {} }),
+      ...made(def, { key: 'r', type: 'r', props: {} }),
       key: 'target',
       ...extra,
     }
@@ -1121,13 +1131,13 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
 
   describe('every renderer', () => {
     const root = container
-      ? instantiate(container, { key: 'seed', type: container.type, props: {} })
+      ? made(container, { key: 'seed', type: container.type, props: {} })
       : undefined
 
     it.each(kit.components.map((c) => [c.type, c] as const))(
       '%s spreads nodeProps onto a real element',
       (type, def) => {
-        const node = instantiate(def, root ?? { key: 'r', type: 'r', props: {} })
+        const node = made(def, root ?? { key: 'r', type: 'r', props: {} })
         node.key = 'target'
 
         /*
@@ -1182,7 +1192,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
          * `data-fs-key` right, passes that test, and silently drops this one.
          * The cost is two forms on a page sharing each other's styling.
          */
-        const node = instantiate(def, root ?? { key: 'r', type: 'r', props: {} })
+        const node = made(def, root ?? { key: 'r', type: 'r', props: {} })
         node.key = 'target'
 
         const { container: dom } = render(
@@ -1254,7 +1264,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
        * and the element in the DOM is the kit's rather than the fallback's.
        */
       for (const def of kit.components.filter((c) => c.dataBound)) {
-        const node = instantiate(def, { key: 'r', type: 'r', props: {} })
+        const node = made(def, { key: 'r', type: 'r', props: {} })
         node.key = 'target'
 
         const { container: dom } = render(
@@ -1281,7 +1291,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
       expect(bound.length).toBeGreaterThan(0)
 
       for (const def of bound) {
-        const node = instantiate(def, { key: 'r', type: 'r', props: {} })
+        const node = made(def, { key: 'r', type: 'r', props: {} })
         node.key = 'field'
 
         const { container: dom } = render(
@@ -1309,7 +1319,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
 
     it('marks the message as an alert when it holds an error', () => {
       for (const def of kit.components.filter((c) => c.dataBound)) {
-        const node = instantiate(def, { key: 'r', type: 'r', props: {} })
+        const node = made(def, { key: 'r', type: 'r', props: {} })
         node.key = 'field'
 
         const { container: dom } = render(
@@ -1333,7 +1343,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
 
     it('points every data-bound control at a message element that already exists', () => {
       for (const def of kit.components.filter((c) => c.dataBound)) {
-        const node = instantiate(def, { key: 'r', type: 'r', props: {} })
+        const node = made(def, { key: 'r', type: 'r', props: {} })
         node.key = 'field'
 
         // No error. The element still has to be there, or the description is

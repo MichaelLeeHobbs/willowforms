@@ -148,9 +148,31 @@ export interface Kit {
  * definition's. A kit is third-party code and can do this by accident when two
  * files are merged.
  */
+/**
+ * A kit's component list, guarded the way `factory.ts` guards a definition.
+ *
+ * `for (const component of kit.components)` threw for a kit whose `components`
+ * is absent or is an object, and both readers below run inside React: `groupKit`
+ * in `Palette.tsx`'s `useMemo`, `indexKit` in the render bodies of
+ * `Properties.tsx` and `StyleTab.tsx`. A throw during render in React 19
+ * unmounts the whole designer rather than showing an empty palette.
+ *
+ * This is the same "a kit is third-party code by design" seam `instantiate`
+ * hardened explicitly, with comments about a kit "compiled loosely or built at
+ * runtime from JSON". These two readers are on the other side of it and were
+ * not hardened.
+ */
+function componentsOf(kit: Kit): ComponentDef[] {
+  if (!kit || !Array.isArray(kit.components)) return []
+  return kit.components.filter(
+    (component): component is ComponentDef =>
+      Boolean(component) && typeof component === 'object' && typeof component.type === 'string',
+  )
+}
+
 export function indexKit(kit: Kit): ReadonlyMap<string, ComponentDef> {
   const byType = new Map<string, ComponentDef>()
-  for (const component of kit.components) {
+  for (const component of componentsOf(kit)) {
     if (!byType.has(component.type)) byType.set(component.type, component)
   }
   return byType
@@ -178,7 +200,7 @@ export function groupKit(kit: Kit): Array<{ group: PaletteGroup; components: Com
    */
   const resolved = indexKit(kit)
 
-  for (const component of kit.components) {
+  for (const component of componentsOf(kit)) {
     if (component.root === true) continue
     if (resolved.get(component.type) !== component) continue
     let bucket = out.find((b) => b.group === component.group)

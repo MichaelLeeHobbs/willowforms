@@ -246,15 +246,27 @@ export type FormData = Record<string, JsonValue>
  * [12-api.md](../../../docs/spec/12-api.md#state-that-is-not-an-answer).
  */
 /*
- * `Readonly`, which is the only part of the split above a compiler can hold.
+ * `Readonly`, which documents the split and does not enforce it.
  *
  * `FormData` and `FormContext` were the identical type, so nothing stopped
  * `validateForm(root, context, { context: data })` -- the two swapped, the form
  * validated against the host's own facts, and the answers treated as context.
- * Readonly makes the direction that matters a type error: a context cannot be
- * handed to something that wants data. The other direction stays legal, because
- * a host that hands its data over as context is doing something odd but not
- * dangerous, and a nominal brand would make every host cast an object literal.
+ *
+ * This comment used to claim `Readonly` made that a type error. It does not.
+ * TypeScript does not factor `readonly` into object assignability, so
+ * `{ readonly [x: string]: JsonValue }` is assignable to
+ * `{ [x: string]: JsonValue }` and the swap above still compiles clean. The
+ * mistake the comment said was now caught was never caught.
+ *
+ * That is worse than saying nothing, and it is why the wording is corrected
+ * rather than the type changed: a wrong claim of enforcement stops the next
+ * person adding the brand that would actually work. A nominal brand is what
+ * would work -- and it is not free, because it makes every host cast an object
+ * literal at the call site, which is a real cost to weigh rather than a
+ * decision to make in passing.
+ *
+ * What `Readonly` does buy is a mutation error inside this package if anything
+ * here ever writes to a context, which is a smaller and true guarantee.
  */
 export type FormContext = Readonly<Record<string, JsonValue>>
 /** Runtime validation errors, keyed by component key. */

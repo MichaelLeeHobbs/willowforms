@@ -357,7 +357,18 @@ export function useDesigner(initial: FormDocument): DesignerApi {
      * said had to be pure.
      */
     const doc = latest.current
+
+    /*
+     * A definition a kit got wrong produces no node, and no drop.
+     *
+     * `instantiate` refuses a `ComponentDef` with no usable `type` -- a kit
+     * built from JSON can arrive without one -- rather than handing
+     * `generateKey` something it will call `.charAt` on. Nothing to insert is
+     * the same outcome as an insert that matched no parent, three lines down.
+     */
     const node = instantiate(def, doc.root)
+    if (!node) return
+
     const root = insertNode(doc.root, containerFor(doc.root, parentKey), node, index)
 
     /*
