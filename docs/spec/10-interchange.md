@@ -106,7 +106,7 @@ nothing produces an `object` yet.
 
 `unexportableRules()` names each dropped rule and the field it was on, and the dialog lists them rather
 than leaving the loss unmentioned. It used to describe all of them as custom rules, so a guarded
-`required` was reported as something it was not. There are four causes, not two:
+`required` was reported as something it was not. There are five causes:
 
 - **`custom` rules.** Arbitrary JavaScript has no declarative equivalent.
 - **Guarded rules.** A rule with a `when` guard applies only sometimes, and JSON Schema's `required` is
@@ -118,6 +118,22 @@ than leaving the loss unmentioned. It used to describe all of them as custom rul
   carries a `renderWhen`, so a wizard's required fields are dropped from the exported `required` array
   wholesale. `unexportableRules()` names them, and the dialog lists them; a host that exports a schema
   without reading that list gets one that accepts every submission.
+- **A measuring rule on a type with no such keyword.** `minimum` and `maximum` are JSON Schema keywords
+  for numbers, and `minLength`/`maxLength` need something with a length. `min` on a string or `minLength`
+  on a boolean exports to a keyword every validator ignores, so it is dropped and reported rather than
+  written down where it would look enforced. Asked on the exported type, not the declared one: `date` and
+  `file` are declared as themselves and export as `string`.
+- **Two format rules on one field.** `email`, `url` and `uuid` each write `format`, and a property has
+  one. A field carrying two exported only the last, silently, while the dialog called the export
+  lossless. Which of two formats an answer really has is not a question the exporter can answer, so all
+  but the last are reported.
+- **Two components sharing a `dataKey`.** Deliberate and documented -- two fields behind opposite guards
+  writing one answer -- but a JSON Schema property is one property, so the last node visited wins and the
+  first's type, format and constraints are discarded. Reported rather than resolved, for the same reason.
+
+The last two appeared in no spec file until this was written, and the count said four over three bullets,
+which left a reader unable to tell whether a bullet was missing or the number was stale. Both, as it
+turned out.
 
 **Known gap:** a required boolean exports as "the key must be present", which is not the same as "it must
 be `true`". A `const: true` would express it, and does not yet.

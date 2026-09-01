@@ -72,6 +72,7 @@ same upgrade logic, badly and differently, and a form definition outlives the co
 interface ComponentNode {
   key: string
   type: string // kit-scoped, matches a ComponentDef
+  dataKey?: string // what the payload calls this answer; defaults to key
   props: Record<string, PropValue>
   schema?: FieldSchema // data-bound components only
   events?: Partial<Record<EventName, ActionRef[]>>
@@ -98,8 +99,14 @@ server receives.
 
 **Keys are unique. Data keys are not.** Two fields behind opposite `renderWhen` guards writing one answer
 is a real pattern, and forbidding it would buy nothing: the payload has one slot for that answer either
-way. `validateDocument` checks that a data key, if present, is a non-empty string, and checks nothing
-else about it.
+way. `validateDocument` holds a data key, if present, to the same
+grammar as a key: `keyProblem` decides both, so `KEY_PATTERN`, the 128-character cap and `RESERVED_KEYS`
+apply, and a failure is reported as `invalid-data-key`. See
+[12-api.md](12-api.md#keys) for the grammar and why it is the JavaScript identifier subset.
+
+This said it checked "nothing else about it", and [12-api.md](12-api.md) said the opposite, so the two
+files contradicted each other on a rule a host meets on import: `dataKey: 'first-name'` reads as legal
+here and fails there.
 
 **Errors stay keyed by `key`.** This follows from the line above and is the part worth stating, because
 the obvious thing to do is key everything the same way. An error belongs to a component on screen, and
@@ -134,11 +141,20 @@ the tree's entries into one stylesheet, and the renderer emits that alongside th
 simulation, which had to come first: authoring a tablet rule is meaningless without a way to see the
 tablet.
 
-The text is **declarations only**. `safeDeclarations` refuses anything holding `{`, `}`, `<`, `@`, or a
-CSS comment delimiter (`/*` or `*/`), because a component's styling that can leave its own block can style
-the whole page, and a document is data. The comment delimiters are on that list for a reason of their own:
-these blocks are concatenated into one sheet, so an unbalanced `/*` comments out every rule that follows
-it, including other components'. Refused text is reported in the Style tab rather than silently dropped.
+The text is **declarations only**. `safeDeclarations` refuses a block holding `{`, `}`, `<`, `@`, `\`, or
+a CSS comment delimiter (`/*` or `*/`); a block whose quotes are not all closed; and a block calling
+`url()`, `image-set()`, `element()` or `cross-fade()`. A component's styling that can leave its own block
+can style the whole page, and a document is data.
+
+The three that are not obvious from that sentence. The comment delimiters, because these blocks are
+concatenated into one sheet, so an unbalanced `/*` comments out every rule after it, other components'
+included. The backslash, because `\3c` is `<` to a CSS parser and the character list alone would not stop
+it. The fetching functions, because `background: url(https://…)` on a page collecting answers makes the
+form call out to whoever wrote the document.
+
+Refused text is reported in the Style tab rather than silently dropped, which is what makes the list worth
+stating in full: an author who writes `background: url(/logo.png)` and sees the whole block refused can
+otherwise find nothing in this document that says why.
 
 A single style _value_ is judged more strictly than a declaration list, by `safeStyleValue` in core.
 That one also refuses `;`, `!`, a comment, a backslash and anything that fetches, because a value on a
