@@ -19,7 +19,9 @@ export const SAMPLE_DOCUMENT: FormDocument = {
       {
         key: 'name',
         type: 'Stack',
-        props: { direction: prop('row'), gap: prop(2) },
+        // Pixels, like every other length in both kits. This shipped the 2 that
+        // the MUI defaults used to carry, so the demo showed the defect.
+        props: { direction: prop('row'), gap: prop(16) },
         children: [
           {
             key: 'firstName',

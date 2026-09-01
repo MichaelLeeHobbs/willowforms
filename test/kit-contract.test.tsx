@@ -229,8 +229,10 @@ describe('the two kits in this repository agree', () => {
       expect(b, type + ' is missing from @formsmith/kit-mui').toBeDefined()
       if (!a || !b) return
 
-      // Everything a form author sees or a document stores. Not defaultProps:
-      // a kit is entitled to a different sensible default.
+      // Everything a form author sees or a document stores. Not defaultProps
+      // wholesale -- a kit is entitled to a different sensible default -- but
+      // the lengths among them are checked separately below, because their
+      // unit belongs to the contract rather than to the kit.
       expect(a.label).toBe(b.label)
       expect(a.icon).toBe(b.icon)
       expect(a.group).toBe(b.group)
@@ -1557,5 +1559,89 @@ describe('the icons the kits ask for', () => {
     })
 
     expect(blank).toEqual([])
+  })
+})
+
+/**
+ * The properties whose values are CSS pixels in both kits.
+ *
+ * A kit is entitled to its own sensible default, which is why the rule above
+ * leaves `defaultProps` alone. It is not entitled to its own *unit*:
+ * `02-kit-contract.md` says a length in a document is CSS pixels, and a kit
+ * built on a design system with its own spacing scale "converts at its edge".
+ * So two kits may default a gap to different numbers of pixels for good
+ * reasons, and a difference of exactly eight times is not one of them.
+ *
+ * Named rather than inferred from the editor, because `columns`, `index` and
+ * `maxLength` are numbers too and none of them is a length.
+ */
+const LENGTHS = ['gap', 'padding', 'radius', 'maxWidth', 'width', 'minColumnWidth']
+
+describe('a length means the same number of pixels in both kits', () => {
+  /*
+   * `kit-mui` defaulted `gap` to 2 on `Screen`, `Stack`, `Step` and `Repeater`
+   * while `kit-html` defaulted it to 16, and `Grid` in the same MUI file said
+   * 16 -- so the kit disagreed with itself as well as with the other one. The
+   * numbers were MUI spacing units left behind when `renderers.tsx` moved gaps
+   * to pixels: `theme.spacing` is 8, so every new layout component the designer
+   * created came out eight times tighter than the same document on `kit-html`.
+   *
+   * The rule above could not see it. It compares what a form author is shown
+   * and skips `defaultProps` on the stated ground that a kit may choose its own
+   * -- true of the number and false of the unit, which is the distinction this
+   * describe adds. `docs/spec/02-kit-contract.md` claimed the defaults were
+   * unchanged and "a form that never set a gap looks identical", which was true
+   * of the renderer's fallback and false of the kit, because `defaultProps` is
+   * written into every node before the fallback is ever consulted.
+   */
+  const html = new Map(htmlKit.components.map((c) => [c.type, c]))
+  const mui = new Map(muiKit.components.map((c) => [c.type, c]))
+  const shared = [...html.keys()].filter((type) => mui.has(type)).sort()
+
+  const lengthsOf = (def: ComponentDef | undefined): Record<string, JsonValue> => {
+    const defaults = def?.defaultProps ?? {}
+    const found: Record<string, JsonValue> = {}
+    for (const name of LENGTHS) {
+      const value = defaults[name]
+      if (value !== undefined) found[name] = value
+    }
+    return found
+  }
+
+  it('found lengths to compare at all', () => {
+    /*
+     * Without this the `it.each` below could compare `{}` to `{}` for every
+     * component -- a renamed prop, a `defaultProps` that stopped being read --
+     * and report success having looked at nothing. This is the shape the rest
+     * of this file already refuses.
+     */
+    const counted = shared.reduce(
+      (total, type) => total + Object.keys(lengthsOf(html.get(type))).length,
+      0,
+    )
+    expect(
+      counted,
+      'no component defaults any length, so nothing below compares anything',
+    ).toBeGreaterThan(4)
+
+    // And `gap` specifically, since it is the one that drifted.
+    expect(shared.filter((type) => 'gap' in lengthsOf(mui.get(type))).length).toBeGreaterThan(3)
+  })
+
+  it.each(shared)('%s defaults its lengths identically', (type) => {
+    expect(lengthsOf(mui.get(type)), 'kit-mui').toEqual(lengthsOf(html.get(type)))
+  })
+
+  it.each(shared)('%s defaults no length to a spacing-scale number', (type) => {
+    /*
+     * The failure with its own name. Agreement alone would be satisfied by both
+     * kits saying 2, which is 2px and not what either author meant. Anything
+     * under 4px is a spacing unit that escaped a conversion rather than a
+     * deliberate hairline: nothing in either kit wants a 2px gap between form
+     * fields.
+     */
+    for (const [name, value] of Object.entries(lengthsOf(mui.get(type)))) {
+      expect(typeof value === 'number' && value > 0 && value < 4, type + '.' + name).toBe(false)
+    }
   })
 })

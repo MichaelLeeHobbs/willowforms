@@ -47,7 +47,7 @@ export const muiKit: Kit = {
       group: 'layout',
       container: true,
       root: true,
-      defaultProps: { maxWidth: 640, gap: 2 },
+      defaultProps: { maxWidth: 640, gap: 16 },
       props: [
         { name: 'maxWidth', label: 'Max width', editor: 'number', section: 'style' },
         { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
@@ -60,7 +60,7 @@ export const muiKit: Kit = {
       icon: 'stack',
       group: 'layout',
       container: true,
-      defaultProps: { direction: 'column', gap: 2 },
+      defaultProps: { direction: 'column', gap: 16 },
       props: [
         {
           name: 'direction',
@@ -241,8 +241,11 @@ export const muiKit: Kit = {
           right: { kind: 'literal', value: key },
         },
       }),
-      // MUI's spacing scale, like Screen and Stack. 16 here would be 128px.
-      defaultProps: { gap: 2 },
+      // Pixels, like Screen, Stack and Grid. The comment here used to say "MUI's
+      // spacing scale ... 16 here would be 128px", which stopped being true when
+      // `renderers.tsx` moved gaps to pixels and left every default eight times
+      // too tight.
+      defaultProps: { gap: 16 },
       props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
       events: [],
     },
@@ -264,7 +267,7 @@ export const muiKit: Kit = {
        */
       dataBound: true,
       dataType: 'array',
-      defaultProps: { gap: 2 },
+      defaultProps: { gap: 16 },
       props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
       events: [],
     },
