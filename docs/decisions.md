@@ -24,6 +24,12 @@ The field that earns this file is **Reversal**: it says which entries deserve a 
 - **What it costs:** about 54 pull requests instead of 7, and a wait for CI plus a review on each. The run
   is several times longer in wall-clock. It buys the only external, objective check on this work that is
   not the same model grading its own homework.
+- **Reversal:** cheap and partial. Nothing in the repository depends on the shape, so a later run can go
+  back to stage batching by editing `queue.md` and `RUN.md`. What does not come back is the review
+  attention on anything already merged: a PR that shipped inside the budget got read, and re-batching it
+  afterwards cannot un-read it. So the cost of reversing is paid by the items still ahead of the change,
+  never by the ones behind it -- which is the argument for erring towards the smaller PR when an item is
+  near the line.
 - **When:** 2026-08-31, before the run started.
 
 ### `rowScopeProblems` stays internal; the spec names `validateDocument` instead
