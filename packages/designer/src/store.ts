@@ -425,7 +425,9 @@ export function useDesigner(initial: FormDocument): DesignerApi {
    *
    * What replaces it is that *every* writer below advances the ref, so
    * `latest.current` is always the document as of now and every decision is
-   * made against it. `assertDecidedAgainstLatest` holds that in place.
+   * made against it. The check at the top of this function holds that in
+   * place: it throws rather than refusing, because a stale read means a writer
+   * skipped the ref, which is a bug in this file and not a race.
    */
   const commitDecided = useCallback((doc: FormDocument, next: FormDocument, label?: string) => {
     /*
@@ -490,10 +492,15 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
       /*
        * Nothing landed, so nothing is committed and the selection does not move.
-       * It used to wrap the result unconditionally, so an insert that matched no
-       * parent still took an undo slot — and still selected a key that is not in
-       * the document, which is the precondition for the next mistake.
+       * It used to wrap the result unconditionally, so an insert the tree
+       * refused still took an undo slot — and still selected a key that is not
+       * in the document, which is the precondition for the next mistake.
        * `moveComponent` and `removeComponent` have always guarded this.
+       *
+       * Refused by `insertNode`, which hands back the root unchanged when the
+       * target cannot hold children. Not "matched no parent": `containerFor`
+       * falls back to the root for a key it does not find, so an unknown parent
+       * lands rather than refusing.
        */
       if (root === doc.root) return false
 

@@ -59,7 +59,7 @@ mistake. Each error explains why the rule exists. Read that before silencing one
 
 ```bash
 pnpm dev           # playground on :5180
-pnpm test          # vitest, 2201 tests
+pnpm test          # vitest, 2256 tests
 pnpm lint          # eslint, including the invariant guardrails
 pnpm format:check  # prettier
 pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs

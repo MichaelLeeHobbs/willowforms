@@ -1195,7 +1195,7 @@ describe('a refusal that used to be announced as a success', () => {
     )
   })
 
-  it('says no when the document was replaced under the insert', () => {
+  it('inserts into the replacement rather than the document it replaced', () => {
     /*
      * The refusal that is still real, and the one the guard in `commitDecided`
      * is for: a writer that does not go through it. `replaceDocument` sets the
