@@ -8,10 +8,11 @@
  * the whole "a kit is a package, not a rewrite" claim rests on.
  *
  * That script checks what the *build* emitted. This checks what the *manifest*
- * claims, which is the half nothing was reading: two of the five declared
- * `"license": "MIT"` and shipped no licence text, and two gained the
- * `./package.json` subpath in the same change that gave the other three theirs
- * -- both spotted by a reviewer rather than by a test.
+ * claims, which is the half nothing was reading: all five declared
+ * `"license": "MIT"` and none of them shipped any licence text, and two then
+ * missed the `./package.json` subpath in the very change that gave the other
+ * three theirs -- caught by a reviewer rather than by a test, which is the
+ * reason this file exists.
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
@@ -66,10 +67,17 @@ describe('every package the directory holds', () => {
   })
 
   it.each(names)('%s exports its own manifest', (name) => {
-    // An `exports` map is a closed door: several resolvers read
-    // `<pkg>/package.json` and get an error rather than the file sitting right
-    // there. The two packages with a stylesheet subpath were the two that
-    // missed this.
-    expect(Object.keys(manifestOf(name).exports ?? {})).toContain('./package.json')
+    /*
+     * An `exports` map is a closed door: several resolvers read
+     * `<pkg>/package.json` and get an error rather than the file sitting right
+     * there. The two packages with a stylesheet subpath were the two that
+     * missed this.
+     *
+     * The target, not just the key. A subpath present and pointed somewhere
+     * else -- at `dist`, at a renamed file -- satisfies the contract's spelling
+     * and breaks the thing it is for, and reading the key alone could not tell
+     * the two apart.
+     */
+    expect(manifestOf(name).exports?.['./package.json']).toBe('./package.json')
   })
 })
