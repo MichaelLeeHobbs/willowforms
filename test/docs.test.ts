@@ -356,6 +356,72 @@ describe('the specification index', () => {
     return [...body.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1] ?? '').sort()
   }
 
+  it('publishes the key grammar core actually enforces', () => {
+    /*
+     * `12-api.md` is the contract a consumer reads, and it published
+     * `RESERVED_KEYS` as three names where the export has thirteen, with no
+     * length bound mentioned at all.
+     *
+     * The ten missing names are not incidental. The list's own docblock records
+     * a required field keyed `toString` having its error merged with
+     * `merged[key] ??= message`, compared against `Object.prototype.toString`,
+     * found not nullish and dropped -- a form with a missing required answer
+     * submitting clean. A consumer generating documents checks against what the
+     * contract publishes, emits `toString` as a `dataKey`, and is refused by
+     * `validateDocument` with nothing in the specification to explain it.
+     *
+     * Read out of the fenced block rather than out of the prose around it, and
+     * compared as sets: this is the block a reader copies.
+     */
+    const keys = read('packages/core/src/keys.ts')
+    const spec = read('docs/spec/12-api.md')
+
+    /*
+     * From the end of the line that opens the array to the `]` that closes it.
+     *
+     * Not from the first `[` after the name: the export is typed
+     * `readonly string[]`, so that bracket belongs to the type, and reading from
+     * it produced an empty list. It failed loudly only because the other side
+     * was full, which is luck rather than design -- hence the emptiness check on
+     * both sides below.
+     */
+    const namesIn = (text: string): string[] => {
+      const at = text.search(/^.*RESERVED_KEYS[^\n]*\[\s*$/m)
+      expect(at, 'no RESERVED_KEYS array to read').toBeGreaterThan(-1)
+
+      const from = text.indexOf('\n', at)
+      const list = text.slice(from, text.indexOf(']', from))
+      return [...list.matchAll(/'([^']+)'/g)].map((match) => match[1] ?? '').sort()
+    }
+
+    const published = namesIn(spec)
+    const exported = namesIn(keys)
+
+    expect(
+      published.length,
+      'the published list is empty, so this compared nothing',
+    ).toBeGreaterThan(0)
+    expect(published, 'the specification publishes a different reserved list').toEqual(exported)
+    expect(exported.length, 'the exported list is empty, so this compared nothing').toBeGreaterThan(
+      0,
+    )
+
+    /*
+     * And the two figures beside it. `MAX_KEY_LENGTH` was in neither the block
+     * nor the prose, so a host importing generated documents met `invalid-key`
+     * on a name satisfying every rule the contract stated.
+     */
+    const pattern = /KEY_PATTERN = (\S+)/
+    expect(pattern.exec(spec)?.[1], 'the published pattern is not the exported one').toBe(
+      pattern.exec(keys)?.[1],
+    )
+
+    const bound = /MAX_KEY_LENGTH = (\d+)/
+    expect(bound.exec(spec)?.[1], 'the published length bound is not the exported one').toBe(
+      bound.exec(keys)?.[1],
+    )
+  })
+
   it.each([
     ['03-components.md', 'ComponentDef', 'packages/core/src/kit.ts'],
     ['01-document-model.md', 'ComponentNode', 'packages/core/src/types.ts'],
