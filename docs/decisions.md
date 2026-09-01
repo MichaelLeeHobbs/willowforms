@@ -14,6 +14,12 @@ The field that earns this file is **Reversal**: it says which entries deserve a 
   positives -- `(a|a)` matches exactly what `(a)` matches, so no author writes one deliberately and
   refusing it takes nothing away. It also happens to be the exact example the code's own docblock named
   as uncaught.
+- **Corrected in review:** the first version of this entry, and the spec paragraph with it, named
+  `(a+|b)*` as part of the residual. It is not -- the inner `+` makes the group hold an unbounded
+  quantifier and the outer `*` repeats it, so the nesting rule already refuses it. The residual is
+  `(a|ab)*`: overlapping branches with no repeat inside either. The same review found that the
+  duplicate-branch check sliced the group body from the character after `(`, so `(?:a|a)*` compared
+  `?:a` against `a` and escaped it -- in the spelling an author is most likely to write.
 - **Rejected: first-character overlap detection.** It would catch `(a|ab)*`, which is the real residual,
   and it would also refuse `(ab|ac)+`, which is perfectly safe and the sort of thing an author writes.
   Refusing a legitimate pattern is a worse failure than missing a dangerous one here: the author gets a

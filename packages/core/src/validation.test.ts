@@ -1194,6 +1194,15 @@ describe('a pattern rule', () => {
      */
     ['a repeated group with a duplicated alternative', '^(a|a)*$'],
     ['the same with three branches', '^(x|a|a)+$'],
+    /*
+     * The non-capturing form, which is what an author actually writes -- and
+     * which the first version of this guard let through: the group body was
+     * sliced from the character after `(`, so `?:a` was compared against `a`
+     * and found different. Raised in review on PR #40.
+     */
+    ['the non-capturing form of the same', '^(?:a|a)*$'],
+    ['a named group with a duplicated alternative', '^(?<pick>a|a)*$'],
+    ['a lookahead prefix does not hide it either', '^(?=a|a)+$'],
   ])('refuses %s rather than running it', (_what, source) => {
     /*
      * Refused means the rule fails, not that it passes. A pattern the engine
@@ -1231,6 +1240,9 @@ describe('a pattern rule', () => {
      */
     expect(pattern('^(ab|cd)+$', 'abcd')).toBeUndefined()
     expect(pattern('^(ab|ac)+$', 'abac')).toBeUndefined()
+    // The non-capturing form of a *legitimate* alternation, so the prefix skip
+    // above cannot be a blanket refusal of `(?:`.
+    expect(pattern('^(?:ab|cd)+$', 'abcd')).toBeUndefined()
     expect(pattern(String.raw`^(\d{3}|\d{4})-x$`, '123-x')).toBeUndefined()
   })
 

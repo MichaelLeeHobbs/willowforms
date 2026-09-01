@@ -257,10 +257,14 @@ function repeatsAt(source: string, at: number): boolean {
  * holds another one. `(\d{3}-)+` — a phone number — passes, because the inner
  * repetition has a fixed length.
  *
- * It is not a decision procedure. `(a|a)*` blows up too and is not caught here,
- * and no cheap syntactic rule separates a dangerous alternation from
- * `(ab|cd)+`. See `docs/build-out/triage.md` for what is left and why closing
- * it needs a different regex engine rather than a better heuristic.
+ * It is not a decision procedure, and what is left is narrower than it was.
+ * `(a|a)*` is refused now -- a duplicated alternative is never useful, so
+ * refusing one costs an author nothing. What is still accepted is an
+ * alternation whose branches genuinely overlap without either being a repeat:
+ * `(a|ab)*` is exponential and passes. No cheap syntactic rule separates that
+ * from `(ab|cd)+`, and a first-character heuristic would refuse `(ab|ac)+`,
+ * which is safe. `docs/spec/08-validation.md` states the residual as a
+ * deployment concern with what a host can do about it.
  */
 function nestedUnbounded(source: string): 'nested' | 'duplicate-branch' | undefined {
   /**
@@ -286,7 +290,28 @@ function nestedUnbounded(source: string): 'nested' | 'duplicate-branch' | undefi
       continue
     }
     if (ch === '(') {
-      stack.push({ unbounded: false, from: i + 1, bars: [] })
+      /*
+       * Where the group's *body* starts, which is not always the next
+       * character.
+       *
+       * `from: i + 1` put the `?:` of a non-capturing group inside the first
+       * alternative, so `(?:a|a)*` compared `?:a` against `a`, found them
+       * different, and let the duplicate through -- the exact shape this check
+       * exists for, in the spelling an author is most likely to write. Raised
+       * in review on PR #40.
+       *
+       * Every `(?…)` prefix is skipped, not only `?:`: a lookahead, a lookbehind
+       * and a named group all put characters before the body for the same
+       * reason and would all mis-slice it.
+       */
+      let from = i + 1
+      if (source[from] === '?') {
+        const named = /^\?<[^>]*>/.exec(source.slice(from))
+        if (named) from += named[0].length
+        else if (source[from + 1] === '<') from += 3
+        else from += 2
+      }
+      stack.push({ unbounded: false, from, bars: [] })
       continue
     }
     if (ch === '|') {
@@ -324,8 +349,8 @@ function nestedUnbounded(source: string): 'nested' | 'duplicate-branch' | undefi
        * author writes one on purpose and refusing it takes nothing away.
        *
        * This is not general alternation analysis and does not pretend to be.
-       * `(a|ab)*` and `(a+|b)*` still blow up and still pass, and no cheap
-       * syntactic rule separates those from `(ab|cd)+` -- overlapping-prefix
+       * `(a|ab)*` still blows up and still passes, and no cheap syntactic rule
+       * separates it from `(ab|cd)+` -- overlapping-prefix
        * detection would refuse `(ab|ac)+`, which is perfectly safe, and
        * refusing a pattern an author legitimately wrote is a worse failure than
        * this one. What is left is in the docblock and in

@@ -120,9 +120,14 @@ Three of these degrade towards failing rather than passing, and they are the one
 
 The guard is structural. It reads the pattern's shape and never runs it, so it catches the nesting
 family and the duplicate branch above, and it does **not** catch an alternation whose branches genuinely
-overlap: `(a|ab)*` and `(a+|b)*` are exponential and are accepted. No cheap syntactic rule separates
-those from `(ab|cd)+`, and a first-character heuristic would refuse `(ab|ac)+`, which is safe --
+overlap without either being a repeat: `(a|ab)*` is exponential and is accepted. No cheap syntactic rule
+separates it from `(ab|cd)+`, and a first-character heuristic would refuse `(ab|ac)+`, which is safe --
 refusing a pattern an author legitimately wrote is a worse failure than missing one.
+
+`(a+|b)*` is **not** in that residual, which this paragraph got wrong: the inner `+` makes the group hold
+an unbounded quantifier and the outer `*` repeats it, so the nesting rule already refuses it. Every
+group-prefix spelling is covered too -- `(?:a|a)*`, `(?<name>a|a)*` and a lookahead prefix are read the
+same way as the bare form.
 
 This matters because **form authors and deployers are different people**. An author writing a pattern is
 not thinking about the server's event loop, and the 4096-character input cap bounds every polynomial
