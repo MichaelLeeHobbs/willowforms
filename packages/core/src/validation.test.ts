@@ -1933,3 +1933,86 @@ describe('a document nested deeper than the tree bound', () => {
     expect(errors).toEqual({ buried: DEFAULT_MESSAGES.required })
   })
 })
+
+describe('a document the submit path cannot read', () => {
+  /*
+   * The malformed-shape rows the two functions a server calls did not have.
+   *
+   * Every neighbouring walker carries them -- `context.test.ts:481`,
+   * `css.test.ts:604-620`, `renderer.test.tsx:1649` -- and the two on the
+   * submit path did not, in a package whose comments repeatedly name an
+   * unhandled 500 as the failure to avoid. No source change was needed for any
+   * of these to throw; `children: 7` is not nullish, so `for...of 7` threw
+   * `TypeError` straight out of a route handler.
+   *
+   * Nothing on the validate path calls `validateDocument`, so none of these
+   * shapes is filtered before it arrives.
+   */
+  const withChildren = (children: unknown): ComponentNode =>
+    ({ key: 'root', type: 'Screen', props: {}, children }) as unknown as ComponentNode
+
+  const BROKEN: [string, unknown][] = [
+    ['a number', 7],
+    ['an object map, which is how a list round-trips through some stores', { '0': {} }],
+    ['a string, which is iterable but not of nodes', 'ab'],
+    ['a list holding null', [null]],
+    ['a list holding a string', ['nope']],
+  ]
+
+  it.each(BROKEN)('validateForm survives children that are %s', (_what, children) => {
+    expect(() => validateForm(withChildren(children), {})).not.toThrow()
+  })
+
+  it.each(BROKEN)('submittedData survives children that are %s', (_what, children) => {
+    expect(() => submittedData(withChildren(children), {})).not.toThrow()
+  })
+
+  it('still walks the children a real document has', () => {
+    /*
+     * The control. Guarding by returning nothing would pass every row above
+     * while quietly validating no form at all -- which is the permissive
+     * failure, not a fix for it.
+     */
+    const root = withChildren([
+      {
+        key: 'name',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      },
+    ])
+
+    expect(validateForm(root, {})).toEqual({ name: DEFAULT_MESSAGES.required })
+  })
+
+  it('reports a validations entry that is not a rule rather than throwing', () => {
+    /*
+     * `applyRule` read `rule.when` before checking it was a rule, so
+     * `"validations": [null]` was a TypeError out of validateForm, on the
+     * server, per submit. `validationsOf` only checks the array is an array,
+     * and both `isRequired` and `context.ts` read rules with `rule?.`, so a
+     * nullish entry was already known to be reachable.
+     */
+    const root = withChildren([
+      {
+        key: 'name',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [null] },
+      },
+    ])
+
+    expect(() => validateForm(root, {})).not.toThrow()
+    expect(validateForm(root, {})).toEqual({ name: UNREADABLE_RULE })
+  })
+
+  it('does not let an unreadable rule pass as satisfied', () => {
+    // The direction. Skipping it would turn a field with one junk rule into a
+    // field with no rules, which is what the surrounding code refuses to do.
+    const root = withChildren([
+      { key: 'name', type: 'Field', props: {}, schema: { type: 'string', validations: [null] } },
+    ])
+
+    expect(validateForm(root, { name: 'anything' })).not.toEqual({})
+  })
+})

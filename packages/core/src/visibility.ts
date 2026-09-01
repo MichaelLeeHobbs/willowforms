@@ -57,6 +57,19 @@ function runs(
 }
 
 export function isVisible(node: ComponentNode, data: FormData, options: EvalOptions = {}): boolean {
+  /*
+   * The node is checked before it is read, like every other document walker in
+   * the package and unlike this one until now. It is the first thing
+   * `validateForm`'s walk calls, on a walk that did not filter its children
+   * either, so `"children": [null]` threw here during both render and
+   * server-side validation.
+   *
+   * Visible is the answer for a node that is not one: hidden would take a
+   * subtree out of validation, which is the permissive direction, and there is
+   * nothing here to hide.
+   */
+  if (!node || typeof node !== 'object') return true
+
   const when = node.renderWhen
   if (!when) return true
 
@@ -87,6 +100,22 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
      * nothing at all.
      */
     case 'condition':
+      /*
+       * A `condition` kind with no condition on it expresses no rule, so it is
+       * shown -- the same answer `i18n` and an unrecognised kind get, for the
+       * reason spelled out at both: this function is asked whether a rule was
+       * expressed, not whether one holds.
+       *
+       * It was passed straight to `evaluateCondition`, which correctly reads a
+       * missing condition as unreadable and answers false, so the node and its
+       * whole subtree left the DOM *and* left `validateForm` -- a required
+       * answer quietly becoming advisory on the server. That is the exact
+       * failure the `default` branch below was written for, reached by one
+       * missing property in a hand-edited document instead of by one mistyped
+       * character. `tree.ts` reports this shape; nothing on the validate path
+       * calls it.
+       */
+      if (!when.condition) return true
       return evaluateCondition(when.condition, data, options.context, options.row)
 
     /*
