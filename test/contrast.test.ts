@@ -86,11 +86,14 @@ function darkBlocks(
   chosenDark: string,
   systemDark: string,
 ): { chosen: Record<string, string>; system: Record<string, string> } {
-  return { chosen: tokensFrom(css, chosenDark), system: tokensFrom(css, systemDark) }
+  return {
+    chosen: tokensFrom(css, chosenDark, false),
+    system: tokensFrom(css, systemDark, false),
+  }
 }
 
 describe("the designer's two dark blocks", () => {
-  it('declare the same tokens', () => {
+  it('match declaration for declaration, not only token for token', () => {
     const { chosen, system } = darkBlocks(
       designerCss,
       ".fs-shell[data-fs-theme='dark']",

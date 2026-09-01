@@ -938,6 +938,79 @@ describe('documentation links', () => {
   })
 })
 
+/**
+ * Every file in the repository, repository-relative, skipping what is generated.
+ *
+ * `sourceFiles` below is deliberately narrower -- it answers "does the product
+ * do this", so it drops tests and fixtures. A pointer at a test file is a
+ * different question and has to see all of them.
+ */
+function everyFile(dir = ''): string[] {
+  const found: string[] = []
+  for (const entry of readdirSync(fileURLToPath(new URL(dir || '.', root)), {
+    withFileTypes: true,
+  })) {
+    const path = dir + entry.name
+    if (entry.isDirectory()) {
+      // `tmp` is in `.gitignore` and holds a copy of a review, which an earlier
+      // draft of this read and then failed on.
+      if (['node_modules', 'dist', '.git', 'coverage', 'test-results', 'tmp'].includes(entry.name))
+        continue
+      found.push(...everyFile(path + '/'))
+      continue
+    }
+    found.push(path)
+  }
+  return found
+}
+
+describe('a pointer at a test file', () => {
+  it('names one that exists', () => {
+    /*
+     * A comment in `Canvas.tsx` sent a reader to a `Canvas.data` variant for
+     * the assertion behind a rule axe cannot check without a layout engine.
+     * There is no such file; the assertion is in `Canvas.test.tsx`. The comment
+     * was true when it was written and a rename made it a dead end, which is
+     * the only kind of stale comment that costs real time: the reader goes
+     * looking, finds nothing, and cannot tell whether the check was moved or
+     * deleted.
+     *
+     * Comments are not compiled and nothing else in this repository reads them,
+     * so the pointer decays silently.
+     *
+     * Code only, and this is the line worth being exact about. Markdown names
+     * test files it does not have: the write-tests skill teaches with an
+     * invented `thing`, and `docs/reviews` asks for tests that were never
+     * written, which is what a review is for. Both are correct prose and
+     * neither is a broken pointer. A comment beside the code is a different
+     * promise -- it says "the check is over there" about a repository the
+     * reader is already standing in.
+     *
+     * Matched by basename, so moving a test between packages does not fail
+     * this. A pointer at a directory or a symbol is a wider problem and this
+     * does not pretend to solve it.
+     */
+    const files = everyFile()
+    const tests = new Set(
+      files.filter((file) => /\.test\.tsx?$/.test(file)).map((file) => file.split('/').pop()),
+    )
+
+    expect(tests.size, 'no test files were found, so this compared nothing').toBeGreaterThan(20)
+
+    const code = files.filter((file) => /\.(?:tsx?|css|mjs)$/.test(file))
+    expect(code.length, 'no code was read, so this compared nothing').toBeGreaterThan(50)
+
+    const dead: string[] = []
+    for (const file of code) {
+      for (const match of read(file).matchAll(/[A-Za-z0-9_][A-Za-z0-9_.-]*\.test\.tsx?\b/g)) {
+        if (!tests.has(match[0])) dead.push(file + ' points at ' + match[0])
+      }
+    }
+
+    expect(dead, 'a comment sends a reader to a file that is not there').toEqual([])
+  })
+})
+
 /*
  * Everything below is one kind of drift: the specification saying a thing does
  * not exist while the repository holds it. That is the direction that matters.
@@ -978,17 +1051,6 @@ function sourceFiles(): { path: string; text: string }[] {
        */
       if (isFixture(entry.name)) continue
 
-      /*
-       * And not the guardrail fixtures either. `eslint.config.test.ts` writes
-       * those into `packages/core/src` and `packages/designer/src`, lints them
-       * and deletes them, and vitest runs test files in parallel -- so this walk
-       * could list one and then find it gone before reading it, and every
-       * DISPROOF case below would fail on a run where nothing changed.
-       *
-       * Skipped by the name they share with the file that writes them, rather
-       * than by catching the `ENOENT`: a file that vanishes mid-walk is a race
-       * worth not having, not an error worth swallowing.
-       */
       found.push({ path, text: read(path) })
     }
   }

@@ -96,6 +96,16 @@
 }
 
 .fs-shell[data-fs-theme='dark'] {
+  /*
+   * The same `color-scheme` the media-query block sets.
+   *
+   * It was in that block only, so a host that forces dark through the attribute
+   * on a machine set to light got the dark palette painted around light UA
+   * widgets: a white scrollbar down a dark panel, a light date picker, a light
+   * spinner on a number field. `color-scheme` is what tells the browser which
+   * one to draw, and no token can say it.
+   */
+  color-scheme: dark;
   --fs-bg-app: #1b1d21;
   --fs-bg-panel: #24272c;
   --fs-bg-well: #15171a;

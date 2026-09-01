@@ -788,7 +788,7 @@ export function Canvas({
        * problem, and `aria-label` is what turns the stop into "Data, group".
        * axe's `scrollable-region-focusable` is one of three rules
        * `test/a11y.test.tsx` disables for want of a layout engine, so this is
-       * asserted directly in `Canvas.data.test.tsx` instead of waited for.
+       * asserted directly in `Canvas.test.tsx` instead of waited for.
        */}
       {preview && (
         <div className="fs-canvas__data">
