@@ -110,7 +110,20 @@ const KIT_MESSAGE =
  * with CI, that one catches any warn-severity rule from any other plugin. Both
  * are held in place by tests; do not delete either as duplication.
  */
-const erroring = (rules) => Object.fromEntries(Object.keys(rules).map((name) => [name, 'error']))
+const erroring = (rules) =>
+  Object.fromEntries(
+    Object.entries(rules).map(([name, level]) => [
+      name,
+      /*
+       * Severity only. An entry may be `['warn', { ...options }]`, and mapping
+       * it to a bare `'error'` would silently drop the options -- changing what
+       * the rule does rather than only whether it fails the build, in a helper
+       * whose whole claim is to be derived from the preset. None of the sixteen
+       * rules carries options today; the shape is the plugin's to change.
+       */
+      Array.isArray(level) ? ['error', ...level.slice(1)] : 'error',
+    ]),
+  )
 
 const HOOKS_RULES = erroring(reactHooks.configs.recommended.rules)
 

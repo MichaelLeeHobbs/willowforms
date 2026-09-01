@@ -443,8 +443,16 @@ describe('the invariants are enforced by the linter, not only by CLAUDE.md', () 
       }
     ).configs.recommended.rules
 
+    /*
+     * An entry may be a bare level or `[level, { ...options }]`. Reading only
+     * the scalar form would report "no rule warns" for a preset whose
+     * warn-severity rules had gained options -- concluding the flag was
+     * unnecessary at exactly the moment it still was.
+     */
+    const severityOf = (level: unknown): unknown => (Array.isArray(level) ? level[0] : level)
+
     const warned = Object.entries(rules)
-      .filter(([, level]) => level === 'warn' || level === 1)
+      .filter(([, level]) => severityOf(level) === 'warn' || severityOf(level) === 1)
       .map(([name]) => name)
 
     expect(
