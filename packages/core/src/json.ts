@@ -18,19 +18,6 @@ export function jsonToString(value: JsonValue | undefined): string {
 }
 
 /**
- * The declared value behind a submitted option string.
- *
- * A `<select>` hands back `event.target.value`, which is always a string, so a
- * numeric option value came back as `"2"` and the form submitted a string where
- * the author had declared a number. Options are matched on the spelling
- * `jsonToString` gave them, so this is the exact inverse of what the kit
- * rendered, and an option with no declared value keeps falling back to its
- * position.
- *
- * A submitted string matching nothing is returned as-is: that is the empty
- * placeholder, and inventing a value for it would be worse.
- */
-/**
  * A declared value, read as an own property.
  *
  * Own, not inherited: the rest of this package reads option fields with
@@ -155,6 +142,19 @@ export function optionValues(options: readonly unknown[]): string[] {
   return out
 }
 
+/**
+ * The declared value behind a submitted option string.
+ *
+ * A `<select>` hands back `event.target.value`, which is always a string, so a
+ * numeric option value came back as `"2"` and the form submitted a string where
+ * the author had declared a number. Options are matched on the spelling
+ * `jsonToString` gave them, so this is the exact inverse of what the kit
+ * rendered, and an option with no declared value keeps falling back to its
+ * position.
+ *
+ * A submitted string matching nothing is returned as-is: that is the empty
+ * placeholder, and inventing a value for it would be worse.
+ */
 export function optionValue(options: readonly unknown[], submitted: string): JsonValue {
   /*
    * Resolved through the same table the control rendered from, so the two are
@@ -189,20 +189,6 @@ export function optionValue(options: readonly unknown[], submitted: string): Jso
 }
 
 /**
- * One entry of an options list, as the two strings a control needs.
- *
- * Every kit drew its own version of this and every one of them read `.value`
- * off the entry without asking what the entry was, so a `null` in the array
- * threw during render — in four places across two kits. The guarded read
- * already existed here, in `optionValue`, which is the function these controls
- * hand their answer back through; it was just not the one they used to draw.
- *
- * The rules are `optionValue`'s, exactly, because the two have to be inverses.
- * An entry that is not an object has no declared value, and an option with no
- * declared value falls back to its position — so the value a control submits is
- * the string this returns.
- */
-/**
  * `optionValues` for one list, computed once however many options ask.
  *
  * `optionEntry` is called from inside `options.map(...)` in both kits, and it
@@ -227,6 +213,20 @@ function valuesFor(all: readonly unknown[]): string[] {
   return computed
 }
 
+/**
+ * One entry of an options list, as the two strings a control needs.
+ *
+ * Every kit drew its own version of this and every one of them read `.value`
+ * off the entry without asking what the entry was, so a `null` in the array
+ * threw during render — in four places across two kits. The guarded read
+ * already existed here, in `optionValue`, which is the function these controls
+ * hand their answer back through; it was just not the one they used to draw.
+ *
+ * The rules are `optionValue`'s, exactly, because the two have to be inverses.
+ * An entry that is not an object has no declared value, and an option with no
+ * declared value falls back to its position — so the value a control submits is
+ * the string this returns.
+ */
 export function optionEntry(
   option: JsonValue | undefined,
   index: number,
