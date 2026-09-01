@@ -125,7 +125,15 @@ export interface DesignerApi {
 
   select: (key: string | undefined) => void
   /** Add a palette entry under a parent, selecting the new node. */
-  addComponent: (def: ComponentDef, parentKey?: string, index?: number) => void
+  /**
+   * Adds a component, and answers whether anything landed.
+   *
+   * It returned `void`, so every caller announced an insert unconditionally --
+   * including the three refusals inside: an insert that matched no parent, one
+   * decided against a document that has since moved, and a definition a kit got
+   * wrong. A screen-reader user was told a component was added when none was.
+   */
+  addComponent: (def: ComponentDef, parentKey?: string, index?: number) => boolean
   setProp: (key: string, name: string, value: PropValue | undefined) => void
   /**
    * Replace a component's field schema, which is where its validation rules
@@ -169,7 +177,8 @@ export interface DesignerApi {
    * carries no key rather than an empty object.
    */
   setNodeCss: (key: string, device: Device, text: string) => void
-  moveComponent: (key: string, parentKey: string, index?: number) => void
+  /** Moves a component, and answers whether it moved. See `addComponent`. */
+  moveComponent: (key: string, parentKey: string, index?: number) => boolean
   /**
    * Copy a component and its subtree in beside it, and select the copy.
    *
@@ -353,15 +362,30 @@ export function useDesigner(initial: FormDocument): DesignerApi {
    * saved document is worse than one that opens it and says what is wrong, and
    * the designer is where somebody goes to repair it.
    */
+  /*
+   * Once, for the document this hook was mounted with -- and the dependency
+   * was `[initial]`, which is not that.
+   *
+   * `initialDocument` is read once, in a `useState` initializer, and ignored
+   * after mount. The effect keyed on it re-ran on every identity change of a
+   * prop the hook does not otherwise look at -- and `README.md` documents the
+   * pattern `initialDocument={form} onChange={setForm}`, under which `form` is
+   * a new object per edit. So a host following the README got a full-document
+   * structural walk plus a repeated `console.warn` on every keystroke,
+   * describing a document `useDesigner` had already discarded.
+   *
+   * An empty dependency array says what the comment said. The value read inside
+   * is the one from the first render, which is the document this hook is about.
+   */
+  const mountedWith = useRef(initial)
   useEffect(() => {
-    const problems = validateDocument(initial)
+    const problems = validateDocument(mountedWith.current)
     if (problems.length === 0) return
     console.warn(
       'Formsmith: this document does not validate. ' +
         problems.map((problem) => problem.message).join(' '),
     )
-    // Once, for the document this hook was mounted with.
-  }, [initial])
+  }, [])
 
   const latest = useRef(history.present)
   useEffect(() => {
@@ -390,7 +414,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
      * the same outcome as an insert that matched no parent, three lines down.
      */
     const node = instantiate(def, doc.root)
-    if (!node) return
+    if (!node) return false
 
     const root = insertNode(doc.root, containerFor(doc.root, parentKey), node, index)
 
@@ -401,7 +425,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
      * the document, which is the precondition for the next mistake.
      * `moveComponent` and `removeComponent` have always guarded this.
      */
-    if (root === doc.root) return
+    if (root === doc.root) return false
 
     /*
      * Committed against the version it was decided on, not against whatever the
@@ -418,8 +442,26 @@ export function useDesigner(initial: FormDocument): DesignerApi {
      * decided against a tree that no longer exists and its index means something
      * else. Doing nothing is recoverable; writing the wrong thing is not.
      */
-    setHistory((h) => (h.present === doc ? commit(h, { ...doc, root }) : h))
-    setSelectedKey(node.key)
+    /*
+     * The selection moves only if the commit landed.
+     *
+     * `setSelectedKey` ran unconditionally on the next line, so when the
+     * document had moved between the read of `latest.current` and the updater,
+     * nothing was inserted and the selection still went to a key that is not in
+     * the document. `Designer.tsx` then announced "Text added to root." for an
+     * insert that did not happen.
+     *
+     * Decided against the same document the commit was decided against, so the
+     * two cannot disagree.
+     */
+    let landed = false
+    setHistory((h) => {
+      if (h.present !== doc) return h
+      landed = true
+      return commit(h, { ...doc, root })
+    })
+    if (landed) setSelectedKey(node.key)
+    return landed
   }, [])
 
   const setProp = useCallback(
@@ -693,14 +735,24 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const moveComponent = useCallback(
     (key: string, parentKey: string, index?: number) => {
+      /*
+       * Answers whether the move happened, for the reason `addComponent` does:
+       * every caller announced one unconditionally, and `moveNode` returns the
+       * identical root for an illegal move -- so a screen-reader user was told a
+       * component moved into a container that will not hold it.
+       */
+      let moved = false
       apply((doc) => {
         const root = moveNode(doc.root, key, parentKey, index)
         // moveNode returns the same root for an illegal move. Wrapping it in a
         // new document anyway defeated the identity check in commit, so a
         // refused drop still grew the undo stack with a state identical to the
         // one before it.
-        return root === doc.root ? doc : { ...doc, root }
+        if (root === doc.root) return doc
+        moved = true
+        return { ...doc, root }
       })
+      return moved
     },
     [apply],
   )
