@@ -15,7 +15,19 @@ import { evaluateCondition } from './condition.js'
 import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
-import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, flatten, validationsOf } from './tree.js'
+import {
+  MAX_TREE_DEPTH,
+  childNodesOf,
+  dataKeyOf,
+  flatten,
+  isRowScope,
+  validationsOf,
+} from './tree.js'
+
+// Re-exported so `@formsmith/core`'s entry point keeps offering it from here,
+// which is where it was public from. The definition moved to `tree.ts` because
+// `rows.ts` had a second, differing copy; see that docblock.
+export { isRowScope }
 import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -907,17 +919,6 @@ export function validateForm(
 
   visit(root, options)
   return errors
-}
-
-/**
- * A node whose children are drawn once per row.
- *
- * Recognised from the node rather than from a type string, because component
- * types are kit-scoped and core must not learn the word `Repeater`. A
- * data-bound container holding a list is the only thing that shape can mean.
- */
-export function isRowScope(node: ComponentNode): boolean {
-  return node.schema?.type === 'array' && node.children !== undefined
 }
 
 /** The record a node's own value is read from: a row's object, or the form's data. */

@@ -80,6 +80,29 @@ export function walk(
  * during render unmounts the whole designer in React 19 -- including the JSON
  * dialog that was the repair route.
  */
+/**
+ * A node whose children are drawn once per row.
+ *
+ * Recognised from the node rather than from a type string, because component
+ * types are kit-scoped and core must not learn the word `Repeater`. A
+ * data-bound container holding a list is the only thing that shape can mean.
+ *
+ * It lives here, in the module both `rows.ts` and `validation.ts` already
+ * import, because there were two of it. `validation.ts` asked
+ * `children !== undefined` and `rows.ts` asked `Array.isArray`, so the two
+ * disagreed about any truthy non-array `children`: a node with
+ * `schema.type: 'array'` and `children: 5` was a repeater to `validateForm`
+ * and not to `rowScopeProblems` or `keyScopesFor`. The submit path then
+ * expected a list and walked children that are not iterable. The leaf guard in
+ * `moveNode` compounded it by writing `Array.isArray` under a comment saying it
+ * asks "the way `isRowScope` asks", which was not what `isRowScope` asked.
+ *
+ * `Array.isArray` is the answer all three now give.
+ */
+export function isRowScope(node: ComponentNode): boolean {
+  return node?.schema?.type === 'array' && Array.isArray(node.children)
+}
+
 export function childNodesOf(node: ComponentNode): ComponentNode[] {
   if (!Array.isArray(node.children)) return []
   return node.children.filter(

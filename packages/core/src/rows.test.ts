@@ -21,7 +21,7 @@ import {
   validateForm,
 } from './validation.js'
 import { createDocument } from './factory.js'
-import { validateDocument } from './tree.js'
+import { findNode, validateDocument } from './tree.js'
 import type { ComponentNode, FormData, FormDocument, JsonValue } from './types.js'
 
 describe('the row coordinate', () => {
@@ -1042,5 +1042,116 @@ describe('keyScopesFor on a document nobody gated', () => {
     }
 
     expect(() => keyScopesFor(deep, 'leaf')).not.toThrow()
+  })
+})
+
+describe('the shape that told the two repeater predicates apart', () => {
+  /*
+   * There were two definitions of "is this a repeater" and this file's one test
+   * of the rule could not distinguish them.
+   *
+   * `validation.ts` asked `children !== undefined` and `rows.ts` asked
+   * `Array.isArray`, and all three fixtures in "recognises a repeater from its
+   * shape, not from a type string" agree under both. The shape that separates
+   * them is a truthy non-array: `schema.type: 'array'` with `children: 5` was a
+   * repeater to `validateForm` -- which then expected a list and walked
+   * children that are not iterable -- and not to `rowScopeProblems` or
+   * `keyScopesFor`.
+   *
+   * One definition now, in `tree.ts`, which both modules already import.
+   */
+  const odd = (children: unknown): ComponentNode =>
+    ({
+      key: 'addressList',
+      dataKey: 'addresses',
+      type: 'Repeater',
+      props: {},
+      schema: { type: 'array', validations: [] },
+      children,
+    }) as unknown as ComponentNode
+
+  it.each([
+    ['a number', 5],
+    ['an object map', { '0': {} }],
+    ['a string', 'ab'],
+  ])('answers the same about children that are %s', (_what, children) => {
+    expect(isRowScope(odd(children))).toBe(false)
+  })
+
+  it('still recognises a real repeater', () => {
+    // The control. Answering false for everything would pass all three rows.
+    expect(isRowScope(odd([]))).toBe(true)
+  })
+
+  it('does not walk a malformed repeater as though it held rows', () => {
+    /*
+     * The consequence, driven through the function that was the permissive
+     * half. `validateForm` treated the node as a repeater and iterated
+     * `children: 5`.
+     */
+    const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [odd(5)] }
+
+    expect(() => validateForm(root, { addresses: [{}] })).not.toThrow()
+  })
+})
+
+describe('which node a duplicate key resolves to', () => {
+  /*
+   * `keyScopesFor` did not take the first match, though its comment cites
+   * `findNode`, `findParent` and `pathTo` for the rule. The guard was
+   * `node.key === nodeKey && enclosing && row === undefined`, so a first match
+   * outside a repeater was skipped and a later duplicate inside one set the row
+   * scope.
+   *
+   * The author then picks `scope: 'row'` on a node in no row: the read is
+   * undefined, the condition false, the component hidden, and never validated.
+   */
+  const twoNamed = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      { key: 'x', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          { key: 'x', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+        ],
+      },
+    ],
+  })
+
+  it('offers no row scope when the first match is not in a repeater', () => {
+    expect(keyScopesFor(twoNamed(), 'x').row).toBeUndefined()
+  })
+
+  it('agrees with findNode about which node that is', () => {
+    /*
+     * The point of the rule, stated as the comparison it is about: two
+     * functions disagreeing about which node a key means is a bug whichever
+     * answer is right.
+     */
+    const root = twoNamed()
+    const resolved = findNode(root, 'x')
+    const insideRepeater = root.children?.[1]?.children?.[0]
+
+    expect(resolved).not.toBe(insideRepeater)
+    expect(keyScopesFor(root, 'x').row).toBeUndefined()
+  })
+
+  it('still offers a row scope when the first match really is in one', () => {
+    // The control. Never offering a row scope would pass both rows above while
+    // breaking every repeater in the panel.
+    const root = twoNamed()
+    const onlyInside: ComponentNode = {
+      ...root,
+      children: [root.children?.[1] as ComponentNode],
+    }
+
+    expect(keyScopesFor(onlyInside, 'x').row).toBeDefined()
   })
 })
