@@ -4,6 +4,24 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### `contextValues` exports its cap instead of reporting truncation in its return type
+
+- **Decided:** `MAX_CONTEXT_VALUES` becomes a public export and the docblock shows a host how to detect
+  truncation (`values.length >= MAX_CONTEXT_VALUES`). The signature stays `JsonValue[]`.
+- **Why:** the failure is real -- a document naming more distinct values than the cap yields a partial
+  list, and `validateAcross` runs one pass per scope built from it, so every step past the cap goes
+  unvalidated and the submit succeeds with its required fields missing. But reaching it needs a thousand
+  distinct literals on one path, which is not a form.
+- **Rejected: returning `{ values, truncated }`,** which is the shape `rowScopeProblems` uses and the one
+  the review points at. It is the better API and it is a breaking change to a public export, rippling
+  through the reference server and its tests, for a shape this severe only in theory. The export makes
+  the limit checkable without pretending the API is better than it is.
+- **Reversal:** cheap, and the export is forward-compatible with the better shape -- adding
+  `contextValuesWithin` or widening the return later does not invalidate a host that compared lengths.
+  What would be expensive is doing nothing: an undocumented silent cap is the kind of thing nobody finds
+  twice.
+- **When:** 2026-09-01, queue item 15.
+
 ### The ReDoS guard learns two shapes and documents the rest, rather than guessing at alternation
 
 - **Decided:** `nestedUnbounded` now propagates an unquantified group's finding to its parent (closing

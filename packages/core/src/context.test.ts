@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
+import {
+  MAX_CONTEXT_VALUES,
+  contextKeys,
+  contextValues,
+  evaluatorKeys,
+  missingContext,
+} from './context.js'
+import { MAX_CONDITION_DEPTH, evaluateCondition, same } from './condition.js'
 import { validateForm } from './validation.js'
-import type { ComponentNode, Condition, Operand } from './types.js'
+import type { ComponentNode, Condition, JsonValue, Operand } from './types.js'
 
 const ctx = (path: string): Operand => ({ kind: 'context', path })
 const lit = (value: string): Operand => ({ kind: 'literal', value })
@@ -660,5 +667,215 @@ describe('evaluatorKeys on a node with no usable key', () => {
     }
 
     expect(evaluatorKeys(plain)).toEqual([])
+  })
+})
+
+describe('the boot-time walkers, driven deep through the branch a panel produces', () => {
+  /*
+   * The only deep fixture for these walkers nests through `not`, which is the
+   * one branch that never had the bug.
+   *
+   * So the depth argument was only ever carried through the `not` recursion,
+   * and the `conditions` loops in this module were never reached at depth by
+   * any test in the repository -- while `and`/`or` is the branch the condition
+   * editor actually produces. `condition.ts` records that this is exactly where
+   * the depth argument was dropped once already. Delete `+ 1` on both loops and
+   * the entire suite stayed green while `contextKeys(root)` threw a RangeError
+   * during a host's startup.
+   *
+   * Built with loops; building either recursively would overflow first.
+   */
+  const DEEP = 50_000
+
+  const nest = (op: 'and' | 'or', n: number): Condition => {
+    let condition: Condition = {
+      op: 'eq',
+      left: { kind: 'context', path: 'step' },
+      right: { kind: 'literal', value: 'one' },
+    }
+    for (let i = 0; i < n; i += 1) condition = { op, conditions: [condition] }
+    return condition
+  }
+
+  const guarded = (condition: Condition): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'field',
+        type: 'Field',
+        props: {},
+        renderWhen: { kind: 'condition', condition },
+        schema: { type: 'string', validations: [] },
+      },
+    ],
+  })
+
+  it.each([
+    ['and', 'and' as const],
+    ['or', 'or' as const],
+  ])('contextKeys survives a document nested through %s', (_what, op) => {
+    expect(() => contextKeys(guarded(nest(op, DEEP)))).not.toThrow()
+  })
+
+  it.each([
+    ['and', 'and' as const],
+    ['or', 'or' as const],
+  ])('contextValues survives a document nested through %s', (_what, op) => {
+    expect(() => contextValues(guarded(nest(op, DEEP)), 'step')).not.toThrow()
+  })
+
+  it('still reads the paths a document nobody would call deep names', () => {
+    /*
+     * The control, and it is load-bearing: bounding by returning nothing would
+     * pass all four rows above while telling every host that its form reads no
+     * context at all -- which is the permissive answer, since `missingContext`
+     * would then report nothing missing.
+     */
+    expect(contextKeys(guarded(nest('and', 3)))).toContain('step')
+    expect(contextValues(guarded(nest('and', 3)), 'step')).toEqual(['one'])
+  })
+})
+
+describe('the cap on how many values one path reports', () => {
+  /*
+   * The cap was asserted as `toBeLessThanOrEqual(1000)` against a 40-step
+   * control, which leaves any value between 40 and 1000 green -- and the
+   * constant was neither exported nor named. So the number could have moved
+   * anywhere in that range with nothing red.
+   */
+  const withSteps = (count: number): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: Array.from({ length: count }, (_unused, index) => ({
+      key: 'step' + String(index),
+      type: 'Box',
+      props: {},
+      renderWhen: {
+        kind: 'condition' as const,
+        condition: {
+          op: 'eq' as const,
+          left: { kind: 'context' as const, path: 'step' },
+          right: { kind: 'literal' as const, value: 'step' + String(index) },
+        },
+      },
+    })),
+  })
+
+  it('reports exactly the cap when a document names more than it', () => {
+    const values = contextValues(withSteps(MAX_CONTEXT_VALUES + 50), 'step')
+
+    expect(values).toHaveLength(MAX_CONTEXT_VALUES)
+  })
+
+  it('lets a caller see that it truncated', () => {
+    /*
+     * The whole reason the constant is exported. The function returns a bare
+     * array, so without this a host cannot tell a complete answer from a
+     * truncated one -- and `validateAcross` runs one pass per scope built from
+     * this list, so every step past the cap goes unvalidated and the submit
+     * succeeds with its required fields missing.
+     */
+    const truncated = contextValues(withSteps(MAX_CONTEXT_VALUES + 50), 'step')
+    const complete = contextValues(withSteps(3), 'step')
+
+    expect(truncated.length >= MAX_CONTEXT_VALUES).toBe(true)
+    expect(complete.length >= MAX_CONTEXT_VALUES).toBe(false)
+  })
+})
+
+describe('a comparison that could not be made', () => {
+  /*
+   * Asserted through `not`, because that is the only place the distinction is
+   * observable -- `evaluateCondition` collapses unreadable to false at the
+   * boundary and the docblock says the difference exists for `not` and only
+   * for `not`.
+   *
+   * The ordering branch answered `false` rather than unreadable when the
+   * operands could not be compared, so `not(gt(x, y))` was **true** and a
+   * component appeared on the strength of a comparison that never happened.
+   * The `in`/`notIn` branch was changed from `false` to `undefined` because
+   * that exact shape was a bug; this one was not.
+   */
+  const cmp = (op: 'gt' | 'gte' | 'lt' | 'lte'): Condition => ({
+    op,
+    left: { kind: 'context', path: 'answer' },
+    right: { kind: 'literal', value: 5 },
+  })
+
+  // The answer arrives as a string, which `order` cannot compare to a number.
+  const notComparable = { answer: '5' }
+
+  it.each(['gt', 'gte', 'lt', 'lte'] as const)(
+    'does not show a component through a negated %s that never happened',
+    (op) => {
+      expect(
+        evaluateCondition({ op: 'not', condition: cmp(op) }, {}, notComparable),
+        'negating an unreadable comparison showed the component',
+      ).toBe(false)
+    },
+  )
+
+  it.each(['gt', 'gte', 'lt', 'lte'] as const)('%s itself stays hidden', (op) => {
+    // The un-negated direction was already right and must stay right: the
+    // boundary collapses unreadable to false, which is hidden.
+    expect(evaluateCondition(cmp(op), {}, notComparable)).toBe(false)
+  })
+
+  it('still orders two values it can compare, in both directions', () => {
+    // The control. Answering unreadable for everything would pass every row
+    // above while breaking every ordering rule in every form -- including
+    // through `not`, which is what the rows above actually read.
+    expect(evaluateCondition(cmp('gt'), {}, { answer: 9 })).toBe(true)
+    expect(evaluateCondition(cmp('lt'), {}, { answer: 1 })).toBe(true)
+    expect(evaluateCondition({ op: 'not', condition: cmp('gt') }, {}, { answer: 9 })).toBe(false)
+    expect(evaluateCondition({ op: 'not', condition: cmp('gt') }, {}, { answer: 1 })).toBe(true)
+  })
+})
+
+describe('same, past its bound', () => {
+  /** `[[[…value…]]]`, n deep, as a fresh chain each call. */
+  const wrap = (value: JsonValue, n: number): JsonValue => {
+    let out = value
+    for (let i = 0; i < n; i += 1) out = [out]
+    return out
+  }
+
+  it('answers true when the walk reaches one object from two sides', () => {
+    /*
+     * The identity shortcut sat *after* the bound check, so past the bound even
+     * two references to the same object compared unequal -- and `false` from
+     * `same` is what makes `ne` and `notIn` true, which is the outcome the
+     * comment there says the choice avoids.
+     *
+     * Two distinct chains bottoming out on one shared value, placed at exactly
+     * `MAX_CONDITION_DEPTH + 1` -- the one depth where the two orderings
+     * disagree.
+     *
+     * Two earlier fixtures were wrong and both are worth recording.
+     * `same(shared, shared)` at the top level never reaches the bound at all,
+     * because identity fires at depth 0 whichever order the lines are in. And
+     * burying the shared value at `+ 50` does not work either: the walk stops
+     * at 201 on the distinct wrappers, so it never arrives at the shared object
+     * to compare it. The window is one level wide.
+     */
+    const shared: JsonValue = { deep: 'value' }
+    const left = wrap(shared, MAX_CONDITION_DEPTH + 1)
+    const right = wrap(shared, MAX_CONDITION_DEPTH + 1)
+
+    expect(same(left, right)).toBe(true)
+  })
+
+  it('still answers false for two deep values that never meet', () => {
+    // The control: the bound is still there, and past it two structures that
+    // are merely alike are not merged.
+    expect(
+      same(
+        wrap({ deep: 'value' }, MAX_CONDITION_DEPTH + 50),
+        wrap({ deep: 'value' }, MAX_CONDITION_DEPTH + 50),
+      ),
+    ).toBe(false)
   })
 })
