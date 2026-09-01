@@ -959,6 +959,17 @@ function everyFile(dir = ''): string[] {
       found.push(...everyFile(path + '/'))
       continue
     }
+
+    /*
+     * Not the guardrail fixtures. `eslint.config.test.ts` writes those into
+     * `packages/core/src` and `packages/designer/src`, lints them and deletes
+     * them, and vitest runs test files in parallel -- so this walk could list
+     * one and then find it gone before `read` opens it, failing with an
+     * `ENOENT` on a run where nothing changed. `sourceFiles` skips them for the
+     * same reason and says so at more length.
+     */
+    if (isFixture(entry.name)) continue
+
     found.push(path)
   }
   return found
