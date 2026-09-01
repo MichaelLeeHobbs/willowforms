@@ -200,22 +200,19 @@ shipped kit's documents mean, and the alternative — declaring option values ki
 spec change. This is the same class as the `gap` units entry above: the kits agree on the shape of a
 property and disagree about what its values mean.
 
-## Renaming a component key leaves every condition that named its answer dangling
+## A ref naming a data key nothing writes is reported by nothing
 
-`renameKey` re-points the renamed node's own `renderWhen` and nothing else. A component with no
-explicit `dataKey` answers under its key, so renaming `emailField` to `email` renames the answer too,
-and a sibling whose `renderWhen` reads `emailField` now reads a key nothing writes. The condition is
-false, the sibling is hidden, its rules never run, and nothing says a word. Dragging the two apart, or
-renaming for tidiness a week later, is all it takes.
+`validateDocument` walks a document's structure and says nothing about a `renderWhen` whose `ref` names
+a data key no node answers under. The condition is false forever, the component is permanently hidden,
+and `renderWhen` gates validation -- so its rules never run on the server either, and the submit
+succeeds.
 
-Found while writing the Key field's first test in `Properties.test.tsx` for item 23, which had none. I
-wrote the assertion for the behaviour I expected, watched it fail, and did not pin the current one --
-the test now covers what the panel really promises (the node's own condition follows it), and this is
-here instead.
+Queue item 18 closed the way this happens most often: a rename used to move the answer name and leave
+every ref behind, and it now re-points them. What is left is the case a rename cannot fix -- a ref typed
+against a key that never existed, or one left dangling by a deletion -- and that wants the gate rather
+than the store.
 
-Out of scope because the fix is a product decision, not a repair. Three defensible answers: re-point
-every ref to the old data key when no other node still writes it; set an explicit `dataKey` on rename so
-the answer name never moves at all, which makes a key pure identity; or refuse the rename with a warning
-naming the components that would break. The first is the smallest, the second is the most honest about
-what a key is, and choosing between them changes what renaming means. `validateDocument` reporting a ref
-to a key nothing writes would also have caught it, and that is a fourth decision.
+Out of scope for that item because it is a new structural error code, which changes what every host's
+boot gate reports about documents stored today. `docs/decisions.md` records the reasoning under the
+rename entry. The shape is `rowScopeProblems`': walk the tree, collect the data keys anything writes,
+report each ref that names none of them, under its own code so a host can decide what to do about it.
