@@ -209,8 +209,27 @@ function bundleFor(
   tag: string,
 ): Record<string, string> {
   if (!translations || typeof translations !== 'object') return {}
-  const bundle = translations[tag]
+  const bundle = Object.hasOwn(translations, tag) ? translations[tag] : undefined
   return bundle && typeof bundle === 'object' ? bundle : {}
+}
+
+/**
+ * One key's text out of a bundle, read as an own property.
+ *
+ * The callers indexed the bundle with an author-typed key using a bare lookup,
+ * so `Object.prototype` members were reachable: typing `toString` as the
+ * translation key put a `Function` into a controlled `<input value={...}>`, and
+ * renaming that key stored it. Core fixed this exact pattern for action
+ * references with `Object.hasOwn`, and `json.ts`, `schema.ts` and `rows.ts` all
+ * read option and data fields the same way.
+ *
+ * `toString` is a legal key: it passes `KEY_PATTERN`, and a translation key is
+ * whatever an author types.
+ */
+function textFor(bundle: Record<string, string>, key: string): string {
+  if (!Object.hasOwn(bundle, key)) return ''
+  const held = bundle[key]
+  return typeof held === 'string' ? held : ''
 }
 
 /**
@@ -258,7 +277,7 @@ function TranslationKeyField({
     const carried = languages
       .map((language): [string, string] => {
         const tag = languageTag(language)
-        return [tag, bundleFor(translations, tag)[value] ?? '']
+        return [tag, textFor(bundleFor(translations, tag), value)]
       })
       .filter(([, text]) => text !== '')
 
@@ -286,6 +305,18 @@ function TranslationKeyField({
       }}
     />
   )
+}
+
+/**
+ * A language's name, or the empty string.
+ *
+ * The same shape `FormSettings.tsx` uses and for the same reason: a `Language`
+ * arrives from a pasted document, so `name` can be absent or not a string, and
+ * a nameless language is a state this product supports rather than a broken
+ * one.
+ */
+function nameOf(language: { name?: unknown }): string {
+  return typeof language.name === 'string' ? language.name.trim() : ''
 }
 
 export function TranslationEditor({
@@ -344,7 +375,7 @@ export function TranslationEditor({
            * bundle nothing read, so the canvas kept showing the raw key.
            */
           const tag = languageTag(language)
-          const text = bundleFor(translations, tag)[value.key] ?? ''
+          const text = textFor(bundleFor(translations, tag), value.key)
           const fieldId = id + '-' + tag
           return (
             <li key={tag}>
@@ -353,7 +384,25 @@ export function TranslationEditor({
                 is exactly the language, not "English default".
               */}
               <div className="fs-binding__language-head">
-                <label htmlFor={fieldId}>{language.name}</label>
+                {/*
+                  The tag when the language has no name, so the field always has
+                  an accessible name.
+
+                  This rendered `language.name` raw. `FormSettings.tsx:85`
+                  writes `name: name.trim()` with an explicit comment that a
+                  nameless language is a supported state, and has a `nameOf`
+                  helper for exactly this shape -- which this file did not use.
+                  So a language with an empty name produced a text input with no
+                  accessible name at all, and `docs/accessibility.md:17` lists
+                  "Every form control in the shell has a label" as a
+                  build-failing check. It passed because no fixture exercises a
+                  nameless language.
+
+                  The tag rather than a placeholder: it is what the author sees
+                  in the language list beside it for the same case, so the two
+                  panels name the same language the same way.
+                */}
+                <label htmlFor={fieldId}>{nameOf(language) || tag}</label>
                 {tag === defaultLanguage && <span className="fs-binding__default">default</span>}
               </div>
               <input

@@ -613,8 +613,24 @@ describe('the translation key field', () => {
      * language boxes blanked as they were typed while the text already written
      * stayed under the old key. Orphaned, with no way back to it from the panel.
      */
+    /*
+     * `en-US`, not `en`, and that is the whole point of this fixture.
+     *
+     * This was dialect-free, so `languageTag(language)` and `language.code`
+     * were the same string everywhere on the path under test -- and the carry
+     * reads its bundle by tag. Replace `languageTag(language)` with
+     * `language.code` at `Binding.tsx:260` and every assertion here stayed
+     * green, while a real document (`createDocument` ships `en-US`) renamed a
+     * key, the carry read bundle `en`, found nothing, and orphaned the text
+     * under the old key -- the exact defect this describe exists to prevent.
+     *
+     * This file already knows the trap: two other blocks switch to `en-US`
+     * specifically to make the tag/code distinction visible, and a comment says
+     * every dialect-free fixture is the unrealistic one. The rename path was
+     * left on the old one.
+     */
     const { user, select, latest } = setup([
-      { code: 'en', name: 'English', bidi: 'ltr' },
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
     ])
     await select()
@@ -625,14 +641,14 @@ describe('the translation key field', () => {
 
     const key = latest().root.children?.[0]?.props['label']
     const before = key?.kind === 'i18n' ? key.key : ''
-    expect(latest().translations['en']?.[before]).toBe('Email')
+    expect(latest().translations['en-US']?.[before]).toBe('Email')
 
     const box = screen.getByRole('textbox', { name: 'Translation key' })
     await user.clear(box)
     await user.type(box, 'emailLabel')
     await user.tab()
 
-    expect(latest().translations['en']?.['emailLabel']).toBe('Email')
+    expect(latest().translations['en-US']?.['emailLabel']).toBe('Email')
     expect(latest().translations['fr']?.['emailLabel']).toBe('Courriel')
 
     /*
@@ -643,7 +659,7 @@ describe('the translation key field', () => {
      * in every bundle: unreachable from the panel, exported with the document,
      * and two entries for one string with nothing saying which the form reads.
      */
-    expect(latest().translations['en']).not.toHaveProperty(before)
+    expect(latest().translations['en-US']).not.toHaveProperty(before)
     expect(latest().translations['fr']).not.toHaveProperty(before)
   })
 
