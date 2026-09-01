@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ComponentDef, FormDocument, Language } from '@formsmith/core'
 import { collectKeys as collect, findNode, prop, validateDocument } from '@formsmith/core'
 
-import { useDesigner } from './store.js'
+import { historyOps, useDesigner } from './store.js'
 
 const field: ComponentDef = {
   type: 'Field',
@@ -825,33 +825,64 @@ describe('invariant 4 on the half of the history a caller can see', () => {
    * state has had its array mutated underneath a component that already
    * rendered from it.
    */
-  it('undo does not mutate the arrays it read', () => {
-    const { result } = renderHook(() => useDesigner(doc()))
+  it('undo and redo leave the arrays they read alone', () => {
+    /*
+     * Asserted on `historyOps`, not through the hook, and the reason is the
+     * whole point of the finding this replaces.
+     *
+     * The version before this round-tripped `document` through
+     * `JSON.stringify` and called that a non-mutation check. It was not: an
+     * `undo` written as `past.pop()` returns the same array it was handed, and
+     * `useDesigner` never gives a caller the history, so every observable
+     * answer is byte-identical. The test named an invariant and guarded
+     * nothing -- which is the exact shape this run exists to remove.
+     *
+     * `commit` has had a non-mutation assertion in this suite since it was
+     * written. These two are the half that had none.
+     */
+    const first = doc()
+    const second = { ...first, name: 'second' }
+    const third = { ...first, name: 'third' }
 
-    act(() => {
-      result.current.setProp('email', 'label', prop('one'))
-    })
-    act(() => {
-      result.current.setProp('email', 'label', { kind: 'computed', expression: 'two' })
-    })
+    const history = { past: [first], present: second, future: [third] }
+    const past = history.past
+    const future = history.future
 
-    const before = result.current.canUndo
-    const snapshot = JSON.stringify(result.current.document)
+    const stepped = historyOps.undo(history)
 
-    act(() => {
-      result.current.undo()
-    })
+    // New arrays, not the ones handed in: a `History` React already rendered
+    // from must not change underneath it.
+    expect(stepped.past).not.toBe(past)
+    expect(stepped.future).not.toBe(future)
+    // And the originals still hold what they held.
+    expect(past).toEqual([first])
+    expect(future).toEqual([third])
+    // The step itself happened, or the assertions above are about a no-op.
+    expect(stepped.present).toBe(first)
+    expect(stepped.future).toEqual([second, third])
 
-    // The document React held before the undo is unchanged; the hook moved to a
-    // different one rather than editing the one it had.
-    expect(before, 'nothing was undoable, so this proves nothing').toBe(true)
-    expect(JSON.stringify(result.current.document)).not.toBe(snapshot)
+    const back = historyOps.redo(stepped)
 
-    act(() => {
-      result.current.redo()
-    })
+    expect(back.past).not.toBe(stepped.past)
+    expect(back.future).not.toBe(stepped.future)
+    expect(stepped.past).toEqual([])
+    expect(stepped.future).toEqual([second, third])
+    expect(back.present).toBe(second)
+  })
 
-    expect(JSON.stringify(result.current.document)).toBe(snapshot)
+  it('refuses to step off the end without touching anything', () => {
+    /*
+     * The boundary, where an implementation reaching for `pop()` on an empty
+     * array is likeliest to differ. Returning the same object is correct here
+     * -- there is nothing to move to -- and the arrays must still be intact.
+     */
+    const only = doc()
+    const empty = { past: [] as FormDocument[], present: only, future: [] as FormDocument[] }
+
+    expect(historyOps.undo(empty)).toBe(empty)
+    expect(historyOps.redo(empty)).toBe(empty)
+    expect(empty.past).toEqual([])
+    expect(empty.future).toEqual([])
   })
 
   it('redo returns exactly the document undo stepped off', () => {

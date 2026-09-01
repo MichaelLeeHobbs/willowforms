@@ -884,5 +884,12 @@ export function useDesigner(initial: FormDocument): DesignerApi {
  * called `history`, which is legal and reads badly: two different things with
  * one name in one file. The state is what a reader of the hook means, so the
  * export is the one that changes.
+ *
+ * This is the only way to assert the half of invariant 4 the hook cannot show.
+ * "Undo holds references to prior documents" is a claim about these arrays as
+ * much as about the tree -- a `History` React has already rendered from must
+ * not change underneath it -- and `useDesigner` never hands a caller the
+ * history, so an `undo` written as `past.pop()` returns the same array and
+ * every observable answer through the hook is identical.
  */
 export const historyOps = { commit, undo, redo }
