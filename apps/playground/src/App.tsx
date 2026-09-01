@@ -17,6 +17,17 @@ import { SAMPLE_DOCUMENT } from './sample.js'
 const STORAGE_KEY = 'formsmith.playground.document'
 
 /**
+ * Which kit was chosen, kept beside the document.
+ *
+ * The kit switch is the demonstration this whole app exists for -- "a kit is a
+ * package, not a rewrite" -- and it did not survive a reload. Somebody switched
+ * to the HTML kit, pressed F5 to check something, and was back on MUI looking at
+ * a document they had authored against the other one. The document was
+ * persisted and the choice that framed it was not.
+ */
+const KIT_KEY = 'formsmith.playground.kit'
+
+/**
  * Two kits, switchable at runtime.
  *
  * This is the demonstration behind the architecture's central claim. The same
@@ -57,6 +68,23 @@ function loadDocument(): FormDocument {
 
 const theme = createTheme({ colorSchemes: { dark: true } })
 
+/**
+ * The kit chosen last time, or MUI.
+ *
+ * Validated against `KITS` rather than trusted: this is `localStorage`, which a
+ * person can edit and an older build of this app can have written, and an id
+ * nothing registers would throw on the next line of `App`.
+ */
+function loadKit(): string {
+  try {
+    const saved = localStorage.getItem(KIT_KEY)
+    return saved !== null && Object.hasOwn(KITS, saved) ? saved : 'mui'
+  } catch {
+    // Private-mode browsers throw on read as well as on write.
+    return 'mui'
+  }
+}
+
 export function App(): ReactNode {
   /*
    * The document the designer is mounted with, and it has to be able to change.
@@ -68,7 +96,7 @@ export function App(): ReactNode {
    * loss reached `localStorage` and a reload did not recover it.
    */
   const [initial, setInitial] = useState(loadDocument)
-  const [kitId, setKitId] = useState<string>('mui')
+  const [kitId, setKitId] = useState<string>(loadKit)
 
   /*
    * The latest document, for the remount to start from.
@@ -96,6 +124,12 @@ export function App(): ReactNode {
   const chooseKit = useCallback((id: string) => {
     setInitial(latest.current)
     setKitId(id)
+    try {
+      localStorage.setItem(KIT_KEY, id)
+    } catch {
+      // Private-mode browsers throw on write, the way `persist` allows for.
+      // Forgetting the choice beats refusing to make it.
+    }
   }, [])
 
   const active = KITS[kitId] ?? KITS['mui']

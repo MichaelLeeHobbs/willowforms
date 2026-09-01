@@ -98,8 +98,18 @@ describe('a body nested deeper than anything will walk', () => {
      */
     const response = await submit(deepBody(100_000))
 
+    /*
+     * 400, and a message about nesting.
+     *
+     * All four ways a body can be refused used to answer 400 with "Send a JSON
+     * document under 1 MB", a sentence a caller cannot act on: it does not tell
+     * a body that was too large from one that was not JSON from one that was
+     * nested too deep, and the first of those earns 413 rather than 400.
+     */
     expect(response.status).toBe(400)
-    expect(await response.json()).toEqual({ error: 'Send a JSON object of answers, under 1 MB' })
+    expect(await response.json()).toEqual({
+      error: 'JSON is nested deeper than this server will read',
+    })
   })
 
   it('refuses at the depth the library stops reading, not at the depth V8 stops writing', async () => {
@@ -223,7 +233,7 @@ describe('a body larger than the limit', () => {
       body,
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(413)
   })
 
   it('stops reading the stream rather than buffering it and then declining', async () => {
@@ -263,7 +273,7 @@ describe('a body larger than the limit', () => {
       } as RequestInit & { duplex: 'half' }),
     )
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(413)
     expect(pulled, 'the whole body was read before it was declined').toBeLessThan(total)
   })
 
@@ -430,6 +440,91 @@ describe('a signal arriving mid-write', () => {
       expect(exit).toHaveBeenCalledTimes(1)
     } finally {
       vi.useRealTimers()
+    }
+  })
+})
+
+describe('a store holding something that is not a document', () => {
+  /*
+   * `forms.json` is a file on disk that a person edits, which is the whole
+   * point of a demo server -- and `held` returned whatever was under the key
+   * with only an own-property check. So `{"x": 5}` came back as a
+   * `FormDocument` and went to `validateForm`, which found no fields, found no
+   * problems, and the route answered `200 {ok:true}`.
+   *
+   * That is the worst of the three possible answers. A 404 says the form is not
+   * there and a 500 says something broke; a 200 tells a client its data was
+   * accepted by a form that does not exist.
+   *
+   * `GET /api/forms` guarded this exact hazard when building the listing, with
+   * a comment calling it "reading a shape as a document because it is truthy".
+   * The guard now lives in `held`, so the listing and the two routes that read
+   * one by id cannot come apart again.
+   */
+  const JUNK: Record<string, unknown> = {
+    aNumber: 5,
+    aString: 'not a document',
+    aList: [1, 2, 3],
+    noId: { root: { key: 'root', type: 'Screen', props: {} } },
+    noRoot: { id: 'noRoot', name: 'No root' },
+    aNull: null,
+  }
+
+  const withJunk = async (extra: Record<string, unknown> = {}): Promise<void> => {
+    await writeFile(store, JSON.stringify({ ...JUNK, ...extra }), 'utf8')
+  }
+
+  // Every case restores the store, because the rest of this file reads `deep`.
+  const restore = async (): Promise<void> => {
+    await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
+  }
+
+  it.each(Object.keys(JUNK))('refuses a submit against %s', async (id) => {
+    await withJunk()
+    try {
+      const response = await app.request('/api/forms/' + id + '/submit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{"anything":"at all"}',
+      })
+
+      expect(response.status, id + ' was answered as though it were a form').toBe(404)
+    } finally {
+      await restore()
+    }
+  })
+
+  it.each(Object.keys(JUNK))('refuses to read %s as a document', async (id) => {
+    await withJunk()
+    try {
+      expect((await app.request('/api/forms/' + id)).status).toBe(404)
+    } finally {
+      await restore()
+    }
+  })
+
+  it('leaves every one of them out of the listing, as it always did', async () => {
+    await withJunk()
+    try {
+      const rows = (await (await app.request('/api/forms')).json()) as { id: string }[]
+      expect(rows).toEqual([])
+    } finally {
+      await restore()
+    }
+  })
+
+  it('still answers for a real document beside them', async () => {
+    /*
+     * The control, and it is what stops the guard being "refuse everything".
+     * The junk and a real form share one store, which is also the realistic
+     * shape: somebody hand-edits one entry in a file that has others.
+     */
+    await withJunk({ deep: FORM })
+    try {
+      expect((await app.request('/api/forms/deep')).status).toBe(200)
+      expect((await submit('{"name":"Ada"}')).status).toBe(200)
+    } finally {
+      await restore()
     }
   })
 })

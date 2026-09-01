@@ -163,8 +163,37 @@ async function withStore<T>(
  * passed the not-found guard and answered 200 with a function's worth of
  * nothing — and the submit route then reached `flatten(undefined)` and 500ed.
  */
+/**
+ * Whether a value out of the store is a document this server will act on.
+ *
+ * One predicate, because "what counts as a stored document" is one question and
+ * two answers to it is how these came apart. The listing had a version of this
+ * -- with a comment calling the mistake "reading a shape as a document because
+ * it is truthy" -- and the two routes that read one by id had none, so a
+ * hand-edited `forms.json` holding `{"x": 5}` was handed to `validateForm` as a
+ * document. The submit route then answered `200 {ok:true}` for a form that does
+ * not exist, which is the worst of the three possible answers: a client is told
+ * its data was accepted.
+ *
+ * `root` as well as `id`, because the listing only ever needed the name and the
+ * other two routes walk the tree. A row in a listing for a document nothing can
+ * open is a row that 404s when it is clicked.
+ *
+ * Deliberately shallow. `validateDocument` is the real check and every write
+ * goes through it; this is the guard for a file somebody edited by hand behind
+ * the server's back.
+ */
+function isStoredDocument(doc: unknown): doc is FormDocument {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false
+  const shape = doc as { id?: unknown; root?: unknown }
+  return typeof shape.id === 'string' && shape.id !== '' && Boolean(shape.root)
+}
+
 function held(store: Store, id: string): FormDocument | undefined {
-  return Object.hasOwn(store, id) ? store[id] : undefined
+  if (!Object.hasOwn(store, id)) return undefined
+
+  const doc: unknown = store[id]
+  return isStoredDocument(doc) ? doc : undefined
 }
 
 const app = new Hono()
@@ -191,23 +220,38 @@ app.use(
 const MAX_BODY = 1_000_000
 
 /**
- * The request body as JSON, or nothing.
+ * Why a body was refused, so the answer can say which of four things happened.
  *
- * Neither parse-guarded nor size-limited: malformed JSON was a 500 rather than
- * a 400 — the failure `validateDocument` was made total to fix, reachable one
- * layer earlier — and a route that writes what it receives to disk had no cap
- * on what it would write.
+ * All four were one 400 reading "Send a JSON document under 1 MB", which is a
+ * sentence a caller cannot act on: it does not distinguish a body that was too
+ * large from one that was not JSON, and the first of those has a status of its
+ * own that tells a client to stop rather than to fix its syntax.
+ */
+export type BodyRefusal = 'too-large' | 'not-json' | 'too-deep'
+
+export interface BodyResult {
+  value?: unknown
+  refused?: BodyRefusal
+}
+
+/**
+ * The request body as JSON, or why not.
+ *
+ * Neither parse-guarded nor size-limited once: malformed JSON was a 500 rather
+ * than a 400 — the failure `validateDocument` was made total to fix, reachable
+ * one layer earlier — and a route that writes what it receives to disk had no
+ * cap on what it would write.
  */
 async function bodyOf(c: {
   req: { text: () => Promise<string>; header: (name: string) => string | undefined; raw: Request }
-}): Promise<unknown> {
+}): Promise<BodyResult> {
   const text = await textOf(c)
-  if (text === undefined) return undefined
+  if (text === undefined) return { refused: 'too-large' }
   let parsed: unknown
   try {
     parsed = JSON.parse(text) as unknown
   } catch {
-    return undefined
+    return { refused: 'not-json' }
   }
   /*
    * And refused if it is nested deeper than anything downstream will walk.
@@ -226,8 +270,25 @@ async function bodyOf(c: {
    * already known to be unreadable. Refusing at the door is what the rest of
    * this project does with input it cannot honour.
    */
-  if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return undefined
-  return parsed
+  if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return { refused: 'too-deep' }
+  return { value: parsed }
+}
+
+/**
+ * The answer for a refused body, with the status the refusal earns.
+ *
+ * 413 for a body over the cap, because that is the code that tells a client the
+ * request itself was too big rather than that it was written wrongly -- a
+ * client retrying a 400 with corrected syntax retries forever.
+ */
+function refusalOf(refused: BodyRefusal): { message: string; status: 400 | 413 } {
+  if (refused === 'too-large') {
+    return { message: 'Body is larger than 1 MB', status: 413 }
+  }
+  if (refused === 'too-deep') {
+    return { message: 'JSON is nested deeper than this server will read', status: 400 }
+  }
+  return { message: 'Body is not valid JSON', status: 400 }
 }
 
 /**
@@ -320,19 +381,16 @@ app.get('/api/forms', async (c) => {
    * first -- so a single bad entry took the whole listing down instead of
    * appearing as one missing row.
    */
+  /*
+   * `isStoredDocument`, the same question the two by-id routes ask.
+   *
+   * This had its own copy of the check -- not an array, named by text -- which
+   * is how it came to accept an entry with no `root` that `GET /api/forms/:id`
+   * refuses. A row in a listing for a document nothing can open is a row that
+   * 404s when it is clicked.
+   */
   const rows = Object.values(store)
-    /*
-     * Not an array, and named by text.
-     *
-     * `typeof [] === 'object'`, so a hand-edited `{"x": []}` became a row -- and
-     * `String(doc.id)` on an object renders `[object Object]`, which is a row
-     * the playground then asks for and cannot find. Both are the same mistake
-     * one level apart: reading a shape as a document because it is truthy.
-     */
-    .filter(
-      (doc): doc is FormDocument => Boolean(doc) && typeof doc === 'object' && !Array.isArray(doc),
-    )
-    .filter((doc) => typeof doc.id === 'string' && doc.id !== '')
+    .filter(isStoredDocument)
     .map((doc) => ({ id: doc.id, name: typeof doc.name === 'string' ? doc.name : '' }))
 
   return c.json(rows)
@@ -345,9 +403,12 @@ app.get('/api/forms/:id', async (c) => {
 
 app.put('/api/forms/:id', async (c) => {
   const body = await bodyOf(c)
-  if (body === undefined) return c.json({ error: 'Send a JSON document under 1 MB' }, 400)
+  if (body.refused) {
+    const { message, status } = refusalOf(body.refused)
+    return c.json({ error: message }, status)
+  }
 
-  const doc = body as FormDocument
+  const doc = body.value as FormDocument
   const errors = validateDocument(doc)
   if (errors.length > 0) return c.json({ error: 'Invalid document', errors }, 422)
 
@@ -502,11 +563,17 @@ app.post('/api/forms/:id/submit', async (c) => {
   }
 
   const body = await bodyOf(c)
-  if (body === undefined || typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return c.json({ error: 'Send a JSON object of answers, under 1 MB' }, 400)
+  if (body.refused) {
+    const { message, status } = refusalOf(body.refused)
+    return c.json({ error: message }, status)
+  }
+  // A fourth refusal, and it is not about the body being unreadable: it is
+  // readable and is not a set of answers.
+  if (!body.value || typeof body.value !== 'object' || Array.isArray(body.value)) {
+    return c.json({ error: 'Send a JSON object of answers' }, 400)
   }
 
-  const data = body as FormData
+  const data = body.value as FormData
   const errors = validateAcross(doc.root, data, scopes)
   if (Object.keys(errors).length > 0) return c.json({ ok: false, errors }, 422)
 
