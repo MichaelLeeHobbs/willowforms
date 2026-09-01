@@ -640,3 +640,139 @@ describe('styleSheetFor on a malformed tree', () => {
     expect(styleSheetFor(fine)).toContain('padding: 8px')
   })
 })
+
+describe('the backslash, which one of the two grammars did not treat as significant', () => {
+  /*
+   * The escape bypass, driven at the sink it reached.
+   *
+   * `FORBIDDEN` was `/[{}<@]|\/\*|\*\//` and did not name the backslash, so the
+   * `FETCHING` refusal below it was one escape away from silent: CSS consumes
+   * escapes while building an identifier, so `\75 rl(` tokenises as the `url(`
+   * function with none of its letters ever appearing, and `FETCHING` matches
+   * letters.
+   *
+   * `FORBIDDEN_VALUE`, the grammar for the *other* sink, has carried `\\` for a
+   * while under a comment naming this exact technique. No fixture in this file
+   * ever put a backslash inside a declaration block, and the escape tests
+   * elsewhere in it exercise `splitTop`, a different reader -- which is easy to
+   * mistake for coverage of this one.
+   */
+  const ESCAPED_URL: [string, string][] = [
+    ['hex escape with a space terminator', 'background:\\75 rl(https://evil.example/beacon)'],
+    ['hex escape, zero padded', 'background:\\000075rl(https://evil.example/beacon)'],
+    ['a single escaped letter', 'background:\\75rl(https://evil.example/beacon)'],
+    ['escape inside the middle of the name', 'background:u\\72 l(https://evil.example/beacon)'],
+    ['escaped opening paren', 'background:url\\28 https://evil.example/beacon)'],
+  ]
+
+  it.each(ESCAPED_URL)('refuses a fetch written with %s', (_what, block) => {
+    expect(safeDeclarations(block)).toBeUndefined()
+  })
+
+  it('refuses a trailing backslash, which swallows the closing brace', () => {
+    /*
+     * The second consequence of the same root cause. `quotesBalanced` skipped
+     * the character after a backslash, so `color:red\` counted as balanced and
+     * `styleSheetFor` emitted `…{color:red\}` -- where `\}` is a valid escape
+     * inside the value token and the block is never closed. One component with
+     * a trailing backslash silently deleted every rule after it and absorbed
+     * the following components' declarations.
+     */
+    expect(safeDeclarations('color:red\\')).toBeUndefined()
+  })
+
+  it('does not delete the rules that follow such a component', () => {
+    /*
+     * Asserted through the sheet rather than through the guard, because the
+     * damage is to the emitted stylesheet: the point is that a later
+     * component's rule survives.
+     */
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        { key: 'first', type: 'Field', props: {}, css: { any: 'color:red\\' } },
+        { key: 'second', type: 'Field', props: {}, css: { any: 'color:blue' } },
+      ],
+    }
+
+    const sheet = styleSheetFor(root, { scope: 'scope' })
+
+    expect(sheet, "the later component's rule was swallowed").toContain('color:blue')
+    const opens = (sheet.match(/\{/g) ?? []).length
+    const closes = (sheet.match(/\}/g) ?? []).length
+    expect(opens, 'the emitted sheet has an unclosed block').toBe(closes)
+  })
+
+  it('still accepts the declarations an author actually writes', () => {
+    /*
+     * The control, and it carries the weight here: refusing every block would
+     * pass every row above while making the Style tab inert. None of these
+     * needs a backslash, which is the argument for refusing it outright.
+     */
+    expect(safeDeclarations('color:red')).toContain('color:red')
+    expect(safeDeclarations('padding:8px 12px')).toContain('padding')
+    expect(safeDeclarations("font-family:'Helvetica Neue', Arial, sans-serif")).toContain('Arial')
+    expect(safeDeclarations('border-radius:4px;color:#333')).toContain('border-radius')
+  })
+})
+
+describe('a node whose key is not a string', () => {
+  /*
+   * The argument that actually throws, which the malformed-tree block in this
+   * file does not vary: it varies `children` only.
+   *
+   * `styleSheetFor` reaches `selectorFor(node.key, scope)` for any node
+   * carrying `css`, and `escapeKey` calls `key.replace`. That shape is one this
+   * repository already treats as real -- `context.ts` handles it explicitly and
+   * `context.test.ts` tests it -- and this walk runs inside the renderer's
+   * `useMemo`, so the throw takes the whole form off screen for somebody who
+   * cannot edit the document.
+   */
+  const withKey = (key: unknown): ComponentNode =>
+    ({
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key, type: 'Field', props: {}, css: { any: 'color:red' } }],
+    }) as unknown as ComponentNode
+
+  it.each([
+    ['a number', 42],
+    ['null', null],
+    ['an object', {}],
+    ['undefined', undefined],
+  ])('does not throw when a css-carrying node has %s for a key', (_what, key) => {
+    expect(() => styleSheetFor(withKey(key), { scope: 'scope' })).not.toThrow()
+  })
+
+  it('still emits the rule for a node whose key is a string', () => {
+    // The control. Skipping every node would pass all four rows above while
+    // emitting an empty stylesheet for every real document.
+    expect(styleSheetFor(withKey('field'), { scope: 'scope' })).toContain('color:red')
+  })
+})
+
+describe('the case of a fetching function', () => {
+  /*
+   * `FETCHING` carries the `i` flag and every refusal fixture in this file is
+   * lower case, so the flag was unasserted in either sink: a case-sensitive
+   * regex would have let both of these through and no row would have failed.
+   */
+  it.each([
+    ['URL', 'background:URL(https://evil.example/x)'],
+    ['Image-Set', 'background:Image-Set("https://evil.example/x" 1x)'],
+    ['ELEMENT', 'background:ELEMENT(#other)'],
+    ['Cross-Fade', 'background:Cross-Fade(url(a), url(b))'],
+  ])('refuses %s in a declaration block', (_what, block) => {
+    expect(safeDeclarations(block)).toBeUndefined()
+  })
+
+  it.each([
+    ['URL', 'URL(https://evil.example/x)'],
+    ['Image-Set', 'Image-Set("https://evil.example/x" 1x)'],
+  ])('refuses %s as a style value', (_what, value) => {
+    expect(safeStyleValue(value)).toBeUndefined()
+  })
+})
