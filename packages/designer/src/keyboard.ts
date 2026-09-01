@@ -136,13 +136,61 @@ export function moveTarget(
 
   if (direction === 'right') {
     const previous = siblings[position - 1]
-    if (!previous || !isContainer(previous.node.type)) return undefined
+    if (!previous) return undefined
+    /*
+     * Asked of the node as well as of the kit, because `moveNode` asks the
+     * node.
+     *
+     * This asked only `isContainer(type)`, which is the *kit's* answer. A node
+     * whose type the kit marks `container: true` but which carries no
+     * `children` array yields a `MoveTarget` that `moveNode` then silently
+     * refuses -- and `Tree.tsx` announces a move that did not happen.
+     * `store.ts` already uses the node-shaped test for the same question.
+     *
+     * Both, not one: the kit's answer is what decides whether a container
+     * *should* accept children, and the array is what decides whether this
+     * particular node can.
+     */
+    if (!isContainer(previous.node.type) || !Array.isArray(previous.node.children)) {
+      return undefined
+    }
     // Onto the end of that container's existing children.
-    return { parentKey: previous.node.key, index: previous.node.children?.length ?? 0 }
+    return { parentKey: previous.node.key, index: previous.node.children.length }
   }
 
-  // Left: out to the grandparent, immediately after the parent.
-  const parent = rows.find((r) => r.node.key === row.parentKey)
+  /*
+   * Left: out to the grandparent, immediately after the parent -- and the
+   * parent is found the way the sibling run above is found, not by a key match.
+   *
+   * This was `rows.find((r) => r.node.key === row.parentKey)`, which is exactly
+   * the mistake the block twelve lines up goes out of its way to avoid. That
+   * comment states the premise plainly: "Two nodes can share a key ... matching
+   * on `parentKey` alone collected the children of *every* parent with that
+   * name". `find` answers the *first* row carrying the name, and both fields
+   * read off it here are positional -- `parent.parentKey` and `parent.index`.
+   *
+   * Traced on this repo's own `twoStacks()` fixture:
+   * `moveTarget(flatten(twoStacks()), 'c', 'left', isContainer)` answered
+   * `index: 1` where `c` lives in the second stack and the correct answer is
+   * `2`. `moveNode` performs that happily and `describeMove` announces "moved
+   * out one level."
+   *
+   * `flatten` is depth-first, so this node's parent is the nearest row above it
+   * at one less depth. Scanning backwards finds that row and no other.
+   */
+  let parent: FlatNode | undefined
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const each = rows[i]
+    if (!each) continue
+    if (each.depth === row.depth - 1) {
+      parent = each
+      break
+    }
+    // Past the parent's own depth without meeting it: the tree is malformed or
+    // this row is at the top, and there is nothing to move out to.
+    if (each.depth < row.depth - 1) break
+  }
+
   if (!parent?.parentKey) return undefined
   return { parentKey: parent.parentKey, index: parent.index + 1 }
 }
