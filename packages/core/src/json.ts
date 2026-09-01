@@ -107,7 +107,9 @@ const declaredOf = (option: unknown): { declared: JsonValue } | undefined => {
  * never anything an author chose.
  */
 export function optionValues(options: readonly unknown[]): string[] {
-  const declared = options.map(declaredOf)
+  // `Array.from`, so a hole becomes `undefined` rather than staying a hole:
+  // `map` preserves holes and every read below is by index.
+  const declared = Array.from(options, declaredOf)
 
   // Every declared spelling, so a position can be seen to collide with one that
   // appears later in the list as well as earlier.
@@ -117,13 +119,26 @@ export function optionValues(options: readonly unknown[]): string[] {
   const out: string[] = []
   const used = new Set<string>()
 
-  options.forEach((_option, index) => {
+  /*
+   * An indexed loop writing `out[index]`, not `forEach` with `push`.
+   *
+   * `forEach` skips the holes in a sparse array, so `[a, , b]` produced two
+   * entries for three options and everything after the hole was off by one --
+   * and `optionValue` resolves a submitted string by finding it in this list
+   * and reading `options[at]`, so it answered with the wrong option. That
+   * breaks the inverse relationship this pair exists to guarantee.
+   *
+   * A sparse array cannot come from `JSON.parse`, which is where a document's
+   * options come from. It can come from a host calling these exports directly,
+   * which they are, and `new Array(3)` is one line of it.
+   */
+  for (let index = 0; index < options.length; index += 1) {
     const entry = declared[index]
     if (entry) {
       const value = jsonToString(entry.declared)
-      out.push(value)
+      out[index] = value
       used.add(value)
-      return
+      continue
     }
 
     /*
@@ -133,9 +148,9 @@ export function optionValues(options: readonly unknown[]): string[] {
      */
     let candidate = String(index)
     while (spoken.has(candidate) || used.has(candidate)) candidate += '.'
-    out.push(candidate)
+    out[index] = candidate
     used.add(candidate)
-  })
+  }
 
   return out
 }

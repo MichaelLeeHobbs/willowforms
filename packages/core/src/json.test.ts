@@ -7,6 +7,7 @@ import {
   jsonToString,
   optionEntry,
   optionValue,
+  optionValues,
   readPath,
   safeHref,
   valueOf,
@@ -689,6 +690,34 @@ describe('an option list that is not quite an option list', () => {
 
     expect(optionEntry(first[0] as JsonValue, 0, first).value).toBe('Yes')
     expect(optionEntry(second[0] as JsonValue, 0, second).value).toBe('No')
+  })
+
+  it('keeps index alignment through a hole in the list', () => {
+    /*
+     * `optionValues` built its output with `push` inside `forEach`, and
+     * `forEach` skips the holes in a sparse array -- so `['a', , 'b']` produced
+     * two entries for three options and everything after the hole was off by
+     * one. `optionValue` resolves a submitted string by finding it in this list
+     * and reading `options[at]`, so it answered with the wrong option: the
+     * inverse relationship this pair exists to guarantee, broken.
+     *
+     * A hole cannot come from `JSON.parse`, so no document produces this. Both
+     * functions are public exports, and `new Array(3)` is one line.
+     */
+    // Built by assignment rather than as `['first', , 'third']`, which
+    // `no-sparse-arrays` refuses -- and rightly, since a hole in a literal is
+    // almost always a typo. Here the hole is the subject.
+    const sparse: unknown[] = new Array<unknown>(3)
+    sparse[0] = 'first'
+    sparse[2] = 'third'
+
+    const values = optionValues(sparse)
+    expect(values, 'the hole collapsed the list').toHaveLength(3)
+    expect(values[0]).toBe('first')
+    expect(values[2]).toBe('third')
+
+    // The round trip, which is the thing that actually broke.
+    expect(optionValue(sparse, 'third')).toBe('third')
   })
 
   it('gives a bare list the same answer with and without the list', () => {
