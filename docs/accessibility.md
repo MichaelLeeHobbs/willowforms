@@ -119,7 +119,7 @@ word is visually hidden text inside the label.
 
 Honest list. None of these are hard, they are simply not done.
 
-- **The automated audit cannot see layout.** axe-core runs over the designer in nine states: at rest,
+- **The automated audit cannot see layout.** axe-core runs over the designer in eleven states: at rest,
   with a component selected, on the Rules, Settings and Style tabs, with a condition being edited, in
   validated preview, with both panes collapsed, and with the JSON dialog open. jsdom has no
   rendering engine, so `color-contrast`, `target-size`, and `scrollable-region-focusable` are disabled by

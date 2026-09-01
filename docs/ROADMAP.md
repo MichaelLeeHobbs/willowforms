@@ -59,7 +59,7 @@ See [docs/spec/06-inspector.md](spec/06-inspector.md#style).
 
 `pnpm test` runs 2277 tests; `pnpm e2e` runs 78 in a real browser. Both gate CI, along with lint,
 formatting, typechecking, and a build that checks every package emitted its entry points. Contrast is
-computed from the stylesheets and axe runs over the designer in nine states. See
+computed from the stylesheets and axe runs over the designer in eleven states. See
 [accessibility.md](accessibility.md).
 
 None of that catches a specification section that claims something the code does not do. An adversarial
