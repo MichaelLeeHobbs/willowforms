@@ -107,6 +107,13 @@ describe('every non-required rule passes on an empty value', () => {
     ['an empty string', ''],
     ['whitespace', '   '],
     ['an empty list', []],
+    /*
+     * `{}`, which `json.ts` counts as empty and this table omitted -- so the
+     * object branch of the shared `isEmpty` was defended for `required` and for
+     * nothing else. Two definitions of empty diverging is the failure that
+     * function's docblock names.
+     */
+    ['an empty object', {}],
   ]
 
   it.each(
@@ -2014,5 +2021,99 @@ describe('a document the submit path cannot read', () => {
     ])
 
     expect(validateForm(root, { name: 'anything' })).not.toEqual({})
+  })
+})
+
+describe('a rule with no value to check against', () => {
+  /*
+   * The four measuring rules, driven with the bound missing.
+   *
+   * `lengthOf(value) < rule.value` and `held < rule.value` are both false when
+   * `rule.value` is undefined -- every comparison against undefined is -- so
+   * the rule silently *passed* and the field was unconstrained on the server
+   * while the Rules tab still listed it. The `pattern` case one line below got
+   * an explicit guard with a comment saying a valueless rule "reaches here from
+   * a paste"; the same paste reaches these four.
+   *
+   * `{ key: 'min' }` with no value is a shape `validateDocument` reports, and
+   * nothing on the validate path calls it.
+   */
+  const VALUELESS: [string, unknown][] = [
+    ['absent', undefined],
+    ['null', null],
+    ['a string', '5'],
+    ['NaN', Number.NaN],
+  ]
+
+  const MEASURING = ['minLength', 'maxLength', 'min', 'max'] as const
+
+  it.each(MEASURING.flatMap((key) => VALUELESS.map((bound) => [key, bound[0], bound[1]] as const)))(
+    '%s with a bound that is %s does not pass',
+    (key, _shape, bound) => {
+      const rule = { key, value: bound } as unknown as ValidationRule
+
+      expect(applyRule(rule, 'a value that would satisfy a real bound', {})).toBeDefined()
+    },
+  )
+
+  it('still applies each of them when the bound is a real number', () => {
+    /*
+     * The control, and it is not decoration: failing unconditionally would pass
+     * every row above while breaking every form that uses these four rules.
+     */
+    expect(applyRule({ key: 'minLength', value: 3 }, 'abcd', {})).toBeUndefined()
+    expect(applyRule({ key: 'minLength', value: 5 }, 'abcd', {})).toBeDefined()
+    expect(applyRule({ key: 'maxLength', value: 3 }, 'ab', {})).toBeUndefined()
+    expect(applyRule({ key: 'min', value: 3 }, 4, {})).toBeUndefined()
+    expect(applyRule({ key: 'min', value: 5 }, 4, {})).toBeDefined()
+    expect(applyRule({ key: 'max', value: 3 }, 2, {})).toBeUndefined()
+  })
+
+  it('leaves an empty value alone, because that is invariant 5', () => {
+    // Only `required` fails on an empty value. A valueless bound must not turn
+    // these four into a second rule that does.
+    for (const key of MEASURING) {
+      const rule = { key } as unknown as ValidationRule
+
+      expect(applyRule(rule, '', {}), key + ' failed on an empty value').toBeUndefined()
+      expect(applyRule(rule, undefined, {}), key + ' failed on no answer').toBeUndefined()
+    }
+  })
+})
+
+describe('the row cap on the projection', () => {
+  /*
+   * `submittedData`'s own row cap, which had never been executed.
+   *
+   * The cap is pinned for `validateForm` and the docblock says the bounds are
+   * duplicated here precisely because a host may project before it validates --
+   * which the signature invites, since neither function needs the other. No
+   * test drove it, so deleting the line left the suite green.
+   */
+  const repeater: ComponentNode = {
+    key: 'addressList',
+    dataKey: 'addresses',
+    type: 'Repeater',
+    props: {},
+    schema: { type: 'array', validations: [] },
+    children: [
+      { key: 'line1', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ],
+  }
+
+  const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [repeater] }
+
+  it('drops a list past the cap rather than projecting it', () => {
+    const over = { addresses: Array.from({ length: MAX_ROWS + 1 }, () => ({ line1: 'x' })) }
+
+    expect(submittedData(root, over)).toEqual({})
+  })
+
+  it('still projects a list under the cap', () => {
+    // The control. Dropping every repeater would pass the row above while
+    // silently emptying every payload this function exists to build.
+    const under = { addresses: [{ line1: 'x' }, { line1: 'y' }] }
+
+    expect(submittedData(root, under)).toEqual(under)
   })
 })
