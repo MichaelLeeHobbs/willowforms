@@ -1639,9 +1639,33 @@ describe('a length means the same number of pixels in both kits', () => {
      * under 4px is a spacing unit that escaped a conversion rather than a
      * deliberate hairline: nothing in either kit wants a 2px gap between form
      * fields.
+     *
+     * Both kits, which is the point and which this checked in one of them --
+     * the case the comment above describes, both kits saying 2, is exactly the
+     * one a `kit-mui`-only loop cannot see. It is reachable: the two kits are
+     * separate packages and a spacing unit escaping a conversion is a mistake
+     * either author can make on their own.
+     *
+     * And the type first. `02-kit-contract.md` says a length-valued default is
+     * a number of CSS pixels, so `'8px'` or `'1rem'` is a contract violation on
+     * its own -- and it slipped through this rule silently, because a string is
+     * not `< 4`. A value that cannot be judged has to fail rather than pass.
      */
-    for (const [name, value] of Object.entries(lengthsOf(mui.get(type)))) {
-      expect(typeof value === 'number' && value > 0 && value < 4, type + '.' + name).toBe(false)
+    for (const [kit, def] of [
+      ['kit-mui', mui.get(type)],
+      ['kit-html', html.get(type)],
+    ] as const) {
+      for (const [name, value] of Object.entries(lengthsOf(def))) {
+        const where = kit + ' ' + type + '.' + name
+
+        expect(typeof value, where + ' is a length, which the contract says is a number').toBe(
+          'number',
+        )
+        expect(
+          typeof value === 'number' && value > 0 && value < 4,
+          where + ' is on the spacing scale rather than in pixels',
+        ).toBe(false)
+      }
     }
   })
 })
