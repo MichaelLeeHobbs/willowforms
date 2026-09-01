@@ -1549,17 +1549,26 @@ describe('an evaluator that throws while resolving a prop', () => {
   }
 
   it('does not take the form down', () => {
-    expect(() =>
-      render(
-        <FormRenderer
-          document={documentOf([computed])}
-          kit={kit}
-          data={{}}
-          evaluate={boom}
-          onChange={() => undefined}
-        />,
-      ),
-    ).not.toThrow()
+    /*
+     * `not.toThrow()` used to be the whole assertion, which the node boundary
+     * guarantees by existing -- the same unfailable shape
+     * `test/kit-contract.test.tsx` documents and removed from itself. What is
+     * actually at stake is that the boundary is not what caught it: a throwing
+     * evaluator is one bad expression, and `resolveProp` answers `null` for it
+     * rather than letting the component be replaced.
+     */
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([computed])}
+        kit={kit}
+        data={{}}
+        evaluate={boom}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="greeting"]')).not.toBeNull()
+    expect(container.querySelector('[data-fs-failed]'), 'a boundary caught it').toBeNull()
   })
 
   it('renders the component rather than the boundary fallback', () => {
@@ -1607,11 +1616,10 @@ describe('an evaluator that throws while resolving a prop', () => {
  * answers by unmounting the tree.
  */
 describe('a document shaped in ways the type forbids', () => {
-  const asDocument = (root: unknown): FormDocument =>
-    documentOf([]) && {
-      ...documentOf([]),
-      root: root as ComponentNode,
-    }
+  const asDocument = (root: unknown): FormDocument => ({
+    ...documentOf([]),
+    root: root as ComponentNode,
+  })
 
   it.each([
     ['a string', 'not-a-binding'],
@@ -2091,5 +2099,434 @@ describe('children that are not nodes', () => {
     expect(screen.getByLabelText('first')).toBeTruthy()
     expect(screen.getByLabelText('second')).toBeTruthy()
     expect(container.querySelector('[data-fs-failed]'), 'a boundary caught something').toBeNull()
+  })
+})
+
+describe('a repeater inside a repeater', () => {
+  /*
+   * The renderer's only nested-row line had no test anywhere in the repository.
+   * `index.tsx` passes `path={row?.path ?? NO_ROWS}` into `<Row>`, and every
+   * repeater fixture was single-level -- so `row` was always `undefined` at that
+   * call and `row?.path` never contributed anything. Replace the whole
+   * expression with `NO_ROWS` and the suite stayed green, while a field in an
+   * inner row emitted an address with the outer coordinate missing: the wrong
+   * answer written to the wrong place, and an error reported against a row
+   * nobody is looking at.
+   *
+   * `rows.test.ts` covers the nested `pushRow`/`addressOf`/`applyChange`
+   * arithmetic, but it is a Node suite with no React in it, so it cannot see
+   * what the renderer passes.
+   */
+  const nested = (): FormDocument =>
+    documentOf([
+      {
+        key: 'orderList',
+        dataKey: 'orders',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          field('reference', 'ref'),
+          {
+            key: 'lineList',
+            dataKey: 'lines',
+            type: 'Screen',
+            props: {},
+            schema: { type: 'array', validations: [] },
+            children: [field('description', 'text')],
+          },
+        ],
+      },
+    ])
+
+  /*
+   * Two orders, and a different number of lines in each. Equal counts would let
+   * an implementation that reads the wrong index still land on something, which
+   * is exactly the confusion this fixture exists to remove.
+   */
+  const twoOrders = {
+    orders: [
+      { ref: 'A', lines: [{ text: 'first' }, { text: 'second' }] },
+      { ref: 'B', lines: [{ text: 'third' }] },
+    ],
+  }
+
+  it('draws every inner row of every outer row', () => {
+    render(
+      <FormRenderer document={nested()} kit={kit} data={twoOrders} onChange={() => undefined} />,
+    )
+
+    expect(screen.getAllByLabelText('reference')).toHaveLength(2)
+    expect(screen.getAllByLabelText('description')).toHaveLength(3)
+  })
+
+  it('gives an inner field the whole coordinate, not just its own row', () => {
+    /*
+     * The failure the missing test allowed: with `path={NO_ROWS}` the inner
+     * `Row` starts a fresh path, so both of order A's lines and order B's only
+     * line report `lines[0]`, `lines[1]`, `lines[0]` -- three fields, two
+     * addresses, and the outer order is nowhere in any of them.
+     */
+    const { container } = render(
+      <FormRenderer document={nested()} kit={kit} data={twoOrders} onChange={() => undefined} />,
+    )
+
+    const rows = [...container.querySelectorAll('[data-fs-key="description"]')].map((each) =>
+      each.getAttribute('data-fs-row'),
+    )
+
+    expect(rows, 'the inner repeater drew the wrong number of rows').toHaveLength(3)
+    expect(new Set(rows).size, 'two inner fields share a row coordinate').toBe(3)
+    for (const row of rows) expect(row).toContain('orders')
+  })
+
+  it('writes an inner answer to the address the outer row names', () => {
+    /*
+     * Round-tripped through `applyChange`, which is what a host does with the
+     * address. Asserting the string alone would pin a format; asserting the
+     * data proves the string means what the renderer thinks it does.
+     */
+    const changes: [string, string][] = []
+    render(
+      <FormRenderer
+        document={nested()}
+        kit={kit}
+        data={twoOrders}
+        onChange={(address, value) => changes.push([address, value as string])}
+      />,
+    )
+
+    // Order B's only line: the last of the three drawn.
+    const inputs = screen.getAllByLabelText('description')
+    fireEvent.change(inputs[inputs.length - 1] as HTMLElement, { target: { value: 'edited' } })
+
+    expect(changes, 'the kit never called onChange').toHaveLength(1)
+    const [address, value] = changes[0] as [string, string]
+
+    const after = applyChange(twoOrders, address, value)
+    const orders = after['orders'] as { ref: string; lines: { text: string }[] }[]
+
+    expect(orders[1]?.lines[0]?.text, 'the edit landed outside order B').toBe('edited')
+    expect(orders[0]?.lines[0]?.text, 'order A was disturbed').toBe('first')
+    expect(orders[0]?.lines[1]?.text).toBe('second')
+  })
+})
+
+describe("a kit's own fallback renderer", () => {
+  /*
+   * `kit.renderers[node.type] ?? kit.fallback ?? MissingType` had no test for
+   * its middle term: no `RendererKit` literal carrying `fallback` existed in any
+   * test or kit source, so deleting `?? kit.fallback` left the suite green while
+   * a host that supplied one silently got the built-in dashed box instead.
+   */
+  function Placeholder({ nodeProps, node }: NodeRendererProps): ReactNode {
+    return <div {...nodeProps}>the kit does not draw {node.type}</div>
+  }
+
+  const withFallback: RendererKit = {
+    id: 'fake',
+    renderers: { Screen: Screen_ },
+    fallback: Placeholder,
+  }
+
+  const unknownType = (): FormDocument => documentOf([{ key: 'odd', type: 'Sparkline', props: {} }])
+
+  it('draws in place of a type the kit has no renderer for', () => {
+    const { container } = render(
+      <FormRenderer
+        document={unknownType()}
+        kit={withFallback}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="odd"]')?.textContent).toBe(
+      'the kit does not draw Sparkline',
+    )
+  })
+
+  it('is preferred to the built-in one', () => {
+    // The control that makes the test above mean something: without it, a kit
+    // fallback that never ran would still satisfy "something was drawn".
+    const { container } = render(
+      <FormRenderer
+        document={unknownType()}
+        kit={withFallback}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="odd"]')?.textContent).not.toContain(
+      'No renderer for component type',
+    )
+  })
+
+  it('leaves a type the kit does draw alone', () => {
+    // And the fallback is a fallback: a kit that has the renderer uses it.
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([])}
+        kit={withFallback}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="root"]')?.textContent).not.toContain(
+      'does not draw',
+    )
+  })
+})
+
+describe('the device the styles are written for', () => {
+  /*
+   * The `device` prop had no test anywhere in the repository. `css.test.ts`
+   * covers `styleSheetFor`'s device argument in isolation, and nothing covered
+   * the renderer passing it -- so dropping `device` from the options object left
+   * the suite green while the designer's canvas emitted media queries that
+   * answer about the browser window rather than the simulated frame. That is
+   * the exact failure the prop's own docblock is written about: an author sizes
+   * a mobile frame on a desktop screen and sees the desktop rules.
+   */
+  const styled = (): FormDocument =>
+    documentOf([
+      {
+        key: 'banner',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [] },
+        css: { any: 'color: red', mobile: 'color: blue' },
+      },
+    ])
+
+  const sheetOf = (container: HTMLElement): string =>
+    container.querySelector('style')?.textContent ?? ''
+
+  it('writes the mobile rule flat when mobile is the device', () => {
+    const { container } = render(
+      <FormRenderer
+        document={styled()}
+        kit={kit}
+        data={{}}
+        device="mobile"
+        onChange={() => undefined}
+      />,
+    )
+
+    const sheet = sheetOf(container)
+    expect(sheet, 'no stylesheet was emitted at all').toContain('color: blue')
+    // Flat, not wrapped: the frame is the device, so the window must not decide.
+    expect(sheet).not.toContain('@media')
+  })
+
+  it('writes it as a media query when no device is simulated', () => {
+    /*
+     * The other half, and the one that makes the assertion above mean
+     * something: without a device the sheet is for a real page, where the
+     * viewport is the right thing to ask.
+     */
+    const { container } = render(
+      <FormRenderer document={styled()} kit={kit} data={{}} onChange={() => undefined} />,
+    )
+
+    const sheet = sheetOf(container)
+    expect(sheet).toContain('@media')
+    expect(sheet).toContain('color: blue')
+  })
+
+  it('leaves out a rule for a device that is not the one being simulated', () => {
+    const { container } = render(
+      <FormRenderer
+        document={styled()}
+        kit={kit}
+        data={{}}
+        device="desktop"
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(sheetOf(container)).not.toContain('color: blue')
+  })
+})
+
+describe('rows that move rather than arrive or leave', () => {
+  /*
+   * The repeater block covered a row being added and a row being removed and
+   * never a reorder, which is the case where drawing by index and drawing by
+   * identity give different answers. React keys these rows by index on purpose
+   * -- `rows.ts` says the coordinate is built from data, not identity -- so a
+   * swap has to redraw the values in their new order rather than leave the old
+   * ones in place.
+   */
+  const listing = (): FormDocument =>
+    documentOf([
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [field('street', 'line1')],
+      },
+    ])
+
+  const streets = (): string[] =>
+    screen.getAllByLabelText('street').map((each) => (each as HTMLInputElement).value)
+
+  it('redraws the rows in their new order', () => {
+    const { rerender } = render(
+      <FormRenderer
+        document={listing()}
+        kit={kit}
+        data={{ addresses: [{ line1: 'one' }, { line1: 'two' }, { line1: 'three' }] }}
+        onChange={() => undefined}
+      />,
+    )
+    expect(streets()).toEqual(['one', 'two', 'three'])
+
+    rerender(
+      <FormRenderer
+        document={listing()}
+        kit={kit}
+        data={{ addresses: [{ line1: 'three' }, { line1: 'one' }, { line1: 'two' }] }}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(streets()).toEqual(['three', 'one', 'two'])
+  })
+
+  it('addresses the moved row by where it now is', () => {
+    /*
+     * The half a value comparison would miss: after a reorder the row keyed
+     * `[0]` must be the one now drawn first, or an edit to it writes to whatever
+     * used to be there.
+     */
+    const changes: string[] = []
+    const { rerender } = render(
+      <FormRenderer
+        document={listing()}
+        kit={kit}
+        data={{ addresses: [{ line1: 'one' }, { line1: 'two' }] }}
+        onChange={(address) => changes.push(address)}
+      />,
+    )
+
+    rerender(
+      <FormRenderer
+        document={listing()}
+        kit={kit}
+        data={{ addresses: [{ line1: 'two' }, { line1: 'one' }] }}
+        onChange={(address) => changes.push(address)}
+      />,
+    )
+
+    const inputs = screen.getAllByLabelText('street')
+    fireEvent.change(inputs[0] as HTMLElement, { target: { value: 'edited' } })
+
+    expect(changes, 'the kit never called onChange').toHaveLength(1)
+    const after = applyChange(
+      { addresses: [{ line1: 'two' }, { line1: 'one' }] },
+      changes[0] as string,
+      'edited',
+    )
+    const rows = after['addresses'] as { line1: string }[]
+
+    expect(rows[0]?.line1, 'the edit landed on the row that moved away').toBe('edited')
+    expect(rows[1]?.line1).toBe('one')
+  })
+})
+
+describe('an answer under a condition that flips back', () => {
+  /*
+   * The `revealHidden` fixtures were rendered once each and never re-rendered
+   * with the hidden field holding data, so "a hidden field keeps its answer
+   * when the condition flips back" was asserted nowhere -- and it is the
+   * promise the whole hidden-is-not-validated design rests on. If hiding a
+   * field dropped its answer, showing it again would silently blank what
+   * somebody typed.
+   */
+  const gated = (): FormDocument =>
+    documentOf([
+      field('trigger'),
+      {
+        key: 'detail',
+        type: 'Field',
+        props: {},
+        schema: { type: 'string', validations: [] },
+        renderWhen: {
+          kind: 'condition',
+          condition: {
+            op: 'eq',
+            left: { kind: 'ref', dataKey: 'trigger' },
+            right: { kind: 'literal', value: 'yes' },
+          },
+        },
+      } as unknown as ComponentNode,
+    ])
+
+  /*
+   * The DOM value, read without a cast. `getByLabelText` already returns an
+   * element narrow enough that asserting `HTMLInputElement` changes no type,
+   * which is what the lint rule was saying; the property read is the part that
+   * needs the narrowing and `in` does it honestly.
+   */
+  const valueOfInput = (label: string): string => {
+    const element = screen.getByLabelText(label)
+    return 'value' in element && typeof element.value === 'string' ? element.value : ''
+  }
+
+  const draw = (data: FormData, reveal: boolean): ReturnType<typeof render> =>
+    render(
+      <FormRenderer
+        document={gated()}
+        kit={kit}
+        data={data}
+        revealHidden={reveal}
+        onChange={() => undefined}
+      />,
+    )
+
+  it('is still there when the condition turns true again', () => {
+    const view = draw({ trigger: 'yes', detail: 'typed earlier' }, false)
+    expect(valueOfInput('detail')).toBe('typed earlier')
+
+    view.rerender(
+      <FormRenderer
+        document={gated()}
+        kit={kit}
+        data={{ trigger: 'no', detail: 'typed earlier' }}
+        onChange={() => undefined}
+      />,
+    )
+    expect(screen.queryByLabelText('detail'), 'the condition never hid it').toBeNull()
+
+    view.rerender(
+      <FormRenderer
+        document={gated()}
+        kit={kit}
+        data={{ trigger: 'yes', detail: 'typed earlier' }}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(valueOfInput('detail')).toBe('typed earlier')
+  })
+
+  it('keeps drawing the answer while the canvas reveals what is hidden', () => {
+    /*
+     * The designer's case. `revealHidden` draws the node with
+     * `data-fs-hidden`, and the value has to come with it -- an author editing
+     * a field they can see marked hidden is editing the answer, not a blank.
+     */
+    const view = draw({ trigger: 'no', detail: 'typed earlier' }, true)
+
+    expect(valueOfInput('detail')).toBe('typed earlier')
+    expect(
+      view.container.querySelector('[data-fs-key="detail"]')?.getAttribute('data-fs-hidden'),
+      'the fixture is not actually hidden, so this proves nothing',
+    ).toBe('true')
   })
 })
