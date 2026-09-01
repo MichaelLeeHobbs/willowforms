@@ -29,17 +29,21 @@ import type {
   PropValue,
 } from './types.js'
 
-/**
- * How deep a condition may nest before a walk here stops reading it.
+/*
+ * On `MAX_CONDITION_DEPTH`, imported above.
  *
- * The same bound `condition.ts` evaluates under, for the same reason: these
+ * How deep a condition may nest before a walk in this file stops reading it:
+ * the same bound `condition.ts` evaluates under, for the same reason. These
  * walks run over a document nobody has validated yet, and a hand-written
  * `{ and: [{ and: [ ... ] }] }` is a stack overflow in a function whose whole
  * job is to survive malformed input.
+ *
+ * `condition.ts` exports it precisely so nobody writes "a second one that
+ * agrees today". `tree.ts` and `rows.ts` both import it; this file was the last
+ * outlier. Not a `/**` block, because the constant is not declared here and a
+ * doc comment with no declaration under it becomes documentation for whatever
+ * comes next -- which is `fromCondition`.
  */
-// Imported from `condition.ts`, which exports it precisely so nobody writes
-// "a second one that agrees today". `tree.ts` and `rows.ts` both import it;
-// this file was the last outlier.
 
 /** Every context path a condition anywhere in this condition reads. */
 function fromCondition(condition: Condition | undefined, out: Set<string>, depth = 0): void {
