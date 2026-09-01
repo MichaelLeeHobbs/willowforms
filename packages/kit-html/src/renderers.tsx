@@ -41,7 +41,24 @@ type Level = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
  * which is the most natural way to try to remove a label. A button with no
  * text, a link with no text, an `aria-label` of `''` on a progress bar.
  */
-const str = (v: unknown, fallback = ''): string => (typeof v === 'string' && v ? v : fallback)
+const str = (v: unknown, fallback = ''): string => {
+  /*
+   * A non-string that is still text renders as its text, not as the fallback.
+   *
+   * This read `typeof v === 'string' && v ? v : fallback`, which collapses "not
+   * a string" and "the empty string" into one answer -- so a label, text,
+   * helper or placeholder arriving as a number showed the fallback instead of
+   * itself. A `computed` binding is evaluated by the host at render time, so a
+   * number genuinely arrives: `label: { kind: 'computed', expression: 'year' }`
+   * drew nothing.
+   *
+   * `jsonToString` is the project's one answer to "what does this value look
+   * like", which both kits already use for a field's value. An empty result
+   * still falls back, because an empty label is a label nobody wrote.
+   */
+  const text = typeof v === 'string' ? v : jsonToString(v as JsonValue | undefined)
+  return text === '' ? fallback : text
+}
 
 /**
  * One of a known set, or the first of them.
@@ -216,17 +233,34 @@ function Field({
   label,
   helper,
   error,
+  nodeProps,
   children,
 }: {
   id: string
   label: string
   helper: string
   error: string | undefined
+  nodeProps: NodeRendererProps['nodeProps']
   children: ReactNode
 }): ReactNode {
   const messageId = id + '-message'
+  /*
+   * `nodeProps` here, on `.fsh-field`, and not on a wrapper around it.
+   *
+   * Seven of the nine field renderers spread it onto an unclassed `<div>` with
+   * `.fsh-field` one level in, while `SwitchNode` and `RadioGroupNode` put it on
+   * `.fsh-field` itself -- so the kit had two DOM shapes at the seam that every
+   * external thing keys off: the designer's selection, `data-fs-key` styling
+   * from the Style tab, and end-to-end selectors. `kit-html.css`'s
+   * `min-width: 0` on `.fsh-field` was inert for the seven, because the flex
+   * item was the wrapper and not the element carrying the rule.
+   *
+   * Converged on the shape the other two already had, which is also the one the
+   * MUI kit produces: the component the document names is the component the
+   * kit's own class describes.
+   */
   return (
-    <div className={'fsh-field' + (error ? ' is-invalid' : '')}>
+    <div {...nodeProps} className={'fsh-field' + (error ? ' is-invalid' : '')}>
       <label className="fsh-field__label" htmlFor={id}>
         {label}
       </label>
@@ -263,15 +297,19 @@ function TextFieldNode({
   }
 
   return (
-    <div {...nodeProps}>
-      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
-        {bool(props['multiline']) ? (
-          <textarea {...shared} rows={4} onChange={(e) => onChange(e.target.value)} />
-        ) : (
-          <input {...shared} type="text" onChange={(e) => onChange(e.target.value)} />
-        )}
-      </Field>
-    </div>
+    <Field
+      id={id}
+      label={str(props['label'])}
+      helper={str(props['helperText'])}
+      error={error}
+      nodeProps={nodeProps}
+    >
+      {bool(props['multiline']) ? (
+        <textarea {...shared} rows={4} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <input {...shared} type="text" onChange={(e) => onChange(e.target.value)} />
+      )}
+    </Field>
   )
 }
 
@@ -285,21 +323,25 @@ function NumberFieldNode({
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
-    <div {...nodeProps}>
-      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
-        <input
-          id={id}
-          className="fsh-input"
-          type="number"
-          disabled={bool(props['disabled'])}
-          value={jsonToString(value)}
-          aria-invalid={error ? true : undefined}
-          {...requiredProps(node)}
-          aria-describedby={id + '-message'}
-          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        />
-      </Field>
-    </div>
+    <Field
+      id={id}
+      label={str(props['label'])}
+      helper={str(props['helperText'])}
+      error={error}
+      nodeProps={nodeProps}
+    >
+      <input
+        id={id}
+        className="fsh-input"
+        type="number"
+        disabled={bool(props['disabled'])}
+        value={jsonToString(value)}
+        aria-invalid={error ? true : undefined}
+        {...requiredProps(node)}
+        aria-describedby={id + '-message'}
+        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+      />
+    </Field>
   )
 }
 
@@ -314,36 +356,34 @@ function CheckboxNode({
   const id = useId()
   const messageId = id + '-message'
   return (
-    <div {...nodeProps}>
-      <div className={'fsh-field fsh-field--inline' + (error ? ' is-invalid' : '')}>
-        <input
-          id={id}
-          className="fsh-checkbox"
-          type="checkbox"
-          disabled={bool(props['disabled'])}
-          checked={value === true}
-          aria-invalid={error ? true : undefined}
-          {...requiredProps(node)}
-          aria-describedby={messageId}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        <label className="fsh-field__label" htmlFor={id}>
-          {str(props['label'])}
-        </label>
-        <p
-          id={messageId}
-          className={'fsh-field__message' + (error ? ' is-error' : '')}
-          {...(error ? { role: 'alert' } : {})}
-        >
-          {/*
-           * The error, or the helper text when there is no error -- which is
-           * what every other field in this kit does and what the MUI kit's
-           * checkbox already did. This one drew the error and dropped the
-           * helper text on the floor.
-           */}
-          {error ?? str(props['helperText'])}
-        </p>
-      </div>
+    <div {...nodeProps} className={'fsh-field fsh-field--inline' + (error ? ' is-invalid' : '')}>
+      <input
+        id={id}
+        className="fsh-checkbox"
+        type="checkbox"
+        disabled={bool(props['disabled'])}
+        checked={value === true}
+        aria-invalid={error ? true : undefined}
+        {...requiredProps(node)}
+        aria-describedby={messageId}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <label className="fsh-field__label" htmlFor={id}>
+        {str(props['label'])}
+      </label>
+      <p
+        id={messageId}
+        className={'fsh-field__message' + (error ? ' is-error' : '')}
+        {...(error ? { role: 'alert' } : {})}
+      >
+        {/*
+         * The error, or the helper text when there is no error -- which is
+         * what every other field in this kit does and what the MUI kit's
+         * checkbox already did. This one drew the error and dropped the
+         * helper text on the floor.
+         */}
+        {error ?? str(props['helperText'])}
+      </p>
     </div>
   )
 }
@@ -361,36 +401,40 @@ function SelectNode({
   const options = Array.isArray(raw) ? raw : []
 
   return (
-    <div {...nodeProps}>
-      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
-        <select
-          id={id}
-          className="fsh-input"
-          disabled={bool(props['disabled'])}
-          value={jsonToString(value)}
-          aria-invalid={error ? true : undefined}
-          {...requiredProps(node)}
-          aria-describedby={id + '-message'}
-          onChange={(e) => onChange(optionValue(options, e.target.value))}
-        >
-          <option value="">{str(props['placeholder'], 'Choose…')}</option>
-          {options.map((option, i) => {
-            /*
-             * `optionEntry` in core, which is `optionValue`'s inverse: the two
-             * have to agree on what an entry means or a choice cannot
-             * round-trip. Read inline here, it also threw on a `null` in the
-             * array, and a document is data.
-             */
-            const { value: v, label } = optionEntry(option, i, options)
-            return (
-              <option key={String(i) + ':' + v} value={v}>
-                {label}
-              </option>
-            )
-          })}
-        </select>
-      </Field>
-    </div>
+    <Field
+      id={id}
+      label={str(props['label'])}
+      helper={str(props['helperText'])}
+      error={error}
+      nodeProps={nodeProps}
+    >
+      <select
+        id={id}
+        className="fsh-input"
+        disabled={bool(props['disabled'])}
+        value={jsonToString(value)}
+        aria-invalid={error ? true : undefined}
+        {...requiredProps(node)}
+        aria-describedby={id + '-message'}
+        onChange={(e) => onChange(optionValue(options, e.target.value))}
+      >
+        <option value="">{str(props['placeholder'], 'Choose…')}</option>
+        {options.map((option, i) => {
+          /*
+           * `optionEntry` in core, which is `optionValue`'s inverse: the two
+           * have to agree on what an entry means or a choice cannot
+           * round-trip. Read inline here, it also threw on a `null` in the
+           * array, and a document is data.
+           */
+          const { value: v, label } = optionEntry(option, i, options)
+          return (
+            <option key={String(i) + ':' + v} value={v}>
+              {label}
+            </option>
+          )
+        })}
+      </select>
+    </Field>
   )
 }
 
@@ -528,22 +572,26 @@ function TextAreaNode({
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
-    <div {...nodeProps}>
-      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
-        <textarea
-          id={id}
-          className="fsh-input"
-          rows={num(props['rows'], 4)}
-          placeholder={str(props['placeholder'])}
-          disabled={bool(props['disabled'])}
-          value={jsonToString(value)}
-          aria-invalid={error ? true : undefined}
-          {...requiredProps(node)}
-          aria-describedby={id + '-message'}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </Field>
-    </div>
+    <Field
+      id={id}
+      label={str(props['label'])}
+      helper={str(props['helperText'])}
+      error={error}
+      nodeProps={nodeProps}
+    >
+      <textarea
+        id={id}
+        className="fsh-input"
+        rows={num(props['rows'], 4)}
+        placeholder={str(props['placeholder'])}
+        disabled={bool(props['disabled'])}
+        value={jsonToString(value)}
+        aria-invalid={error ? true : undefined}
+        {...requiredProps(node)}
+        aria-describedby={id + '-message'}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </Field>
   )
 }
 
@@ -690,7 +738,15 @@ function RadioGroupNode({
                   type="radio"
                   name={id}
                   value={v}
-                  checked={jsonToString(value) === v}
+                  /*
+                   * A value nobody wrote is not the selected one, which is
+                   * exactly what `RadioItemNode` twenty lines below guards and
+                   * this path did not. Options authored as
+                   * `[{ label: 'Prefer not to say', value: '' }, ...]` rendered
+                   * with the first radio already selected on an unanswered
+                   * group, because an unanswered group's value is `''` too.
+                   */
+                  checked={v !== '' && jsonToString(value) === v}
                   onChange={() => onChange(optionValue(options, v))}
                 />
                 <span>{label}</span>
@@ -765,23 +821,27 @@ function DatePickerNode({
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
-    <div {...nodeProps}>
-      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
-        <input
-          id={id}
-          type="date"
-          className="fsh-input"
-          min={str(props['min']) || undefined}
-          max={str(props['max']) || undefined}
-          disabled={bool(props['disabled'])}
-          value={jsonToString(value)}
-          aria-invalid={error ? true : undefined}
-          {...requiredProps(node)}
-          aria-describedby={id + '-message'}
-          onChange={(e) => onChange(e.target.value || null)}
-        />
-      </Field>
-    </div>
+    <Field
+      id={id}
+      label={str(props['label'])}
+      helper={str(props['helperText'])}
+      error={error}
+      nodeProps={nodeProps}
+    >
+      <input
+        id={id}
+        type="date"
+        className="fsh-input"
+        min={str(props['min']) || undefined}
+        max={str(props['max']) || undefined}
+        disabled={bool(props['disabled'])}
+        value={jsonToString(value)}
+        aria-invalid={error ? true : undefined}
+        {...requiredProps(node)}
+        aria-describedby={id + '-message'}
+        onChange={(e) => onChange(e.target.value || null)}
+      />
+    </Field>
   )
 }
 
@@ -796,6 +856,8 @@ function FileUploadNode({
   const id = useId()
   /** How many files the last choice dropped for being over `maxSize`. */
   const [dropped, setDropped] = useState(0)
+  /** How many choices have been made, so a repeated refusal is a new string. */
+  const [attempt, setAttempt] = useState(0)
   /*
    * The names the document holds, drawn beside the input.
    *
@@ -813,6 +875,8 @@ function FileUploadNode({
     .join(', ')
 
   const multiple = bool(props['multiple'])
+  const heldId = id + '-held'
+  const refusedId = id + '-refused'
   /*
    * The value is the selected file's name, and nothing more. A file input is
    * uncontrolled by design, and turning bytes into form data is an upload
@@ -821,55 +885,95 @@ function FileUploadNode({
    * whether a file was chosen.
    */
   return (
-    <div {...nodeProps}>
-      <Field id={id} label={str(props['label'])} helper={str(props['helperText'])} error={error}>
-        <input
-          id={id}
-          type="file"
-          className="fsh-input"
-          accept={str(props['accept']) || undefined}
-          multiple={multiple}
-          disabled={bool(props['disabled'])}
-          aria-invalid={error ? true : undefined}
-          {...requiredProps(node)}
-          aria-describedby={id + '-message'}
+    <Field
+      id={id}
+      label={str(props['label'])}
+      helper={str(props['helperText'])}
+      error={error}
+      nodeProps={nodeProps}
+    >
+      <input
+        id={id}
+        type="file"
+        className="fsh-input"
+        accept={str(props['accept']) || undefined}
+        multiple={multiple}
+        disabled={bool(props['disabled'])}
+        aria-invalid={error ? true : undefined}
+        {...requiredProps(node)}
+        /*
+         * Every line on screen about this input, not just the helper one.
+         *
+         * "Holding contract.pdf" is the only statement of what this field will
+         * actually submit -- a file input is uncontrolled, so the browser's own
+         * display says "No file chosen" while the payload carries a name -- and
+         * it was described by nothing, so a screen reader user moving to the
+         * input was told the label and the helper text and never what was held.
+         * The refusal notice was likewise unreferenced. The MUI kit folds both
+         * strings into `helperText`, which is the element it wires
+         * `aria-describedby` to, so this was a divergence the other kit had
+         * right.
+         */
+        aria-describedby={
+          [id + '-message', filesHeld ? heldId : '', dropped > 0 ? refusedId : '']
+            .filter(Boolean)
+            .join(' ') || undefined
+        }
+        /*
+         * `maxSize` is honoured here rather than left to a host that may never
+         * look. It was a number in a panel with a hint admitting it did
+         * nothing, which is a control that lies about being one.
+         *
+         * A refusal, not a truncation: the oversized files are left out and
+         * the ones that fit are kept, so choosing five files and one of them
+         * being too large does not silently drop the other four. The size is
+         * in kilobytes, which is what the label says.
+         */
+        onChange={(e) => {
+          const limit = num(props['maxSize'], 0) * 1024
+          const chosen = Array.from(e.target.files ?? [])
+          const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
           /*
-           * `maxSize` is honoured here rather than left to a host that may never
-           * look. It was a number in a panel with a hint admitting it did
-           * nothing, which is a control that lies about being one.
+           * Somebody is told when a file is dropped.
            *
-           * A refusal, not a truncation: the oversized files are left out and
-           * the ones that fit are kept, so choosing five files and one of them
-           * being too large does not silently drop the other four. The size is
-           * in kilobytes, which is what the label says.
+           * `maxSize` filtered the reported names and said nothing, so
+           * choosing a file over the limit looked exactly like choosing none:
+           * the picker closed, the list did not change, and no message
+           * appeared. A refusal nobody can see is indistinguishable from a
+           * bug in the picker.
            */
-          onChange={(e) => {
-            const limit = num(props['maxSize'], 0) * 1024
-            const chosen = Array.from(e.target.files ?? [])
-            const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
-            /*
-             * Somebody is told when a file is dropped.
-             *
-             * `maxSize` filtered the reported names and said nothing, so
-             * choosing a file over the limit looked exactly like choosing none:
-             * the picker closed, the list did not change, and no message
-             * appeared. A refusal nobody can see is indistinguishable from a
-             * bug in the picker.
-             */
-            setDropped(chosen.length - kept.length)
-            onChange(multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null))
-          }}
-        />
-        {filesHeld ? <p className="fsh-field__hint">Holding {filesHeld}</p> : null}
-        {dropped > 0 ? (
-          <p className="fsh-field__error" role="alert">
-            {dropped === 1
-              ? 'One file was too large and was not added.'
-              : String(dropped) + ' files were too large and were not added.'}
-          </p>
-        ) : null}
-      </Field>
-    </div>
+          setDropped(chosen.length - kept.length)
+          /*
+           * Bumped whether or not the count changed.
+           *
+           * A live region only announces on mutation, and
+           * `setDropped(chosen.length - kept.length)` writes the same number
+           * for a second identical refusal -- React re-renders the same text
+           * and a screen reader says nothing, so the second attempt looked
+           * like the picker had stopped working. `docs/accessibility.md`
+           * records the same fix for the designer's own live region: an
+           * unchanged announcement is never read.
+           */
+          setAttempt((n) => n + 1)
+          onChange(multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null))
+        }}
+      />
+      {filesHeld ? (
+        <p id={heldId} className="fsh-field__hint">
+          Holding {filesHeld}
+        </p>
+      ) : null}
+      {dropped > 0 ? (
+        <p id={refusedId} className="fsh-field__error" role="alert">
+          {(dropped === 1
+            ? 'One file was too large and was not added.'
+            : String(dropped) + ' files were too large and were not added.') +
+            // A zero-width space per attempt, so a repeat of the same refusal
+            // is a different string and the live region reads it again.
+            '\u200b'.repeat(attempt % 2)}
+        </p>
+      ) : null}
+    </Field>
   )
 }
 

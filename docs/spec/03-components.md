@@ -195,7 +195,7 @@ rather than being two components, because they are one idea with two shapes.
 | Component     | Status | Properties               |
 | ------------- | ------ | ------------------------ |
 | `Link`        | Built  | `text`, `href`, `target` |
-| `Breadcrumbs` | Built  | `items`                  |
+| `Breadcrumbs` | Built  | `items`, `label`         |
 
 ## Events
 
