@@ -4,6 +4,27 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### `KeyField` gets the re-sync guard, not a key on the panel
+
+- **Decided:** `KeyField` carries an `if (value !== committed)` block like its eight siblings, and
+  `Inspector` keeps rendering the three panels unkeyed.
+- **Why:** a key cannot tell the two cases apart and a guard can. The panel has to reset this field when
+  the _selection_ moves and must not reset it when a _rename_ moves the value, because the field is the
+  thing performing the rename -- remounting mid-rename takes the focus and discards the refusal alert,
+  which the call site's own docblock records as an already-fixed defect. `node.key` and
+  `api.selectedKey` both change on a successful rename, so keying on either re-creates it. The guard
+  distinguishes them: a refused rename leaves `value` alone, a successful one moves `value` to something
+  this field committed, and only a `value` it never wrote resets the draft.
+- **Rejected: `key={api.selectedKey}` on the three panels.** The review argues for it, and it is the more
+  structural answer -- it would protect the ninth editor added without a guard, which is the real
+  weakness here. It loses on the rename case above. The protection it would have given is replaced by a
+  test that reads whatever editors the panel renders across a selection change, rather than naming the
+  eight, so a ninth without a guard fails it.
+- **Reversal:** cheap. The guard is six lines in one function and the sweep test does not depend on it.
+  What is not cheap is re-deciding it wrongly: keying the panel looks like a tidy-up and silently
+  reintroduces a defect this file has now fixed twice, so the reasoning lives in the code beside both.
+- **When:** 2026-08-31, queue item 3.
+
 ### One pull request per queue item, capped at 12 files and 500 lines
 
 - **Decided:** the 2026-08-31 remediation run ships one PR per queue item, sized to a hard budget, merged

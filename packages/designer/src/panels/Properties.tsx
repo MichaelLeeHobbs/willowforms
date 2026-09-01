@@ -69,7 +69,13 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
        * pinned from the test side as well.
        *
        * Selecting a different component is what should replace this field, and
-       * the panel above already remounts on that.
+       * the panel above does *not* remount on that -- `Inspector` renders this
+       * panel unkeyed and `Designer` renders `Inspector` unkeyed, and neither
+       * ever did. That sentence was the whole justification for this field
+       * having no key and no re-sync guard, and it was false, so the field
+       * showed and would commit the previously selected component's key.
+       * `KeyField` carries the guard its eight siblings carry now; the reason a
+       * guard rather than a key is the right answer is in its own docblock.
        */}
       <KeyField value={node.key} onRename={(next) => api.renameKey(node.key, next)} />
 
@@ -251,7 +257,44 @@ function KeyField({
   onRename: (next: string) => RenameResult
 }): ReactNode {
   const [draft, setDraft] = useState(value)
+  const [committed, setCommitted] = useState(value)
   const [error, setError] = useState('')
+
+  /*
+   * The re-sync guard every other editor in this panel carries, and the one
+   * this field did not.
+   *
+   * Without it this box showed, and would commit, the *previously* selected
+   * component's key. Nothing remounts it on a selection change: `Inspector`
+   * renders `<Properties>` unkeyed and `Designer` renders `<Inspector>`
+   * unkeyed, and `selectedKey` stays defined when moving between two live
+   * nodes, so `Properties` never takes its `!node` early return and this field
+   * never unmounts. Select `email`, click `phone`, and the Key row read `email`
+   * under a heading naming `phone` -- carrying any refusal alert left over from
+   * `email` with it. Then delete `email`, click into the box and press Enter,
+   * and `commit()` compared draft `'email'` against value `'phone'` and renamed
+   * `phone` to `email`: the name is free now, so the store agrees, and the
+   * component's `dataKey` fallback -- and therefore its submitted payload key --
+   * goes with it.
+   *
+   * A guard rather than a React key, which is the part worth reading. Keying
+   * this field on the node's key is what the docblock at its call site records
+   * as a defect: a successful rename changes the key, so the field would unmount
+   * mid-edit and take the focus and the refusal alert with it. Keying the whole
+   * panel on `api.selectedKey` has the identical problem, because the store
+   * keeps the selection on the node it just renamed. The guard distinguishes the
+   * two cases where a key cannot: a refused rename leaves `value` alone so it
+   * does not fire, a successful one moves `value` to something this field
+   * committed so it does not fire, and only a `value` this field never wrote --
+   * a selection change, an undo, an applied JSON import -- resets the draft.
+   *
+   * Same shape as `DataKeyField` above and `JsonEditor` below.
+   */
+  if (value !== committed) {
+    setCommitted(value)
+    setDraft(value)
+    setError('')
+  }
 
   const commit = (): void => {
     /*
@@ -266,6 +309,14 @@ function KeyField({
     if (trimmed === value) return
     const result = onRename(trimmed)
     if (result.ok) {
+      /*
+       * `committed` moves with the rename this field just performed, so the
+       * guard above reads the new `value` as one it wrote and leaves the draft
+       * and the focus alone. Without this line the guard would fire on the
+       * field's own successful rename and re-create the remount the call site's
+       * docblock says was removed.
+       */
+      setCommitted(trimmed)
       setError('')
       return
     }

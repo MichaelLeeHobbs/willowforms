@@ -2128,3 +2128,150 @@ describe('the Rules tab and a pattern nobody can run', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
+
+/**
+ * The panel across a selection change, which no test in this file or in `e2e/`
+ * ever performed.
+ *
+ * The harness has had `selectKey` since it was written and every test called it
+ * exactly once, as the first selection -- so the transition that every editor
+ * in this panel has to survive was the one transition never driven. Eight
+ * editors carry a re-sync guard for it and several more are keyed per node at
+ * their call site; `KeyField` was neither, and the docblock justifying that
+ * said "the panel above already remounts on that", which nothing does.
+ *
+ * The test at 'is gone rather than stale after the rename is undone' pins the
+ * unmount-on-undo half of exactly this reasoning. This is the selection half.
+ */
+describe('moving the selection from one component to another', () => {
+  const keyBox = (): HTMLElement => screen.getByRole('textbox', { name: /^Key/ })
+
+  const two = (): [ComponentNode, ComponentNode[]] => [
+    { key: 'email', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    [{ key: 'phone', type: 'Field', props: {}, schema: { type: 'string', validations: [] } }],
+  ]
+
+  it('shows the newly selected component key, not the one before it', async () => {
+    const [first, rest] = two()
+    const { selectKey } = setup(first, rest)
+
+    await selectKey('email')
+    expect((keyBox() as HTMLInputElement).value).toBe('email')
+
+    await selectKey('phone')
+
+    expect((keyBox() as HTMLInputElement).value).toBe('phone')
+  })
+
+  it('does not rename the new component to the old one when the old one is gone', async () => {
+    /*
+     * The whole defect, end to end, and the reason it is worse than a display
+     * bug. With the stale draft still reading `email`, `commit()` compares it
+     * against value `'phone'`, finds them different, and calls
+     * `renameKey('phone', 'email')` -- which now *succeeds*, because deleting
+     * `email` freed the name. `phone` is silently renamed, and since
+     * `dataKeyOf` falls back to the node key, the submitted payload key goes
+     * with it.
+     */
+    const [first, rest] = two()
+    const { user, selectKey, node } = setup(first, rest)
+
+    await selectKey('email')
+    await selectKey('phone')
+
+    /*
+     * The row's Remove button, not a click on the row followed by Delete.
+     *
+     * That was the first version and it was vacuous -- it passed with the guard
+     * deleted. Selecting `email` in order to delete it leaves the selection on
+     * a node that is then gone, `Properties` takes its `!node` early return, and
+     * the unmount destroys the stale draft the test exists to observe. The
+     * review's scenario is specifically that the selection *stays* on `phone`,
+     * and this button is the control that does that: it carries
+     * `onPointerDown` `stopPropagation` so removing a row does not select it.
+     */
+    await user.click(screen.getByRole('button', { name: 'Remove email' }))
+    expect(node('email'), 'the fixture did not actually remove email').toBeUndefined()
+
+    keyBox().focus()
+    await user.keyboard('{Enter}')
+
+    expect(node('phone'), 'phone was renamed out from under the selection').toBeDefined()
+    expect(
+      node('email'),
+      'the deleted key came back on a component that never had it',
+    ).toBeUndefined()
+  })
+
+  it('carries no refusal message across from the component before it', async () => {
+    const [first, rest] = two()
+    const { user, selectKey } = setup(first, rest)
+
+    await selectKey('email')
+    await user.clear(keyBox())
+    await user.type(keyBox(), 'phone{Enter}')
+    expect(screen.getByRole('alert')).toBeTruthy()
+
+    await selectKey('phone')
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  /*
+   * The sweep, and the reason it is not a list of editor names.
+   *
+   * The panel is safe today because eight editors each carry their own
+   * `if (value !== committed)` block, not because anything keys the panel on the
+   * selection -- so a ninth editor added without one inherits the bug silently,
+   * and a test naming the eight would not notice. This drives whatever the panel
+   * actually renders: every textbox gets typed into under the first selection,
+   * and none of them may still be showing that text under the second.
+   *
+   * A key on the panel would make all of this structural, and it is the wrong
+   * fix here: the store keeps the selection on a node it just renamed, so
+   * keying on `api.selectedKey` unmounts the Key field mid-rename and takes the
+   * focus and the refusal alert with it -- the defect its call site records as
+   * already fixed once.
+   */
+  it('leaves no editor in the panel showing the previous selection value', async () => {
+    /*
+     * The sweep, and the reason it types nothing.
+     *
+     * An editor with no re-sync guard seeds its draft with `useState(value)`
+     * and never updates it, so it shows the previous node's value across a
+     * selection change with no interaction at all -- which is exactly what the
+     * Key row did. Driving the boxes first was the first draft of this test and
+     * it was worse than useless: typing into the Key box renames the node on
+     * blur, which remounts every keyed sibling, so the captured elements
+     * detached and the test failed on "could not be focused" rather than on
+     * anything about staleness.
+     *
+     * Not a list of editor names, because the panel is safe today only by eight
+     * independent guards rather than by one key on the panel -- so the ninth
+     * editor added without one is the thing this has to catch, and a test
+     * naming the eight would not. This reads whatever the panel renders.
+     */
+    const marker = 'zzfirst'
+    const { selectKey } = setup(
+      { key: marker, type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+      [{ key: 'zzsecond', type: 'Field', props: {}, schema: { type: 'string', validations: [] } }],
+    )
+
+    await selectKey(marker)
+    const before = screen.getAllByRole('textbox')
+    expect(before.length, 'no editors were read, so this proves nothing').toBeGreaterThan(0)
+    expect(
+      before.filter((box) => (box as HTMLInputElement).value.includes(marker)).length,
+      'the first selection never showed its own value, so the check below cannot fail',
+    ).toBeGreaterThan(0)
+
+    await selectKey('zzsecond')
+
+    const stale = screen
+      .getAllByRole('textbox')
+      .filter((box) => (box as HTMLInputElement).value.includes(marker))
+      .map((box) => box.getAttribute('id') ?? 'an editor with no id')
+
+    expect(stale, 'these editors kept the previous selection value').toEqual([])
+  })
+})
