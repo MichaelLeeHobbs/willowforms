@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { findLanguage, languageTag } from '@formsmith/core'
+import { languagesOf } from './language.js'
 import type { Device, FormDocument, IconName, Kit } from '@formsmith/core'
 import type { RendererKit } from '@formsmith/renderer'
 
@@ -209,7 +210,7 @@ export function Designer({
    * the canvas rendering every translation as its raw key. Derived rather than
    * corrected in an effect, so there is no frame where that is on screen.
    */
-  const languages = api.document.languages
+  const languages = languagesOf(api.document)
   /*
    * `findLanguage`, not a fourth inline re-spelling of the tag rule.
    *
@@ -467,7 +468,7 @@ function Toolbar({
   language: string | undefined
   onLanguage: (next: string | undefined) => void
 }): ReactNode {
-  const languages = api.document.languages
+  const languages = languagesOf(api.document)
   return (
     <header className="fs-toolbar">
       <h1 className="fs-toolbar__title">{api.document.name}</h1>

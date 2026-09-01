@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { languagesOf } from '../language.js'
 import { languageTag } from '@formsmith/core'
 import type { Language } from '@formsmith/core'
 
@@ -49,11 +50,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
    * dialog that would repair the document. `store.ts` only warns about a host's
    * `initialDocument`, which is the path such a document arrives by.
    */
-  const languages = Array.isArray(doc.languages)
-    ? doc.languages.filter(
-        (language): language is Language => Boolean(language) && typeof language === 'object',
-      )
-    : []
+  const languages = languagesOf(doc)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
@@ -141,7 +138,12 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
       </div>
 
       <h3 className="fs-rules__heading">
-        Languages <span className="fs-rules__count">{doc.languages.length}</span>
+        {/*
+          The count of what this panel can draw, not of what the array holds.
+          A document with three entries and one usable one said "3" over a list
+          of one, which reads as a panel that lost something.
+        */}
+        Languages <span className="fs-rules__count">{languages.length}</span>
       </h3>
 
       <ul className="fs-languages">

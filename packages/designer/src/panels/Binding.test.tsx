@@ -717,3 +717,62 @@ describe('two languages sharing a tag', () => {
     expect(latest().languages[0]?.bidi).toBe('ltr')
   })
 })
+
+describe('a document whose languages are not languages', () => {
+  /*
+   * `FormSettings` filtered `doc.languages` to "a non-null object", and
+   * `languageTag` reads `.code` without guarding it: `languageTag({})` is
+   * `undefined` and `languageTag({ code: 5 })` is `5`, and the duplicate check
+   * calls `.toLowerCase()` on the result. So `{"languages":[{}]}` took the
+   * settings tab down -- the failure that filter exists to prevent, through the
+   * half of the shape it was not looking at.
+   *
+   * `typeof [] === 'object'`, which is why "a non-null object" is never enough
+   * on its own, and this file's own fixtures are the place a host's JSON
+   * arrives from.
+   */
+  const junk = (languages: unknown): ReturnType<typeof setup> =>
+    setup(languages as Language[] | undefined)
+
+  it.each([
+    ['an empty object', [{}]],
+    ['a code that is a number', [{ code: 5 }]],
+    ['an array', [[]]],
+    ['null', [null]],
+    ['a string', ['en']],
+  ])('opens the settings tab for %s', async (_what, languages) => {
+    const view = junk([...languages, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    // The tab is up, and the one real language beside the junk is drawn.
+    expect(screen.getAllByRole('checkbox', { name: 'Right to left' })).toHaveLength(1)
+  })
+
+  it('counts what it can draw rather than what the array holds', async () => {
+    /*
+     * The heading read `doc.languages.length`, so a document with three entries
+     * and one usable one said "3" over a list of one -- which reads as a panel
+     * that lost something, and sends somebody looking for the two rows it did
+     * not draw.
+     */
+    const view = junk([{}, null, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    expect(screen.getByText('Languages').textContent).toContain('1')
+  })
+
+  it('leaves an entry it cannot draw in the document', async () => {
+    /*
+     * Dropped from the panel, never from the document. Opening a tab must not
+     * delete data, and "the panel ignores it" and "the panel ate it" look the
+     * same from the tab.
+     */
+    const view = junk([{}, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    expect(view.latest().languages).toEqual([
+      {},
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+    ])
+  })
+})
