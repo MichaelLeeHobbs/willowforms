@@ -2168,6 +2168,57 @@ describe('the lookup and mutation family on a document nothing gated', () => {
     }
   })
 
+  it('duplicates a malformed children value without changing its shape', () => {
+    /*
+     * `if (node.children)` is truthy for a non-array, so `children: {}` was
+     * silently coerced into `children: []` on the copy -- a *different*
+     * malformed document rather than the same one, and unlike `updateNode` and
+     * `removeNode`, which leave a non-array `children` exactly as they found
+     * it. Raised in review on PR #42.
+     *
+     * A copy differs from its source in its keys and in nothing else, and a
+     * document this shape is one somebody is about to repair -- where a copy
+     * that quietly differs from what they are looking at is the worst thing to
+     * hand them.
+     */
+    for (const children of [{}, 'ab', 5]) {
+      const source = { key: 'odd', type: 'Field', props: {}, children } as unknown as ComponentNode
+      const root: ComponentNode = {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [source],
+      }
+
+      const copy = duplicateNode(root, 'odd')
+
+      expect(copy?.children, JSON.stringify(children)).toEqual(children)
+    }
+  })
+
+  it('still copies a real list of children', () => {
+    // The control. Carrying every `children` through untouched would pass the
+    // row above while leaving the copy's descendants sharing the source's keys.
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'box',
+          type: 'Stack',
+          props: {},
+          children: [{ key: 'in', type: 'Field', props: {} }],
+        },
+      ],
+    }
+
+    const copy = duplicateNode(root, 'box')
+
+    expect(copy?.children).toHaveLength(1)
+    expect(copy?.children?.[0]?.key, 'the copy shares its source key').not.toBe('in')
+  })
+
   it('still walks a document that is fine', () => {
     /*
      * The control. Guarding by returning nothing would pass every row above

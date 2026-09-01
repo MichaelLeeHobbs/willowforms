@@ -409,7 +409,24 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
         ]),
       )
     }
-    if (node.children) next.children = childNodesOf(node).map(copy)
+    /*
+     * A copy differs from its source in its keys and in nothing else.
+     *
+     * `if (node.children)` is truthy for a non-array, so `children: {}` and
+     * `children: "ab"` were silently coerced into `children: []` on the copy --
+     * turning a malformed leaf into an empty container, which is a *different*
+     * malformed document rather than the same one. `updateNode` and
+     * `removeNode` both leave a non-array `children` exactly as they found it.
+     *
+     * Raised in review on PR #42, which suggested `Array.isArray` so the copy
+     * carries no `children` at all in that case. This goes one step further and
+     * carries the value through unchanged, because dropping it is also a
+     * structural difference between a node and its duplicate -- and a document
+     * this shape is one somebody is about to repair, where a copy that quietly
+     * differs from what they are looking at is the worst thing to hand them.
+     */
+    if (Array.isArray(node.children)) next.children = childNodesOf(node).map(copy)
+    else if (node.children !== undefined) next.children = node.children
     return next
   }
 
