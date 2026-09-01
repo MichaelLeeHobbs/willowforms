@@ -307,6 +307,23 @@ export function resolveDrop(
   const axis = wrapping ? 'row' : inferAxis(siblings)
 
   let slot = children.length
+  /*
+   * The bar, drawn in the band the pointer is in rather than across the whole
+   * container.
+   *
+   * `barFor` averages the neighbours either side of the slot, so on the full
+   * children list a slot at a band boundary averages the last child of one row
+   * and the first of the next -- putting the bar between two columns, in the
+   * gap between rows, nowhere near the pointer. The slot is right and the
+   * drawing is wrong, which is the worst combination: the drop lands where the
+   * author meant and the preview said somewhere else.
+   *
+   * A band is a row by construction, so it is measured as one whatever the
+   * container's inferred axis is, and `spanOf` over the band gives the bar the
+   * row's own height instead of the container's.
+   */
+  let indicator: Rect | undefined
+
   if (wrapping) {
     const band = bandAt(bands, y)
     const before = band.find((child) => x < child.rect.left + child.rect.width / 2)
@@ -320,6 +337,18 @@ export function resolveDrop(
       const last = band[band.length - 1]
       slot = last ? children.indexOf(last) + 1 : children.length
     }
+
+    const bandSlot = before ? band.indexOf(before) : band.length
+    /*
+     * A stand-in parent whose rectangle is the band's own box.
+     *
+     * `spanOf` returns the parent's rectangle whenever the children share its
+     * repeater row -- which ordinary children always do, both being `undefined`
+     * -- so handing it the band changes nothing by itself. The band's extent
+     * has to arrive as the parent's, which is what this does: the bar then has
+     * the row's height and sits in the row, and `barFor` is left alone.
+     */
+    indicator = barFor({ ...parent, rect: boxOf(band) ?? parent.rect }, band, bandSlot, 'row')
   } else {
     const position = axis === 'row' ? x : y
     for (let i = 0; i < children.length; i++) {
@@ -340,7 +369,7 @@ export function resolveDrop(
     parentKey: parent.key,
     // Index in the real children list, which still includes the dragged node.
     index: documentIndex(candidates, parent.key, children, slot, draggedKey),
-    indicator: barFor(parent, children, slot, axis),
+    indicator: indicator ?? barFor(parent, children, slot, axis),
     orientation: axis,
     empty: false,
   }
@@ -431,6 +460,30 @@ function indexInParent(filtered: Candidate[], slot: number): number {
 function spanOf(parent: Candidate, children: Candidate[]): Rect {
   const first = children[0]
   if (!first || first.row === parent.row) return parent.rect
+
+  let top = Infinity
+  let bottom = -Infinity
+  let left = Infinity
+  let right = -Infinity
+  for (const child of children) {
+    top = Math.min(top, child.rect.top)
+    bottom = Math.max(bottom, child.rect.top + child.rect.height)
+    left = Math.min(left, child.rect.left)
+    right = Math.max(right, child.rect.left + child.rect.width)
+  }
+  return { top, left, width: right - left, height: bottom - top }
+}
+
+/**
+ * The rectangle a group of children occupies, or nothing for an empty group.
+ *
+ * `spanOf` cannot answer this: it short-circuits to the parent's rectangle when
+ * the children share the parent's repeater row, which ordinary children always
+ * do. This is the geometry question on its own.
+ */
+function boxOf(children: Candidate[]): Rect | undefined {
+  const first = children[0]
+  if (!first) return undefined
 
   let top = Infinity
   let bottom = -Infinity

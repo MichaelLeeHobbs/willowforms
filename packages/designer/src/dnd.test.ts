@@ -775,6 +775,52 @@ describe('a wrapping container, which both shipped kits have', () => {
     expect(resolveDrop(grid(), x, y)?.index).toBe(index)
   })
 
+  it('draws the bar in the band the pointer is in', () => {
+    /*
+     * The half of the original report the index assertions above do not cover:
+     * "with the drop bar drawn a row away from the pointer". The slot can be
+     * right while the drawing is wrong, which is the worse combination -- the
+     * drop lands where the author meant and the preview said somewhere else, so
+     * they aim again.
+     *
+     * `barFor` averages the neighbours either side of the slot, and on the full
+     * children list the slot for "before c" sits between `b` (the top row's
+     * last) and `c` (the bottom row's first). Averaging those puts the bar at
+     * x = 50 -- between the two columns of the top row -- when the pointer is at
+     * the start of the bottom row.
+     */
+    const drop = resolveDrop(grid(), 10, 60)
+
+    expect(drop?.index, 'the slot itself moved').toBe(2)
+
+    const bar = drop?.indicator
+    expect(bar, 'no indicator was returned').toBeDefined()
+
+    // At the left edge of the bottom row, where the pointer is.
+    expect(bar?.left).toBeLessThan(50)
+    // And spanning the bottom row rather than the whole container: the row is
+    // 50 tall and starts at 50.
+    expect(bar?.top).toBe(50)
+    expect(bar?.height).toBe(50)
+  })
+
+  it('draws the bar between two children of the same band', () => {
+    // The ordinary case in a band, so the fix is not "always draw at the left".
+    const bar = resolveDrop(grid(), 110, 60)?.indicator
+
+    expect(bar?.left).toBeGreaterThan(50)
+    expect(bar?.top).toBe(50)
+    expect(bar?.height).toBe(50)
+  })
+
+  it('draws the bar in the top row when the pointer is there', () => {
+    // The control for both rows above: a band-local bar has to follow the band.
+    const bar = resolveDrop(grid(), 110, 10)?.indicator
+
+    expect(bar?.top).toBe(0)
+    expect(bar?.height).toBe(50)
+  })
+
   it('reaches every slot, which one axis could not', () => {
     /*
      * The point of the row above, stated as the property: on one axis the
