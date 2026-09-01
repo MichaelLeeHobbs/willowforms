@@ -17,7 +17,7 @@
  * for, and the host decides what to do about it.
  */
 
-import { same } from './condition.js'
+import { MAX_CONDITION_DEPTH, same } from './condition.js'
 import { readPath } from './json.js'
 import { MAX_TREE_DEPTH, validationsOf } from './tree.js'
 import type {
@@ -37,7 +37,9 @@ import type {
  * `{ and: [{ and: [ ... ] }] }` is a stack overflow in a function whose whole
  * job is to survive malformed input.
  */
-const MAX_CONDITION_DEPTH = 200
+// Imported from `condition.ts`, which exports it precisely so nobody writes
+// "a second one that agrees today". `tree.ts` and `rows.ts` both import it;
+// this file was the last outlier.
 
 /** Every context path a condition anywhere in this condition reads. */
 function fromCondition(condition: Condition | undefined, out: Set<string>, depth = 0): void {
@@ -240,7 +242,32 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * literals each count, and a document can reach the cap faster than the number
  * suggests — which is an argument for the cap rather than against it.
  */
-const MAX_CONTEXT_VALUES = 1000
+/**
+ * How many distinct values `contextValues` will report for one path.
+ *
+ * Exported, and it was not, which is what made the cap silent. The function
+ * returns a bare array, so a caller that hit the ceiling could not tell a
+ * complete answer from a truncated one -- and the consequence is on the submit
+ * path: `validateAcross` runs one pass per scope the caller builds from this
+ * list, so every step past the cap is never validated at all and the submit
+ * succeeds with its required fields missing. `rows.ts` states the rule this
+ * broke -- "a check that reports problems must never answer 'no problem' when
+ * what happened was 'did not look'".
+ *
+ * A host detects truncation by comparing the result's length against this:
+ *
+ * ```ts
+ * const steps = contextValues(document.root, 'step')
+ * if (steps.length >= MAX_CONTEXT_VALUES) throw new Error('this form has more steps than can be checked')
+ * ```
+ *
+ * That is deliberately weaker than the `truncated` flag `rowScopeProblems`
+ * carries, and `docs/decisions.md` records why: changing this signature to
+ * report it properly is a breaking change to a public export for a shape that
+ * needs a thousand distinct literals on one path to reach. The export makes the
+ * limit checkable without pretending the API is better than it is.
+ */
+export const MAX_CONTEXT_VALUES = 1000
 
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
   /*

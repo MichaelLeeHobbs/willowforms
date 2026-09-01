@@ -67,7 +67,13 @@ export {
 // shape of its argument leaves a consumer unable to name what it is passing.
 export type { StyleSheetOptions } from './css.js'
 
-export { contextKeys, contextValues, evaluatorKeys, missingContext } from './context.js'
+export {
+  MAX_CONTEXT_VALUES,
+  contextKeys,
+  contextValues,
+  evaluatorKeys,
+  missingContext,
+} from './context.js'
 
 /*
  * `MAX_KEY_LENGTH` beside the two it belongs with, and it was missing.
