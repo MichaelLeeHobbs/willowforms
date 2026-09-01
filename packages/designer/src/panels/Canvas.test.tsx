@@ -717,3 +717,126 @@ describe('a drag over the canvas', () => {
     expect(renders()).toBeGreaterThan(before)
   })
 })
+
+describe('typing into a kit component while arranging the form', () => {
+  /*
+   * `onKeyDownCapture` had no coverage in any suite, and the one test that
+   * looks like it does proves something else.
+   *
+   * "does not let a design-mode click reach the kit component" clicks the input
+   * and types -- but `onMouseDownCapture` has already cancelled the default, so
+   * focus never enters the input and `document.activeElement` is the shell, an
+   * *ancestor* of the surface. The keydown therefore never reaches the
+   * surface's capture handler at all, and the empty `input.value` is explained
+   * entirely by focus never arriving. `e2e/canvas.spec.ts` has the same
+   * limitation and `e2e/keyboard.spec.ts` presses Tab without typing.
+   *
+   * Delete `onKeyDownCapture` from the props spread and both suites stay green,
+   * restoring the defect the handler's comment describes: tabbing into the
+   * canvas and typing reaches the kit's `onChange`, seeding preview data with
+   * answers nobody entered.
+   *
+   * Driven by focusing the input directly, which is what Tab does and what a
+   * click cannot.
+   */
+  it('does not reach the kit input when focus is already inside it', async () => {
+    const { user, node } = setup()
+
+    const input = node('first').querySelector('input') as HTMLInputElement
+    input.focus()
+
+    expect(document.activeElement, 'focus never entered the input, so this proves nothing').toBe(
+      input,
+    )
+
+    await user.keyboard('typed')
+
+    expect(input.value).toBe('')
+  })
+
+  it('still lets Tab move focus out of the component', async () => {
+    /*
+     * The allowlist, which was untested too -- and it matters because the
+     * handler's comment records that a broader version of it let Ctrl+V, Ctrl+A
+     * and Ctrl+X through to the kit.
+     *
+     * Tab is the one that has to keep working, because it is how a keyboard
+     * user leaves a component at all: swallow it and the canvas is a trap. My
+     * first version asserted Escape instead and was wrong about a different
+     * thing -- the *shell* ignores keys whose target is a text field, so
+     * Escape from inside an input clears nothing whether or not the canvas
+     * passes it on, and the test could not have told the two apart.
+     */
+    const { user, node } = setup()
+
+    const input = node('first').querySelector('input') as HTMLInputElement
+    input.focus()
+    expect(document.activeElement).toBe(input)
+
+    await user.keyboard('{Tab}')
+
+    expect(document.activeElement, 'Tab was swallowed by the canvas').not.toBe(input)
+  })
+
+  it('hands typing back in preview mode', async () => {
+    // The control, and the reason the handler is conditional: preview is where
+    // the form is meant to collect answers.
+    const { user, node } = setup()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    const input = node('first').querySelector('input') as HTMLInputElement
+    await user.click(input)
+    await user.keyboard('typed')
+
+    expect(input.value).toBe('typed')
+  })
+})
+
+describe('a press that is not the primary button', () => {
+  /*
+   * These assert real behaviour and they do NOT yet isolate the guard, which is
+   * said here rather than left for somebody to discover.
+   *
+   * `Canvas.tsx`'s primary-button check is untested while the identical guard in
+   * the tree has a dedicated pair. Replacing it with a no-op leaves both rows
+   * below green, so something else in this environment also stops a right-press
+   * arming a drag and these cannot tell the two apart. What they do pin is the
+   * outcome a user sees -- a right-press moves nothing -- which is worth having
+   * and is not the same as covering the line.
+   *
+   * Recorded in `docs/build-out/found.md`. Isolating it needs the reason a
+   * jsdom right-press does not reach `begin`, which is a question about the
+   * environment rather than about this component.
+   */
+  const order = (view: ReturnType<typeof setup>['view']): (string | null)[] =>
+    [...view.container.querySelectorAll('[data-fs-key]')].map((el) =>
+      el.getAttribute('data-fs-key'),
+    )
+
+  it('does not relocate the component on a right-press', () => {
+    const { view, node } = setup()
+    const before = order(view)
+    expect(before.length, 'nothing is on the canvas, so this proves nothing').toBeGreaterThan(1)
+
+    fireEvent.pointerDown(node('first'), { button: 2, clientX: 10, clientY: 10, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 14, clientY: 60, pointerId: 1 })
+    fireEvent.pointerUp(window, { clientX: 14, clientY: 60, pointerId: 1 })
+
+    expect(view.container.querySelector('.fs-drag-label'), 'a drag was armed').toBeNull()
+    expect(order(view)).toEqual(before)
+  })
+
+  it('still arms one on the primary button', () => {
+    // The control. Refusing every press would pass the row above while making
+    // the canvas undraggable.
+    const { view, node } = setup()
+
+    fireEvent.pointerDown(node('first'), { button: 0, clientX: 10, clientY: 10, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 14, clientY: 60, pointerId: 1 })
+
+    expect(view.container.querySelector('.fs-drag-label')).not.toBeNull()
+
+    fireEvent.pointerUp(window, { clientX: 14, clientY: 60, pointerId: 1 })
+  })
+})

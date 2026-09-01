@@ -216,3 +216,19 @@ Out of scope for that item because it is a new structural error code, which chan
 boot gate reports about documents stored today. `docs/decisions.md` records the reasoning under the
 rename entry. The shape is the one `rowScopeProblems` uses: walk the tree, collect the data keys anything writes,
 report each ref that names none of them, under its own code so a host can decide what to do about it.
+
+## The canvas's primary-button guard cannot be isolated by a jsdom test
+
+`Canvas.tsx`'s `if (event.button !== 0) return` is what stops a right-press arming a drag, and replacing
+it with a no-op leaves every test green -- including two written for it in `Canvas.test.tsx`, which say
+so in their own comment rather than claiming coverage they do not have.
+
+Something else in the jsdom environment also stops a right-press reaching `begin`, so a test driven
+there cannot tell the guard from that. The tests that exist pin the outcome a user sees (a right-press
+moves nothing), which is worth having and is not the same as covering the line.
+
+Out of scope for queue item 24 because settling it means finding out _why_ a `fireEvent.pointerDown`
+with `button: 2` does not reach the handler the way `button: 0` does -- a question about the environment
+rather than about this component. The tree's equivalent guard has a working pair of tests, so comparing
+the two harnesses is the obvious place to start. `e2e/` is the other option: a real browser has real
+buttons, and this is the class of thing `CLAUDE.md` says belongs there.

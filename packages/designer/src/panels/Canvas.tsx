@@ -207,10 +207,21 @@ export function Canvas({
    */
   const selected = api.selectedNode
   const selectedKey = api.selectedKey
-  const parent =
-    selectedKey && selectedKey !== api.document.root.key
-      ? findParent(api.document.root, selectedKey)
-      : undefined
+  /*
+   * Memoised, and it was the one tree walk in this component that was not.
+   *
+   * `Canvas` re-renders on every `pointermove` of every drag, because `useDrag`
+   * puts the pointer position in state -- so this walked the whole document per
+   * pointer event, on the path where the pointer is producing dozens a second.
+   * Every other walk here is already behind a `useMemo`.
+   */
+  const parent = useMemo(
+    () =>
+      selectedKey && selectedKey !== api.document.root.key
+        ? findParent(api.document.root, selectedKey)
+        : undefined,
+    [api.document.root, selectedKey],
+  )
 
   const { addComponent, duplicateComponent, removeComponent } = api
   const selectionActions = useMemo(() => {
@@ -387,6 +398,34 @@ export function Canvas({
        * nothing about the gesture said it would.
        */
       if (event.button !== 0) return
+
+      /*
+       * Cancelled, like `onMouseDownCapture` beside it.
+       *
+       * `pointerdown` was the one interaction event this canvas did not
+       * intercept while editing: `onMouseDownCapture`, `onClickCapture` and
+       * `onKeyDownCapture` all cancel, and this one only armed a drag. That
+       * mattered for the reason `05-canvas.md` already records for mouse --
+       * cancelling `mousedown` alone was insufficient because MUI's Select
+       * opens from an inner `onMouseDown` -- and the identical argument holds
+       * for a kit whose controls open on `onPointerDown`, which is what
+       * Radix-based components do and what `ARCHITECTURE.md:35` names as the
+       * next kit.
+       *
+       * Before the drag is armed rather than after, so a press that opens a
+       * control is stopped whether or not it becomes a drag.
+       *
+       * `preventDefault` only, where `onMouseDownCapture` beside it also calls
+       * `stopPropagation` -- and the asymmetry is deliberate. `preventDefault`
+       * is what stops a control opening, which is the whole job here.
+       * `stopPropagation` on *this* event additionally keeps it from the
+       * shell's own listeners, and the shell needs it: with both, pressing a
+       * component and then Escape no longer cleared the selection, because the
+       * shortcut never saw the press that should have put focus in the shell.
+       * Measured -- the Escape test in this file's own suite is what said so.
+       */
+      event.preventDefault()
+
       const key = keyFromEventTarget(event.target)
       // The root is the canvas itself; dragging it has nowhere to go.
       if (!key || key === api.document.root.key) return
@@ -485,13 +524,25 @@ export function Canvas({
       if (preview) return undefined
 
       /*
-       * A release outside the surface is not this zone's release.
+       * There is deliberately no bounds check here, and the block that used to
+       * sit at this spot described one as though there were.
        *
-       * The zones are asked in turn and the first to answer wins, so a drop
-       * anywhere on the page that happened to resolve against the canvas's
-       * geometry was claimed by the canvas -- the tree, which is beside it, only
-       * got a look in because it is registered first. Asking whether the point
-       * is on the surface at all is the question the zone is for.
+       * It read "asking whether the point is on the surface at all is the
+       * question the zone is for", immediately below a docblock saying the
+       * opposite and explaining why the check was removed: the canvas scrolls,
+       * so a legitimate drop onto the last component of a long form is released
+       * below the visible box while sitting squarely inside the form, and
+       * clamping to the client box broke exactly that drop.
+       *
+       * Two comments on one function disagreeing about whether a guard exists
+       * is worse than either alone -- a reader stopping at the first is told the
+       * code does a thing it does not do, and the review that found this
+       * downgraded the missing check from HIGH to MEDIUM precisely because the
+       * trade-off is deliberate and documented. What was left was the dead
+       * paragraph, so that is what is gone.
+       *
+       * If a guard is ever added it clamps to the scrollable *content* box, not
+       * the client box, which is the distinction the removed version got wrong.
        */
 
       // `-1`, a snapshot no drag can be holding: this one is measured for this
@@ -514,6 +565,25 @@ export function Canvas({
        *
        * A release the tree claims first never reaches this line, so at most one
        * snapshot survives a gesture -- and the next `takeSnapshot` replaces it.
+       *
+       * What it does not do is release the snapshot for a drag that ended
+       * *without* a release. Escape, `pointercancel`, `blur` and
+       * `visibilitychange` all abandon a drag and none of them reaches this
+       * line, so the snapshot outlives the gesture -- and the docblock above
+       * claiming it "goes with the drag" was false on those four paths.
+       *
+       * It is not cleared from an effect on `dragState`, which is the obvious
+       * repair and the wrong one: setting state from an effect is the cascade
+       * `react-hooks/set-state-in-effect` refuses, and the paragraph above says
+       * so already. What makes a leftover snapshot harmless is the reader
+       * rather than the writer -- `dropTarget` compares `snapshot.dragId`
+       * against the live drag's id and answers nothing when they differ, so a
+       * snapshot from an abandoned gesture can never be resolved against. One
+       * object is retained until the next drag replaces it, which is bounded
+       * and inert.
+       *
+       * The comment is what was wrong here, so the comment is what changed.
+       * `dragId` is the guard; state that is unreachable is not stale state.
        */
       setSnapshot(undefined)
 
