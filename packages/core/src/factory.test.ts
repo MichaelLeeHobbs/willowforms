@@ -131,9 +131,21 @@ describe('the prototype-pollution defence the restructure was for', () => {
 
     const node = made(def, root)
 
+    /*
+     * Asserted against the props object, not against `{}`.
+     *
+     * Assigning `__proto__` on an object literal sets *that object's*
+     * prototype; it does not write to `Object.prototype`. So checking
+     * `({})['polluted']` was checking an object the defect never touches -- a
+     * redundant assertion with a misleading message, passing for reasons having
+     * nothing to do with the guard. Raised in review on PR #47.
+     *
+     * What the defect produces is a props object that *inherits* `polluted`,
+     * which is what these read.
+     */
     expect(
-      ({} as Record<string, unknown>)['polluted'],
-      'Object.prototype was written',
+      (node.props as Record<string, unknown>)['polluted'],
+      'the props object inherited a value from a defaultProps __proto__ key',
     ).toBeUndefined()
     expect(Object.getPrototypeOf(node.props)).toBe(Object.prototype)
   })
@@ -151,6 +163,28 @@ describe('the prototype-pollution defence the restructure was for', () => {
       expect(Object.hasOwn(made(def, root).props, name)).toBe(true)
     },
   )
+
+  it('does not offer a definition with no usable type in the palette', () => {
+    /*
+     * `indexKit` and `groupKit` accepted a component whose `type` is the empty
+     * string, so the palette could show an entry `instantiate` then refuses --
+     * a control that is visible and inert, which is worse than one that is
+     * absent. Raised in review on PR #47.
+     */
+    const kit: Kit = {
+      id: 'k',
+      label: 'K',
+      components: [{ ...base, type: '' } as unknown as ComponentDef, { ...base, type: 'Real' }],
+    }
+
+    expect(indexKit(kit).get('')).toBeUndefined()
+    expect(indexKit(kit).get('Real'), 'the usable one was filtered too').toBeDefined()
+    expect(
+      groupKit(kit)
+        .flatMap((group) => group.components)
+        .map((c) => c.type),
+    ).toEqual(['Real'])
+  })
 
   it('refuses a definition with no usable type', () => {
     /*

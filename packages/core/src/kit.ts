@@ -166,7 +166,16 @@ function componentsOf(kit: Kit): ComponentDef[] {
   if (!kit || !Array.isArray(kit.components)) return []
   return kit.components.filter(
     (component): component is ComponentDef =>
-      Boolean(component) && typeof component === 'object' && typeof component.type === 'string',
+      Boolean(component) &&
+      typeof component === 'object' &&
+      typeof component.type === 'string' &&
+      /*
+       * Non-empty, and that matters rather than being tidiness: `instantiate`
+       * refuses a definition whose `type` is the empty string, so without this
+       * the palette can offer an entry that does nothing when dropped. A
+       * control that is visible and inert is worse than one that is absent.
+       */
+      component.type.length > 0,
   )
 }
 
