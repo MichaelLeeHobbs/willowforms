@@ -237,9 +237,12 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * hundred thousand distinct literals is a few seconds to author in the JSON
  * editor and a hundred thousand passes to submit against. A thousand is far
  * past any real flow: a wizard with more than a thousand steps is not a wizard.
- * The `add` below compares with `===`, so structurally equal object literals
- * each count and a document reaches the cap faster than the number suggests --
- * an argument for the cap rather than against it.
+ *
+ * `add` below de-duplicates with `same`, the structural comparison a condition
+ * itself uses, so what is capped is a thousand genuinely *distinct* values --
+ * not a thousand literals, however they are spelled. Reaching it from a hand-
+ * authored form is not a thing that happens; reaching it from a generated or
+ * pasted document is, and that is the case the cap is for.
  *
  * Exported, and it was not, which is what made the cap silent. The function
  * returns a bare array, so a caller that hit the ceiling could not tell a
