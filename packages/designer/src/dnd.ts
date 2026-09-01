@@ -147,6 +147,69 @@ function inOneRow(children: Candidate[], x: number, y: number): Candidate[] {
   return best
 }
 
+/**
+ * Children banded into the visual rows they occupy, in document order.
+ *
+ * Distinct from `inOneRow`, which groups by a repeater's *data* row address.
+ * This one is geometry: a wrapping container puts siblings on several lines
+ * with no data rows involved at all.
+ *
+ * Two children share a band when their vertical centres are within half the
+ * shorter one's height of each other. Comparing centres rather than edges keeps
+ * a tall child and a short one on the same line together, and the half-height
+ * tolerance stops a column of stacked fields banding into one.
+ */
+function visualRows(children: Candidate[]): Candidate[][] {
+  const bands: Candidate[][] = []
+
+  for (const child of children) {
+    const centre = child.rect.top + child.rect.height / 2
+    const band = bands.find((each) =>
+      each.some((held) => {
+        const heldCentre = held.rect.top + held.rect.height / 2
+        const tolerance = Math.min(held.rect.height, child.rect.height) / 2
+        return Math.abs(heldCentre - centre) <= tolerance
+      }),
+    )
+    if (band) band.push(child)
+    else bands.push([child])
+  }
+
+  return bands
+}
+
+/**
+ * The band a pointer is in, or the nearest one.
+ *
+ * Nearest by vertical distance for the reason `inOneRow` gives: a pointer in
+ * the gap between two rows still has to get an answer, and the gap belongs to
+ * whichever row it is closer to.
+ */
+function bandAt(bands: Candidate[][], y: number): Candidate[] {
+  const containing = bands.find((band) =>
+    band.some((child) => y >= child.rect.top && y <= child.rect.top + child.rect.height),
+  )
+  if (containing) return containing
+
+  let best = bands[0] as Candidate[]
+  let bestDistance = Infinity
+  for (const band of bands) {
+    for (const child of band) {
+      const distance =
+        y < child.rect.top
+          ? child.rect.top - y
+          : y > child.rect.top + child.rect.height
+            ? y - (child.rect.top + child.rect.height)
+            : 0
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = band
+      }
+    }
+  }
+  return best
+}
+
 function parentAt(
   candidates: Candidate[],
   x: number,
@@ -220,20 +283,85 @@ export function resolveDrop(
     }
   }
 
-  const axis = inferAxis(siblings)
-  const position = axis === 'row' ? x : y
+  /*
+   * A wrapping container is resolved in reading order, not on one axis.
+   *
+   * `inferAxis` collapses a layout to `'row' | 'column'` by summing the deltas
+   * between adjacent children, and the slot loop then compares the pointer
+   * against midpoints on that one axis. Both shipped kits render `Grid` as
+   * `gridTemplateColumns: repeat(auto-fit, minmax(...))` -- a genuinely 2-D
+   * wrapping layout, `container: true`, with a palette entry in each. A default
+   * `Grid` holding four children lays them out 2x2, `inferAxis` answers `'row'`,
+   * and a drop into the bottom-right cell resolved to slot 1 -- between the two
+   * children of the *top* row -- with the drop bar drawn a row away from the
+   * pointer. Slots 2 and 3 were unreachable by any pointer position.
+   *
+   * A layout is wrapping when its children occupy more than one visual band and
+   * at least one band holds more than one child. That is exactly the case
+   * neither axis describes: several bands each holding one child is a column,
+   * one band holding several is a row, and both of those keep the original path.
+   */
+  const bands = visualRows(children)
+  const wrapping = bands.length > 1 && bands.some((band) => band.length > 1)
+
+  const axis = wrapping ? 'row' : inferAxis(siblings)
 
   let slot = children.length
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i]
-    if (!child) continue
-    const middle =
-      axis === 'row'
-        ? child.rect.left + child.rect.width / 2
-        : child.rect.top + child.rect.height / 2
-    if (position < middle) {
-      slot = i
-      break
+  /*
+   * The bar, drawn in the band the pointer is in rather than across the whole
+   * container.
+   *
+   * `barFor` averages the neighbours either side of the slot, so on the full
+   * children list a slot at a band boundary averages the last child of one row
+   * and the first of the next -- putting the bar between two columns, in the
+   * gap between rows, nowhere near the pointer. The slot is right and the
+   * drawing is wrong, which is the worst combination: the drop lands where the
+   * author meant and the preview said somewhere else.
+   *
+   * A band is a row by construction, so it is measured as one whatever the
+   * container's inferred axis is, and `spanOf` over the band gives the bar the
+   * row's own height instead of the container's.
+   */
+  let indicator: Rect | undefined
+
+  if (wrapping) {
+    const band = bandAt(bands, y)
+    const before = band.find((child) => x < child.rect.left + child.rect.width / 2)
+    if (before) {
+      slot = children.indexOf(before)
+    } else {
+      /*
+       * Past every child in this band: the slot is after the band's last
+       * member, which in reading order is where the next band begins.
+       */
+      const last = band[band.length - 1]
+      slot = last ? children.indexOf(last) + 1 : children.length
+    }
+
+    const bandSlot = before ? band.indexOf(before) : band.length
+    /*
+     * A stand-in parent whose rectangle is the band's own box.
+     *
+     * `spanOf` returns the parent's rectangle whenever the children share its
+     * repeater row -- which ordinary children always do, both being `undefined`
+     * -- so handing it the band changes nothing by itself. The band's extent
+     * has to arrive as the parent's, which is what this does: the bar then has
+     * the row's height and sits in the row, and `barFor` is left alone.
+     */
+    indicator = barFor({ ...parent, rect: boxOf(band) ?? parent.rect }, band, bandSlot, 'row')
+  } else {
+    const position = axis === 'row' ? x : y
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i]
+      if (!child) continue
+      const middle =
+        axis === 'row'
+          ? child.rect.left + child.rect.width / 2
+          : child.rect.top + child.rect.height / 2
+      if (position < middle) {
+        slot = i
+        break
+      }
     }
   }
 
@@ -241,7 +369,7 @@ export function resolveDrop(
     parentKey: parent.key,
     // Index in the real children list, which still includes the dragged node.
     index: documentIndex(candidates, parent.key, children, slot, draggedKey),
-    indicator: barFor(parent, children, slot, axis),
+    indicator: indicator ?? barFor(parent, children, slot, axis),
     orientation: axis,
     empty: false,
   }
@@ -332,6 +460,30 @@ function indexInParent(filtered: Candidate[], slot: number): number {
 function spanOf(parent: Candidate, children: Candidate[]): Rect {
   const first = children[0]
   if (!first || first.row === parent.row) return parent.rect
+
+  let top = Infinity
+  let bottom = -Infinity
+  let left = Infinity
+  let right = -Infinity
+  for (const child of children) {
+    top = Math.min(top, child.rect.top)
+    bottom = Math.max(bottom, child.rect.top + child.rect.height)
+    left = Math.min(left, child.rect.left)
+    right = Math.max(right, child.rect.left + child.rect.width)
+  }
+  return { top, left, width: right - left, height: bottom - top }
+}
+
+/**
+ * The rectangle a group of children occupies, or nothing for an empty group.
+ *
+ * `spanOf` cannot answer this: it short-circuits to the parent's rectangle when
+ * the children share the parent's repeater row, which ordinary children always
+ * do. This is the geometry question on its own.
+ */
+function boxOf(children: Candidate[]): Rect | undefined {
+  const first = children[0]
+  if (!first) return undefined
 
   let top = Infinity
   let bottom = -Infinity
