@@ -869,7 +869,19 @@ export function validateForm(
        * the repeater optional.
        */
       if (stored !== undefined && stored !== null && !Array.isArray(stored)) {
-        errors[addressOf(path, node.key)] = NOT_A_LIST
+        /*
+         * Without overwriting the repeater's own rule failure, which is the
+         * guard the `TOO_MANY_ROWS` branch below already carries and this one
+         * did not. That comment says clobbering "los[es] the message a person
+         * can act on", and the same is true here: "This list was not sent as a
+         * list" tells an author nothing they can do, where "This field is
+         * required" is a sentence about their form.
+         *
+         * The rules on the repeater itself are checked a few lines up and write
+         * to this same address.
+         */
+        const at = addressOf(path, node.key)
+        if (!Object.hasOwn(errors, at)) errors[at] = NOT_A_LIST
         return
       }
 

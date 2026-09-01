@@ -14,6 +14,8 @@ import {
   isRequired,
   autoValidateKeys,
   patternProblem,
+  submittedAcross,
+  NOT_A_LIST,
   submittedData,
   validateAcross,
   validateField,
@@ -2211,5 +2213,153 @@ describe('the row cap on the projection', () => {
     const under = { addresses: [{ line1: 'x' }, { line1: 'y' }] }
 
     expect(submittedData(root, under)).toEqual(under)
+  })
+})
+
+describe('submittedAcross and a key that lives on Object.prototype', () => {
+  /*
+   * The twin of the block above, and it had no test of any kind.
+   *
+   * That block drives `validateAcross` only. `submittedAcross` has the same
+   * hazard by the same mechanism -- `merged[key] ??= value` reads before it
+   * writes -- and it is the function that builds the *payload*. Change
+   * `validation.ts`'s `Object.create(null)` to `{}` here and every answer
+   * submitted under a data key of `toString`, `valueOf`, `constructor`,
+   * `hasOwnProperty` or `isPrototypeOf` disappears from the projection, on the
+   * submit path, with nothing failing.
+   *
+   * Nothing has to be bypassed to reach it: all five pass `KEY_PATTERN`, and
+   * nothing on the render or validate path calls `validateDocument`.
+   */
+  const PROTOTYPE_KEYS = ['toString', 'valueOf', 'constructor', 'hasOwnProperty', 'isPrototypeOf']
+
+  const field = (key: string): ComponentNode => ({
+    key,
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  const step = (name: string, children: ComponentNode[]): ComponentNode => ({
+    key: 'step' + name,
+    type: 'Box',
+    props: {},
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: name },
+      },
+    },
+    children,
+  })
+
+  /*
+   * Two scopes, so the coalescing branch is what runs rather than a single pass
+   * that never merges anything. One prototype-named field per step, so the
+   * merge has to carry a name from each.
+   */
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      step('one', PROTOTYPE_KEYS.slice(0, 3).map(field)),
+      step('two', PROTOTYPE_KEYS.slice(3).map(field)),
+    ],
+  }
+
+  const scopes = [{ context: { step: 'one' } }, { context: { step: 'two' } }]
+
+  const answers: FormData = Object.fromEntries(
+    PROTOTYPE_KEYS.map((key) => [key, 'answered ' + key]),
+  )
+
+  it('carries every answer whose key is inherited from Object.prototype', () => {
+    const payload = submittedAcross(root, answers, scopes)
+
+    const lost = PROTOTYPE_KEYS.filter((key) => payload[key] !== 'answered ' + key)
+    expect(lost, 'these answers were dropped from the submitted payload').toEqual([])
+  })
+
+  it('hands back a plain object rather than a null-prototype one', () => {
+    /*
+     * The other half of the same decision. `submittedData` spreads back to a
+     * plain object deliberately, "so a host does not receive something
+     * surprising back from a function it will hand straight to
+     * `JSON.stringify`" -- and a host calling `payload.hasOwnProperty(...)` on
+     * a null-prototype object throws.
+     */
+    const payload = submittedAcross(root, answers, scopes)
+
+    expect(Object.getPrototypeOf(payload)).toBe(Object.prototype)
+    expect(Object.hasOwn(payload, 'toString')).toBe(true)
+  })
+
+  it('still submits an ordinary answer, and only what the form asked', () => {
+    // The control. Returning everything unfiltered would pass both rows above
+    // while defeating the whole point of the projection.
+    const plain: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [step('one', [field('email')])],
+    }
+
+    const payload = submittedAcross(plain, { email: 'a@b.c', notAsked: 'x' }, [
+      { context: { step: 'one' } },
+    ])
+
+    expect(payload).toEqual({ email: 'a@b.c' })
+  })
+})
+
+describe('a repeater whose own rule fails while its answer is the wrong shape', () => {
+  /*
+   * `NOT_A_LIST` overwrote the repeater's own rule failure, which is the
+   * mistake the `TOO_MANY_ROWS` branch twenty lines below it was fixed for --
+   * that one guards with `if (!Object.hasOwn(errors, at))` and explains that
+   * clobbering "los[es] the message a person can act on".
+   *
+   * The same argument applies here and the guard was not copied: an author
+   * reading "This list was not sent as a list" learns nothing they can act on,
+   * where "This field is required" is a sentence about their form.
+   */
+  const list: ComponentNode = {
+    key: 'addressList',
+    dataKey: 'addresses',
+    type: 'Repeater',
+    props: {},
+    schema: { type: 'array', validations: [{ key: 'required' }] },
+    children: [
+      { key: 'line1', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ],
+  }
+
+  const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [list] }
+
+  it('keeps the message a person can act on', () => {
+    /*
+     * An empty string, not `'nope'`. Both are "not a list", but only one also
+     * fails `required` -- a non-empty string satisfies it, so the first draft
+     * of this test had no prior error for `NOT_A_LIST` to clobber and was
+     * asserting against a case that could not distinguish the two.
+     */
+    const errors = validateForm(root, { addresses: '' })
+
+    expect(errors['addressList']).toBe(DEFAULT_MESSAGES.required)
+  })
+
+  it('still reports the shape when no rule of its own failed', () => {
+    // The control. Never reporting NOT_A_LIST would pass the row above while
+    // turning every required field inside the repeater optional again.
+    const optional: ComponentNode = {
+      ...root,
+      children: [{ ...list, schema: { type: 'array', validations: [] } }],
+    }
+
+    expect(validateForm(optional, { addresses: 'nope' })['addressList']).toBe(NOT_A_LIST)
+    expect(validateForm(optional, { addresses: '' })['addressList']).toBe(NOT_A_LIST)
   })
 })
