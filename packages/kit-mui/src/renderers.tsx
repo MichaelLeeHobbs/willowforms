@@ -493,9 +493,14 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
         // something alongside auto-fit. Ignoring it here made the same document
         // lay out differently in the two kits.
         // `px()`, for the reason `Screen`'s own comment gives: MUI reads a
-        // bare number at or below 1 as a percentage. This one cannot reach that
-        // range today -- `minWidth` floors it -- and it is the same length in
-        // the same unit either way, so it is written the same way.
+        // bare number at or below 1 as a percentage. `px()` hands it a CSS
+        // string instead, which the sizing transform passes through untouched,
+        // so the range stops mattering rather than being avoided.
+        //
+        // Worth having rather than relying on the arithmetic staying large:
+        // `minColumnWidth` is an ordinary number prop with no floor, so a
+        // document saying `1` and `columns: 1` reaches exactly the value that
+        // would be read as 100%.
         maxWidth: columns > 0 ? px(columns * (minWidth + gap)) : undefined,
       }}
     >
