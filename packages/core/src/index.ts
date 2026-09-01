@@ -122,6 +122,8 @@ export {
   pathTo,
   removeNode,
   repointBinding,
+  repointDataKey,
+  writersOf,
   updateNode,
   validateDocument,
   walk,

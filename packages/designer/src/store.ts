@@ -33,6 +33,10 @@ import {
   repointBinding,
   updateNode,
   validateDocument,
+  dataKeyOf,
+  writersOf,
+  repointDataKey,
+  flatten,
 } from '@formsmith/core'
 
 export const MAX_HISTORY = 100
@@ -599,24 +603,88 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       }
 
       /*
-       * The key and anything that names it. A `Step` ships with a condition
-       * comparing `context.step` against its own key, so renaming one rewrote
-       * `node.key` and left the condition naming the old one — the step became
-       * unsatisfiable, permanently, with nothing reporting why. `duplicateNode`
-       * in core had the same hole from the other side and is fixed the same way.
+       * The key, anything that names it *as a step*, and -- now -- anything that
+       * reads its answer.
+       *
+       * The first two were here. A `Step` ships with a condition comparing
+       * `context.step` against its own key, so renaming one rewrote `node.key`
+       * and left the condition naming the old one, and `repointBinding` fixes
+       * that on the renamed node itself.
+       *
+       * The third was not, and the comment above claimed it was. `dataKeyOf` is
+       * `node.dataKey ?? node.key` and `instantiate` never writes a `dataKey`,
+       * so a freshly dropped component's answer name *is* its key -- and this
+       * moved the answer while every `renderWhen` elsewhere in the document went
+       * on naming the old one. The ref reads an answer nothing writes, the
+       * condition is false, the component is permanently hidden, and because
+       * `renderWhen` gates validation, `validateForm` skips whatever is inside
+       * it on the server too. `repointBinding` cannot do this job: it rewrites
+       * literals in comparisons that read `context` and says in as many words
+       * that it leaves refs alone, because a *copy* shares its source's data key
+       * deliberately. A rename is the case where that is false.
+       *
+       * Only when the renamed node was the sole writer of the name. Two fields
+       * behind opposite guards writing one answer is a supported shape, and if
+       * another node still writes it every ref still resolves -- rewriting them
+       * would break a document that was correct.
+       *
+       * `docs/decisions.md` records why re-pointing rather than the three other
+       * defensible answers.
        */
-      apply((doc) =>
-        withRoot(
-          doc,
-          updateNode(doc.root, key, (node) => ({
-            ...node,
-            key: trimmed,
-            ...(node.renderWhen
-              ? { renderWhen: repointBinding(node.renderWhen, key, trimmed) }
-              : {}),
-          })),
-        ),
+      const before = findNode(history.present.root, key) as ComponentNode
+      const movedName = dataKeyOf(before)
+      const alsoWrites = writersOf(history.present.root, movedName).filter(
+        (each: string) => each !== key,
       )
+
+      /*
+       * Three conditions, and `movedName === key` was standing in for two of
+       * them badly.
+       *
+       * The answer only moves when the node has no `dataKey` of its own, since
+       * `dataKeyOf` is `node.dataKey ?? node.key` and an explicit one does not
+       * follow the key. `movedName === key` is true for a node whose `dataKey`
+       * is spelled out and happens to equal its key -- a shape a host's JSON
+       * produces and the designer's own key editor can leave behind -- and for
+       * that node the rename moves nothing, so re-pointing every ref would send
+       * them all at a name nothing writes. Exactly the defect this code exists
+       * to prevent, caused by the fix for it.
+       *
+       * And a node with no `schema` writes no answer at all, so there is
+       * nothing for a ref to have been reading. `writersOf` already tests
+       * `node.schema`, which is why `alsoWrites` is empty for one of these and
+       * the gate read that emptiness as "sole writer".
+       */
+      const followsTheRename =
+        alsoWrites.length === 0 && before.schema !== undefined && before.dataKey === undefined
+
+      apply((doc) => {
+        const renamed = updateNode(doc.root, key, (node) => ({
+          ...node,
+          key: trimmed,
+          ...(node.renderWhen ? { renderWhen: repointBinding(node.renderWhen, key, trimmed) } : {}),
+        }))
+
+        if (!followsTheRename) return withRoot(doc, renamed)
+
+        /*
+         * Every node's own `renderWhen`, including the renamed one's -- a
+         * component may read its own answer through a sibling's guard, and a
+         * self-reference is no less dangling than any other.
+         */
+        let repointed = renamed
+        for (const node of flatten(renamed)) {
+          if (!node.node.renderWhen) continue
+          const next = repointDataKey(node.node.renderWhen, movedName, trimmed)
+          if (next === node.node.renderWhen) continue
+          repointed = updateNode(repointed, node.node.key, (each) => ({
+            ...each,
+            renderWhen: next,
+          }))
+        }
+
+        return withRoot(doc, repointed)
+      })
       setSelectedKey((current) => (current === key ? trimmed : current))
       return { ok: true }
     },

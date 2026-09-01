@@ -4,6 +4,32 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### Renaming a key re-points the refs that read its answer, when it was the only writer
+
+- **Decided:** `renameKey` rewrites every `renderWhen` ref naming the moved data key, and only when the
+  renamed node was the sole writer of that name. `repointDataKey` and `writersOf` are new in
+  `@formsmith/core`.
+- **Why:** a key is identity _and_, for a node with no explicit `dataKey`, the payload name -- and
+  `instantiate` never writes one, so that is every freshly dropped component. The rename moved the answer
+  and left every condition reading the old name, which reads an answer nothing writes: the component is
+  permanently hidden and, because `renderWhen` gates validation, its rules never run on the server
+  either. Silent and permissive, which is the class this project is organised against.
+- **Rejected: writing an explicit `dataKey` on rename** so the answer name never moves. Conceptually the
+  cleanest -- it makes a key pure identity -- and it breaks the ordinary gesture: an author who renames
+  `field1` to `email` early on _wants_ the payload name to change, and this would silently keep
+  `field1` in the payload forever.
+- **Rejected: refusing the rename** and naming the components that would break. Safest, and hostile:
+  renaming is a normal authoring gesture and refusing it because something references the field makes the
+  designer feel broken rather than careful.
+- **Rejected for now: reporting a dangling ref from `validateDocument`.** It is the right safety net and
+  it is a new structural error code, which changes what every host's boot gate says about documents that
+  are stored today. That is a separate decision with its own blast radius, and it belongs in its own item
+  rather than smuggled into a rename fix. Recorded in `docs/build-out/found.md`.
+- **Reversal:** moderate. The two new exports are public, so removing them later is a breaking change,
+  and a document renamed under this rule has had its refs rewritten -- undoing the _policy_ does not
+  un-rewrite them. What is cheap to revisit is the sole-writer condition, which is one boolean.
+- **When:** 2026-09-01, queue item 18.
+
 ### `contextValues` exports its cap instead of reporting truncation in its return type
 
 - **Decided:** `MAX_CONTEXT_VALUES` becomes a public export and the docblock shows a host how to detect

@@ -399,6 +399,82 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
   return { kind: 'condition', condition: inCondition(value.condition) }
 }
 
+/**
+ * Every ref naming one data key, pointed at another.
+ *
+ * The counterpart to `repointBinding`, and deliberately not the same function.
+ * That one rewrites *literals* inside comparisons that read `context`, and says
+ * why it leaves refs alone: "a `ref` names a data key, which the copy shares
+ * deliberately". True for `duplicateNode`, its other caller -- a copy really
+ * does answer under the same name. False for a rename, where the data key
+ * genuinely moved.
+ *
+ * That gap is the defect. `dataKeyOf` is `node.dataKey ?? node.key` and
+ * `instantiate` never writes a `dataKey`, so a freshly dropped component's
+ * answer name *is* its key -- and renaming the key renamed the answer while
+ * every condition elsewhere in the document went on naming the old one. The
+ * ref reads an answer nothing writes, the condition is false, the component is
+ * permanently hidden, and because `renderWhen` gates validation, `validateForm`
+ * skips whatever is inside it on the server too. Nothing reports any of it.
+ *
+ * Bounded like its sibling, and total for the same reason: this runs on a
+ * document a host may never have gated.
+ */
+export function repointDataKey(value: PropValue, from: string, to: string): PropValue {
+  if (!value || typeof value !== 'object' || value.kind !== 'condition') return value
+
+  const inCondition = (condition: Condition, depth = 0): Condition => {
+    if (!condition || typeof condition !== 'object') return condition
+    if (depth > MAX_CONDITION_DEPTH) return condition
+
+    const operand = (side: Operand | undefined): Operand | undefined =>
+      side?.kind === 'ref' && side.dataKey === from ? { ...side, dataKey: to } : side
+
+    const shape = condition as unknown as Record<string, unknown>
+    const next: Record<string, unknown> = { ...shape }
+
+    /*
+     * Every side, with no `readsContext` test. That test is what tells a key
+     * from a value for a *literal*, where `'welcome'` could be either. A ref is
+     * never ambiguous: it names a data key by construction, so one naming the
+     * key that moved always follows it.
+     */
+    for (const name of SIDES) {
+      if (shape[name] !== undefined) next[name] = operand(shape[name] as Operand)
+    }
+
+    if (Array.isArray(shape['conditions'])) {
+      next['conditions'] = (shape['conditions'] as Condition[]).map((each) =>
+        inCondition(each, depth + 1),
+      )
+    }
+    if (shape['condition'] !== undefined) {
+      next['condition'] = inCondition(shape['condition'] as Condition, depth + 1)
+    }
+
+    return next as unknown as Condition
+  }
+
+  return { ...value, condition: inCondition(value.condition) }
+}
+
+/**
+ * How many nodes answer under one data key.
+ *
+ * Two fields behind opposite `renderWhen` guards writing one answer is a
+ * supported shape -- `07-bindings.md` says so -- and it is the case that decides
+ * whether a rename should re-point anything. If another node still writes the
+ * name, every ref to it still resolves and rewriting them would break the
+ * document rather than repair it.
+ */
+export function writersOf(root: ComponentNode, dataKey: string): string[] {
+  const keys: string[] = []
+  walk(root, (node) => {
+    if (node.schema && dataKeyOf(node) === dataKey) keys.push(node.key)
+  })
+  return keys
+}
+
 /** A copy of the subtree at `key`, re-keyed. See the block above `repointBinding`. */
 export function duplicateNode(root: ComponentNode, key: string): ComponentNode | undefined {
   const source = findNode(root, key)
