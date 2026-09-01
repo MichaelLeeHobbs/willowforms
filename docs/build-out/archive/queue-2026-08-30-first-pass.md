@@ -1,5 +1,9 @@
 # Build-out queue — remediating the 2026-08-30 deep review
 
+> **Archived. Do not run.** This queue is closed and its run finished. The `/goal` line below
+> points at `docs/build-out/queue.md`, which now holds a different, live queue. Pasting it would start a
+> run against that queue while reading this contract.
+
 Paste this to start or resume the run:
 
 ```
