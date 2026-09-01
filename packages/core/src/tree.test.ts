@@ -37,6 +37,16 @@ function fixture(): ComponentNode {
   return container('root', [container('stack', [leaf('a'), leaf('b')]), leaf('c')])
 }
 
+/**
+ * `instantiate`, narrowed. It answers `undefined` for a definition with no
+ * usable `type`, which no fixture here supplies.
+ */
+const made = (def: ComponentDef, root: ComponentNode): ComponentNode => {
+  const node = instantiate(def, root)
+  if (!node) throw new Error('instantiate refused a definition this test expects it to accept')
+  return node
+}
+
 describe('traversal', () => {
   it('collects keys parents-first, depth-first', () => {
     expect(collectKeys(fixture())).toEqual(['root', 'stack', 'a', 'b', 'c'])
@@ -1054,7 +1064,7 @@ describe('a component that arrives with a visibility rule', () => {
   const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [] }
 
   it('names the node the rule is on, not the type', () => {
-    const node = instantiate(stepDef, root)
+    const node = made(stepDef, root)
 
     expect(node.renderWhen).toEqual({
       kind: 'condition',
@@ -1069,9 +1079,9 @@ describe('a component that arrives with a visibility rule', () => {
   it('gives two steps different rules, so they are different steps', () => {
     // Generated from the key, so a second one cannot silently share the first's
     // condition and show at the same time.
-    const first = instantiate(stepDef, root)
+    const first = made(stepDef, root)
     const withFirst: ComponentNode = { ...root, children: [first] }
-    const second = instantiate(stepDef, withFirst)
+    const second = made(stepDef, withFirst)
 
     expect(second.key).not.toBe(first.key)
     expect(second.renderWhen).not.toEqual(first.renderWhen)
@@ -1081,7 +1091,7 @@ describe('a component that arrives with a visibility rule', () => {
     const plain: ComponentDef = { ...stepDef, type: 'Box' }
     delete (plain as { defaultRenderWhen?: unknown }).defaultRenderWhen
 
-    expect(instantiate(plain, root).renderWhen).toBeUndefined()
+    expect(made(plain, root).renderWhen).toBeUndefined()
   })
 })
 
