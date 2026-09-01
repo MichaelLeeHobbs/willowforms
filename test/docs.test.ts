@@ -1113,7 +1113,14 @@ describe('a section that calls itself planned is still planned', () => {
  */
 describe('the server parity section and the server it cites', () => {
   /** Everything the demo server imports from core, from the import block. */
+  /*
+   * Parsed once per describe rather than per call. Four assertions each
+   * re-reading and re-scanning the same file is work with one answer, and the
+   * answer cannot change inside a run.
+   */
+  let cached: Set<string> | undefined
   const imported = (): Set<string> => {
+    if (cached) return cached
     const source = read('apps/demo-server/src/index.ts')
     const names = new Set<string>()
     for (const block of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@formsmith\/core'/g)) {
@@ -1122,6 +1129,7 @@ describe('the server parity section and the server it cites', () => {
         if (trimmed) names.add(trimmed)
       }
     }
+    cached = names
     return names
   }
 
@@ -1143,13 +1151,43 @@ describe('the server parity section and the server it cites', () => {
     expect([...names]).toContain('validateDocument')
   })
 
+  /*
+   * The per-scope half of the contract, named once. Both directions below are
+   * about these four.
+   */
+  const PER_SCOPE = ['validateAcross', 'submittedAcross', 'contextValues', 'missingContext']
+
   it('names the functions the reference server actually calls', () => {
     const section = parity()
-    const missing = ['validateAcross', 'submittedAcross', 'contextValues', 'missingContext']
-      .filter((name) => imported().has(name))
-      .filter((name) => !section.includes(name))
+    const names = imported()
+    const missing = PER_SCOPE.filter((name) => names.has(name)).filter(
+      (name) => !section.includes(name),
+    )
 
     expect(missing, 'the parity section does not mention these, and the server calls them').toEqual(
+      [],
+    )
+  })
+
+  it('does not name one the reference server has stopped calling', () => {
+    /*
+     * The other direction, which the check above does not cover.
+     *
+     * It asserts only that an imported name is mentioned, so the spec could get
+     * *ahead* of the server -- keep teaching `validateAcross` after the route
+     * stopped calling it -- and nothing would fail. That is the same drift this
+     * whole item is about, pointing the other way: the section claimed
+     * `validateForm` was what the server used long after it was not.
+     *
+     * Raised in review on PR #37.
+     */
+    const section = parity()
+    const names = imported()
+    const stale = PER_SCOPE.filter((name) => section.includes(name)).filter(
+      (name) => !names.has(name),
+    )
+
+    expect(stale, 'the parity section teaches these and the server no longer imports them').toEqual(
       [],
     )
   })
