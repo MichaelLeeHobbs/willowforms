@@ -85,12 +85,30 @@ export interface DragController {
   consumeClick: () => boolean
 }
 
+/**
+ * Which pointer an event belongs to.
+ *
+ * `?? 0` because a synthesised event -- jsdom's, and any fixture that builds
+ * one by hand -- carries no `pointerId`, and the spec's own primary pointer is
+ * the one a mouse reports. Normalising both sides keeps the identity check real
+ * (two different ids still differ) without demanding that every caller model a
+ * field the browser fills in for them.
+ */
+const pointerOf = (event: { pointerId?: number }): number => event.pointerId ?? 0
+
 export function useDrag(
   onCommit: (source: DragSource, target: DropCommit) => void,
 ): DragController {
   const [state, setState] = useState<DragState | undefined>(undefined)
 
-  const pending = useRef<{ source: DragSource; x: number; y: number } | undefined>(undefined)
+  /**
+   * The press this drag belongs to, including which pointer made it.
+   *
+   * `pointerId` so a second pointer cannot move or end a drag it did not start.
+   */
+  const pending = useRef<
+    { source: DragSource; pointerId: number; x: number; y: number } | undefined
+  >(undefined)
   const zones = useRef(new Map<string, DropResolver>())
   /*
    * The last position a move reported, and the press before any move did.
@@ -136,7 +154,30 @@ export function useDrag(
   }, [onCommit])
 
   const begin = useCallback((source: DragSource, event: ReactPointerEvent) => {
-    pending.current = { source, x: event.clientX, y: event.clientY }
+    /*
+     * One press at a time, and the drag remembers whose it is.
+     *
+     * Nothing filtered events by `pointerId`, so *any* pointer's `pointerup`
+     * ended and committed a drag another pointer started -- at the second
+     * pointer's coordinates. On touch, which `05-canvas.md` calls a supported
+     * target: finger A drags a palette entry onto the canvas, finger B taps
+     * Preview and lifts, and finger B's release resolves the zones at finger
+     * B's position and commits an insertion there, while finger A is still down
+     * and the drag label still follows it.
+     *
+     * `begin` also overwrote `pending.current` with no in-flight check, so a
+     * second press mid-drag silently retargeted the drag -- the same root cause
+     * reached from the other end. A drag in progress owns the gesture until it
+     * ends.
+     */
+    if (pending.current) return
+
+    pending.current = {
+      source,
+      pointerId: pointerOf(event),
+      x: event.clientX,
+      y: event.clientY,
+    }
     // Seeded from the press, so the fallback above has a real position to give
     // even for a gesture that never moved.
     at.current = { x: event.clientX, y: event.clientY }
@@ -175,6 +216,8 @@ export function useDrag(
     const onMove = (event: PointerEvent): void => {
       const press = pending.current
       if (!press) return
+      // Only the pointer that started this drag may move it. See `begin`.
+      if (pointerOf(event) !== press.pointerId) return
 
       if (!moved.current) {
         const travelled = Math.hypot(event.clientX - press.x, event.clientY - press.y)
@@ -188,6 +231,8 @@ export function useDrag(
 
     const onUp = (event: PointerEvent): void => {
       const press = pending.current
+      // Only the pointer that started this drag may end it. See `begin`.
+      if (press && pointerOf(event) !== press.pointerId) return
       const dragged = moved.current
 
       // Ask each zone where this release lands, now, rather than reading a
@@ -288,6 +333,24 @@ export function useDrag(
     }
 
     /*
+     * Only the pointer that started this drag may cancel it.
+     *
+     * `pointercancel` was wired straight to `abandon`, with no `pointerId`
+     * check, while `pointermove` and `pointerup` both have one -- so a second
+     * finger becoming a scroll cancelled the first finger's drag. The same
+     * cross-gesture defect those two were fixed for, through the one event type
+     * that was left out.
+     *
+     * Escape keeps calling `abandon` directly, because a key press belongs to no
+     * pointer.
+     */
+    const onCancel = (event: PointerEvent): void => {
+      const press = pending.current
+      if (press && pointerOf(event) !== press.pointerId) return
+      abandon()
+    }
+
+    /*
      * Losing the window ends the drag.
      *
      * These are bare window listeners with no `setPointerCapture`, so a release
@@ -343,7 +406,7 @@ export function useDrag(
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', abandon)
+    window.addEventListener('pointercancel', onCancel)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('click', lowerSwallow)
     window.addEventListener('pointerdown', lowerSwallow)
@@ -352,7 +415,7 @@ export function useDrag(
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', abandon)
+      window.removeEventListener('pointercancel', onCancel)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('click', lowerSwallow)
       window.removeEventListener('pointerdown', lowerSwallow)

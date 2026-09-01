@@ -657,10 +657,20 @@ describe('a drag over the canvas', () => {
     await user.pointer({ target, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } })
     const before = renders()
 
-    // Past the threshold, then a few moves, which is the shortest real drag.
-    fireEvent.pointerMove(window, { clientX: 40, clientY: 40 })
-    fireEvent.pointerMove(window, { clientX: 60, clientY: 60 })
-    fireEvent.pointerMove(window, { clientX: 80, clientY: 80 })
+    /*
+     * Past the threshold, then a few moves, which is the shortest real drag.
+     *
+     * `pointerId: 1` on every one, because `user.pointer` above uses that for a
+     * mouse and `fireEvent` defaults to 0 -- so without it this fixture is two
+     * *different* pointers for one physical gesture, which is not a thing a
+     * browser produces. `useDrag` now ignores a move from a pointer that did
+     * not start the drag, which is what makes finger B unable to commit finger
+     * A's drag, and this fixture had to start modelling the identity the
+     * browser fills in.
+     */
+    fireEvent.pointerMove(window, { clientX: 40, clientY: 40, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 60, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 80, clientY: 80, pointerId: 1 })
 
     /*
      * A drag is actually in flight, which was assumed rather than asserted.
@@ -679,7 +689,7 @@ describe('a drag over the canvas', () => {
 
     expect(renders()).toBe(before)
 
-    fireEvent.pointerUp(window, { clientX: 80, clientY: 80 })
+    fireEvent.pointerUp(window, { clientX: 80, clientY: 80, pointerId: 1 })
   })
 
   it('still re-renders them when the document changes', async () => {
