@@ -755,6 +755,75 @@ describe('a document whose languages are not languages', () => {
     expect(screen.getAllByRole('checkbox', { name: 'Right to left' })).toHaveLength(1)
   })
 
+  /*
+   * The third panel that reads the language list, and the one that did not
+   * guard it.
+   *
+   * `Properties` passed `api.document.languages` straight into the prop row,
+   * where `Binding` maps it to draw one box per language. So the settings tab
+   * and the toolbar survived a malformed document and the inspector did not:
+   * binding a property to a translation threw during render, and the designer
+   * went down at the moment its job was repairing that document.
+   *
+   * Driven through `Properties` rather than by rendering `Binding` with a bad
+   * prop. `Binding` declares `Language[]` and is entitled to believe it; the
+   * question is what fills it.
+   */
+  it.each([
+    ['null', [null]],
+    ['not an array at all', 'de'],
+  ])('draws a translated property when languages are %s', async (_what, languages) => {
+    /*
+     * The two shapes that actually threw: `languageTag(null)` reads `.dialect`
+     * off null, and a `languages` that is not an array has no `.map`. Restoring
+     * the raw read fails both.
+     */
+    const view = junk(
+      Array.isArray(languages)
+        ? [...languages, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }]
+        : languages,
+    )
+    await view.select()
+
+    await view.user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+
+    expect(
+      screen.getAllByRole('textbox', { name: 'Translation key' }),
+      'the inspector did not survive the document',
+    ).toHaveLength(1)
+    expect(screen.queryAllByLabelText('English')).toHaveLength(Array.isArray(languages) ? 1 : 0)
+  })
+
+  it.each([
+    ['no name', [{ code: 'de' }]],
+    ['a name that is an object', [{ code: 'de', name: {}, bidi: 'ltr' }]],
+  ])('draws one box per language when an entry has %s', async (_what, languages) => {
+    /*
+     * Controls, and worth saying so: these two pass with the raw read as well.
+     * `Binding` labels each box `nameOf(language) || tag`, which was written for
+     * a nameless language and absorbs an unreadable one for free.
+     *
+     * They are here because they are the shapes somebody would assume this
+     * guard is for, and a reader who assumes that and deletes the guard should
+     * find out from the rows above rather than from a bug report. What these
+     * pin is that the guarded list drops the junk entry rather than drawing an
+     * unnamed box beside the real one.
+     */
+    const view = junk([
+      ...(languages as unknown[]),
+      { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
+    ])
+    await view.select()
+
+    await view.user.selectOptions(screen.getByLabelText('Label binding'), 'i18n')
+
+    expect(screen.getAllByLabelText('English')).toHaveLength(1)
+    expect(
+      screen.queryAllByLabelText('de'),
+      'an entry the panel cannot read was drawn',
+    ).toHaveLength(0)
+  })
+
   it('counts what it can draw rather than what the array holds', async () => {
     /*
      * The heading read `doc.languages.length`, so a document with three entries
