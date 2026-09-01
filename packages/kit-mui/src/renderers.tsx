@@ -136,7 +136,12 @@ const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
   error ? { role: 'alert' } : {}
 
 /**
- * The same, for a helper line that carries a notice which is not an error.
+ * The same, for a helper line carrying whichever message is showing.
+ *
+ * Not "a notice rather than an error": its argument is `error ?? tooLarge(...)`,
+ * so an error reaches it too, and announcing whichever one is on screen is the
+ * point. `alertWhenError` above is the narrower sibling, for a line that can
+ * only ever hold an error.
  *
  * `FileUploadNode` produced its "too large" message only when `error` was
  * undefined and asked for `role="alert"` only when `error` was set -- two
@@ -919,7 +924,8 @@ function FileUploadNode({
         filesHeld || str(props['helperText']),
       )}
       slotProps={{
-        // The notice, not the error: a dropped file is announced too.
+        // Whichever message the line is carrying. An error wins upstream, and a
+        // dropped file is announced with the same mechanism rather than silently.
         formHelperText: alertWhenSaying(notice),
         inputLabel: { shrink: true },
         htmlInput: {
