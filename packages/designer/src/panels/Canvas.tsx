@@ -778,15 +778,31 @@ export function Canvas({
         )}
       </div>
 
+      {/*
+       * `tabIndex` on the dumps, because `designer.css` caps them at 180px and
+       * scrolls. A scrollable box that nothing can focus is unreachable by
+       * keyboard: a pointer user could read a long form's data, and a keyboard
+       * user got the first few lines and no way to reach the rest.
+       *
+       * Named as well as focusable. A tab stop that announces nothing is its own
+       * problem, and `aria-label` is what turns the stop into "Data, group".
+       * axe's `scrollable-region-focusable` is one of three rules
+       * `test/a11y.test.tsx` disables for want of a layout engine, so this is
+       * asserted directly in `Canvas.test.tsx` instead of waited for.
+       */}
       {preview && (
         <div className="fs-canvas__data">
           <section>
             <h2 className="fs-panel__heading">Data</h2>
-            <pre>{JSON.stringify(data, null, 2)}</pre>
+            <pre tabIndex={0} role="group" aria-label="Data">
+              {JSON.stringify(data, null, 2)}
+            </pre>
           </section>
           <section>
             <h2 className="fs-panel__heading">Errors</h2>
-            <pre>{JSON.stringify(errors, null, 2)}</pre>
+            <pre tabIndex={0} role="group" aria-label="Errors">
+              {JSON.stringify(errors, null, 2)}
+            </pre>
           </section>
         </div>
       )}

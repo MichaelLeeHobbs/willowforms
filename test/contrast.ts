@@ -68,7 +68,21 @@ export function ratio(a: string, b: string): number {
  * Deliberately crude otherwise: these are stylesheets this repo owns, so a real
  * parser would be more machinery than the job needs.
  */
-export function tokensFrom(css: string, selector: string): Record<string, string> {
+export function tokensFrom(
+  css: string,
+  selector: string,
+  /*
+   * Custom properties only, which is what a palette is -- and what made this
+   * blind to the declaration that drifted.
+   *
+   * The two dark blocks are compared for having drifted apart, and the
+   * comparison read `--fs-*` and nothing else, so `color-scheme: dark` sat in
+   * one block and not the other and the guard said they matched. A rule is more
+   * than its tokens. Contrast callers still want the palette; the drift check
+   * asks for everything.
+   */
+  customOnly = true,
+): Record<string, string> {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
   const tokens: Record<string, string> = {}
   let found = false
@@ -81,7 +95,7 @@ export function tokensFrom(css: string, selector: string): Record<string, string
       const [name, value] = declaration.split(':')
       if (!name || !value) continue
       const trimmed = name.trim()
-      if (trimmed.startsWith('--')) tokens[trimmed] = value.trim()
+      if (trimmed.startsWith('--') || !customOnly) tokens[trimmed] = value.trim()
     }
   }
 

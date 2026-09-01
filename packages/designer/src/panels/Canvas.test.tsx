@@ -523,6 +523,45 @@ describe('a component a condition hides', () => {
     expect(view.container.querySelector('[data-fs-key="first"]')).not.toBeNull()
   })
 
+  describe('the preview data and error dumps', () => {
+    /*
+     * `designer.css` caps `.fs-canvas__data pre` at 180px and scrolls it, and the
+     * markup carried no `tabIndex`, so a keyboard user reached the first few
+     * lines of a long form's data and had no way to reach the rest. A pointer
+     * user could read all of it.
+     *
+     * axe's `scrollable-region-focusable` is the rule that names this, and
+     * `test/a11y.test.tsx` disables it by name along with two others for want of
+     * a layout engine -- so the enforced suite was configured such that it could
+     * not report this. Asserted directly here instead, which needs no layout: the
+     * attribute is either on the element or it is not.
+     */
+    it('are focusable, so a keyboard can scroll them', () => {
+      const view = open()
+      fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+      const dumps = [...view.container.querySelectorAll('.fs-canvas__data pre')]
+      expect(dumps.length, 'preview rendered no dumps, so this asserts nothing').toBe(2)
+
+      for (const dump of dumps) {
+        expect(dump.getAttribute('tabindex'), dump.getAttribute('aria-label') ?? '').toBe('0')
+      }
+    })
+
+    it('say what they are when focus lands on them', () => {
+      // A tab stop that announces nothing is its own defect: the reader gets
+      // "group" and has to guess which of the two they are in.
+      const view = open()
+      fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+      const named = [...view.container.querySelectorAll('.fs-canvas__data pre')].map((dump) =>
+        dump.getAttribute('aria-label'),
+      )
+
+      expect(named).toEqual(['Data', 'Errors'])
+    })
+  })
+
   it('marks only the component the condition hides', () => {
     const view = open()
 

@@ -182,6 +182,38 @@ const CHROME_UNDER_CANVAS = new Set([
 ])
 
 /**
+ * Whether an ancestor compound is chrome the designer owns.
+ *
+ * Looks inside a zero-specificity wrapper, which the membership test did not.
+ * The scope pattern already reads through `:where()` and `:is()` -- a comment
+ * in this file explains that wrapping a scope does not stop it being the scope
+ * -- and the *exemption* compared the whole compound against the allowlist as a
+ * string. So `:where(.fs-canvas__bar) button` was read as reaching into the
+ * form: recognised as a scope through the wrapper, and not recognised as
+ * chrome through the same wrapper. One direction saw past it and the other did
+ * not.
+ *
+ * A compound naming several scopes is chrome only if *every* one of them is,
+ * because the rule applies wherever any of them matches.
+ */
+function isChrome(part: string): boolean {
+  if (CHROME_UNDER_CANVAS.has(part)) return true
+
+  const inner = /^:(?:where|is)\((.*)\)$/.exec(part.trim())
+  if (!inner) return false
+
+  const named = (inner[1] ?? '')
+    .split(',')
+    .map((each) => each.trim())
+    .filter((each) => each !== '')
+
+  // Only the ones this guard would treat as form scopes have to be exempt; a
+  // chrome-only name such as `.fs-toolbar` never triggers the check at all.
+  const scopes = named.filter((each) => SCOPE_PATTERN.test(each))
+  return scopes.length > 0 && scopes.every((each) => CHROME_UNDER_CANVAS.has(each))
+}
+
+/**
  * The compound selectors of one selector, in order, split on combinators.
  *
  * Only at paren depth zero. A naive split on whitespace shatters
@@ -363,7 +395,7 @@ function reachesIntoTheForm(selector: string): boolean {
    */
   const insideTheForm = parts
     .slice(0, -1)
-    .some((part) => SCOPE_PATTERN.test(part) && !CHROME_UNDER_CANVAS.has(part))
+    .some((part) => SCOPE_PATTERN.test(part) && !isChrome(part))
 
   if (!insideTheForm) return false
 
@@ -391,6 +423,110 @@ function reachesIntoTheForm(selector: string): boolean {
 function escapesTheDesigner(selector: string): boolean {
   return !/\.fs-/.test(selector)
 }
+
+/**
+ * The containers that hold many different kinds of control.
+ *
+ * Not every container qualifies. `.fs-selection__toolbar` holds one kind of
+ * button and `.fs-dialog__actions` holds two, so a type-keyed rule under either
+ * is describing every element that will ever be there. These three are the ones
+ * a rule cannot be written *about*, because what sits inside them is open-ended
+ * -- which is what makes a type-keyed rule under them a base rather than a
+ * decision, and what makes it beating a later class rule a defect.
+ */
+const SHARED_SCOPES = ['.fs-panel', '.fs-toolbar', '.fs-canvas__bar']
+
+/**
+ * Whether a compound is a bare element type -- no class, id or attribute.
+ *
+ * Pseudo-classes are stripped first, because `button:disabled` is still keyed
+ * on the type: the pseudo raises specificity, but it does not change what the
+ * rule is for.
+ */
+function isBareType(compound: string): boolean {
+  const bare = compound.replace(/:{1,2}[a-z-]+(\([^()]*\))?/g, '').trim()
+  return bare !== '' && /^[a-z][a-z0-9-]*$/.test(bare)
+}
+
+describe('a base rule does not out-specify the rules it is a base for', () => {
+  /*
+   * The defect, in one sentence: `.fs-panel button` is (0,1,1) and beat every
+   * later (0,1,0) rule styling the same elements, whatever the source order, so
+   * whole blocks that read as deliberate never applied.
+   *
+   * `.fs-tabs__tab` is a `<button>` inside both panel asides and never got its
+   * `background: none`. `.fs-color__swatch` never got the 28px its own comment
+   * argues for -- logical and physical properties cascade together, so
+   * `inline-size` did not escape `width`. And `11-theming.md` documents
+   * `--fs-font-mono` for "The JSON editor, the raw CSS box, the code editor",
+   * of which only `.fs-dialog__editor` sits outside `.fs-panel`: the other two
+   * rendered in the proportional UI font with the token they name unreachable.
+   * `test/docs.test.ts` checks that a token is declared, not that the rule
+   * using it wins, so nothing here reported any of it.
+   *
+   * What is pinned is the scope's *contribution*: a shared scope in front of a
+   * bare type has to be zero-specificity, so the rule sits at (0,0,1) and any
+   * later class rule takes it. Pseudo-classes on the subject are untouched --
+   * `button:disabled` should outrank `button`, and it still does.
+   */
+  const underSharedScope = selectors(withoutComments).flatMap((selector) =>
+    commaSeparated(selector).flatMap((one) => {
+      const parts = compounds(one)
+      const subject = parts[parts.length - 1] ?? ''
+      if (parts.length < 2 || !isBareType(subject)) return []
+      return parts
+        .slice(0, -1)
+        .filter((part) => SHARED_SCOPES.some((scope) => part.includes(scope)))
+        .map((part) => ({ selector: one, scope: part }))
+    }),
+  )
+
+  it('found the rules it is meant to be checking', () => {
+    // Without this the list could go empty -- a scope renamed, the bases
+    // rewritten -- and the assertion below would pass having looked at nothing.
+    expect(
+      underSharedScope.map((each) => each.selector),
+      'no rule keys a bare element type off a shared scope',
+    ).not.toEqual([])
+
+    for (const type of ['button', 'input', 'select', 'textarea']) {
+      expect(
+        underSharedScope.some((each) => each.selector.endsWith(' ' + type)),
+        `nothing bases ${type} off a shared scope, so this type is unchecked`,
+      ).toBe(true)
+    }
+  })
+
+  it.each(SHARED_SCOPES)('%s contributes no specificity to a type-keyed rule', (scope) => {
+    const offenders = underSharedScope
+      .filter((each) => each.scope.includes(scope) && !/^:where\(/.test(each.scope))
+      .map((each) => each.selector)
+
+    expect(offenders).toEqual([])
+  })
+
+  it('the two boxes 11-theming.md names outrank the base that was overriding them', () => {
+    /*
+     * The named consequence, asserted against the base rather than against
+     * itself. Checking that `.fs-code__area` declares the token is the check
+     * that was already passing while the box rendered proportional.
+     */
+    const bases = underSharedScope
+      .filter((each) => /\b(input|textarea)$/.test(each.selector))
+      .map((each) => each.selector)
+    expect(bases, 'no base rule styles a text control here').not.toEqual([])
+
+    for (const victim of ['.fs-code__area', '.fs-binding__expression']) {
+      expect(declarationsFor(victim), victim).toContain('font-family')
+      for (const base of bases) {
+        // The conflict is real: the base sets the `font` shorthand, which
+        // includes the family, over every text control in the panel.
+        expect(declarationsFor(base), `${base} sets no font, so it never won one`).toContain('font')
+        expect(base.startsWith(':where('), `${base} still outranks ${victim}`).toBe(true)
+      }
+    }
+  })
+})
 
 describe('designer.css isolation', () => {
   const all = selectors(withoutComments)
