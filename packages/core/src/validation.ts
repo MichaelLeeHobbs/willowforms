@@ -117,6 +117,31 @@ export const TOO_MANY_ROWS = 'This list has too many rows to check.'
  */
 export const NOT_A_LIST = 'This list was not sent as a list.'
 
+/**
+ * What the form reports when its own tree is nested deeper than the bound.
+ *
+ * `validateForm` was the only walk in this package with no depth bound, and it
+ * is the one on the submit path: `walk`, `contextKeys`, `objectFor`,
+ * `keyScopesFor` and `submittedData` all check `depth > MAX_TREE_DEPTH` and
+ * this one did not. A stored document nested a few thousand deep -- nothing on
+ * the validate path calls `validateDocument`, as `validateAcross`'s own comment
+ * says -- threw `RangeError` on every submit, which is the unhandled 500 the
+ * comments in this file repeatedly cite as the failure to avoid.
+ *
+ * Reported rather than skipped, which is where this differs from
+ * `submittedData`'s bound one function down. Returning silently is what that
+ * projection should do -- it submits what was asked and given, and past the
+ * bound nothing was asked. Here it would mean every field below level 500 goes
+ * unchecked and the submit succeeds anyway: a required answer missing, on the
+ * server, with nothing to see. That is the permissive failure `TOO_MANY_ROWS`
+ * twenty lines up refuses for the identical reason, in the same words -- what
+ * cannot be checked has not been satisfied.
+ *
+ * So the two do now disagree past the bound, loudly and on purpose: the form
+ * refuses, so there is no payload for the projection to be wrong about.
+ */
+export const TOO_DEEP = 'This form is nested too deeply to check.'
+
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 
 /*
@@ -641,10 +666,21 @@ export function validateForm(
    */
   const errors: FormErrors = Object.create(null) as FormErrors
 
-  const visit = (node: ComponentNode, scope: EvalOptions): void => {
-    if (!isVisible(node, data, scope)) return
-
+  const visit = (node: ComponentNode, scope: EvalOptions, depth = 0): void => {
     const path = scope.row?.path ?? NO_ROWS
+
+    /*
+     * The bound this walk did not have. See `TOO_DEEP`: reported at the address
+     * where the walk stopped, not returned silently, because a subtree nobody
+     * checked is a subtree whose required fields all passed.
+     */
+    if (depth > MAX_TREE_DEPTH) {
+      const at = addressOf(path, node.key)
+      if (!Object.hasOwn(errors, at)) errors[at] = TOO_DEEP
+      return
+    }
+
+    if (!isVisible(node, data, scope)) return
     const error = validateField(node, data, scope)
     if (error) errors[addressOf(path, node.key)] = error
 
@@ -705,12 +741,12 @@ export function validateForm(
           ...scope,
           row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
-        for (const child of node.children ?? []) visit(child, inner)
+        for (const child of node.children ?? []) visit(child, inner, depth + 1)
       })
       return
     }
 
-    for (const child of node.children ?? []) visit(child, scope)
+    for (const child of node.children ?? []) visit(child, scope, depth + 1)
   }
 
   visit(root, options)
@@ -803,7 +839,14 @@ export function submittedData(
      * A host that projects before it validates -- which the signature invites,
      * since neither function needs the other -- did unbounded work on a body
      * somebody else chose the size of. The row cap and the tree bound are the
-     * two `validateForm` already refuses on.
+     * two `validateForm` refuses on.
+     *
+     * That sentence was false when it was written: `validateForm` carried the
+     * row cap and had no tree bound at all, so this comment described a
+     * protection its neighbour did not have, in the file where the neighbour is
+     * the one that runs on a server. It carries both now, and refuses past the
+     * tree bound where this one returns -- see `TOO_DEEP` for why the two
+     * answers differ.
      */
     if (depth > MAX_TREE_DEPTH) return
     if (!isVisible(node, data, scope)) return

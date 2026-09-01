@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import type { ComponentNode, Condition, FormData, ValidationRule } from './types.js'
 import { contextValues } from './context.js'
+import { MAX_TREE_DEPTH } from './tree.js'
 import type { EvalOptions, Evaluator } from './validation.js'
 import {
   DEFAULT_MESSAGES,
   MAX_ROWS,
+  TOO_DEEP,
   TOO_MANY_ROWS,
   UNREADABLE_RULE,
   applyRule,
@@ -1798,5 +1800,84 @@ describe('a repeater failing its own rule and the row cap at once', () => {
     const rows = { addresses: Array.from({ length: MAX_ROWS + 1 }, () => ({ line1: 'x' })) }
 
     expect(validateForm(root2, rows)).toEqual({ addressList: TOO_MANY_ROWS })
+  })
+})
+
+describe('a document nested deeper than the tree bound', () => {
+  /*
+   * The submit path, driven deep, which nothing in this file ever did.
+   *
+   * `validateForm`'s walk had no depth bound at all -- the only walk in the
+   * package without one, on the only path that runs server-side against a body
+   * somebody else chose the shape of. Nothing on that path calls
+   * `validateDocument`, so the gate that would have refused the document never
+   * runs. Every fixture in this file was two or three levels deep, so
+   * `submittedData`'s bound at the equivalent line had never been executed
+   * either: deleting it left the whole suite green.
+   *
+   * Built with a loop; building it recursively would overflow before the
+   * assertion could run.
+   */
+  const nested = (n: number): ComponentNode => {
+    let node: ComponentNode = {
+      key: 'buried',
+      type: 'TextField',
+      props: {},
+      schema: { type: 'string', validations: [{ key: 'required' }] },
+    }
+    for (let i = 0; i < n; i += 1) {
+      node = { key: 'box' + String(i), type: 'Screen', props: {}, children: [node] }
+    }
+    return node
+  }
+
+  it('reports rather than throwing a RangeError out of the submit path', () => {
+    const errors = validateForm(nested(MAX_TREE_DEPTH * 2), {})
+
+    expect(Object.values(errors)).toContain(TOO_DEEP)
+  })
+
+  it('refuses rather than passing, because a subtree nobody checked is not a subtree that passed', () => {
+    /*
+     * The direction, pinned. Returning silently past the bound would be the
+     * cheaper fix and it is the wrong one: the buried field is `required` and
+     * unanswered, so a silent stop answers "valid" for a form with a missing
+     * required answer -- on the server. `TOO_MANY_ROWS` refuses the identical
+     * shape twenty lines up in the source and says why in the same words.
+     *
+     * Asserted as "not empty" rather than by address, because the address the
+     * refusal lands on is the walk's stopping point and pinning it here would
+     * make this test about the bound's exact value.
+     */
+    expect(validateForm(nested(MAX_TREE_DEPTH * 2), {})).not.toEqual({})
+  })
+
+  it('and the projection stops instead, which is the documented disagreement', () => {
+    /*
+     * The two answer differently past the bound, deliberately. `submittedData`
+     * submits what was asked and given, and past the bound nothing was asked --
+     * so it drops the subtree rather than inventing an error in a payload. The
+     * form has already refused, so there is no submit for the projection to be
+     * wrong about.
+     *
+     * Asserted by *answering* the buried field and watching the answer not come
+     * back, rather than by `not.toThrow()`. That was the first version of this
+     * test and it proved nothing: a thousand-deep tree does not overflow the
+     * stack, so it passed with `validation.ts`'s bound deleted -- which is
+     * exactly the "never been executed" state the review found the guard in.
+     * Measured: with the bound removed, `buried` is present here.
+     */
+    const deep = nested(MAX_TREE_DEPTH * 2)
+
+    expect(submittedData(deep, { buried: 'an answer' })).toEqual({})
+    expect(submittedData(nested(20), { buried: 'an answer' })).toEqual({ buried: 'an answer' })
+  })
+
+  it('still validates a form nobody would call deep', () => {
+    // The control. A bound low enough to catch real authoring would be worse
+    // than the crash -- fields would silently stop being checked.
+    const errors = validateForm(nested(20), {})
+
+    expect(errors).toEqual({ buried: DEFAULT_MESSAGES.required })
   })
 })

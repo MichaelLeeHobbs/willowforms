@@ -26,6 +26,7 @@ import { MAX_CONDITION_DEPTH, evaluateCondition, same } from './condition.js'
 import { createDocument } from './factory.js'
 import { repointBinding, validateDocument } from './tree.js'
 import { rowScopeProblems } from './rows.js'
+import { TOO_DEEP, submittedData, validateForm } from './validation.js'
 
 /*
  * Far past the bound and far past the stack. The same figure `condition.test.ts`
@@ -53,6 +54,36 @@ const deepOr = (n: number): Condition => {
   let condition: Condition = { op: 'truthy', value: { kind: 'literal', value: true } }
   for (let i = 0; i < n; i += 1) condition = { op: 'or', conditions: [condition] }
   return condition
+}
+
+/**
+ * A chain of nested containers, n deep, each one guarded by a condition.
+ *
+ * The other builders in this file nest a *condition*; this one nests the tree,
+ * because the walker it drives recurses over children and calls `isVisible` --
+ * and so crosses a condition -- on every level. Built with a loop for the same
+ * reason as the rest: building it recursively would overflow before the test
+ * could.
+ *
+ * Driven at `DEPTH`, the same 50 000 the rest of this file uses, and not at
+ * some smaller number just past `MAX_TREE_DEPTH`. That distinction is the whole
+ * point of this file: a thousand-deep tree does not overflow the stack, so a
+ * row built at that depth passes `not.toThrow()` whether or not the walker is
+ * bounded, and proves only that the bound's *message* appears. Measured while
+ * writing this -- deleting `submittedData`'s bound left the first version of
+ * these rows green.
+ */
+const deepTree = (n: number): ComponentNode => {
+  let node: ComponentNode = {
+    key: 'leaf',
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'required' }] },
+  }
+  for (let i = 0; i < n; i += 1) {
+    node = { key: 'box' + String(i), type: 'Screen', props: {}, children: [node] }
+  }
+  return node
 }
 
 const guardedBy = (key: string, condition: Condition): ComponentNode => ({
@@ -214,6 +245,40 @@ const WALKERS: Walker[] = [
       }),
     read: (result) => reported(result),
     answer: { keys: ['loose'], said: true },
+  },
+  /*
+   * The walker on the submit path, which was missing from this table.
+   *
+   * This file states its own completeness rule -- "a row that is not added is a
+   * hole somebody can see" -- and the hole was the one walk that runs on a
+   * server against a body somebody else chose the shape of. `validateForm`'s
+   * `visit` was declared `(node, scope)` with no depth parameter at all, while
+   * `walk`, `contextKeys`, `objectFor`, `keyScopesFor` and `submittedData`
+   * beside it all check `depth > MAX_TREE_DEPTH`. It belongs here by this
+   * file's own criterion: it calls `isVisible` on every node, so it crosses a
+   * condition on every level.
+   *
+   * It answers rather than throwing, and what it answers is a refusal -- see
+   * `TOO_DEEP`. Returning silently would leave every field past the bound
+   * unchecked and the submit successful, which is the permissive failure the
+   * whole package is organised against.
+   */
+  {
+    name: 'validateForm, through a tree deeper than the bound',
+    drive: () => validateForm(deepTree(DEPTH), {}),
+    read: (result) => Object.values(result as Record<string, string>).includes(TOO_DEEP),
+    answer: true,
+  },
+  {
+    name: 'submittedData, through the same tree',
+    drive: () => submittedData(deepTree(DEPTH), {}),
+    /*
+     * The projection stops rather than refusing, which is the difference the
+     * two docblocks now spell out. Read as "it returned an object" rather than
+     * as a specific payload: what matters here is that it did not throw.
+     */
+    read: (result) => typeof result === 'object' && result !== null,
+    answer: true,
   },
 ]
 
