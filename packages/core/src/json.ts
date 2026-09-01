@@ -233,9 +233,11 @@ export function optionEntry(
   /**
    * The list this option came from, so its rendered value can be made unique.
    *
-   * Optional only so an existing caller keeps compiling; every caller in this
-   * repository passes it, and one that does not gets the old per-option rule
-   * with the collision it carries. See `optionValues`.
+   * Optional so an existing caller keeps compiling. Every *kit* in this
+   * repository passes it, and a caller that does not gets the per-option rule
+   * with the collision it carries -- which is a real path, exercised on purpose
+   * by `json.test.ts`, and the reason that branch is guarded rather than
+   * assumed dead. See `optionValues`.
    */
   all?: readonly unknown[],
 ): { value: string; label: string } {
