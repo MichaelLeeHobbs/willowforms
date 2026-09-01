@@ -12,9 +12,9 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ComponentDef, FormDocument, Language } from '@formsmith/core'
-import { collectKeys as collect, validateDocument } from '@formsmith/core'
+import { collectKeys as collect, findNode, prop, validateDocument } from '@formsmith/core'
 
-import { useDesigner } from './store.js'
+import { historyOps, useDesigner } from './store.js'
 
 const field: ComponentDef = {
   type: 'Field',
@@ -692,5 +692,218 @@ describe('the store and edits that changed nothing', () => {
 
     expect(warn).not.toHaveBeenCalled()
     warn.mockRestore()
+  })
+})
+
+/**
+ * One node's `label` prop, unwrapped to the value an author typed.
+ *
+ * `setProp` stores a `PropValue`, so the raw prop is `{ kind: 'static', value }`
+ * and comparing it against a string never matches. The binding kinds this file
+ * switches between are exactly what the undo label now distinguishes, so the
+ * shape matters and is read rather than stringified.
+ */
+const propOf = (document: FormDocument, key: string): unknown => {
+  const held = findNode(document.root, key)?.props['label']
+  if (held !== null && typeof held === 'object' && 'kind' in held) {
+    return (held as { kind: string; value?: unknown }).kind === 'static'
+      ? (held as { value?: unknown }).value
+      : (held as { kind: string }).kind
+  }
+  return held
+}
+
+describe('an undo label that folded two different gestures into one slot', () => {
+  /*
+   * `commit` replaces the present when the new label matches the last one, so a
+   * coalesced run of keystrokes and the gesture that follows it shared a slot.
+   *
+   * `setProp`'s label was `'prop:' + key + ':' + name` and omitted the binding
+   * *kind*, while `Properties.tsx` passes one `onChange` to the text editors, to
+   * `ClearButton` and to `BindingMode`. So typing a label and then switching
+   * that label's binding mode were the same label: the present became the empty
+   * expression and the typed text was in neither `past` nor `future`, destroyed
+   * in one step.
+   *
+   * This file's own `setRenderWhen` and `setFieldSchema` had already been fixed
+   * the same way, and `setRenderWhen`'s comment describes this failure verbatim.
+   */
+  it('keeps the typed value when the binding mode changes right after', () => {
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.setProp('email', 'label', prop('Email address'))
+    })
+    act(() => {
+      // What BindingMode's select handler does: a fresh binding object of a
+      // different kind, through the same onChange.
+      result.current.setProp('email', 'label', { kind: 'computed', expression: '' })
+    })
+    act(() => {
+      result.current.undo()
+    })
+
+    expect(
+      propOf(result.current.document, 'email'),
+      'the typed value was destroyed rather than stacked on',
+    ).toBe('Email address')
+  })
+
+  it('keeps the typed value when the property is cleared right after', () => {
+    // ClearButton's gesture, through the same onChange. `undefined` removes the
+    // property so the component default applies again.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.setProp('email', 'label', prop('Email address'))
+    })
+    act(() => {
+      result.current.setProp('email', 'label', undefined)
+    })
+    act(() => {
+      result.current.undo()
+    })
+
+    expect(propOf(result.current.document, 'email')).toBe('Email address')
+  })
+
+  it('still folds a run of typing into one step', () => {
+    /*
+     * The control, and it is the reason the label exists at all: putting the
+     * whole value in the label would make every keystroke its own undo entry,
+     * which is the defect the coalescing was added to fix.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.setProp('email', 'label', prop('E'))
+    })
+    act(() => {
+      result.current.setProp('email', 'label', prop('Em'))
+    })
+    act(() => {
+      result.current.setProp('email', 'label', prop('Ema'))
+    })
+    act(() => {
+      result.current.undo()
+    })
+
+    /*
+     * The fixture's `email` node carries no `label` prop, so the state before
+     * the run is `undefined` -- which is what one undo has to land on if the
+     * three keystrokes really were one step.
+     */
+    expect(propOf(result.current.document, 'email')).toBeUndefined()
+  })
+
+  it('keeps a raw CSS block when the box is cleared right after typing', () => {
+    // `setNodeCss` had the same shape: within one device, typing and clearing
+    // shared a slot.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.setNodeCss('email', 'any', 'color:red')
+    })
+    act(() => {
+      result.current.setNodeCss('email', 'any', '')
+    })
+    act(() => {
+      result.current.undo()
+    })
+
+    const node = findNode(result.current.document.root, 'email')
+    expect(node?.css?.['any']).toBe('color:red')
+  })
+})
+
+describe('invariant 4 on the half of the history a caller can see', () => {
+  /*
+   * `commit` has a non-mutation assertion and neither `undo` nor `redo` does,
+   * so half of what that test's own comment calls "invariant 4's caller-visible
+   * half" was unguarded. Rewrite `undo` to `past.pop()` and every test that
+   * calls it stays green -- while the `History` object React still holds in
+   * state has had its array mutated underneath a component that already
+   * rendered from it.
+   */
+  it('undo and redo leave the arrays they read alone', () => {
+    /*
+     * Asserted on `historyOps`, not through the hook, and the reason is the
+     * whole point of the finding this replaces.
+     *
+     * The version before this round-tripped `document` through
+     * `JSON.stringify` and called that a non-mutation check. It was not: an
+     * `undo` written as `past.pop()` returns the same array it was handed, and
+     * `useDesigner` never gives a caller the history, so every observable
+     * answer is byte-identical. The test named an invariant and guarded
+     * nothing -- which is the exact shape this run exists to remove.
+     *
+     * `commit` has had a non-mutation assertion in this suite since it was
+     * written. These two are the half that had none.
+     */
+    const first = doc()
+    const second = { ...first, name: 'second' }
+    const third = { ...first, name: 'third' }
+
+    const history = { past: [first], present: second, future: [third] }
+    const past = history.past
+    const future = history.future
+
+    const stepped = historyOps.undo(history)
+
+    // New arrays, not the ones handed in: a `History` React already rendered
+    // from must not change underneath it.
+    expect(stepped.past).not.toBe(past)
+    expect(stepped.future).not.toBe(future)
+    // And the originals still hold what they held.
+    expect(past).toEqual([first])
+    expect(future).toEqual([third])
+    // The step itself happened, or the assertions above are about a no-op.
+    expect(stepped.present).toBe(first)
+    expect(stepped.future).toEqual([second, third])
+
+    const back = historyOps.redo(stepped)
+
+    expect(back.past).not.toBe(stepped.past)
+    expect(back.future).not.toBe(stepped.future)
+    expect(stepped.past).toEqual([])
+    expect(stepped.future).toEqual([second, third])
+    expect(back.present).toBe(second)
+  })
+
+  it('refuses to step off the end without touching anything', () => {
+    /*
+     * The boundary, where an implementation reaching for `pop()` on an empty
+     * array is likeliest to differ. Returning the same object is correct here
+     * -- there is nothing to move to -- and the arrays must still be intact.
+     */
+    const only = doc()
+    const empty = { past: [] as FormDocument[], present: only, future: [] as FormDocument[] }
+
+    expect(historyOps.undo(empty)).toBe(empty)
+    expect(historyOps.redo(empty)).toBe(empty)
+    expect(empty.past).toEqual([])
+    expect(empty.future).toEqual([])
+  })
+
+  it('redo returns exactly the document undo stepped off', () => {
+    /*
+     * Round-tripped rather than asserted against a literal, because the point
+     * is that neither direction rebuilt or edited the stored document.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.setProp('email', 'label', prop('one'))
+    })
+    const after = JSON.stringify(result.current.document)
+
+    act(() => {
+      result.current.undo()
+    })
+    act(() => {
+      result.current.redo()
+    })
+
+    expect(JSON.stringify(result.current.document)).toBe(after)
   })
 })

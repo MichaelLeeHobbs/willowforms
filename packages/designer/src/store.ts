@@ -282,6 +282,25 @@ function withRoot(doc: FormDocument, root: ComponentNode): FormDocument {
   return root === doc.root ? doc : { ...doc, root }
 }
 
+/**
+ * Which kind of binding a property value is, for an undo label.
+ *
+ * A static value, an expression and a translation key are three different
+ * gestures on one control, and `commit` folds consecutive edits that share a
+ * label. Without this they shared one, so switching between them replaced the
+ * entry holding what was typed rather than stacking on it.
+ *
+ * `'none'` for a cleared property, which is `ClearButton`'s gesture and has
+ * to be distinguishable from typing for exactly the same reason.
+ */
+const bindingKind = (value: PropValue | undefined): string => {
+  if (value === undefined) return 'none'
+  if (value !== null && typeof value === 'object' && 'kind' in value) {
+    return String((value as { kind: unknown }).kind)
+  }
+  return 'static'
+}
+
 export function useDesigner(initial: FormDocument): DesignerApi {
   const [history, setHistory] = useState<History>({ past: [], present: initial, future: [] })
   const [chosenKey, setSelectedKey] = useState<string | undefined>(undefined)
@@ -410,8 +429,29 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             else props[name] = value
             return { ...node, props }
           }),
-        // Typing into one property is one undo step, not one per character.
-        'prop:' + key + ':' + name,
+        /*
+         * Typing into one property is one undo step, not one per character --
+         * and the *binding kind* is in the label, which it was not.
+         *
+         * `commit` replaces the present when the new label matches the last
+         * one, so a coalesced run of keystrokes and the gesture that follows it
+         * shared a slot: type "Email address" into Label, then switch the Label
+         * binding select to Expression, and the same label matched. The present
+         * became the empty expression and "Email address" was in neither `past`
+         * nor `future` -- destroyed in one step, with Ctrl+Z landing on the
+         * empty original and Ctrl+Y returning the empty expression. Reset does
+         * the same thing, from the same `onChange`.
+         *
+         * `Properties.tsx` passes one `onChange` to the text editors, to
+         * `ClearButton` and to `BindingMode`, so all three arrive here
+         * indistinguishable unless the value says which is which.
+         *
+         * This file has already fixed this defect twice, and both fixes are the
+         * same shape: `setRenderWhen` puts the kind in its label with a comment
+         * describing this failure verbatim, and `setFieldSchema` puts the type
+         * and rule keys in its own. This was the third site and it was left.
+         */
+        'prop:' + key + ':' + name + ':' + bindingKind(value),
       )
     },
     [apply],
@@ -715,7 +755,12 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             return { ...node, css: next }
           }),
         // Coalesced per device, so typing a padding value is one undo entry.
-        'css:' + key + ':' + device,
+        /*
+         * The device, and the *shape* of what is being written. Same reasoning
+         * as `setProp` above: within one device a coalesced run of typing and
+         * the gesture that clears the box shared a slot, so one undo took both.
+         */
+        'css:' + key + ':' + device + ':' + (text.trim() === '' ? 'cleared' : 'text'),
       )
     },
     [apply],
@@ -839,5 +884,12 @@ export function useDesigner(initial: FormDocument): DesignerApi {
  * called `history`, which is legal and reads badly: two different things with
  * one name in one file. The state is what a reader of the hook means, so the
  * export is the one that changes.
+ *
+ * This is the only way to assert the half of invariant 4 the hook cannot show.
+ * "Undo holds references to prior documents" is a claim about these arrays as
+ * much as about the tree -- a `History` React has already rendered from must
+ * not change underneath it -- and `useDesigner` never hands a caller the
+ * history, so an `undo` written as `past.pop()` returns the same array and
+ * every observable answer through the hook is identical.
  */
 export const historyOps = { commit, undo, redo }
