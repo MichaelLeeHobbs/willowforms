@@ -113,8 +113,15 @@ suite has rules -- the per-kit block and the rules driven per kit from outside i
 It checks more than that now, and the list is worth having in one place: the events table in
 `03-components.md` against what the two kits declare, both token tables in `11-theming.md` against the
 two stylesheets in both directions, the axe rules `a11y.test.tsx` disables against the ones
-`accessibility.md` names, the end-to-end total against the spec files rather than against the other
-documents, the decision log's shape, and the component catalogue against the kits.
+`accessibility.md` names, each file's opening status against the state this index gives it, the
+`ComponentDef` block in `03-components.md` against the interface in core, the decision log's shape, and
+the component catalogue against the kits.
+
+The two suite totals are checked as well, and not here: `README.md`, `CLAUDE.md`, `ROADMAP.md` and the
+write-tests skill are the documents that quote them, and no file under `docs/spec/` quotes either. This
+paragraph used to claim the opposite -- the end-to-end total checked "against the spec files rather than
+against the other documents" -- which is exactly backwards, in the one section whose job is to tell a
+reader which claims are machine-checked.
 
 It cannot check that a section marked **Built** actually is. That is the claim worth being strict about
 when writing here, and it is the one that has been wrong most often.

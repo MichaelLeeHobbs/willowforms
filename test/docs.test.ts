@@ -325,6 +325,107 @@ describe('the specification index', () => {
     expect(index).toContain('(' + name + ')')
   })
 
+  /**
+   * The field names an `interface` block declares, comments and types dropped.
+   *
+   * Brace-matched from the opening line rather than read to the first `}`,
+   * because a field can be a function type or an object literal and take a
+   * brace with it. `defaultRenderWhen` is one, which is the field this was
+   * written to catch.
+   */
+  const fieldsOf = (text: string, name: string): string[] => {
+    const open = text.indexOf('interface ' + name)
+    expect(open, 'no interface ' + name + ' to read').toBeGreaterThan(-1)
+
+    let depth = 0
+    let end = open
+    for (let at = text.indexOf('{', open); at < text.length; at += 1) {
+      if (text[at] === '{') depth += 1
+      if (text[at] === '}') depth -= 1
+      if (depth === 0) {
+        end = at
+        break
+      }
+    }
+
+    const body = text
+      .slice(text.indexOf('{', open) + 1, end)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+
+    return [...body.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1] ?? '').sort()
+  }
+
+  it.each([
+    ['03-components.md', 'ComponentDef', 'packages/core/src/kit.ts'],
+    ['01-document-model.md', 'ComponentNode', 'packages/core/src/types.ts'],
+  ])('%s declares the same fields as %s in core', (file, name, source) => {
+    /*
+     * A code block in the specification is read as the thing itself.
+     *
+     * `ComponentDef` omitted `root` and `defaultRenderWhen`. Both are
+     * load-bearing: `02-kit-contract.md` makes "exactly one component is the
+     * root, and it is not in the palette" a rule the contract suite enforces,
+     * and this block gave a kit author no field to declare one with -- so a
+     * third-party kit written against the specification failed a rule whose
+     * mechanism appeared nowhere. `ComponentNode` omitted `dataKey`, which the
+     * same file documents as Built eleven lines further down.
+     *
+     * Names only, not types. A block that renamed `icon`'s type to something
+     * shorter for a reader is fine; a block missing a field is not, and the
+     * missing field is the failure both of these were.
+     */
+    expect(fieldsOf(read('docs/spec/' + file), name)).toEqual(fieldsOf(read(source), name))
+  })
+
+  it.each(files)('%s opens with the status the index gives it', (name) => {
+    /*
+     * The index and the file, in both directions.
+     *
+     * `README.md` states the rule -- a file's status "has to match what the
+     * file itself opens with" -- and nothing held anything to it. The index
+     * gave `03-components.md` **Partial** while that file opened **Built** over
+     * two `### Still to build` lists, and the index went further and named `03`
+     * among the files that "read Partial ... and each of those files says which
+     * one in its own preamble", which 03's preamble did not.
+     *
+     * The direction matters. A reader scanning the index is asking the
+     * pessimistic question and gets Partial; the file, which is the copy that
+     * gets edited as work lands, is the one that overstates. So the check is an
+     * equality rather than a "no worse than".
+     *
+     * `00-product.md` is exempt in both places at once: the index gives it a
+     * dash and the file says it carries no status, for the same reason.
+     */
+    if (name === '00-product.md') return
+
+    const text = read('docs/spec/' + name)
+    const end = text.indexOf('\n## ')
+    const preamble = end === -1 ? text : text.slice(0, end)
+    const opens = /\*\*Status: (built|partial|planned|undecided)/i.exec(preamble)
+
+    expect(opens, name + ' has no status before its first section').toBeTruthy()
+
+    /*
+     * The row for this file in the index table, read by the link rather than by
+     * position: the table has a Covers column full of prose, and a column index
+     * would move the first time somebody adds one.
+     */
+    const row = index
+      .split('\n')
+      .find((line) => line.startsWith('|') && line.includes('(' + name + ')'))
+
+    expect(row, name + ' has no row in the index table').toBeTruthy()
+
+    const cells = (row ?? '').split('|').map((cell) => cell.trim())
+    const state = cells[cells.length - 2] ?? ''
+
+    expect(
+      state.toLowerCase(),
+      name + ' opens ' + (opens?.[1] ?? '') + ' and the index says ' + state,
+    ).toBe((opens?.[1] ?? '').toLowerCase())
+  })
+
   it.each(files)('%s opens with a status', (name) => {
     /*
      * The status is what makes this document also the roadmap. A section with

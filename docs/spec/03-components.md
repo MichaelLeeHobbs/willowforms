@@ -1,7 +1,14 @@
 # Component catalogue
 
-**Status: built.** 27 of the 27 below are built, in both kits, and every palette group this catalogue
-uses has components in it.
+**Status: partial.** 27 of the 27 below are built, in both kits, and every palette group this catalogue
+uses has components in it. The catalogue is done; the two designs at the bottom of this file are not.
+Repeated scope has no add or remove buttons and no `minItems`/`maxItems` rules, and steps have no Next or
+Back. Both sections say so under their own **Still to build**.
+
+This file opened **Built** over those two lists. `README.md` calls that the direction that has been wrong
+most often, and it was wrong here on the file that is also the roadmap -- so a reader planning against it
+saw a catalogue finished and read the rest as finished too. `test/docs.test.ts` now holds each file's
+opening status against the index, in both directions.
 
 The two numbers are digits rather than words on purpose: `test/docs.test.ts` reads them and compares
 them against the table below and against both kits' `definitions.ts`, so a component added to a kit and
@@ -22,8 +29,10 @@ interface ComponentDef {
   type: string // kit-scoped id, matches ComponentNode.type
   label: string // palette display name
   group: PaletteGroup
-  icon?: string // name from the shared icon vocabulary
+  icon?: IconName // from the vocabulary core declares, not a free string
   container?: boolean // accepts children
+  root?: boolean // the document root; exactly one per kit, never in the palette
+  defaultRenderWhen?: (key: string) => PropValue // a visibility rule a new instance starts with
   dataBound?: boolean // appears in submitted data
   dataType?: FieldSchema['type']
   defaultProps: Record<string, JsonValue>
@@ -31,6 +40,13 @@ interface ComponentDef {
   events: EventName[]
 }
 ```
+
+`root` and `defaultRenderWhen` were missing from this block while both were load-bearing elsewhere:
+[02-kit-contract.md](02-kit-contract.md) makes "exactly one component is the root, and it is not in the
+palette" a rule the contract suite enforces, and this block gave a kit author no field to declare one
+with. A third-party kit written against it shipped no root and failed a rule whose mechanism was
+undocumented. `test/docs.test.ts` now compares the fields in this block against `ComponentDef` in
+`packages/core/src/kit.ts`.
 
 ### Property count is a design decision
 
@@ -316,10 +332,11 @@ as specified — a hidden field is not validated — and it is wrong for a wizar
 are not _unwanted_, they are _already done_. The distinction is the whole design: `renderWhen` false
 means the author excluded this, and a step the user is not on means not yet.
 
-So core gained two functions and no new concept:
+So core gained three functions and no new concept:
 
 ```ts
 validateAcross(root, data, scopes: EvalOptions[]): FormErrors
+submittedAcross(root, data, scopes: EvalOptions[]): FormData
 contextValues(root, path): JsonValue[]
 ```
 

@@ -157,10 +157,17 @@ a test enforcing that for the designer's own stylesheet; a Style tab that let an
 prevent, one form at a time.
 
 The text is **declarations only**, applied scoped to the element carrying `data-fs-key`. `{`, `}`, `<`,
-`@` and the CSS comment delimiters `/*` and `*/` are refused: the first four are how a component's styling
-would end its own block and reach the page, leave CSS through `</style>`, or open an `@import`, and a
-comment delimiter is how it would swallow the rules after it -- these blocks share one sheet, so an
-unbalanced `/*` takes other components' styling with it. Refused rather than escaped, because escaping invites an
+`@`, `\` and the CSS comment delimiters `/*` and `*/` are refused, as is a block whose quotes are not all
+closed or that calls `url()`, `image-set()`, `element()` or `cross-fade()`. The first four characters are
+how a component's styling would end its own block and reach the page, leave CSS through `</style>`, or
+open an `@import`; the backslash is how it would spell one of them anyway, since `\3c` is `<` to a CSS
+parser; and a comment delimiter is how it would swallow the rules after it -- these blocks share one
+sheet, so an unbalanced `/*` takes other components' styling with it. The fetching functions were refused
+for this panel in particular: `background: url(https://…)` on a page collecting answers makes the form
+call out to whoever wrote the document.
+
+Stated in full because this panel reports the refusal to the author, and a list that omitted three of
+them left somebody reading "refused" with nothing here to explain which character offended. Refused rather than escaped, because escaping invites an
 argument about which escape is sufficient, and refused rather than cleaned, because silently rewriting
 what an author typed is how a rule ends up meaning something nobody asked for. The panel says the text
 was refused; the renderer leaves it out.

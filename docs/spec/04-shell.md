@@ -165,9 +165,14 @@ rules are:
 
 ### Known conflict
 
-`Delete` and `Backspace` on a focused tree row are handled by the row and by a window-level shortcut --
+`Delete` and `Backspace` on a focused tree row are handled by the row and by a shell-level shortcut --
 both keys, in both places. The row stops propagation, because without it one keypress removed the
-component twice and needed two undos. Any new window-level shortcut has to consider the same collision.
+component twice and needed two undos. Any new shell-level shortcut has to consider the same collision.
+
+**Shell-level, not window-level.** `Designer.tsx` attaches the handler to `shell.current`, and this said
+`window` twice. On `window` the designer claimed Ctrl+Z, Delete, Backspace and Escape for the whole host
+page, so a builder embedded in an admin panel took that page's undo away and gave nothing back. A
+contributor following the old wording would have bound to `window` and put it back.
 
 ## The live region
 
