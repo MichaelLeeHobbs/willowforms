@@ -50,6 +50,23 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
    * dialog that would repair the document. `store.ts` only warns about a host's
    * `initialDocument`, which is the path such a document arrives by.
    */
+  /*
+   * Every write in this panel sends this list back, not `doc.languages`.
+   *
+   * Passing the raw array would write whatever the document held -- including
+   * the entries this panel refused to draw -- through an API typed
+   * `Language[]`, handing a malformed entry on as though something had read it.
+   *
+   * Sending the guarded list does drop those entries, and that is right for an
+   * edit: adding a language, removing one, choosing a default and ticking
+   * "Right to left" are all the author acting on what the panel showed them, so
+   * what the panel showed them is what gets written. It is not right for a
+   * read, which is why nothing here quietly repairs the document on mount.
+   *
+   * This note said the default-language radio was "the one place in this panel
+   * where dropping is right", which was never true of one place -- `add`,
+   * `remove` and the checkbox write the same list for the same reason.
+   */
   const languages = languagesOf(doc)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
@@ -175,19 +192,8 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                     type="radio"
                     name="fs-default-language"
                     checked={isDefault}
-                    /*
-                     * The guarded list here too. Passing `doc.languages` back
-                     * would write whatever the document held -- including the
-                     * entries this panel refused to draw -- through an API that
-                     * takes `Language[]`, so a malformed entry would be handed
-                     * on as though it had been read.
-                     *
-                     * Writing `languages` instead does drop the unusable
-                     * entries, and that is the one place in this panel where
-                     * dropping is right: the author has chosen a default
-                     * language, which is an edit, and an edit writes what the
-                     * panel showed them.
-                     */
+                    // The guarded list, like every write in this panel. See
+                    // `languages` above for why an edit writes what was drawn.
                     onChange={() => api.setLanguages(languages, tag)}
                   />
                   Default
