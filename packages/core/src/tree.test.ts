@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createDocument, emptyRoot, instantiate, prop } from './factory.js'
 import { toJsonSchema, unexportableRules } from './schema.js'
-import { keyProblem } from './keys.js'
+import { MAX_KEY_LENGTH, keyProblem } from './keys.js'
 import { validateForm } from './validation.js'
 import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument } from './types.js'
@@ -2227,6 +2227,59 @@ describe('the lookup and mutation family on a document nothing gated', () => {
     }
   })
 
+  it('trims a copied key that would exceed the length bound', () => {
+    /*
+     * The over-length path had no test. `generateKey` is bounded by
+     * `MAX_KEY_LENGTH` through `keyProblem`, and `copyKey` minted whatever it
+     * liked -- so duplicating a component with a 128-character key produced a
+     * 129-character key, which this same package's `validateDocument` then
+     * reports as `invalid-key`. A mint that produces a document the gate
+     * refuses is not a mint. Raised in review on PR #43.
+     */
+    const long = 'a'.repeat(MAX_KEY_LENGTH)
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: long, type: 'Field', props: {} }],
+    }
+
+    const copy = duplicateNode(root, long)
+    if (!copy) throw new Error('nothing was duplicated')
+
+    expect(copy.key.length).toBeLessThanOrEqual(MAX_KEY_LENGTH)
+    expect(copy.key, 'the copy kept its source key').not.toBe(long)
+    expect(keyProblem(copy.key), 'the copy is a key the gate refuses').toBeUndefined()
+  })
+
+  it('keeps trimming until it finds a free one', () => {
+    /*
+     * The loop, not only the first trim. Two long keys whose trimmed forms
+     * would collide have to end up distinct, or duplicating twice mints a
+     * document with a duplicate key -- which `updateNode` then resolves to the
+     * first match forever after.
+     */
+    const long = 'b'.repeat(MAX_KEY_LENGTH)
+    let root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: long, type: 'Field', props: {} }],
+    }
+
+    const keys = new Set<string>([long])
+    for (let i = 0; i < 3; i += 1) {
+      const copy = duplicateNode(root, long)
+      if (!copy) throw new Error('nothing was duplicated')
+      expect(copy.key.length).toBeLessThanOrEqual(MAX_KEY_LENGTH)
+      expect(keys.has(copy.key), 'minted a key already taken: ' + copy.key).toBe(false)
+      keys.add(copy.key)
+      root = { ...root, children: [...(root.children ?? []), copy] }
+    }
+
+    expect(keys.size).toBe(4)
+  })
+
   it('still copies a real list of children', () => {
     // The control. Carrying every `children` through untouched would pass the
     // row above while leaving the copy's descendants sharing the source's keys.
@@ -2389,13 +2442,35 @@ describe('invariant 4 on the operations that had no assertion for it', () => {
     const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [source] }
 
     const copy = duplicateNode(root, 'rich')
-    expect(copy, 'nothing was duplicated').toBeDefined()
-    expect(copy?.key, 'the copy kept its source key').not.toBe('rich')
+    if (!copy) throw new Error('nothing was duplicated')
+    expect(copy.key, 'the copy kept its source key').not.toBe('rich')
 
-    // Mutate every record on the copy; none of it may reach the source.
-    copy?.events?.onChange?.push({ name: 'other', type: 'code' })
-    copy?.schema?.validations?.push({ key: 'email' })
-    if (copy?.css) copy.css['any'] = 'color:blue'
+    /*
+     * Every record is asserted present *before* it is mutated, and mutated
+     * without optional chaining.
+     *
+     * The first version used `copy?.events?.onChange?.push(...)`, so if a
+     * record had not been copied at all the mutation was a silent no-op and the
+     * source was unchanged for the wrong reason -- the test passed while
+     * proving nothing about aliasing. Raised in review on PR #43, and it is the
+     * exact shape this run keeps finding: an assertion that cannot fail because
+     * the thing it acts on is not there.
+     */
+    const events = copy.events?.onChange
+    const validations = copy.schema?.validations
+    const css = copy.css
+
+    expect(events, 'events were not copied at all').toBeDefined()
+    expect(validations, 'the schema was not copied at all').toBeDefined()
+    expect(css, 'css was not copied at all').toBeDefined()
+    expect(events).toEqual([{ name: 'save', type: 'code' }])
+    expect(validations).toEqual([{ key: 'required' }])
+    expect(css?.['any']).toBe('color:red')
+
+    // Now mutate them, with no optional chaining to swallow a missing record.
+    ;(events as { name: string; type: string }[]).push({ name: 'other', type: 'code' })
+    ;(validations as { key: string }[]).push({ key: 'email' })
+    ;(css as Record<string, string>)['any'] = 'color:blue'
 
     expect(source.events?.onChange).toEqual([{ name: 'save', type: 'code' }])
     expect(source.schema?.validations).toEqual([{ key: 'required' }])
