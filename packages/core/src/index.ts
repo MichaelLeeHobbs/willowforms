@@ -34,6 +34,7 @@ export {
   isEmpty,
   jsonToString,
   optionEntry,
+  optionValues,
   optionValue,
   readPath,
   safeHref,

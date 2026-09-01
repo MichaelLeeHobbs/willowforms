@@ -30,48 +30,112 @@ export function jsonToString(value: JsonValue | undefined): string {
  * A submitted string matching nothing is returned as-is: that is the empty
  * placeholder, and inventing a value for it would be worse.
  */
+/**
+ * A declared value, read as an own property.
+ *
+ * Own, not inherited: the rest of this package reads option fields with
+ * `Object.hasOwn` for the reason `schema.ts` names -- "an application that has
+ * polluted `Object.prototype.label`". A plain lookup meant a valueless option
+ * resolved to the inherited value, so the control's submitted value stopped
+ * being the inverse of what it rendered.
+ *
+ * A `null` declared value is *declared*, and distinct from absent. The old
+ * `?? undefined` collapsed the two, so an option written `{ label: 'None',
+ * value: null }` fell back to its position one line later and rendered a value
+ * the author did not write.
+ */
+const declaredOf = (option: unknown): { declared: JsonValue } | undefined => {
+  if (option === null || typeof option !== 'object' || Array.isArray(option)) return undefined
+  if (!Object.hasOwn(option, 'value')) return undefined
+  return { declared: (option as Record<string, JsonValue>)['value'] as JsonValue }
+}
+
+/**
+ * The string every option in a list renders as, computed over the whole list.
+ *
+ * The list is the unit because uniqueness is a property of the list, and this is
+ * the defect that made it one. `optionEntry` fell back to `String(index)` for an
+ * option with no declared value while looking at that option alone -- so
+ * `[{ label: 'A' }, { label: 'B', value: 0 }]` rendered **two `<option>`s with
+ * `value="0"`**: A took position 0 and B declared the number 0. `optionValue`
+ * then resolved `'0'` through its declared-first pass and returned B's answer
+ * for a user who picked A.
+ *
+ * The two functions' contract is that they are inverses -- `optionEntry`'s
+ * docblock says "The rules are `optionValue`'s, exactly, because the two have to
+ * be inverses" -- and they cannot be while one of them decides per option and
+ * the other decides per list. Both read this table now, so the claim is true by
+ * construction rather than by two implementations agreeing.
+ *
+ * A colliding position is pushed out with a suffix rather than renumbered.
+ * Renumbering would move *other* options' values, which changes what a form
+ * submits for answers nobody edited; a suffix changes only the option that had
+ * no declared value in the first place, and that option's rendered value was
+ * never anything an author chose.
+ */
+export function optionValues(options: readonly unknown[]): string[] {
+  const declared = options.map(declaredOf)
+
+  // Every declared spelling, so a position can be seen to collide with one that
+  // appears later in the list as well as earlier.
+  const spoken = new Set<string>()
+  for (const entry of declared) if (entry) spoken.add(jsonToString(entry.declared))
+
+  const out: string[] = []
+  const used = new Set<string>()
+
+  options.forEach((_option, index) => {
+    const entry = declared[index]
+    if (entry) {
+      const value = jsonToString(entry.declared)
+      out.push(value)
+      used.add(value)
+      return
+    }
+
+    /*
+     * `.` because it cannot end a number's rendering, so `1.` never collides
+     * with a position, and the loop covers the case where an author declared
+     * the literal string `'0.'` as well.
+     */
+    let candidate = String(index)
+    while (spoken.has(candidate) || used.has(candidate)) candidate += '.'
+    out.push(candidate)
+    used.add(candidate)
+  })
+
+  return out
+}
+
 export function optionValue(options: readonly unknown[], submitted: string): JsonValue {
   /*
-   * `unknown`, because the two callers hand over two different shapes and both
-   * are right. The renderer passes a document's own option list, which is JSON.
-   * The Properties panel passes a kit's `PropOption[]`, which is `{ label,
-   * value }` and is not assignable to `JsonValue` for want of an index
-   * signature -- so the panel worked around the type by mapping to `o.value`
-   * first, which unwrapped exactly the field this function reads. The type was
-   * the reason the call was wrong.
-   */
-  const declaredOf = (option: unknown): JsonValue | undefined =>
-    option !== null && typeof option === 'object' && !Array.isArray(option)
-      ? ((option as Record<string, JsonValue>)['value'] ?? undefined)
-      : undefined
-
-  /*
-   * Declared values first, positions second, in two passes rather than one.
+   * Resolved through the same table the control rendered from, so the two are
+   * inverses by construction.
    *
-   * A list mixing the two -- `['Yes', { label: 'No', value: '0' }]` -- has an
-   * option whose declared value is the string `0` and an option whose position
-   * is 0, and a single pass returned whichever came first in the list. An
-   * author who wrote a value meant that value; a position is what an option
-   * falls back to when nobody wrote one.
+   * This used to walk the list twice on its own -- declared spellings first,
+   * positions second -- which is the right *rule* and could not express the
+   * one case it exists for: a position that collides with a declared value
+   * elsewhere. Both options rendered the same string, the declared pass won,
+   * and picking the first submitted the second one's answer.
    */
-  for (const option of options) {
-    const declared = declaredOf(option)
-    if (declared !== undefined && jsonToString(declared) === submitted) return declared
+  const values = optionValues(options)
+  const at = values.indexOf(submitted)
+
+  if (at !== -1) {
+    const entry = declaredOf(options[at])
+    /*
+     * A declared value is handed back as the author wrote it -- the number `0`
+     * rather than the string `'0'` -- because that is what the form is
+     * collecting. An option with no declared value has only its position, and
+     * the string the control put in the DOM is that position.
+     */
+    return entry ? entry.declared : submitted
   }
 
   /*
-   * And a position otherwise, which is what `submitted` already is.
-   *
-   * There was a second loop here that walked the options looking for an index
-   * matching the submitted string and returned `submitted` when it found one --
-   * the same value the line below returns, so deleting it cannot change an
-   * answer. It read as the second half of the two-pass rule and was not: the
-   * first pass is what resolves `['Yes', { label: 'No', value: '0' }]`, by
-   * preferring the declared `'0'` over the position `0`.
-   *
-   * A submitted string that matches no declared value is the string a control
-   * put in the DOM, and for an option with no declared value that string is its
-   * index. Handing it back unchanged is right for both.
+   * A submitted string that matches no option at all is handed back unchanged.
+   * It is what a control put in the DOM, and inventing a value for it would be
+   * worse than passing it through.
    */
   return submitted
 }
@@ -93,6 +157,14 @@ export function optionValue(options: readonly unknown[], submitted: string): Jso
 export function optionEntry(
   option: JsonValue | undefined,
   index: number,
+  /**
+   * The list this option came from, so its rendered value can be made unique.
+   *
+   * Optional only so an existing caller keeps compiling; every caller in this
+   * repository passes it, and one that does not gets the old per-option rule
+   * with the collision it carries. See `optionValues`.
+   */
+  all?: readonly unknown[],
 ): { value: string; label: string } {
   const record =
     option !== null && typeof option === 'object' && !Array.isArray(option) ? option : undefined
@@ -107,8 +179,12 @@ export function optionEntry(
    * option that carries neither -- `{}`, `null`, a nested list -- because a
    * position is the only name such an option has.
    */
-  const declared = record ? record['value'] : option
-  const value = declared === undefined || declared === null ? String(index) : jsonToString(declared)
+  const value = all
+    ? (optionValues(all)[index] ?? String(index))
+    : (() => {
+        const declared = record ? record['value'] : option
+        return declared === undefined || declared === null ? String(index) : jsonToString(declared)
+      })()
   /*
    * `jsonToString`, not a string check.
    *

@@ -23,7 +23,22 @@
 import type { Language } from './types.js'
 
 export function languageTag(language: Language): string {
-  return language.dialect ? language.code + '-' + language.dialect : language.code
+  /*
+   * A string, not truthiness, which is what the gate's deliberate copy asks.
+   *
+   * `tree.ts`'s language check requires `dialect` to be a string; this asked
+   * whether it was truthy. So `{"code":"en","dialect":5}` validated clean --
+   * `validateDocument` never reports a non-string dialect -- while this built
+   * the tag `en-5`, which `findLanguage` then matched against nothing. The
+   * document named a language it did not have and every translation rendered
+   * as its raw key.
+   *
+   * The docblock above records that this copy has already drifted from the gate
+   * once. This is the second time, and the two now ask the same question.
+   */
+  return typeof language.dialect === 'string' && language.dialect
+    ? language.code + '-' + language.dialect
+    : language.code
 }
 
 /** The language a tag refers to, if the document has it. */

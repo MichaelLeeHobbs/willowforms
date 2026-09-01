@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { findLanguage, languageTag } from './language.js'
+
 import {
   isEmpty,
   jsonToString,
@@ -9,6 +11,7 @@ import {
   safeHref,
   valueOf,
 } from './json.js'
+import type { JsonValue, Language } from './types.js'
 
 describe('jsonToString', () => {
   it('passes strings through and renders primitives', () => {
@@ -459,5 +462,142 @@ describe('an option whose label is not a string', () => {
     expect(optionEntry({ label: null, value: 'a' }, 0)).toEqual({ value: 'a', label: 'a' })
     expect(optionEntry({ label: { deep: 1 }, value: 'b' }, 0)).toEqual({ value: 'b', label: 'b' })
     expect(optionEntry({ label: ['x'], value: 'c' }, 0)).toEqual({ value: 'c', label: 'c' })
+  })
+})
+
+describe('the two option functions as actual inverses', () => {
+  /*
+   * The round-trip test in this file never called the function that produces
+   * the spelling a control puts in the DOM.
+   *
+   * It computed the submitted string as `jsonToString(option.value)` -- the
+   * same expression `optionValue` compares against internally -- so the
+   * round-trip was symmetrical by construction and could not fail. The spelling
+   * a control actually renders comes from `optionEntry`, which is what both
+   * kits use.
+   *
+   * Driven through `optionEntry` here, so the two are tested as the inverses
+   * their docblocks claim they are.
+   */
+  const roundTrip = (options: JsonValue[]): { rendered: string[]; resolved: JsonValue[] } => {
+    const rendered = options.map((option, index) => optionEntry(option, index, options).value)
+    return { rendered, resolved: rendered.map((value) => optionValue(options, value)) }
+  }
+
+  it('never renders two options with the same value', () => {
+    /*
+     * The defect, exactly. `[{label:'A'}, {label:'B', value:0}]` rendered two
+     * `<option value="0">`: A took position 0 and B declared the number 0.
+     */
+    const options: JsonValue[] = [{ label: 'A' }, { label: 'B', value: 0 }]
+
+    const { rendered } = roundTrip(options)
+
+    expect(
+      new Set(rendered).size,
+      'two options render the same value: ' + rendered.join(', '),
+    ).toBe(rendered.length)
+  })
+
+  it('resolves the option a user picked, not the one that shares its spelling', () => {
+    /*
+     * The consequence. Picking A submitted B's answer -- silently, and only
+     * through the JSON options editor or a JSON Schema `enum` import rather
+     * than through the normal picker, which is why nothing found it.
+     */
+    const options: JsonValue[] = [{ label: 'A' }, { label: 'B', value: 0 }]
+
+    const { rendered, resolved } = roundTrip(options)
+
+    expect(resolved[1], "B's declared value did not survive").toBe(0)
+    expect(resolved[0], "picking A resolved to B's answer").not.toBe(0)
+    expect(optionValue(options, rendered[0] ?? '')).toBe(rendered[0])
+  })
+
+  it.each([
+    ['a mixed list', [{ label: 'A' }, { label: 'B', value: 0 }] as JsonValue[]],
+    ['positions colliding both ways', [{ label: 'B', value: 1 }, { label: 'A' }] as JsonValue[]],
+    [
+      'a declared value matching a later position',
+      [{ label: 'A', value: 2 }, {}, {}] as JsonValue[],
+    ],
+    ['bare strings, which declare themselves', ['Yes', 'No'] as JsonValue[]],
+    ['a JSON Schema enum shape', ['a', 'b', 'c'] as JsonValue[]],
+    ['options carrying neither label nor value', [{}, null, []] as JsonValue[]],
+    ['a declared null, which is declared', [{ label: 'None', value: null }, {}] as JsonValue[]],
+    ['numeric labels', [{ label: 2024, value: 'y2024' }, { label: 2025 }] as JsonValue[]],
+  ])('round-trips %s through the spelling the kit rendered', (_what, options) => {
+    const { rendered, resolved } = roundTrip(options)
+
+    expect(new Set(rendered).size, 'duplicate rendered values: ' + rendered.join(', ')).toBe(
+      rendered.length,
+    )
+
+    // Every option resolves back to something distinct, which is what "a
+    // control's submitted value is the inverse of what it rendered" means.
+    expect(new Set(resolved.map((value) => jsonToString(value))).size).toBe(options.length)
+  })
+
+  it('still hands back a value nobody rendered, unchanged', () => {
+    // The control for the fallthrough: a submitted string matching no option is
+    // what a control put in the DOM, and inventing a value would be worse.
+    expect(optionValue([{ label: 'A' }], 'not-an-option')).toBe('not-an-option')
+  })
+})
+
+describe('option fields read as own properties', () => {
+  /*
+   * `optionValue` and `optionEntry` read option fields with plain lookups where
+   * the rest of the package reads own properties -- `valueOf`, `readPath` and
+   * `schema.ts`, whose comment names "an application that has polluted
+   * `Object.prototype.label`" as the case being defended against.
+   *
+   * With `Object.prototype.value` polluted, a valueless option resolved to the
+   * inherited value and the control's submitted value stopped being the inverse
+   * of what it rendered.
+   */
+  it('ignores a value inherited from Object.prototype', () => {
+    const proto = Object.prototype as unknown as Record<string, unknown>
+    proto['value'] = 'polluted'
+    try {
+      const options: JsonValue[] = [{ label: 'A' }, { label: 'B' }]
+      const rendered = options.map((option, index) => optionEntry(option, index, options).value)
+
+      expect(rendered).toEqual(['0', '1'])
+      expect(optionValue(options, '0')).toBe('0')
+    } finally {
+      delete proto['value']
+    }
+  })
+})
+
+describe('a dialect the gate would not call one', () => {
+  /*
+   * `languageTag` used truthiness on `dialect` while the gate's deliberate copy
+   * requires a string -- and `validateDocument` never reports a non-string
+   * dialect. So `{"code":"en","dialect":5}` validated clean while this built
+   * `en-5`, which `findLanguage` matched against nothing: the document named a
+   * language it did not have, and every translation rendered as its raw key.
+   */
+  it.each([
+    ['a number', 5],
+    ['true', true],
+    ['an object', {}],
+  ])('falls back to the bare code when the dialect is %s', (_what, dialect) => {
+    const language = { code: 'en', dialect, name: 'English', bidi: 'ltr' } as unknown as Language
+
+    expect(languageTag(language)).toBe('en')
+  })
+
+  it('still builds the tag from a real dialect', () => {
+    // The control. Always returning the bare code would pass every row above
+    // while breaking en-US, which is what createDocument ships.
+    expect(languageTag({ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' })).toBe('en-US')
+  })
+
+  it('finds the language a well-formed document names', () => {
+    const languages: Language[] = [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }]
+
+    expect(findLanguage(languages, 'en-US')?.code).toBe('en')
   })
 })
