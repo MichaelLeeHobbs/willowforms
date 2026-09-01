@@ -141,8 +141,9 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
              * rule.
              */
             const written = setDeclaration(text, control.name, next)
-            if (written && !safeDeclarations(written)) return
+            if (written && !safeDeclarations(written)) return false
             api.setNodeCss(node.key, device, written)
+            return true
           }}
         />
       ))}
@@ -177,7 +178,8 @@ function DeclarationField({
 }: {
   control: { name: string; label: string; placeholder: string }
   value: string
-  onCommit: (next: string) => void
+  /** Answers whether the value was written. A refusal keeps the typed text. */
+  onCommit: (next: string) => boolean
 }): ReactNode {
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
@@ -192,10 +194,36 @@ function DeclarationField({
     setDraft(value)
   }
 
+  const [refused, setRefused] = useState('')
+
   const commit = (): void => {
     if (draft === committed) return
+
+    /*
+     * The refusal is shown, and the typed text is kept.
+     *
+     * This set `committed` to `draft` and called `onCommit`, which returns
+     * early when `safeDeclarations` refuses the block -- so `api.setNodeCss`
+     * was never called, the `value` prop did not move, and the re-render
+     * overwrote `draft` with the stale value. Type `6px}` into Radius and press
+     * Enter: the field blanked back to its previous value, with no reason given
+     * and no chance to delete the stray character.
+     *
+     * The raw box beside it explains the identical refusal, which is what makes
+     * this one hard to defend: one sink, one rule, and only one of the two
+     * controls told the author anything.
+     */
+    const ok = onCommit(draft)
+    if (!ok) {
+      setRefused(
+        'That value cannot be written as CSS. Braces, angle brackets, at-signs, comments and ' +
+          'backslashes are refused, and quotes have to be closed.',
+      )
+      return
+    }
+
+    setRefused('')
     setCommitted(draft)
-    onCommit(draft)
   }
 
   return (
@@ -209,14 +237,35 @@ function DeclarationField({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
+          aria-invalid={refused ? true : undefined}
+          aria-describedby={refused ? 'fs-style-' + control.name + '-error' : undefined}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
               commit()
             }
-            if (e.key === 'Escape') setDraft(value)
+            if (e.key === 'Escape') {
+              setDraft(value)
+              setRefused('')
+            }
           }}
         />
+        {/*
+          Mounted when there is something to say, rather than a `role="alert"`
+          added to an element that is already there.
+
+          A role applied to a live element is unreliably announced -- assistive
+          technology watches a live region for *mutations*, and changing what an
+          element is is not one it can be relied on to report. So the one
+          control in this panel that refused input silently would also have been
+          the one whose refusal might not be spoken. Every other error in this
+          slice mounts a new element; this now does too.
+        */}
+        {refused && (
+          <p id={'fs-style-' + control.name + '-error'} className="fs-prop-row__error" role="alert">
+            {refused}
+          </p>
+        )}
       </div>
     </div>
   )

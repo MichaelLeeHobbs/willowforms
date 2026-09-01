@@ -36,6 +36,24 @@ function nameOf(language: { name?: unknown }): string {
 
 export function FormSettings({ api }: FormSettingsProps): ReactNode {
   const { document: doc } = api
+
+  /*
+   * The list's shape is guarded, and the shape of each language already was.
+   *
+   * `nameOf` exists precisely because "a `Language` arrives from a pasted
+   * document", and its docblock states that a throw during render in React 19
+   * unmounts the whole designer -- so every language in this list was defended
+   * and the list itself was not. `doc.languages` was read as an array three
+   * times, and the Form tab is the tab the left pane can open, so
+   * `doc.languages.map` threw and took the designer with it, including the JSON
+   * dialog that would repair the document. `store.ts` only warns about a host's
+   * `initialDocument`, which is the path such a document arrives by.
+   */
+  const languages = Array.isArray(doc.languages)
+    ? doc.languages.filter(
+        (language): language is Language => Boolean(language) && typeof language === 'object',
+      )
+    : []
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
@@ -86,12 +104,12 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
       bidi: 'ltr',
     }
     const tag = languageTag(language)
-    if (doc.languages.some((l) => languageTag(l).toLowerCase() === tag.toLowerCase())) {
+    if (languages.some((l) => languageTag(l).toLowerCase() === tag.toLowerCase())) {
       setError(tag + ' is already in the list.')
       return
     }
 
-    api.setLanguages([...doc.languages, language])
+    api.setLanguages([...languages, language])
     setCode('')
     setName('')
     setError('')
@@ -106,8 +124,8 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
    * tell which of the two they had lost.
    */
   const remove = (at: number): void => {
-    if (doc.languages.length === 1) return
-    api.setLanguages(doc.languages.filter((_, index) => index !== at))
+    if (languages.length === 1) return
+    api.setLanguages(languages.filter((_, index) => index !== at))
   }
 
   return (
@@ -127,7 +145,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
       </h3>
 
       <ul className="fs-languages">
-        {doc.languages.map((language, at) => {
+        {languages.map((language, at) => {
           const tag = languageTag(language)
           const isDefault = tag === doc.defaultLanguage
           return (
@@ -176,7 +194,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                      */
                     onChange={(e) =>
                       api.setLanguages(
-                        doc.languages.map((l, i) =>
+                        languages.map((l, i) =>
                           i === at ? { ...l, bidi: e.target.checked ? 'rtl' : 'ltr' } : l,
                         ),
                       )

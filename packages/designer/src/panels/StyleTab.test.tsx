@@ -452,3 +452,73 @@ describe('a style property bound to a condition inside a row', () => {
     })
   })
 })
+
+describe('a brace typed into a structured control', () => {
+  /*
+   * Every refusal test in this file types into the RAW CSS box, and nothing
+   * ever typed a brace into a structured control -- so `StyleTab.tsx:143-145`
+   * was untested here and in `e2e/style.spec.ts`, which also only fills the raw
+   * box.
+   *
+   * Delete the `safeDeclarations` check and both suites stayed green while the
+   * defect its own comment records returns: "a brace typed into the Radius
+   * field was stored, the renderer then dropped the whole block, and the
+   * component lost every other declaration on that layer with nothing on screen
+   * explaining why".
+   *
+   * The file has a Radius test and three brace tests. The one combination that
+   * matters is the one that was missing.
+   */
+  it('is refused rather than written', async () => {
+    const harness = setup(field())
+    await harness.openStyle()
+
+    await harness.user.type(screen.getByLabelText('Padding'), '8px')
+    await harness.user.tab()
+    expect(harness.latest()?.css?.any, 'nothing was written at all').toContain('padding: 8px')
+
+    await harness.user.type(screen.getByLabelText('Radius'), '6px}')
+    await harness.user.tab()
+
+    expect(harness.latest()?.css?.any).not.toContain('6px}')
+    expect(harness.latest()?.css?.any, 'the earlier declaration was lost too').toContain(
+      'padding: 8px',
+    )
+  })
+
+  it('says why, and keeps what was typed', async () => {
+    /*
+     * The half that made this worse than a plain refusal: `commit` set
+     * `committed` before calling `onCommit`, which returns early on a refusal,
+     * so the value prop never moved and the re-render overwrote the draft with
+     * the stale value. The field blanked back with no reason given and no
+     * chance to delete the stray character -- while the raw box beside it
+     * explains the identical refusal.
+     */
+    const harness = setup(field())
+    await harness.openStyle()
+
+    await harness.user.type(screen.getByLabelText('Radius'), '6px}')
+    await harness.user.tab()
+
+    expect(screen.getByRole('alert').textContent).toMatch(/cannot be written as CSS/i)
+    expect(screen.getByLabelText('Radius')).toHaveProperty('value', '6px}')
+  })
+
+  it('clears the refusal once the value is corrected', async () => {
+    // The control: a message that never goes away is its own defect.
+    const harness = setup(field())
+    await harness.openStyle()
+
+    await harness.user.type(screen.getByLabelText('Radius'), '6px}')
+    await harness.user.tab()
+    expect(screen.queryByRole('alert')).not.toBeNull()
+
+    await harness.user.clear(screen.getByLabelText('Radius'))
+    await harness.user.type(screen.getByLabelText('Radius'), '6px')
+    await harness.user.tab()
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(harness.latest()?.css?.any).toContain('6px')
+  })
+})
