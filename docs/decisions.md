@@ -4,6 +4,28 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### One pull request per queue item, capped at 12 files and 500 lines
+
+- **Decided:** the 2026-08-31 remediation run ships one PR per queue item, sized to a hard budget, merged
+  into `main` only after a Copilot review has been read and answered. No long-lived run branch, no stage
+  batching. `docs/build-out/queue.md` carries the budget and the per-item procedure.
+- **Why:** the previous run's stage PRs were reviewed like this -- #28 at 17 files and 940 lines: zero
+  Copilot comments; #29 at 54 files and 3342 lines: zero; #30 at 96 files and 5875 lines: three; #31 at
+  96 files and 2958 lines: one; #32 at 7 files and 186 lines: three. A large diff does not get a shallow
+  review from Copilot, it gets none, and the PR still reads as reviewed from the outside because a bot
+  posted something. The smallest PR of the five drew as many comments as the largest.
+- **Rejected: stacked branches.** Item N+1 cut from item N's branch with the PR based on it would keep
+  each diff small _and_ let work continue while a review is pending. It also gives an unattended run a
+  second way to get its git state wrong, and rebasing a stack after a Copilot fix lands mid-chain is
+  exactly the operation that goes wrong at 3am. One open PR at a time is slower and has one failure mode.
+- **Rejected: keeping stage PRs and asking Copilot to try harder.** There is no such setting. The comment
+  form of the re-request only re-checks findings already open, which is the documented behaviour that
+  makes a grown PR look clean.
+- **What it costs:** about 54 pull requests instead of 7, and a wait for CI plus a review on each. The run
+  is several times longer in wall-clock. It buys the only external, objective check on this work that is
+  not the same model grading its own homework.
+- **When:** 2026-08-31, before the run started.
+
 ### `rowScopeProblems` stays internal; the spec names `validateDocument` instead
 
 - **Decided:** the document, not the export. `docs/spec/12-api.md` told hosts to call `rowScopeProblems`
