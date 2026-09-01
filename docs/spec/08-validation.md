@@ -166,9 +166,13 @@ validateField(node, data, options?): string | undefined
 validateForm(root, data, options?): FormErrors          // key -> message
 applyRule(rule, value, data, options?): string | undefined
 
-// A form validated once per scope. See Server parity: a wizard needs these,
-// and calling the two above on one instead is a submit that reports success
-// over answers it never looked at.
+// What a form actually submits: the answers to questions it is still asking.
+// A server that stores the raw body stores whatever the browser sent.
+submittedData(root, data, options?): FormData
+
+// A form validated once per scope. See Server parity: a wizard needs these
+// two, and calling `validateForm`/`submittedData` on one instead is a submit
+// that reports success over answers it never looked at.
 validateAcross(root, data, scopes): FormErrors
 submittedAcross(root, data, scopes): FormData
 
@@ -241,6 +245,12 @@ A form with no steps validates once, and this is the whole of it:
 import { missingContext, submittedData, validateForm } from '@formsmith/core'
 
 const context = { user: { role: session.role } }
+
+// Once, at startup. A visibility rule reading a path the server does not supply
+// is not a rejected submit, it is an accepted one that skipped a required
+// answer -- see The evaluator below.
+const missing = missingContext(document.root, context)
+if (missing.length) throw new Error('context missing: ' + missing.join(', '))
 
 const errors = validateForm(document.root, submitted, { context })
 if (Object.keys(errors).length > 0) return respond(422, { errors })
