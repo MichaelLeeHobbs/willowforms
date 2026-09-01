@@ -468,6 +468,16 @@ describe('a store holding something that is not a document', () => {
     noId: { root: { key: 'root', type: 'Screen', props: {} } },
     noRoot: { id: 'noRoot', name: 'No root' },
     aNull: null,
+    /*
+     * A root that is present and not a node. `Boolean(shape.root)` was the
+     * first version of the guard and let these through, which puts the finding
+     * back exactly: every walker finds no fields on a scalar, so the tree is
+     * empty, nothing fails, and the submit answers 200.
+     */
+    scalarRoot: { id: 'scalarRoot', root: 5 },
+    listRoot: { id: 'listRoot', root: [] },
+    emptyRoot: { id: 'emptyRoot', root: {} },
+    rootWithoutType: { id: 'rootWithoutType', root: { key: 'root', props: {} } },
   }
 
   const withJunk = async (extra: Record<string, unknown> = {}): Promise<void> => {

@@ -179,14 +179,34 @@ async function withStore<T>(
  * other two routes walk the tree. A row in a listing for a document nothing can
  * open is a row that 404s when it is clicked.
  *
- * Deliberately shallow. `validateDocument` is the real check and every write
- * goes through it; this is the guard for a file somebody edited by hand behind
- * the server's back.
+ * The root has to be a node, not merely present. `Boolean(shape.root)` was the
+ * first version and it let `{"id":"x","root":5}` through -- a truthy value that
+ * every walker then finds no fields on, so the tree is empty, nothing fails,
+ * and `/submit` answers `200 {ok:true}` again. That is the finding this guard
+ * exists for, reproduced one level down, and a hand-edited file is exactly
+ * where a scalar in that slot comes from.
+ *
+ * Still deliberately shallow: `key`, `type` and `props` are what a
+ * `ComponentNode` must have for a walk to mean anything, and `validateDocument`
+ * is the real check that every write goes through. This is the guard for a file
+ * somebody edited behind the server's back.
  */
 function isStoredDocument(doc: unknown): doc is FormDocument {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false
   const shape = doc as { id?: unknown; root?: unknown }
-  return typeof shape.id === 'string' && shape.id !== '' && Boolean(shape.root)
+  if (typeof shape.id !== 'string' || shape.id === '') return false
+
+  const root = shape.root
+  if (!root || typeof root !== 'object' || Array.isArray(root)) return false
+
+  const node = root as { key?: unknown; type?: unknown; props?: unknown }
+  return (
+    typeof node.key === 'string' &&
+    typeof node.type === 'string' &&
+    Boolean(node.props) &&
+    typeof node.props === 'object' &&
+    !Array.isArray(node.props)
+  )
 }
 
 function held(store: Store, id: string): FormDocument | undefined {
