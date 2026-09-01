@@ -231,6 +231,107 @@ function holdsAlternatives(compound: string): boolean {
 }
 
 /**
+ * Every `fs-` class that encloses the rendered form, read out of `Designer.tsx`.
+ *
+ * The guard used to name these as two literal strings, `shell` and `canvas` --
+ * and `.fs-body` is a real wrapper between them today. So `.fs-body input`, the
+ * exact rule that broke MUI's notched outline, sat at a genuine ancestor of the
+ * form and matched neither name: `reachesIntoTheForm` returned false because
+ * the ancestor compound did not match the scope pattern, and
+ * `escapesTheDesigner` returned false because `.fs-` appears in the selector.
+ * The whole guard stayed green.
+ *
+ * This file already made this argument once, for scopes *under* the canvas:
+ * "a guard that names its scopes as strings cannot notice that the scopes
+ * moved". The reasoning was applied to the inside of the canvas and not to the
+ * chain leading down to it. Derived now, so a new wrapper is guarded the day it
+ * is added rather than the day somebody remembers this list.
+ *
+ * The window is from `fs-shell` to `fs-canvas` in the source: everything the
+ * form is nested inside, by construction.
+ */
+function formScopes(): string[] {
+  const source = readFileSync(fileURLToPath(new URL('./Designer.tsx', import.meta.url)), 'utf8')
+  const lines = source.split('\n')
+
+  const at = lines.findIndex((line) => line.includes('"fs-canvas"'))
+  // A control: a window that found nothing would make every scope test below
+  // vacuous at once.
+  expect(at, 'Designer.tsx no longer renders fs-canvas').toBeGreaterThan(-1)
+
+  const indentOf = (line: string): number => line.length - line.trimStart().length
+  const canvasIndent = indentOf(lines[at] ?? '')
+
+  /*
+   * Ancestors by indentation, not by source order.
+   *
+   * Everything between `fs-shell` and `fs-canvas` in the file includes the left
+   * panel, which is a *sibling* of the canvas rather than something the form
+   * sits inside -- and treating it as a form scope makes every legitimate
+   * `.fs-panel input` rule a violation. An ancestor is a line above the canvas
+   * indented less than it is.
+   *
+   * Indentation is a real structural signal here because it is machine
+   * maintained: `pnpm format:check` gates CI, so a hand-misindented file cannot
+   * reach main.
+   */
+  const names = new Set<string>(['fs-canvas'])
+  for (let i = at - 1; i >= 0; i -= 1) {
+    const line = lines[i]
+    if (!line || line.trim() === '') continue
+    if (indentOf(line) >= canvasIndent) continue
+
+    for (const match of line.matchAll(/className="([^"]*)"/g)) {
+      for (const name of (match[1] ?? '').split(/\s+/)) {
+        if (name.startsWith('fs-')) names.add(name)
+      }
+    }
+    if (line.includes('"fs-shell"')) break
+  }
+
+  expect(names.has('fs-shell'), 'the walk never reached the shell').toBe(true)
+
+  /*
+   * And every name is safe to put straight into a regular expression.
+   *
+   * `SCOPE_PATTERN` interpolates these without escaping, and the comment there
+   * said an assertion guaranteed it -- which was a description of a check that
+   * did not exist. A wrapper class carrying a `.`, a `+` or a `(` would have
+   * built a pattern that matches the wrong thing, or throws, and either way the
+   * guard would stop guarding what it says it guards.
+   *
+   * Underscore is in the set because BEM elements use `__`, and it is not a
+   * metacharacter.
+   */
+  for (const name of names) {
+    expect(name, 'a scope class needs escaping before it can go in a pattern').toMatch(
+      /^[a-zA-Z0-9_-]+$/,
+    )
+  }
+
+  return [...names]
+}
+
+/**
+ * The scope test, built from the classes above rather than from two literals.
+ *
+ * These go into the pattern unescaped, so `formScopes` asserts every one of
+ * them is `[a-zA-Z0-9_-]` before returning. That assertion is the reason no
+ * escaping is needed here; without it a wrapper class carrying a metacharacter
+ * would build a pattern that matches the wrong thing or throws, and the guard
+ * would stop guarding what it says it guards.
+ */
+const SCOPE_NAMES = formScopes()
+/*
+ * A prefix match, with no trailing boundary, which is what the two literals it
+ * replaced did. `.fs-canvas__frame` is inside the form and has to count as a
+ * scope -- and `\b` does not fire before `_`, so anchoring the end silently
+ * stopped matching every BEM element under the canvas. Six of this file's own
+ * self-tests said so, which is the value of a guard that tests itself.
+ */
+const SCOPE_PATTERN = new RegExp('\\.(' + SCOPE_NAMES.join('|') + ')')
+
+/**
  * Does this selector style something inside the rendered form?
  *
  * Two halves, and both are needed. It has to *descend* from a scope that
@@ -262,7 +363,7 @@ function reachesIntoTheForm(selector: string): boolean {
    */
   const insideTheForm = parts
     .slice(0, -1)
-    .some((part) => /\.fs-(shell|canvas)/.test(part) && !CHROME_UNDER_CANVAS.has(part))
+    .some((part) => SCOPE_PATTERN.test(part) && !CHROME_UNDER_CANVAS.has(part))
 
   if (!insideTheForm) return false
 
@@ -370,6 +471,17 @@ describe('designer.css isolation', () => {
      */
     it.each([
       ['.fs-shell input', 'the original incident, at the top'],
+      /*
+       * `.fs-body` is a real wrapper between the shell and the canvas, and the
+       * guard named its scopes as the two literal strings `shell` and `canvas`
+       * -- so this exact rule, at a genuine ancestor of the form, matched
+       * neither. `reachesIntoTheForm` said false because the ancestor compound
+       * did not match, and `escapesTheDesigner` said false because `.fs-`
+       * appears in the selector. The whole guard stayed green on the one rule
+       * it exists for.
+       */
+      ['.fs-body input', 'and at the wrapper between them, which nothing named'],
+      ['.fs-body .fs-canvas input', 'through that wrapper and on down'],
       ['.fs-canvas__frame input', 'the same rule, at the wrapper the form is in now'],
       ['.fs-canvas__surface input', 'and at the one it used to be in'],
       ['.fs-canvas input', 'and at any other depth'],
