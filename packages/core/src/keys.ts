@@ -101,7 +101,10 @@ export const RESERVED_KEYS: readonly string[] = Object.freeze([
  * `applyChange` never calls this itself, which is exactly what makes that
  * silence hard to trace from here.
  *
- * This said *every* caller shows it to someone. One rule, so a rename and a paste are judged the
+ * The wording above is a correction: this docblock used to say every caller
+ * shows the message to someone, which was true of half of them.
+ *
+ * One rule, so a rename and a paste are judged the
  * same way.
  */
 export function keyProblem(key: unknown): string | undefined {

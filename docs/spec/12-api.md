@@ -160,10 +160,18 @@ then omitted these four. All are exported from `@formsmith/core` and all four ar
 server.
 
 ```ts
-validateAcross(root, data, scopes: EvalOptions[]): FormErrors
-submittedAcross(root, data, scopes: EvalOptions[]): FormData
-contextValues(root, path): JsonValue[]
-evaluatorKeys(root): string[]
+export declare function validateAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormErrors
+export declare function submittedAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormData
+export declare function contextValues(root: ComponentNode, path: string): JsonValue[]
+export declare function evaluatorKeys(root: ComponentNode): string[]
 ```
 
 The first two are what a wizard needs, and they come as a pair for a reason. A step is a container behind
