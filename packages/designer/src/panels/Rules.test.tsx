@@ -629,6 +629,51 @@ describe('a schema a paste can produce', () => {
     expect(await drawn([null, { key: 'required' }, 5])).toBe(clean)
   })
 
+  it.each([
+    ['a pattern whose value is null', { key: 'pattern', value: null }],
+    ['a pattern whose value is a number', { key: 'pattern', value: 5 }],
+    ['a pattern whose value is a list', { key: 'pattern', value: [] }],
+    ['a key nothing recognises', { key: 'requird' }],
+    ['a key that is a number', { key: 5 }],
+  ])('opens the tab for a schema holding %s', async (_what, rule) => {
+    /*
+     * The filter checked "a non-null object with a string `key`", which admits
+     * every one of these -- and the pattern row calls
+     * `patternProblem(rule.value)`, which reads `.length`. On `null` that
+     * throws and takes the Rules tab down, which is the failure the filter
+     * exists to prevent, through the half of the shape it was not looking at.
+     *
+     * An unrecognised key is dropped for a different reason: `validateForm`
+     * refuses it with `UNREADABLE_RULE`, so a row for it would offer to edit a
+     * rule the server will not run.
+     */
+    const view = setup([], malformed([rule, { key: 'required' }]))
+    await view.selectRow('email')
+    await view.openRules()
+
+    // The tab is up and the real rule beside the junk is still drawn.
+    expect(view.view.container.querySelectorAll('.fs-rule').length).toBe(1)
+  })
+
+  it('leaves a rule it cannot draw in the document', async () => {
+    /*
+     * Dropped from the panel, never from the document. Opening a tab must not
+     * delete data: `write` sends what the author edited, so an undrawable rule
+     * survives untouched -- and a host that fixes its JSON gets it back.
+     */
+    const { selectRow, openRules, latest } = setup(
+      [],
+      malformed([{ key: 'pattern', value: null }, { key: 'required' }]),
+    )
+    await selectRow('email')
+    await openRules()
+
+    expect(rulesOf(latest(), 'email')).toEqual([
+      { key: 'pattern', value: null },
+      { key: 'required' },
+    ])
+  })
+
   it('adds a rule to a schema whose validations were not a list', async () => {
     const { user, selectRow, openRules, latest } = setup([], malformed('required'))
     await selectRow('email')
