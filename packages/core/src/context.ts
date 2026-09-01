@@ -230,20 +230,16 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * there is no name there to collect.
  */
 /**
- * How many distinct values this will collect for one path.
+ * How many distinct values `contextValues` will report for one path.
  *
  * `contextValues(root, 'step')` is how a host discovers a form's steps, and the
  * reference server runs one full validation pass per value it gets back. A
  * hundred thousand distinct literals is a few seconds to author in the JSON
- * editor and a hundred thousand passes to submit against.
- *
- * Far past any real flow: a wizard with more than a thousand steps is not a
- * wizard. The `add` below also compares with `===`, so structurally equal object
- * literals each count, and a document can reach the cap faster than the number
- * suggests — which is an argument for the cap rather than against it.
- */
-/**
- * How many distinct values `contextValues` will report for one path.
+ * editor and a hundred thousand passes to submit against. A thousand is far
+ * past any real flow: a wizard with more than a thousand steps is not a wizard.
+ * The `add` below compares with `===`, so structurally equal object literals
+ * each count and a document reaches the cap faster than the number suggests --
+ * an argument for the cap rather than against it.
  *
  * Exported, and it was not, which is what made the cap silent. The function
  * returns a bare array, so a caller that hit the ceiling could not tell a
