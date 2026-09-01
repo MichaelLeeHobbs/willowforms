@@ -202,7 +202,7 @@ export default tseslint.config(
    * JSX in it and would only add noise.
    */
   {
-    files: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'test/**/*.ts', 'test/**/*.tsx'],
+    files: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'test/**/*.ts'],
     plugins: { 'react-hooks': reactHooks },
     rules: { ...HOOKS_RULES },
   },
