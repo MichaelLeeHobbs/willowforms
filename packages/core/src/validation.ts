@@ -15,7 +15,7 @@ import { evaluateCondition } from './condition.js'
 import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
 import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
-import { MAX_TREE_DEPTH, dataKeyOf, flatten, validationsOf } from './tree.js'
+import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, flatten, validationsOf } from './tree.js'
 import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -141,28 +141,6 @@ export const NOT_A_LIST = 'This list was not sent as a list.'
  * refuses, so there is no payload for the projection to be wrong about.
  */
 export const TOO_DEEP = 'This form is nested too deeply to check.'
-
-/**
- * A node's children, for the two walks a server runs.
- *
- * `node.children ?? []` guards nullish and nothing else, so a truthy non-array
- * -- `children: 5`, `children: {}`, `children: "ab"` -- reached `for...of` and
- * threw `TypeError: node.children is not iterable`, and a `children: [null]`
- * entry reached `isVisible`, which dereferenced it. Both on the submit path,
- * both out of a route handler, both from a document nothing on that path gates.
- *
- * `walk` in `tree.ts` has had exactly this guard for a while, under a comment
- * naming the same incident -- "one node missing `props` used to take the whole
- * form with it". These two walks are the ones that did not borrow it. A node
- * that is not a node contributes nothing, which is what `validateDocument`
- * reports about it.
- */
-const childrenOfNode = (node: ComponentNode): ComponentNode[] =>
-  Array.isArray(node.children)
-    ? node.children.filter(
-        (child): child is ComponentNode => Boolean(child) && typeof child === 'object',
-      )
-    : []
 
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 
@@ -919,12 +897,12 @@ export function validateForm(
           ...scope,
           row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
-        for (const child of childrenOfNode(node)) visit(child, inner, depth + 1)
+        for (const child of childNodesOf(node)) visit(child, inner, depth + 1)
       })
       return
     }
 
-    for (const child of childrenOfNode(node)) visit(child, scope, depth + 1)
+    for (const child of childNodesOf(node)) visit(child, scope, depth + 1)
   }
 
   visit(root, options)
@@ -1062,7 +1040,7 @@ export function submittedData(
           row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
         const kept: FormData = Object.create(null) as FormData
-        for (const child of childrenOfNode(node)) collect(child, inner, kept, depth + 1)
+        for (const child of childNodesOf(node)) collect(child, inner, kept, depth + 1)
         return { ...kept }
       })
       return
@@ -1073,7 +1051,7 @@ export function submittedData(
       const value = valueOf(held, key)
       if (value !== undefined) into[key] = value
     }
-    for (const child of childrenOfNode(node)) collect(child, scope, into, depth + 1)
+    for (const child of childNodesOf(node)) collect(child, scope, into, depth + 1)
   }
 
   const kept: FormData = Object.create(null) as FormData

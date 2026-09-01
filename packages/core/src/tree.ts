@@ -61,19 +61,47 @@ export function walk(
  * First, because that is what `pathTo` already does and what `querySelector`
  * does in `geometry.ts`, so all three now agree.
  */
-export function findNode(root: ComponentNode, key: string): ComponentNode | undefined {
+/**
+ * A node's children, guarded the way `walk` guards them.
+ *
+ * `node.children ?? []` and `node.children?.forEach` both guard nullish and
+ * nothing else, so a truthy non-array reached the iteration: `children: {}` and
+ * `children: "ab"` threw `TypeError`, and `children: [null]` handed a non-node
+ * to the next level. `walk` above has carried exactly this check for a while,
+ * under a comment naming the incident it came from -- "one node missing `props`
+ * used to take the whole form with it" -- and the lookup and mutation family
+ * below it never borrowed it.
+ *
+ * That matters here more than it looks. `store.ts` deliberately only warns
+ * about an invalid `initialDocument`, arguing that a library which will not
+ * open a host's own saved document is worse than one that opens it and says
+ * what is wrong. That is a good decision, and it makes every one of these
+ * walkers load-bearing: `flatten` runs in `Tree.tsx`'s render body, and a throw
+ * during render unmounts the whole designer in React 19 -- including the JSON
+ * dialog that was the repair route.
+ */
+export function childNodesOf(node: ComponentNode): ComponentNode[] {
+  if (!Array.isArray(node.children)) return []
+  return node.children.filter(
+    (child): child is ComponentNode => Boolean(child) && typeof child === 'object',
+  )
+}
+
+export function findNode(root: ComponentNode, key: string, depth = 0): ComponentNode | undefined {
+  if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return undefined
   if (root.key === key) return root
-  for (const child of root.children ?? []) {
-    const hit = findNode(child, key)
+  for (const child of childNodesOf(root)) {
+    const hit = findNode(child, key, depth + 1)
     if (hit) return hit
   }
   return undefined
 }
 
-export function findParent(root: ComponentNode, key: string): ComponentNode | undefined {
-  for (const child of root.children ?? []) {
+export function findParent(root: ComponentNode, key: string, depth = 0): ComponentNode | undefined {
+  if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return undefined
+  for (const child of childNodesOf(root)) {
     if (child.key === key) return root
-    const hit = findParent(child, key)
+    const hit = findParent(child, key, depth + 1)
     if (hit) return hit
   }
   return undefined
@@ -81,16 +109,17 @@ export function findParent(root: ComponentNode, key: string): ComponentNode | un
 
 /** Keys from the root down to the target, inclusive. Empty if not found. */
 export function pathTo(root: ComponentNode, key: string): string[] {
-  const search = (n: ComponentNode, trail: string[]): string[] | undefined => {
+  const search = (n: ComponentNode, trail: string[], depth: number): string[] | undefined => {
+    if (!n || typeof n !== 'object' || depth > MAX_TREE_DEPTH) return undefined
     const next = [...trail, n.key]
     if (n.key === key) return next
-    for (const child of n.children ?? []) {
-      const hit = search(child, next)
+    for (const child of childNodesOf(n)) {
+      const hit = search(child, next, depth + 1)
       if (hit) return hit
     }
     return undefined
   }
-  return search(root, []) ?? []
+  return search(root, [], 0) ?? []
 }
 
 /** One node's place in the tree, as a flat list in document order. */
@@ -119,8 +148,15 @@ export function flatten(root: ComponentNode): FlatNode[] {
     index: number,
     depth: number,
   ): void => {
+    /*
+     * Total and bounded, like `walk` above, and it was neither -- despite that
+     * function's comment calling it "the walk every other module borrows".
+     * `flatten` is not designer-only: `validation.ts`'s `autoValidateKeys`
+     * walks the public tree with it.
+     */
+    if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     out.push({ node, parentKey, index, depth })
-    node.children?.forEach((child, i) => visit(child, node.key, i, depth + 1))
+    childNodesOf(node).forEach((child, i) => visit(child, node.key, i, depth + 1))
   }
   visit(root, undefined, 0, 0)
   return out
@@ -373,7 +409,7 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
         ]),
       )
     }
-    if (node.children) next.children = node.children.map(copy)
+    if (node.children) next.children = childNodesOf(node).map(copy)
     return next
   }
 
@@ -394,9 +430,17 @@ export function updateNode(
   root: ComponentNode,
   key: string,
   update: (node: ComponentNode) => ComponentNode,
+  depth = 0,
 ): ComponentNode {
+  /*
+   * Total and bounded, like `walk`. `if (!root.children) return root` guards
+   * nullish only, so `children: 5` reached `.map` and threw out of an event
+   * handler on the first edit -- on the same unvalidated host document
+   * `store.ts` deliberately warns about rather than refusing.
+   */
+  if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return root
   if (root.key === key) return update(root)
-  if (!root.children) return root
+  if (!Array.isArray(root.children)) return root
 
   /*
    * The first match, and only the first.
@@ -427,10 +471,10 @@ export function updateNode(
    */
   let found = false
   let changed = false
-  const children = root.children.map((child) => {
+  const children = childNodesOf(root).map((child) => {
     if (found) return child
     if (findNode(child, key)) found = true
-    const next = updateNode(child, key, update)
+    const next = updateNode(child, key, update, depth + 1)
     if (next !== child) changed = true
     return next
   })
@@ -464,15 +508,17 @@ export function insertNode(
 }
 
 /** Remove the node matching key. Removing the root is a no-op. */
-export function removeNode(root: ComponentNode, key: string): ComponentNode {
+export function removeNode(root: ComponentNode, key: string, depth = 0): ComponentNode {
+  // Total and bounded, for the reason `updateNode` gives.
+  if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return root
   if (root.key === key) return root
-  if (!root.children) return root
+  if (!Array.isArray(root.children)) return root
 
   // The first match only, for the reason `updateNode` gives.
   let changed = false
   const children: ComponentNode[] = []
 
-  for (const child of root.children) {
+  for (const child of childNodesOf(root)) {
     if (!changed && child.key === key) {
       changed = true
       continue
@@ -481,7 +527,7 @@ export function removeNode(root: ComponentNode, key: string): ComponentNode {
       children.push(child)
       continue
     }
-    const next = removeNode(child, key)
+    const next = removeNode(child, key, depth + 1)
     if (next !== child) changed = true
     children.push(next)
   }

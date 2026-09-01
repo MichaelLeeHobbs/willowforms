@@ -2103,3 +2103,87 @@ describe('walk', () => {
     expect(seen).toEqual(['only'])
   })
 })
+
+describe('the lookup and mutation family on a document nothing gated', () => {
+  /*
+   * The malformed-shape rows `walk` has had for a while and its six neighbours
+   * never borrowed.
+   *
+   * `store.ts` deliberately only `console.warn`s an invalid `initialDocument`,
+   * arguing that a library which will not open a host's own saved document is
+   * worse than one that opens it and says what is wrong. That is a good
+   * decision and it makes every function here load-bearing: `flatten` runs in
+   * `Tree.tsx`'s render body, and a throw during render unmounts the whole
+   * designer in React 19 -- including the JSON dialog that was the repair
+   * route. `flatten` is not designer-only either: `autoValidateKeys` walks the
+   * public tree with it.
+   *
+   * No source change was needed for any of these to throw. `children: {}` and
+   * `children: "ab"` are not nullish, so `?? []` and `?.forEach` let them
+   * through.
+   */
+  const broken = (children: unknown): ComponentNode =>
+    ({ key: 'root', type: 'Screen', props: {}, children }) as unknown as ComponentNode
+
+  const SHAPES: [string, unknown][] = [
+    ['an object map', { '0': { key: 'a', type: 'Field', props: {} } }],
+    ['a number', 5],
+    ['a string', 'ab'],
+    ['a list holding null', [null]],
+    ['a list holding a number', [7]],
+  ]
+
+  const CALLS: [string, (root: ComponentNode) => unknown][] = [
+    ['flatten', (root) => flatten(root)],
+    ['findNode', (root) => findNode(root, 'x')],
+    ['findParent', (root) => findParent(root, 'x')],
+    ['pathTo', (root) => pathTo(root, 'x')],
+    ['updateNode', (root) => updateNode(root, 'x', (n) => n)],
+    ['removeNode', (root) => removeNode(root, 'x')],
+    ['duplicateNode', (root) => duplicateNode(root, 'root')],
+  ]
+
+  it.each(
+    CALLS.flatMap(([name, call]) =>
+      SHAPES.map((shape) => [name, shape[0], call, shape[1]] as const),
+    ),
+  )('%s survives children that are %s', (_name, _shape, call, children) => {
+    expect(() => call(broken(children))).not.toThrow()
+  })
+
+  it('and none of them is bounded only by the stack', () => {
+    /*
+     * `walk` is depth-bounded and its comment calls it "the walk every other
+     * module borrows". These six were not, so a document nested past the stack
+     * was a RangeError out of a render body or an event handler. Built with a
+     * loop; building it recursively would overflow before the assertion could.
+     */
+    let deep: ComponentNode = { key: 'leaf', type: 'Field', props: {} }
+    for (let i = 0; i < 50_000; i += 1) {
+      deep = { key: 'box' + String(i), type: 'Screen', props: {}, children: [deep] }
+    }
+
+    for (const [name, call] of CALLS) {
+      expect(() => call(deep), name + ' overflowed').not.toThrow()
+    }
+  })
+
+  it('still walks a document that is fine', () => {
+    /*
+     * The control. Guarding by returning nothing would pass every row above
+     * while breaking the panel, so each call is checked against a real answer.
+     */
+    const root: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'x', type: 'Field', props: {} }],
+    }
+
+    expect(flatten(root).map((row) => row.node.key)).toEqual(['root', 'x'])
+    expect(findNode(root, 'x')?.key).toBe('x')
+    expect(findParent(root, 'x')?.key).toBe('root')
+    expect(pathTo(root, 'x')).toEqual(['root', 'x'])
+    expect(removeNode(root, 'x').children).toEqual([])
+  })
+})
