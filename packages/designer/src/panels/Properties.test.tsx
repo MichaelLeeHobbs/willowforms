@@ -2315,3 +2315,67 @@ describe('moving the selection from one component to another', () => {
     expect(stale, 'these editors kept the previous selection value').toEqual([])
   })
 })
+
+describe('the number editor, which the fixture kit declares and nothing drove', () => {
+  /*
+   * The `padding` prop carries the comment "so what this panel stores for one
+   * can be checked", and nothing in this file or in `e2e/` ever touched it.
+   *
+   * Delete the `Number.isFinite` arm and the suite stays green while `Infinity`
+   * and `NaN` land in `node.props` -- which `JSON.stringify` writes as `null`,
+   * so the export and the submitted payload disagree with what the author
+   * typed. The comment there names that as a fixed defect; nothing held the fix
+   * in place.
+   */
+  /*
+   * Queried by type rather than by label. The row renders a "Padding" label and
+   * a "Padding binding" one, and the accessible-name lookups pick neither
+   * cleanly -- and the control under test is the number input itself, which is
+   * the only one on the panel.
+   */
+  const numberBox = (): HTMLInputElement => {
+    const box = document.querySelector<HTMLInputElement>('input[type="number"]')
+    if (!box) throw new Error('the panel rendered no number editor')
+    return box
+  }
+
+  it('stores a number the author types', async () => {
+    const { user, select, latest } = setup(dataField())
+    await select()
+
+    await user.clear(numberBox())
+    await user.type(numberBox(), '24')
+
+    expect(latest()?.props['padding']).toEqual({ kind: 'static', value: 24 })
+  })
+
+  /*
+   * The `Number.isFinite` arm is NOT covered here, and that is said rather than
+   * papered over.
+   *
+   * It exists for `1e999`, which a real browser accepts into a `type="number"`
+   * input and hands over as the raw string, so `Number(value)` is `Infinity` --
+   * a value `JSON.stringify` writes as `null`, which is the defect the comment
+   * beside it records. jsdom sanitises an invalid number-input value to `''`
+   * before any handler sees it, so the empty-string branch fires instead and no
+   * test driven here can tell the two apart. Two attempts confirmed it:
+   * `user.type` never reaches the handler, and `fireEvent.change` with the same
+   * string arrives as `''`.
+   *
+   * Recorded in `docs/build-out/found.md`. It belongs in `e2e/`, which is what
+   * `CLAUDE.md` says about anything jsdom cannot represent.
+   */
+
+  it('clears the property when the box is emptied', async () => {
+    // The control for the other half of the same branch: an empty box removes
+    // the property so the component default applies again.
+    const { user, select, latest } = setup(dataField())
+    await select()
+
+    await user.clear(numberBox())
+    await user.type(numberBox(), '24')
+    await user.clear(numberBox())
+
+    expect(latest()?.props['padding']).toBeUndefined()
+  })
+})

@@ -276,3 +276,19 @@ because that is the only author-written string a repeater has: the component dec
 The real fix is a `label` property on `Repeater` in both kits, which is a contract change --
 `03-components.md`'s "built means both kits implement it" -- and so out of scope for a remediation run.
 `kit-html`'s repeater has the same shape.
+## The number editor's overflow guard cannot be driven in jsdom
+
+`Properties.tsx`'s number editor refuses a value `Number.isFinite` rejects, because `Number('1e999')` is
+`Infinity` and `JSON.stringify` writes that as `null` -- so the export and the submitted payload would
+disagree with what the author typed. The comment there records it as a fixed defect.
+
+Nothing holds the fix in place and nothing here can. A real browser accepts `1e999` into a
+`type="number"` input and hands the raw string to `onChange`; jsdom sanitises an invalid number-input
+value to `''` first, so the empty-string branch fires and no jsdom test can separate the two. Confirmed
+twice: `user.type` never reaches the handler at all, and `fireEvent.change` with the same string arrives
+as `''`.
+
+Belongs in `e2e/`, which is what `CLAUDE.md` says about anything jsdom cannot represent. One Playwright
+case typing `1e999` into a number property and asserting the stored document holds no `null` would
+settle it. The same shape as the canvas's primary-button guard recorded above -- both are guards whose
+input the test environment refuses to produce.
