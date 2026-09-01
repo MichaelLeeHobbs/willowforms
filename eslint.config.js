@@ -65,12 +65,65 @@ const dynamicImportOf = (names) => {
 const dynamicImportUnder = (prefix) =>
   `ImportExpression[source.value=/^${prefix.replace(/\//g, '[/]')}/]`
 
+/**
+ * A dynamic import whose specifier is not a plain string.
+ *
+ * The two selectors above read `source.value`, which only a `Literal` node has.
+ * A `TemplateLiteral` has no `value` at all, so the attribute test cannot match
+ * and every restriction above is one backtick away from silent. Measured with
+ * `Linter.verify`: `import('@mui/material')` reports and
+ * `` import(`@mui/material`) `` does not, nor does `` import(`@mui/${n}`) ``,
+ * `import(p)` or `import('@mui/' + 'material')`.
+ *
+ * Restricting the *shape* rather than adding a second list of names is the
+ * point. A selector matching a template literal's first quasi would close the
+ * backtick and leave `import(p)`, and a third one for that would leave the
+ * concatenation — three lists naming one rule, which is how a fix lands on one
+ * side of a symmetry. Inside these two directories there is no legitimate
+ * reason for a dynamic import not to name its module outright, and saying so
+ * once closes every spelling of the bypass at the same time.
+ */
+const OPAQUE_DYNAMIC_IMPORT = "ImportExpression:not([source.type='Literal'])"
+
+const OPAQUE_MESSAGE = (invariant, who) =>
+  `Invariant ${invariant}: name the module as a plain string. ${who} is checked by a selector that reads the specifier, so a template literal, a variable or a concatenation is unreviewable here — which is exactly the form somebody reaches for to get around the rule.`
+
 const KIT_MESSAGE =
   'Invariant 2: the designer must not depend on a specific kit. Take a Kit and a RendererKit as props instead.'
 
+/**
+ * The hooks preset, with every rule at error severity.
+ *
+ * Three of its sixteen rules ship as `"warn"` -- `exhaustive-deps`,
+ * `incompatible-library` and `unsupported-syntax` -- and this config spread the
+ * preset unchanged. `pnpm lint` was `eslint .` with no `--max-warnings`, and
+ * `eslint` exits 0 on warnings, so the block below was widened to reach
+ * `store.ts` (where every hook in the designer actually lives) and then
+ * reported there in yellow while CI stayed green. The guard in
+ * `test/eslint.config.test.ts` recorded `ruleId` and discarded `severity`, so
+ * it could not tell the difference either.
+ *
+ * Derived from the preset rather than three names written out again: a rule
+ * added to it in a later release arrives at error severity without anybody
+ * remembering to come back here. `--max-warnings 0` on the lint script is the
+ * other half and is not redundant with this -- this one makes an editor agree
+ * with CI, that one catches any warn-severity rule from any other plugin. Both
+ * are held in place by tests; do not delete either as duplication.
+ */
+const erroring = (rules) => Object.fromEntries(Object.keys(rules).map((name) => [name, 'error']))
+
+const HOOKS_RULES = erroring(reactHooks.configs.recommended.rules)
+
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/*.tsbuildinfo', 'docs/**'],
+    /*
+     * `coverage/**` because the documented `pnpm test:coverage` writes istanbul's
+     * own generated `.js` files there, and they fall under the type-aware block.
+     * A `pnpm lint` after a coverage run failed outright with "TSConfig does not
+     * include this file" -- a broken gate rather than noise, for anybody whose
+     * habit is to run coverage first.
+     */
+    ignores: ['**/dist/**', '**/node_modules/**', '**/*.tsbuildinfo', 'docs/**', 'coverage/**'],
   },
 
   js.configs.recommended,
@@ -108,13 +161,13 @@ export default tseslint.config(
 
   // React packages.
   {
-    files: ['packages/*/src/**/*.tsx', 'apps/playground/src/**/*.tsx'],
+    files: ['packages/*/src/**/*.tsx', 'apps/playground/src/**/*.tsx', 'test/**/*.tsx'],
     ...react.configs.flat.recommended,
     settings: { react: { version: 'detect' } },
     plugins: { react, 'react-hooks': reactHooks, 'jsx-a11y': jsxA11y },
     rules: {
       ...react.configs.flat.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
+      ...HOOKS_RULES,
       ...jsxA11y.flatConfigs.recommended.rules,
       // The new JSX transform is on, so React need not be in scope.
       'react/react-in-jsx-scope': 'off',
@@ -136,9 +189,9 @@ export default tseslint.config(
    * JSX in it and would only add noise.
    */
   {
-    files: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
+    files: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'test/**/*.ts', 'test/**/*.tsx'],
     plugins: { 'react-hooks': reactHooks },
-    rules: { ...reactHooks.configs.recommended.rules },
+    rules: { ...HOOKS_RULES },
   },
 
   /*
@@ -193,6 +246,10 @@ export default tseslint.config(
           message:
             'Invariant 1: @formsmith/core imports no component library, dynamically or otherwise.',
         },
+        {
+          selector: OPAQUE_DYNAMIC_IMPORT,
+          message: OPAQUE_MESSAGE(1, '@formsmith/core'),
+        },
       ],
     },
   },
@@ -229,6 +286,10 @@ export default tseslint.config(
         {
           selector: dynamicImportUnder('@formsmith/kit-'),
           message: KIT_MESSAGE,
+        },
+        {
+          selector: OPAQUE_DYNAMIC_IMPORT,
+          message: OPAQUE_MESSAGE(2, '@formsmith/designer'),
         },
       ],
     },

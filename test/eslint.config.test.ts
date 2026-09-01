@@ -20,7 +20,7 @@
  * obvious.
  */
 
-import { rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -40,6 +40,24 @@ interface Case {
   code: string
   /** The rule that has to fire, or none for a control. */
   rule: string | null
+  /**
+   * Part of the message the contributor is supposed to read, when it matters.
+   *
+   * `README.md:137-143` promises a contributor a message explaining why the
+   * rule exists before they silence it, and the assertions here were on rule id
+   * alone -- so every message could have been emptied, or made to name the
+   * wrong invariant, with nothing going red. Only set where the wording is the
+   * deliverable; a rule id is enough for the rest.
+   */
+  says?: string
+}
+
+/** One reported problem, with the field the guard used to throw away. */
+interface Reported {
+  rule: string
+  /** 2 is an error, 1 is a warning. See the severity assertion below. */
+  severity: number
+  message: string
 }
 
 const CASES: Case[] = [
@@ -65,6 +83,44 @@ const CASES: Case[] = [
     what: 'a .tsx file in core importing a component library',
     path: fixture('core', 'core_tsx_mui', 'tsx'),
     code: "import Box from '@mui/material/Box'\nexport const B = Box\n",
+    rule: 'no-restricted-imports',
+    says: 'Invariant 1',
+  },
+  /*
+   * The other four names in COMPONENT_LIBRARIES.
+   *
+   * Only `@mui` was ever exercised. Deleting `antd` and `@chakra-ui` from the
+   * list left every case in this file passing while the designer could import
+   * Ant Design -- and this file's own opening argument is that fixing one side
+   * of a symmetry is the failure the remediation run exists to stop. Four
+   * fifths of the symmetry was untested.
+   *
+   * Spread across both invariants rather than piled onto one, so the list is
+   * proved to reach core and the designer alike.
+   */
+  {
+    what: 'core importing emotion',
+    path: fixture('core', 'core_emotion', 'ts'),
+    code: "import styled from '@emotion/styled'\nexport const s = styled\n",
+    rule: 'no-restricted-imports',
+  },
+  {
+    what: 'core importing Ant Design',
+    path: fixture('core', 'core_antd', 'ts'),
+    code: "import { Button } from 'antd'\nexport const b = Button\n",
+    rule: 'no-restricted-imports',
+  },
+  {
+    what: 'the designer importing Chakra',
+    path: fixture('designer', 'designer_chakra', 'ts'),
+    code: "import { Box } from '@chakra-ui/react'\nexport const B = Box\n",
+    rule: 'no-restricted-imports',
+    says: 'Invariant 2',
+  },
+  {
+    what: 'the designer importing Radix',
+    path: fixture('designer', 'designer_radix', 'ts'),
+    code: "import * as Dialog from '@radix-ui/react-dialog'\nexport const D = Dialog\n",
     rule: 'no-restricted-imports',
   },
   {
@@ -132,6 +188,44 @@ const CASES: Case[] = [
     code: "export const load = (): Promise<unknown> => import('@mui/material/Box')\n",
     rule: 'no-restricted-syntax',
   },
+  /*
+   * The backtick, and the three spellings beside it.
+   *
+   * `dynamicImportOf` builds `ImportExpression[source.value=/…/]`, and only a
+   * `Literal` node has a `source.value` -- a `TemplateLiteral` has none at all,
+   * so the attribute test cannot match and every dynamic-import restriction
+   * above was one keystroke from silent. Measured with `Linter.verify` before
+   * the fix: the string literal reported and all four of these did not.
+   *
+   * They are covered by restricting the shape rather than by four more name
+   * lists, so all four cases name the same rule and the same selector.
+   */
+  {
+    what: 'the designer reaching a component library through a template literal',
+    path: fixture('designer', 'designer_template_mui', 'ts'),
+    code: 'export const load = (): Promise<unknown> => import(`@mui/material`)\n',
+    rule: 'no-restricted-syntax',
+    says: 'plain string',
+  },
+  {
+    what: 'the designer building a specifier with an interpolation',
+    path: fixture('designer', 'designer_template_expr', 'ts'),
+    code:
+      'export const load = (name: string): Promise<unknown> =>\n' + '  import(`@mui/${name}`)\n',
+    rule: 'no-restricted-syntax',
+  },
+  {
+    what: 'core importing a specifier held in a variable',
+    path: fixture('core', 'core_dynamic_variable', 'ts'),
+    code: 'export const load = (path: string): Promise<unknown> => import(path)\n',
+    rule: 'no-restricted-syntax',
+  },
+  {
+    what: 'core concatenating a specifier',
+    path: fixture('core', 'core_dynamic_concat', 'ts'),
+    code: "export const load = (): Promise<unknown> => import('react' + '-dom')\n",
+    rule: 'no-restricted-syntax',
+  },
   {
     what: 'a hook in a .ts file with a dependency it does not declare',
     path: fixture('designer', 'designer_hook_deps', 'ts'),
@@ -187,18 +281,32 @@ function cleanUp(): void {
 }
 
 /** Every case linted in one pass, because a type-aware run is not cheap. */
-async function lintAll(): Promise<Map<string, string[]>> {
+async function lintAll(): Promise<Map<string, Reported[]>> {
   for (const each of CASES) writeFileSync(abs(each.path), each.code)
 
   try {
     const eslint = new ESLint({ cwd: fileURLToPath(root) })
     const results = await eslint.lintFiles(CASES.map((each) => abs(each.path)))
 
-    const byPath = new Map<string, string[]>()
+    const byPath = new Map<string, Reported[]>()
     for (const result of results) {
       byPath.set(
         result.filePath,
-        result.messages.map((message) => message.ruleId ?? 'parse error: ' + message.message),
+        /*
+         * `severity` is kept, and it was thrown away.
+         *
+         * This mapping was `message.ruleId ?? …` and nothing else, so a warning
+         * and an error were the same result to every assertion below. A rule
+         * turned fully `off` would have been caught; one downgraded from
+         * `error` to `warn` would not -- and `pnpm lint` was `eslint .` with no
+         * `--max-warnings`, which exits 0 on warnings. Both invariants could
+         * have been switched off at the gate while this file stayed green.
+         */
+        result.messages.map((message) => ({
+          rule: message.ruleId ?? 'parse error: ' + message.message,
+          severity: message.severity,
+          message: message.message,
+        })),
       )
     }
     return byPath
@@ -230,7 +338,8 @@ describe('the invariants are enforced by the linter, not only by CLAUDE.md', () 
 
       const wrong: string[] = []
       for (const each of CASES) {
-        const rules = byPath.get(abs(each.path)) ?? []
+        const reported = byPath.get(abs(each.path)) ?? []
+        const rules = reported.map((one) => one.rule)
 
         // A parse error would make every "did not report" assertion below pass
         // for the wrong reason, so it is called out as its own failure.
@@ -244,13 +353,45 @@ describe('the invariants are enforced by the linter, not only by CLAUDE.md', () 
           if (rules.length > 0) wrong.push(each.what + ' was reported for ' + rules.join(', '))
           continue
         }
-        if (!rules.includes(each.rule)) {
+
+        const hits = reported.filter((one) => one.rule === each.rule)
+        if (hits.length === 0) {
           wrong.push(
             each.what +
               ' was not reported by ' +
               each.rule +
               ' (got ' +
               (rules.join(', ') || 'nothing') +
+              ')',
+          )
+          continue
+        }
+
+        /*
+         * An invariant that only warns is not an invariant. `--max-warnings 0`
+         * on the lint script is what makes a warning fail CI today, and the
+         * test below holds that flag in place -- but a rule declared `error`
+         * here says so in the config a reader opens, rather than in a flag in a
+         * sibling file, so both are checked.
+         */
+        const warnings = hits.filter((one) => one.severity !== 2)
+        if (warnings.length > 0) {
+          wrong.push(
+            each.what +
+              ' was reported by ' +
+              each.rule +
+              ' at warning severity, which does not fail the build',
+          )
+          continue
+        }
+
+        if (each.says !== undefined && !hits.some((one) => one.message.includes(each.says ?? ''))) {
+          wrong.push(
+            each.what +
+              ' was reported, but no message said "' +
+              each.says +
+              '" (got ' +
+              hits.map((one) => one.message).join(' | ') +
               ')',
           )
         }
@@ -260,4 +401,55 @@ describe('the invariants are enforced by the linter, not only by CLAUDE.md', () 
     },
     120_000,
   )
+
+  /*
+   * The gate, not the config.
+   *
+   * `eslint` exits 0 on warnings. Three of the sixteen rules in
+   * `react-hooks`'s recommended preset ship as `"warn"` --
+   * `exhaustive-deps`, `incompatible-library` and `unsupported-syntax` -- and
+   * the config spreads that preset without overriding severity, so the rule the
+   * hooks block was widened to reach `store.ts` for reported in yellow and CI
+   * went green. Every hook in the designer lives in that file.
+   *
+   * `--max-warnings 0` closes that and every future one: a plugin upgrade that
+   * adds a fourth warn-severity rule cannot reopen it. Which is exactly why the
+   * flag needs a test -- it is one word in a sibling file, it looks like noise
+   * in a diff, and nothing else in the repository would notice it going away.
+   */
+  it('fails the build on a warning, not only on an error', () => {
+    const manifest: unknown = JSON.parse(readFileSync(abs('package.json'), 'utf8'))
+    const scripts = (manifest as { scripts?: Record<string, string> }).scripts ?? {}
+    const lint = scripts['lint'] ?? ''
+
+    expect(lint, 'the lint script is gone or renamed').toContain('eslint')
+    expect(
+      lint,
+      '`eslint` exits 0 on warnings, so without --max-warnings 0 any rule at warn severity is unenforced',
+    ).toContain('--max-warnings 0')
+  })
+
+  /*
+   * And the reason the flag is load-bearing rather than belt-and-braces: this
+   * asserts the three rules really do arrive at warn severity, so if a future
+   * plugin release promotes them the comment above stops being true and this
+   * test says so rather than quietly describing history.
+   */
+  it('still needs that flag, because the hooks preset still ships warn-severity rules', async () => {
+    const plugin = await import('eslint-plugin-react-hooks')
+    const rules = (
+      plugin.default as unknown as {
+        configs: { recommended: { rules: Record<string, unknown> } }
+      }
+    ).configs.recommended.rules
+
+    const warned = Object.entries(rules)
+      .filter(([, level]) => level === 'warn' || level === 1)
+      .map(([name]) => name)
+
+    expect(
+      warned.length,
+      'no rule in the preset warns any more; --max-warnings 0 may now be the only thing this comment is about',
+    ).toBeGreaterThan(0)
+  })
 })
