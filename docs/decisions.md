@@ -4,6 +4,28 @@ Choices made under delegated design authority that would otherwise have been que
 
 The field that earns this file is **Reversal**: it says which entries deserve a second look.
 
+### The ReDoS guard learns two shapes and documents the rest, rather than guessing at alternation
+
+- **Decided:** `nestedUnbounded` now propagates an unquantified group's finding to its parent (closing
+  `(?:(a+))+`, which was a one-token bypass), and refuses a repeated group with a _duplicated_
+  alternative (`(a|a)*`). General alternation analysis is not attempted. What is left is written into
+  `docs/spec/08-validation.md` as a deployment concern with three concrete things a host can do.
+- **Why:** the duplicate-branch rule is the only alternation case that can be refused with **zero** false
+  positives -- `(a|a)` matches exactly what `(a)` matches, so no author writes one deliberately and
+  refusing it takes nothing away. It also happens to be the exact example the code's own docblock named
+  as uncaught.
+- **Rejected: first-character overlap detection.** It would catch `(a|ab)*`, which is the real residual,
+  and it would also refuse `(ab|ac)+`, which is perfectly safe and the sort of thing an author writes.
+  Refusing a legitimate pattern is a worse failure than missing a dangerous one here: the author gets a
+  rule that can never pass and no way to see why, whereas the missed pattern is a deployment risk the
+  deployer can mitigate and has now been told how to.
+- **Rejected: doing nothing and only documenting.** The plain-group bypass is a plain bug -- the guard
+  claimed a family and missed two spellings of it -- and `(a|a)*` costs nothing to close.
+- **Reversal:** cheap either way. Both checks are local to one function and each has its own test row and
+  its own message. The part that would be expensive to undo is the spec section: a deployer who has read
+  it and put a timeout on their submit route is not harmed if the guard later improves.
+- **When:** 2026-08-31, queue item 7.
+
 ### `KeyField` gets the re-sync guard, not a key on the panel
 
 - **Decided:** `KeyField` carries an `if (value !== committed)` block like its eight siblings, and

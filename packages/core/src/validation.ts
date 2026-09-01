@@ -262,9 +262,12 @@ function repeatsAt(source: string, at: number): boolean {
  * `(ab|cd)+`. See `docs/build-out/triage.md` for what is left and why closing
  * it needs a different regex engine rather than a better heuristic.
  */
-function nestedUnbounded(source: string): boolean {
-  /** Where each open group started, and whether it holds an unbounded quantifier. */
-  const stack: { unbounded: boolean }[] = []
+function nestedUnbounded(source: string): 'nested' | 'duplicate-branch' | undefined {
+  /**
+   * Per open group: whether it holds an unbounded quantifier, and where its
+   * top-level alternatives start so a duplicate among them can be seen.
+   */
+  const stack: { unbounded: boolean; from: number; bars: number[] }[] = []
   let inClass = false
 
   for (let i = 0; i < source.length; i += 1) {
@@ -283,7 +286,12 @@ function nestedUnbounded(source: string): boolean {
       continue
     }
     if (ch === '(') {
-      stack.push({ unbounded: false })
+      stack.push({ unbounded: false, from: i + 1, bars: [] })
+      continue
+    }
+    if (ch === '|') {
+      const group = stack[stack.length - 1]
+      if (group) group.bars.push(i)
       continue
     }
     if (ch === ')') {
@@ -302,12 +310,54 @@ function nestedUnbounded(source: string): boolean {
        * `a{10}` and false of `(a+){10}`. The code was written to the sentence
        * rather than to the distinction inside it.
        */
-      if (repeatsAt(source, i + 1) && group.unbounded) return true
-      if (quantified && group.unbounded) return true
+      if (repeatsAt(source, i + 1) && group.unbounded) return 'nested'
+      if (quantified && group.unbounded) return 'nested'
 
-      // A quantified group is itself an unbounded repetition as far as any
-      // group enclosing it is concerned.
-      if (quantified) {
+      /*
+       * The alternation half, kept deliberately narrow: a repeated group with
+       * two identical alternatives.
+       *
+       * `(a|a)*` is the shape this function's own docblock names as uncaught,
+       * and ~35 characters of input against it wedges the thread. Catching it
+       * costs nothing in false positives, because a duplicated alternative is
+       * never useful -- `(a|a)` matches exactly what `(a)` matches, so no
+       * author writes one on purpose and refusing it takes nothing away.
+       *
+       * This is not general alternation analysis and does not pretend to be.
+       * `(a|ab)*` and `(a+|b)*` still blow up and still pass, and no cheap
+       * syntactic rule separates those from `(ab|cd)+` -- overlapping-prefix
+       * detection would refuse `(ab|ac)+`, which is perfectly safe, and
+       * refusing a pattern an author legitimately wrote is a worse failure than
+       * this one. What is left is in the docblock and in
+       * `docs/spec/08-validation.md`, stated as a deployment concern rather
+       * than as a footnote, because form authors and deployers are different
+       * people.
+       */
+      if (repeatsAt(source, i + 1) && group.bars.length > 0) {
+        const edges = [group.from, ...group.bars.map((bar) => bar + 1)]
+        const branches = edges.map((from, index) =>
+          source.slice(from, index + 1 < edges.length ? (group.bars[index] ?? i) : i),
+        )
+        if (new Set(branches).size < branches.length) return 'duplicate-branch'
+      }
+
+      /*
+       * What the enclosing group learns from this one closing.
+       *
+       * Two things, and only the first was propagated. A quantified group is
+       * itself an unbounded repetition as far as any group enclosing it is
+       * concerned -- that was here. But a group holding an unbounded quantifier
+       * still holds one when it is *not* quantified, and that flag was simply
+       * discarded: an unquantified `)` popped the group and threw its finding
+       * away.
+       *
+       * So one plain group was all it took. `(?:(a+))+` and `((a+))+` are
+       * one-token rewrites of the shape this function refuses, and both
+       * compiled and ran -- traced on `(?:(a+))+`, which returned false. A
+       * forty-character answer then hangs the Node event loop for the whole
+       * process.
+       */
+      if (quantified || group.unbounded) {
         const outer = stack[stack.length - 1]
         if (outer) outer.unbounded = true
       }
@@ -319,7 +369,7 @@ function nestedUnbounded(source: string): boolean {
     }
   }
 
-  return false
+  return undefined
 }
 
 /**
@@ -354,10 +404,23 @@ function nestedUnbounded(source: string): boolean {
  * under the field before anybody had finished the first character.
  */
 export function patternProblem(pattern: string): string | undefined {
-  if (nestedUnbounded(pattern)) {
+  /*
+   * Two shapes, two sentences. The author is being asked to change the pattern,
+   * and "bound the inner one" is not advice about `(a|a)*` -- there is no inner
+   * repeat to bound. Telling somebody to fix a thing their pattern does not
+   * have is how a refusal becomes a dead end.
+   */
+  const shape = nestedUnbounded(pattern)
+  if (shape === 'nested') {
     return (
       'This pattern has an unbounded repeat inside another one, which can take ' +
       'exponential time to match. Bound the inner one, or rewrite it without the nesting.'
+    )
+  }
+  if (shape === 'duplicate-branch') {
+    return (
+      'This pattern repeats a group whose alternatives include the same choice twice, ' +
+      'which can take exponential time to match. Remove the duplicate.'
     )
   }
   try {

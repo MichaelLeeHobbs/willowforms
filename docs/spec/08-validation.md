@@ -110,7 +110,34 @@ Three of these degrade towards failing rather than passing, and they are the one
 - A **pattern with a nested unbounded quantifier matches nothing at all.** `(a+)+` and `(\w+)+@example\.com`
   are the shape whose backtracking is exponential, so they are refused rather than run -- which means every
   value fails that rule, including the ones the author was testing with. The rule editor says so; a host
-  calling `applyRule` directly sees only the failure.
+  calling `applyRule` directly sees only the failure. A plain group around the inner repeat does not
+  evade it -- `(?:(a+))+` and `((a+))+` are refused too -- and neither does a bounded outer quantifier:
+  `(a+){10}` is ten million ways to split thirty characters.
+- A **repeated group with the same alternative twice is refused**, under its own message. `(a|a)*` is
+  exponential and a duplicated branch is never useful, so refusing it costs an author nothing.
+
+### What the pattern guard does not cover, and what a deployer does about it
+
+The guard is structural. It reads the pattern's shape and never runs it, so it catches the nesting
+family and the duplicate branch above, and it does **not** catch an alternation whose branches genuinely
+overlap: `(a|ab)*` and `(a+|b)*` are exponential and are accepted. No cheap syntactic rule separates
+those from `(ab|cd)+`, and a first-character heuristic would refuse `(ab|ac)+`, which is safe --
+refusing a pattern an author legitimately wrote is a worse failure than missing one.
+
+This matters because **form authors and deployers are different people**. An author writing a pattern is
+not thinking about the server's event loop, and the 4096-character input cap bounds every polynomial
+pattern without bounding an exponential one. A host running author-supplied patterns against
+attacker-supplied values on a shared Node event loop should assume the guard is a filter and not a
+proof, and do at least one of:
+
+- run submission validation off the request thread, so a wedged match costs one worker rather than the
+  process;
+- put a wall-clock timeout around the submit route, so a hung match is a 503 rather than a dead server;
+- gate which authors may write a `pattern` rule at all, if the author population is not the trusted one.
+
+`patternProblem` is exported for the first of those: a host can refuse a document at import time on the
+same judgement the rule editor shows.
+
 - A **rule key the engine does not recognise fails with `UNREADABLE_RULE`.** This is the one place a rule
   reports rather than passes on an empty value, and deliberately: an unknown key is a document from a
   newer version or a hand edit, and a rule nobody can read is not a rule anybody should be told passed.

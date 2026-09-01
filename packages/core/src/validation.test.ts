@@ -1178,6 +1178,22 @@ describe('a pattern rule', () => {
     ['a quantified group that is itself quantified', '^(a+)+$'],
     ['the same shape with a star', '^(a*)*$'],
     ['a nested group', '^((a+)*)+$'],
+    /*
+     * One plain group was all it took. An unquantified `)` popped the group and
+     * discarded its finding, so the enclosing group never learned it held an
+     * unbounded quantifier -- and both of these are one-token rewrites of the
+     * three rows above. Traced before the fix: `(?:(a+))+` returned false.
+     */
+    ['an unbounded quantifier wrapped in a plain group', '^(?:(a+))+$'],
+    ['the same, in a capturing group', '^((a+))+$'],
+    ['two plain groups deep', '^(?:(?:(a+)))+$'],
+    /*
+     * The alternation shape this file used to record as uncaught. A duplicated
+     * alternative is never useful -- `(a|a)` matches what `(a)` matches -- so
+     * refusing it costs an author nothing.
+     */
+    ['a repeated group with a duplicated alternative', '^(a|a)*$'],
+    ['the same with three branches', '^(x|a|a)+$'],
   ])('refuses %s rather than running it', (_what, source) => {
     /*
      * Refused means the rule fails, not that it passes. A pattern the engine
@@ -1189,12 +1205,33 @@ describe('a pattern rule', () => {
 
   it('does not catch every blowup, and says so', () => {
     /*
-     * `(a|a)*` is exponential too and is not refused: no cheap syntactic rule
-     * separates a dangerous alternation from `(ab|cd)+`. It is here so the
-     * limit is written down in the suite rather than only in a comment — if a
-     * later change does start catching it, this test says so.
+     * The limit, asserted on a pattern that is actually outside the guard.
+     *
+     * This test's whole job is to notice when the guard grows, and it asserted
+     * `^(ab|cd)+$` -- a benign alternation that was never in scope. So the
+     * limit it claimed to pin was pinned by nothing: adding detection that
+     * refused `(a|a)*`, which its own comment named as the uncaught shape, left
+     * this green. That detection has since been added, which is exactly the
+     * change this test was supposed to report and did not.
+     *
+     * `(a|ab)*` is the honest residual: overlapping branches of different
+     * lengths, exponential, and genuinely not separable from a safe pattern by
+     * any cheap syntactic rule. If a later change starts refusing it, this goes
+     * red and somebody has to decide whether the false positives came with it.
+     */
+    expect(pattern('^(a|ab)*$', 'ab')).toBeUndefined()
+  })
+
+  it('still allows an alternation whose branches differ', () => {
+    /*
+     * The control for the duplicate-branch rule, and the reason it is narrow.
+     * `(ab|cd)+` is safe and common, and `(ab|ac)+` shares a first character
+     * and is also safe -- a prefix-overlap heuristic would have refused the
+     * second, which is a worse failure than missing it.
      */
     expect(pattern('^(ab|cd)+$', 'abcd')).toBeUndefined()
+    expect(pattern('^(ab|ac)+$', 'abac')).toBeUndefined()
+    expect(pattern(String.raw`^(\d{3}|\d{4})-x$`, '123-x')).toBeUndefined()
   })
 
   it('allows a bounded inner quantifier, which is what real patterns look like', () => {
@@ -1654,13 +1691,27 @@ describe('rules that a document can malform or misplace', () => {
  * one rule is how the two come to disagree.
  */
 describe('patternProblem', () => {
+  /*
+   * The sentence, not only that there is one.
+   *
+   * These asserted `toBeDefined()`, so which of the messages an author is shown
+   * was unpinned -- and that string is what the Rules tab puts in front of them
+   * while the rule can still be fixed. The three now say different things and
+   * the difference is the point: telling somebody to "bound the inner one" when
+   * their pattern has no inner repeat is a refusal with no way out of it.
+   */
   it.each([
-    ['(a+)+$', 'an unbounded repeat inside another'],
-    ['(a+){10}b', 'and a bounded one wrapping an unbounded one'],
-    ['(', 'a pattern that does not compile'],
-    ['[a-', 'an unterminated class'],
-  ])('reports %s — %s', (pattern) => {
-    expect(patternProblem(pattern)).toBeDefined()
+    ['(a+)+$', 'an unbounded repeat inside another', /unbounded repeat inside another one/],
+    [
+      '(a+){10}b',
+      'and a bounded one wrapping an unbounded one',
+      /unbounded repeat inside another one/,
+    ],
+    ['(a|a)*', 'a repeated group with the same choice twice', /same choice twice/],
+    ['(', 'a pattern that does not compile', /not a valid regular expression/],
+    ['[a-', 'an unterminated class', /not a valid regular expression/],
+  ])('reports %s — %s', (pattern, _what, says) => {
+    expect(patternProblem(pattern)).toMatch(says)
   })
 
   it.each(['^\\d{5}$', '(\\d{3}-){4}x', '(\\d{1,3}\\.){3}\\d{1,3}', '', '^[A-Z]{2}$'])(
