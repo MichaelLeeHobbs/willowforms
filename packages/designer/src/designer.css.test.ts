@@ -290,15 +290,36 @@ function formScopes(): string[] {
   }
 
   expect(names.has('fs-shell'), 'the walk never reached the shell').toBe(true)
+
+  /*
+   * And every name is safe to put straight into a regular expression.
+   *
+   * `SCOPE_PATTERN` interpolates these without escaping, and the comment there
+   * said an assertion guaranteed it -- which was a description of a check that
+   * did not exist. A wrapper class carrying a `.`, a `+` or a `(` would have
+   * built a pattern that matches the wrong thing, or throws, and either way the
+   * guard would stop guarding what it says it guards.
+   *
+   * Underscore is in the set because BEM elements use `__`, and it is not a
+   * metacharacter.
+   */
+  for (const name of names) {
+    expect(name, 'a scope class needs escaping before it can go in a pattern').toMatch(
+      /^[a-zA-Z0-9_-]+$/,
+    )
+  }
+
   return [...names]
 }
 
 /**
  * The scope test, built from the classes above rather than from two literals.
  *
- * A class name is `[a-z0-9-]` by construction here, so no escaping is needed --
- * but the assertion says so rather than assuming it, because a name that needed
- * escaping would silently build a pattern matching the wrong thing.
+ * These go into the pattern unescaped, so `formScopes` asserts every one of
+ * them is `[a-zA-Z0-9_-]` before returning. That assertion is the reason no
+ * escaping is needed here; without it a wrapper class carrying a metacharacter
+ * would build a pattern that matches the wrong thing or throws, and the guard
+ * would stop guarding what it says it guards.
  */
 const SCOPE_NAMES = formScopes()
 /*
