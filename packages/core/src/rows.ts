@@ -19,7 +19,7 @@
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
 import { keyProblem } from './keys.js'
-import { dataKeyOf, validationsOf } from './tree.js'
+import { MAX_TREE_DEPTH, dataKeyOf, isRowScope, validationsOf } from './tree.js'
 import type { ComponentNode, Condition, FormData, JsonValue } from './types.js'
 
 /**
@@ -185,7 +185,7 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
       if (!isRepeater) {
         if (node.schema) names.push(dataKeyOf(node))
         // Its children are answers in *its* rows, not in this one.
-        if (isRowScopeNode(node)) return
+        if (isRowScope(node)) return
       }
       for (const child of kids(node)) gather(child, false, depth + 1)
     }
@@ -213,6 +213,7 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
    * reports but cannot prevent, the panel offered the row keys of one node
    * while every other lookup in the session resolved to another.
    */
+  let matched = false
   const visit = (
     node: ComponentNode,
     enclosing: ComponentNode | undefined,
@@ -220,9 +221,32 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
   ): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     if (!enclosing && node.schema) form.push(dataKeyOf(node))
-    if (node.key === nodeKey && enclosing && row === undefined) row = rowKeysOf(enclosing)
+    /*
+     * The first match, full stop -- and the guard above did not express that.
+     *
+     * It was `node.key === nodeKey && enclosing && row === undefined`, so when
+     * the first node in document order carrying this key is *not* inside a
+     * repeater, `enclosing` is undefined, the assignment is skipped, and a
+     * later duplicate that is inside one sets it. What that takes is the first
+     * match with an enclosing repeater, which is a different rule from the one
+     * the comment above states and from the one `findNode` follows.
+     *
+     * Failure scenario: two nodes keyed `x`, the first at form level and the
+     * second inside a repeater. `findNode` resolves `x` to the form-level node,
+     * the Properties panel and Style tab offer a row scope for it, the author
+     * picks `scope: 'row'` on a node in no row -- and the read is `undefined`,
+     * the condition false, the component hidden, and never validated.
+     *
+     * `matched` is separate from `row` because "we have seen the first match"
+     * and "that match was inside a repeater" are two questions, and only the
+     * first decides whether to keep looking.
+     */
+    if (!matched && node.key === nodeKey) {
+      matched = true
+      if (enclosing) row = rowKeysOf(enclosing)
+    }
     // The innermost repeater wins, which is what `scope: 'row'` names.
-    const deeper = isRowScopeNode(node) ? node : enclosing
+    const deeper = isRowScope(node) ? node : enclosing
     for (const child of kids(node)) visit(child, deeper, depth + 1)
   }
   visit(root, undefined, 0)
@@ -248,16 +272,9 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
  * boot-time answer `missingContext` takes. Unlike context, this one is decidable
  * from the tree alone, so `validateDocument` reports it rather than a host.
  */
-/**
- * How deep this will walk before stopping.
- *
- * Same reason as the gate's own bound, and the same number: this runs from
- * `validateDocument`, so an unbounded walk here throws a `RangeError` out of the
- * function whose whole job is never to throw on a document. Stopping quietly is
- * right — the gate has already refused a document this deep, and reporting the
- * depth twice helps nobody.
- */
-const MAX_TREE_DEPTH = 500
+// `MAX_TREE_DEPTH` is imported, not re-declared -- see the import block. The
+// docblock that used to sit here belonged to the local constant and documented
+// nothing once that went.
 
 export function rowScopeProblems(root: ComponentNode): { key: string; problem: string }[] {
   const problems: { key: string; problem: string }[] = []
@@ -287,7 +304,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
        * outer row holds. Only its contents belong to the row below.
        */
       for (const child of kids(inner)) {
-        if (isRowScopeNode(child)) {
+        if (isRowScope(child)) {
           if (child.schema) names.add(dataKeyOf(child))
           continue
         }
@@ -307,10 +324,10 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
 
   const mark = (node: ComponentNode, repeating: boolean, depth: number): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
-    if (node.schema && !isRowScopeNode(node) && !repeating) {
+    if (node.schema && !isRowScope(node) && !repeating) {
       formKeys.add(dataKeyOf(node))
     }
-    const deeper = repeating || isRowScopeNode(node)
+    const deeper = repeating || isRowScope(node)
     for (const child of kids(node)) mark(child, deeper, depth + 1)
   }
   mark(root, false, 0)
@@ -448,16 +465,12 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
       }
     }
 
-    const scope = isRowScopeNode(node) ? rowKeys(node) : enclosing
+    const scope = isRowScope(node) ? rowKeys(node) : enclosing
     for (const child of kids(node)) visit(child, scope, depth + 1)
   }
   visit(root, undefined)
 
   return problems
-}
-
-function isRowScopeNode(node: ComponentNode): boolean {
-  return node?.schema?.type === 'array' && Array.isArray(node.children)
 }
 
 /**
