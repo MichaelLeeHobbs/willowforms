@@ -667,6 +667,23 @@ export function validateForm(
   const errors: FormErrors = Object.create(null) as FormErrors
 
   const visit = (node: ComponentNode, scope: EvalOptions, depth = 0): void => {
+    /*
+     * Visibility first, then the bound, and the order is load-bearing.
+     *
+     * With the bound first, a deeply nested *hidden* subtree produced
+     * `TOO_DEEP` and refused the submit -- even though this function's own
+     * docblock says hidden components are skipped and so is everything beneath
+     * them, and nothing visible needed checking. A form with a collapsed
+     * wizard branch nobody is on would have been unsubmittable.
+     *
+     * Nothing is lost by asking in this order. `isVisible` evaluates one node's
+     * `renderWhen` and recurses no further -- `evaluateCondition` carries its
+     * own `MAX_CONDITION_DEPTH` -- so calling it at depth costs one frame, and
+     * the walk still only reaches level 501 when every ancestor was visible,
+     * which is exactly the case the bound exists for.
+     */
+    if (!isVisible(node, data, scope)) return
+
     const path = scope.row?.path ?? NO_ROWS
 
     /*
@@ -679,8 +696,6 @@ export function validateForm(
       if (!Object.hasOwn(errors, at)) errors[at] = TOO_DEEP
       return
     }
-
-    if (!isVisible(node, data, scope)) return
     const error = validateField(node, data, scope)
     if (error) errors[addressOf(path, node.key)] = error
 

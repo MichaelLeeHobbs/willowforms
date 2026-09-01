@@ -1873,6 +1873,58 @@ describe('a document nested deeper than the tree bound', () => {
     expect(submittedData(nested(20), { buried: 'an answer' })).toEqual({ buried: 'an answer' })
   })
 
+  /**
+   * A chain of visible containers with one hidden node at the far end.
+   *
+   * `at` is the depth the hidden node lands on, counting the root as 0. The two
+   * orderings only ever disagree here: anywhere shallower, `isVisible` returns
+   * before the depth check is reached under either order, and anywhere deeper
+   * the walk has already stopped.
+   */
+  const hiddenAt = (at: number): ComponentNode => {
+    let node: ComponentNode = {
+      key: 'branch',
+      type: 'Screen',
+      props: {},
+      renderWhen: { kind: 'static', value: false },
+      children: [
+        {
+          key: 'buried',
+          type: 'Field',
+          props: {},
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+        },
+      ],
+    }
+    for (let i = at - 1; i > 0; i -= 1) {
+      node = { key: 'box' + String(i), type: 'Screen', props: {}, children: [node] }
+    }
+    return { key: 'root', type: 'Screen', props: {}, children: [node] }
+  }
+
+  it('does not refuse a submit over a subtree past the bound that nobody can see', () => {
+    /*
+     * The bound asks after visibility, not before it.
+     *
+     * With the order reversed, the node at depth 501 was refused with TOO_DEEP
+     * before anything asked whether it was on screen -- although this
+     * function's docblock says hidden components are skipped and so is
+     * everything beneath them. Nothing visible needed checking and the submit
+     * was refused anyway.
+     *
+     * The window is exactly one level wide, which is why the first version of
+     * this test did not catch it: a hidden branch at depth 1 returns before the
+     * depth check under either order, so it passed with the mutation applied.
+     * Caught in review on PR #35; the vacuous first draft was mine.
+     */
+    expect(validateForm(hiddenAt(MAX_TREE_DEPTH + 1), {})).toEqual({})
+  })
+
+  it('still refuses when the node past the bound is one somebody can see', () => {
+    // The control. Reordering must not turn the bound off, only ask it second.
+    expect(Object.values(validateForm(nested(MAX_TREE_DEPTH * 2), {}))).toContain(TOO_DEEP)
+  })
+
   it('still validates a form nobody would call deep', () => {
     // The control. A bound low enough to catch real authoring would be worse
     // than the crash -- fields would silently stop being checked.
