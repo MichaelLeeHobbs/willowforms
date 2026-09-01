@@ -333,6 +333,24 @@ export function useDrag(
     }
 
     /*
+     * Only the pointer that started this drag may cancel it.
+     *
+     * `pointercancel` was wired straight to `abandon`, with no `pointerId`
+     * check, while `pointermove` and `pointerup` both have one -- so a second
+     * finger becoming a scroll cancelled the first finger's drag. The same
+     * cross-gesture defect those two were fixed for, through the one event type
+     * that was left out.
+     *
+     * Escape keeps calling `abandon` directly, because a key press belongs to no
+     * pointer.
+     */
+    const onCancel = (event: PointerEvent): void => {
+      const press = pending.current
+      if (press && pointerOf(event) !== press.pointerId) return
+      abandon()
+    }
+
+    /*
      * Losing the window ends the drag.
      *
      * These are bare window listeners with no `setPointerCapture`, so a release
@@ -388,7 +406,7 @@ export function useDrag(
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', abandon)
+    window.addEventListener('pointercancel', onCancel)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('click', lowerSwallow)
     window.addEventListener('pointerdown', lowerSwallow)
@@ -397,7 +415,7 @@ export function useDrag(
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', abandon)
+      window.removeEventListener('pointercancel', onCancel)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('click', lowerSwallow)
       window.removeEventListener('pointerdown', lowerSwallow)

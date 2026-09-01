@@ -825,6 +825,68 @@ describe('two pointers at once', () => {
   const def = { type: 'Field', label: 'Field' } as never
   const otherDef = { type: 'Other', label: 'Other' } as never
 
+  it('ignores a cancellation from a pointer that did not start the drag', () => {
+    /*
+     * `pointercancel` was wired straight to `abandon` with no `pointerId`
+     * check, while `pointermove` and `pointerup` both had one -- so finger B
+     * becoming a scroll cancelled finger A's drag. The same cross-gesture
+     * defect this describe is about, through the one event type left out.
+     *
+     * A browser really does send this: a second touch that starts scrolling is
+     * cancelled by the compositor while the first is still down.
+     */
+    const commit = vi.fn()
+    const { result } = renderHook(() => useDrag(commit))
+
+    act(() => {
+      result.current.registerZone(
+        'canvas',
+        vi.fn(() => ({ parentKey: 'root', index: 0 })),
+      )
+      result.current.begin({ kind: 'new', def }, press(10, 10, 1))
+    })
+    act(() => {
+      pointer('pointermove', 80, 80, 1)
+    })
+
+    expect(result.current.state, 'the drag never started').toBeDefined()
+
+    act(() => {
+      window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 2 }))
+    })
+
+    expect(result.current.state, "another pointer's cancellation ended this drag").toBeDefined()
+
+    // And the drag still ends normally for the pointer that owns it.
+    act(() => {
+      pointer('pointerup', 80, 80, 1)
+    })
+
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('still cancels for the pointer that did start it', () => {
+    // The control: filtering everything out would pass the row above while
+    // making `pointercancel` do nothing at all.
+    const commit = vi.fn()
+    const { result } = renderHook(() => useDrag(commit))
+
+    act(() => {
+      result.current.registerZone(
+        'canvas',
+        vi.fn(() => ({ parentKey: 'root', index: 0 })),
+      )
+      result.current.begin({ kind: 'new', def }, press(10, 10, 1))
+    })
+    act(() => {
+      pointer('pointermove', 80, 80, 1)
+      window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 }))
+    })
+
+    expect(result.current.state).toBeUndefined()
+    expect(commit).not.toHaveBeenCalled()
+  })
+
   it('ignores a release from a pointer that did not start the drag', () => {
     const commit = vi.fn()
     const { result } = renderHook(() => useDrag(commit))
