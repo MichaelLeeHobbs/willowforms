@@ -793,7 +793,21 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <Box {...nodeProps}>
       <FormControlLabel
         value={value}
-        checked={group ? value !== '' && group.value === value : false}
+        /*
+         * Controlled only under a group, because only a group has an answer.
+         *
+         * `checked={false}` outside one made a standalone item permanently
+         * unchecked: a controlled input whose value never moves, so clicking it
+         * does nothing. Nothing stops that structure -- `ComponentDef` has no
+         * way to say a type may only appear under another -- so a `RadioItem`
+         * dropped on its own is a document somebody can author, and it should
+         * behave like a radio rather than like a disabled one.
+         *
+         * Omitting the prop leaves it uncontrolled, which is the platform's own
+         * behaviour and the honest answer when there is no group to be the
+         * source of truth.
+         */
+        {...(group ? { checked: value !== '' && group.value === value } : {})}
         /*
          * Only when the document says so.
          *

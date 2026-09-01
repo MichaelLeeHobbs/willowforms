@@ -155,6 +155,33 @@ describe('an unanswered radio group', () => {
     expect(checkedIn(container)).toEqual([])
   })
 
+  it('lets an item outside a group be checked, because nothing forbids one', () => {
+    /*
+     * The guard's other edge. Fixing the pre-checked group by writing
+     * `checked={group ? ... : false}` made a `RadioItem` with no group above it
+     * a controlled input whose value never moves: permanently unchecked, and a
+     * click does nothing.
+     *
+     * Reachable, because `ComponentDef` has no way to say a type may only
+     * appear under another -- the palette will drop a `RadioItem` anywhere, so
+     * that document is one somebody can author. Uncontrolled is the honest
+     * answer when there is no group to hold the answer.
+     */
+    const container = draw({
+      key: 'lonely',
+      type: 'RadioItem',
+      props: { value: prop('yes'), label: prop('Yes') },
+    })
+
+    const radio = container.querySelector<HTMLInputElement>('input[type="radio"]')
+    expect(radio, 'no radio was drawn, so this proves nothing').toBeTruthy()
+    expect(radio?.checked, 'it started checked').toBe(false)
+
+    fireEvent.click(radio as HTMLInputElement)
+
+    expect(radio?.checked, 'a radio outside a group could not be checked').toBe(true)
+  })
+
   it('has nothing checked when the items do carry values', () => {
     // The ordinary case, and the control: an unanswered group is unanswered
     // whatever its options are called.
