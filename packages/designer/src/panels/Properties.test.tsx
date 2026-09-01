@@ -1300,7 +1300,19 @@ describe('removing a nested condition', () => {
      * is an `eq` comparison, which has no options list, so counting textareas
      * counts the rows that happen to be membership tests.
      */
-    const harness = setup(twoLists())
+    /*
+     * With a sibling field, so the panel has a data key to seed a new clause
+     * with.
+     *
+     * This fixture used to be the edited node alone -- and a condition cannot
+     * test its own field, so the key list was empty and the button minted
+     * `{ kind: 'ref', dataKey: '' }`: a clause that reads nothing, is false
+     * forever, and takes everything under it out of validation. The test
+     * counted the row and called it added. It was asserting the defect.
+     */
+    const harness = setup(twoLists(), [
+      { key: 'other', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
+    ])
     await harness.select()
 
     expect(screen.getAllByRole('button', { name: /^Remove condition/ })).toHaveLength(2)
@@ -1317,6 +1329,34 @@ describe('removing a nested condition', () => {
         ? condition.conditions.length
         : 0,
     ).toBe(3)
+
+    /*
+     * And the clause it added reads a real field. Counting rows says a row
+     * appeared; this says the row is one an author can satisfy.
+     */
+    const clauses =
+      condition && 'conditions' in condition && Array.isArray(condition.conditions)
+        ? condition.conditions
+        : []
+    const added = clauses[2] as { value?: { dataKey?: string }; left?: { dataKey?: string } }
+    expect(added?.left?.dataKey ?? added?.value?.dataKey).toBe('other')
+  })
+
+  it('offers no way to add a clause when there is no field to read', async () => {
+    /*
+     * The other half. With nothing to seed from, the button is disabled rather
+     * than minting a clause that reads nothing -- the same argument the
+     * Show-when select already makes, where "A condition" is disabled when
+     * there is nothing to test.
+     */
+    const harness = setup(twoLists())
+    await harness.select()
+
+    // `hasAttribute` rather than a cast to `HTMLButtonElement`: `getByRole`
+    // already returns one narrow enough that the cast changed no type, and
+    // this reads the attribute the user agent actually acts on.
+    const add = screen.getByRole('button', { name: 'Add condition' })
+    expect(add.hasAttribute('disabled')).toBe(true)
   })
 
   it('leaves the surviving row showing its own options', async () => {

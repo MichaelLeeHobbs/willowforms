@@ -725,19 +725,38 @@ export function ConditionEditor({
               </button>
             </div>
           ))}
+          {/*
+            Disabled when there is no key to read, rather than minting a clause
+            that reads nothing.
+
+            `emptyCondition(dataKeys[0] ?? '')` produced
+            `{ kind: 'ref', dataKey: '' }` -- the exact shape `switchKind` was
+            changed to stop producing, and one core's gate does not catch:
+            `tree.ts` validates a `ref` with `text(value['dataKey'])`, which
+            accepts the empty string. So in a document whose data-key list has
+            emptied, the new clause read nothing, the group was false forever,
+            the component was permanently hidden, and `validateForm` skipped
+            every rule beneath it -- while `validateDocument` reported the
+            document clean.
+
+            The same argument the Show-when select already makes one file over,
+            where "A condition" is disabled when there is nothing to test: an
+            option that can only produce an unsatisfiable rule is not an option.
+          */}
           <button
             type="button"
-            onClick={() =>
-              onChange({
-                ...value,
-                conditions: [
-                  ...asList(value.conditions),
-                  rowDataKeys?.[0] !== undefined
-                    ? emptyCondition(rowDataKeys[0], 'row')
-                    : emptyCondition(dataKeys[0] ?? ''),
-                ],
-              })
-            }
+            disabled={rowDataKeys?.[0] === undefined && dataKeys[0] === undefined}
+            onClick={() => {
+              const seed =
+                rowDataKeys?.[0] !== undefined
+                  ? emptyCondition(rowDataKeys[0], 'row')
+                  : dataKeys[0] !== undefined
+                    ? emptyCondition(dataKeys[0])
+                    : undefined
+              if (!seed) return
+
+              onChange({ ...value, conditions: [...asList(value.conditions), seed] })
+            }}
           >
             Add condition
           </button>

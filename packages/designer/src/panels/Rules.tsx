@@ -89,6 +89,46 @@ export interface RulesProps {
   api: DesignerApi
 }
 
+/**
+ * Every rule key this panel knows how to draw a row for.
+ *
+ * Taken from `DEFAULT_MESSAGES`, which is core's own list and the one
+ * `validateForm` answers `UNREADABLE_RULE` against. Two lists would agree until
+ * somebody added a rule to one.
+ */
+const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
+
+/**
+ * Whether this panel can draw a row for a stored rule without falling over.
+ *
+ * A known key *and*, where the row reads the value, a value of the right shape.
+ * The check here was "a non-null object with a string `key`", which admits
+ * `{ key: 'pattern', value: null }` -- and the pattern row calls
+ * `patternProblem(rule.value)`, which reads `.length` and throws on `null`.
+ * That takes the Rules tab down, which is the failure this filter exists to
+ * prevent, through the half of the shape it was not looking at.
+ *
+ * An unknown key is dropped too. `validateForm` already refuses one with
+ * `UNREADABLE_RULE`, so a row for it would offer to edit a rule the server will
+ * not run -- and the row is built from `rule.key`, so there is nothing to draw.
+ *
+ * Dropped from the panel, never from the document: `write` only ever sends what
+ * the author edited, so a rule this cannot draw is left exactly as it is rather
+ * than quietly deleted by opening a tab.
+ */
+function usable(rule: unknown): rule is ValidationRule {
+  if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return false
+
+  const shape = rule as { key?: unknown; value?: unknown }
+  if (typeof shape.key !== 'string' || !KNOWN_RULES.has(shape.key)) return false
+
+  // The only row that reads the value as text. The numeric rules coerce, and
+  // the valueless ones never look.
+  if (shape.key === 'pattern') return typeof shape.value === 'string'
+
+  return true
+}
+
 export function Rules({ api }: RulesProps): ReactNode {
   const node = api.selectedNode
 
@@ -116,7 +156,20 @@ export function Rules({ api }: RulesProps): ReactNode {
    * on the canvas and took the whole designer down the moment this tab opened.
    * The panel is where somebody goes to repair such a document.
    */
-  const rules = Array.isArray(schema.validations) ? schema.validations : []
+  /*
+   * And every entry has to be a rule, not only the list an array.
+   *
+   * `Array.isArray` alone was blessed as sufficient and is not: an array whose
+   * entries are junk passes it and crashes one line later at
+   * `new Set(rules.map((r) => r.key))` on `validations: [null]`.
+   *
+   * `validateDocument` does reject that entry -- but `store.ts` only *warns*
+   * for a host-supplied `initialDocument`, which is precisely the path the
+   * docblock above says is ungated. A host restoring
+   * `{"schema":{"type":"string","validations":[null]}}` took the designer down
+   * on opening this tab, and this is the panel somebody opens to repair it.
+   */
+  const rules = (Array.isArray(schema.validations) ? schema.validations : []).filter(usable)
   const write = (next: Partial<FieldSchema>): void =>
     api.setFieldSchema(node.key, { ...schema, ...next })
 
