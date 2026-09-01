@@ -400,33 +400,70 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   }, [history.present])
 
   /**
-   * Commit a document this callback already decided on, and say it happened.
+   * Commit a document this callback already decided on.
    *
    * `addComponent` and `moveComponent` used to answer by assigning to a local
    * from inside the `setHistory` updater. React requires an updater to be pure
    * and is free to defer it or run it twice, so the boolean was read before the
-   * assignment on any path where React did not eagerly evaluate -- and it works
-   * today only because React's eager-state optimisation happens to run it. A
-   * value that is right because of an optimisation is a value that is wrong.
+   * assignment on any path where React did not eagerly evaluate -- and it worked
+   * only because React's eager-state optimisation happens to run it. A value
+   * that is right because of an optimisation is a value that is wrong.
    *
    * So the decision is made out here, from `latest.current`, and the updater
-   * only writes. `latest.current` also advances *now* rather than in the effect
-   * below, which closes the other half of the same problem: the ref was a
-   * render behind, so two edits in one tick both read the document from before
-   * either of them.
+   * only writes. `latest.current` advances *now* rather than in the effect
+   * below, which closes the other half of the same problem: the ref was a render
+   * behind, so two edits in one tick both read the document from before either
+   * of them.
    *
-   * The `h.present !== doc` guard stays, and becomes what it should always have
-   * been -- a safety net for a writer that does not go through here, rather
-   * than the mechanism the answer depends on.
+   * There is no `h.present !== doc` guard any more, and that is the point rather
+   * than a simplification. It could refuse a commit while the caller had already
+   * returned `true` and moved the selection -- reintroducing the exact
+   * "announced as a success" failure the return value exists to prevent -- and
+   * it was reachable: any other writer in the same tick left `latest.current`
+   * behind `h.present`. It cannot be right to keep a guard whose firing is
+   * itself the bug.
+   *
+   * What replaces it is that *every* writer below advances the ref, so
+   * `latest.current` is always the document as of now and every decision is
+   * made against it. `assertDecidedAgainstLatest` holds that in place.
    */
   const commitDecided = useCallback((doc: FormDocument, next: FormDocument, label?: string) => {
+    /*
+     * The caller decided against the document as of now, which is the property
+     * the guard used to check for at commit time and could only enforce by
+     * refusing. Checked here instead, where a violation is a bug in this file
+     * rather than a race: it means a writer changed the history without
+     * advancing the ref, which is the one way `latest.current` can fall behind.
+     *
+     * A throw rather than a refusal, because there is no correct thing to write
+     * in that state and silently doing nothing is what this whole area was
+     * getting wrong.
+     */
+    if (doc !== latest.current) {
+      throw new Error('a document was decided against a stale read of the store')
+    }
+
     latest.current = next
-    setHistory((h) => (h.present === doc ? commit(h, next, label) : h))
+    setHistory((h) => commit(h, next, label))
   }, [])
 
-  const apply = useCallback((mutate: (doc: FormDocument) => FormDocument, label?: string) => {
-    setHistory((h) => commit(h, mutate(h.present), label))
-  }, [])
+  /**
+   * Every other edit, decided out here for the same reason.
+   *
+   * This ran `mutate` inside the updater, so it never advanced the ref -- and a
+   * `setProp` followed by an `addComponent` in one tick therefore left the
+   * insert deciding against a document that no longer existed. `mutate` is pure
+   * by contract, so running it out here changes nothing about what is written.
+   */
+  const apply = useCallback(
+    (mutate: (doc: FormDocument) => FormDocument, label?: string) => {
+      const doc = latest.current
+      const next = mutate(doc)
+      if (next === doc) return
+      commitDecided(doc, next, label)
+    },
+    [commitDecided],
+  )
 
   const addComponent = useCallback(
     (def: ComponentDef, parentKey?: string, index?: number) => {
@@ -799,50 +836,54 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [apply],
   )
 
-  const duplicateComponent = useCallback((key: string): string | undefined => {
-    /*
-     * `latest.current`, and committed against it, the way `addComponent` does.
-     *
-     * This read `history.present` out of the render closure, which is a render
-     * behind whenever two edits land in one tick -- and `duplicateNode` derives
-     * the copy's key from the root it is handed. Two duplications resolved
-     * against the same stale root produce two nodes with the same generated key,
-     * which is the duplicate-key state that makes every later tree operation
-     * edit the first match, silently. The whole point of this callback is to
-     * hand back a key nothing else is using.
-     */
-    const doc = latest.current
+  const duplicateComponent = useCallback(
+    (key: string): string | undefined => {
+      /*
+       * `latest.current`, and committed against it, the way `addComponent` does.
+       *
+       * This read `history.present` out of the render closure, which is a render
+       * behind whenever two edits land in one tick -- and `duplicateNode` derives
+       * the copy's key from the root it is handed. Two duplications resolved
+       * against the same stale root produce two nodes with the same generated key,
+       * which is the duplicate-key state that makes every later tree operation
+       * edit the first match, silently. The whole point of this callback is to
+       * hand back a key nothing else is using.
+       */
+      const doc = latest.current
 
-    const parent = findParent(doc.root, key)
-    if (!parent) return undefined
+      const parent = findParent(doc.root, key)
+      if (!parent) return undefined
 
-    const copy = duplicateNode(doc.root, key)
-    if (!copy) return undefined
+      const copy = duplicateNode(doc.root, key)
+      if (!copy) return undefined
 
-    const index = parent.children?.findIndex((child) => child.key === key) ?? -1
-    if (index === -1) return undefined
+      const index = parent.children?.findIndex((child) => child.key === key) ?? -1
+      if (index === -1) return undefined
 
-    // Directly after the original, which is where a duplicate belongs and
-    // where the eye is already looking.
-    const root = insertNode(doc.root, parent.key, copy, index + 1)
+      // Directly after the original, which is where a duplicate belongs and
+      // where the eye is already looking.
+      const root = insertNode(doc.root, parent.key, copy, index + 1)
 
-    /*
-     * Nothing landed, so nothing is committed, the way every other writer here
-     * guards. An insert the tree refused still took a slot in a capped
-     * undo stack -- which means a real edit fell off the end of it -- and still
-     * moved the selection onto a key that is not in the document.
-     */
-    if (root === doc.root) return undefined
+      /*
+       * Nothing landed, so nothing is committed, the way every other writer here
+       * guards. An insert the tree refused still took a slot in a capped
+       * undo stack -- which means a real edit fell off the end of it -- and still
+       * moved the selection onto a key that is not in the document.
+       */
+      if (root === doc.root) return undefined
 
-    /*
-     * Refused rather than merged if the document has moved underneath, for the
-     * reason `addComponent` gives: the copy's key was chosen against a tree that
-     * no longer exists, so writing it is how the collision happens.
-     */
-    setHistory((h) => (h.present === doc ? commit(h, { ...doc, root }) : h))
-    setSelectedKey(copy.key)
-    return copy.key
-  }, [])
+      /*
+       * Through `commitDecided`, which advances the ref -- so the next call in
+       * this tick derives its copy's key from a tree that already holds this one.
+       * That is what stops two duplications producing one key twice, which is the
+       * collision this callback exists to avoid.
+       */
+      commitDecided(doc, { ...doc, root })
+      setSelectedKey(copy.key)
+      return copy.key
+    },
+    [commitDecided],
+  )
 
   const setRenderWhen = useCallback(
     (key: string, value: PropValue | undefined) => {
@@ -957,6 +998,9 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   )
 
   const replaceDocument = useCallback((next: FormDocument) => {
+    // The ref too, or an edit later in this tick is decided against the
+    // document this one replaced.
+    latest.current = next
     setHistory((h) => commit(h, next))
     setSelectedKey(undefined)
   }, [])
@@ -975,8 +1019,31 @@ export function useDesigner(initial: FormDocument): DesignerApi {
    * Every member below is already stable — `useCallback` with empty or narrow
    * dependencies — so the only thing that was changing was the wrapper.
    */
-  const undoNow = useCallback(() => setHistory(undo), [])
-  const redoNow = useCallback(() => setHistory(redo), [])
+  /*
+   * These step the history rather than editing the document, so they cannot
+   * decide a next document out here -- what they move to depends on the history
+   * React holds. The ref is advanced from inside the updater, which is the one
+   * place that knows, and it is a write to a ref rather than a decision read
+   * back out: the value is not used to answer anything this tick.
+   */
+  const undoNow = useCallback(
+    () =>
+      setHistory((h) => {
+        const next = undo(h)
+        latest.current = next.present
+        return next
+      }),
+    [],
+  )
+  const redoNow = useCallback(
+    () =>
+      setHistory((h) => {
+        const next = redo(h)
+        latest.current = next.present
+        return next
+      }),
+    [],
+  )
 
   return useMemo(
     () => ({

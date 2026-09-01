@@ -12,7 +12,13 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ComponentDef, FormDocument, Language } from '@formsmith/core'
-import { collectKeys as collect, findNode, prop, validateDocument } from '@formsmith/core'
+import {
+  collectKeys as collect,
+  emptyRoot,
+  findNode,
+  prop,
+  validateDocument,
+} from '@formsmith/core'
 
 import { historyOps, useDesigner } from './store.js'
 
@@ -1330,5 +1336,119 @@ describe('the document a host hands in, checked once', () => {
     } finally {
       warn.mockRestore()
     }
+  })
+})
+
+describe('two different writers in one tick', () => {
+  /*
+   * The failure a reviewer found in the first version of this fix, which
+   * replaced the impure updater with a guard that could refuse a commit while
+   * the caller had already returned `true` and moved the selection. That is the
+   * "announced as a success" failure the return value exists to prevent,
+   * reintroduced by the fix for it.
+   *
+   * It was reachable through any writer that did not advance the ref: `apply`
+   * ran its mutation inside the updater, so a `setProp` before an
+   * `addComponent` left the insert deciding against a document that no longer
+   * existed, and the guard then dropped it.
+   *
+   * Every writer advances the ref now, so the state the guard was watching for
+   * cannot arise -- and `commitDecided` throws rather than refusing if it ever
+   * does, because there is no correct thing to write from a stale read.
+   */
+  /** How many children the fixture starts with, so an insert is a delta. */
+  const started = (doc().root.children ?? []).length
+
+  const def: ComponentDef = {
+    type: 'Field',
+    label: 'Field',
+    icon: 'text',
+    group: 'inputs',
+    defaultProps: {},
+    props: [],
+    events: [],
+  }
+
+  it('keeps an edit made just before an insert', () => {
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let landed: boolean | undefined
+    act(() => {
+      result.current.setProp('email', 'label', prop('after'))
+      landed = result.current.addComponent(def, 'root')
+    })
+
+    expect(landed, 'the insert was refused').toBe(true)
+
+    // Both survived: the edit is in the document and so is the new node.
+    expect(propOf(result.current.document, 'email')).toBe('after')
+    expect((result.current.document.root.children ?? []).length - started).toBe(1)
+  })
+
+  it('keeps an insert made just before an edit', () => {
+    // The other order, because the ref is advanced by both and either could
+    // have been the one that did not.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.addComponent(def, 'root')
+      result.current.setProp('email', 'label', prop('after'))
+    })
+
+    expect(propOf(result.current.document, 'email')).toBe('after')
+    expect((result.current.document.root.children ?? []).length - started).toBe(1)
+  })
+
+  it('inserts into the replacement when a document is replaced in the same tick', () => {
+    /*
+     * `replaceDocument` writes the history directly rather than editing the
+     * document, so it is the writer likeliest to be forgotten when the rule is
+     * "every writer advances the ref". Forgotten, the insert here is decided
+     * against the document that was replaced -- and `commitDecided` refuses to
+     * write from a stale read rather than putting the node in a tree nobody is
+     * looking at.
+     *
+     * Both in one `act`, because with them in separate ones the effect catches
+     * the ref up in between and this proves nothing.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.replaceDocument({ ...doc(), id: 'replaced', root: emptyRoot() })
+      result.current.addComponent(def, 'root')
+    })
+
+    expect(result.current.document.id, 'the replacement was lost').toBe('replaced')
+    expect(
+      result.current.document.root.children ?? [],
+      'the insert went somewhere else',
+    ).toHaveLength(1)
+  })
+
+  it('keeps an edit made just before a duplicate, and gives the copy its own key', () => {
+    /*
+     * `duplicateNode` derives the copy's key from the root it is handed, so a
+     * duplication decided against a stale root is how two nodes come to share a
+     * key -- the state that makes every later tree operation edit the first
+     * match silently. This callback exists to hand back a key nothing else is
+     * using.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let first: string | undefined
+    let second: string | undefined
+    act(() => {
+      result.current.setProp('email', 'label', prop('after'))
+      first = result.current.duplicateComponent('email')
+      second = result.current.duplicateComponent('email')
+    })
+
+    expect(propOf(result.current.document, 'email')).toBe('after')
+    expect(first).toBeDefined()
+    expect(second).toBeDefined()
+    expect(second, 'two duplications produced one key').not.toBe(first)
+
+    const keys = (result.current.document.root.children ?? []).map((child) => child.key)
+    expect(new Set(keys).size, 'two nodes share a key').toBe(keys.length)
   })
 })
