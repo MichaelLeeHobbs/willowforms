@@ -269,6 +269,45 @@ describe('the Style tab', () => {
     expect(radius).not.toHaveProperty('ariaInvalid', 'true')
   })
 
+  it('drops the refusal when the typed text is repaired back to the written value', async () => {
+    /*
+     * The other way out of a refusal, and the one that had no way out.
+     *
+     * `commit` returns early when the draft matches what was written, and that
+     * path cleared nothing -- so refusing `6px}` and then deleting the brace
+     * left the alert up and the field `aria-invalid` over text that was now
+     * exactly the value in the document. Repairing the mistake by hand is the
+     * obvious thing to do and it was the one repair the control would not
+     * acknowledge; typing some *other* valid value cleared it, because that
+     * reaches the write.
+     *
+     * The commit first, so `4px` is genuinely the written value and the early
+     * return is the path under test. Without it `draft === committed` holds for
+     * the empty string and the refusal never happens.
+     */
+    const harness = setup(field())
+    await harness.openStyle()
+
+    const radius = screen.getByLabelText('Radius')
+    await harness.user.clear(radius)
+    await harness.user.type(radius, '4px')
+    await harness.user.tab()
+
+    await harness.user.type(radius, '}')
+    await harness.user.tab()
+
+    expect(screen.getByRole('alert'), 'the refusal never happened').toBeTruthy()
+    expect(radius).toHaveProperty('ariaInvalid', 'true')
+
+    // Take the brace back out, which puts the box back to what was written.
+    await harness.user.type(radius, '{backspace}')
+    await harness.user.tab()
+
+    expect(radius).toHaveProperty('value', '4px')
+    expect(screen.queryByRole('alert'), 'the refusal outlived the text it was about').toBeNull()
+    expect(radius).not.toHaveProperty('ariaInvalid', 'true')
+  })
+
   it('keeps the refused text in the box so it can be repaired', async () => {
     // Refusing is not the same as deleting what somebody typed: the text stays,
     // flagged, so the stray brace can be taken out rather than retyped.

@@ -207,7 +207,20 @@ function DeclarationField({
   }
 
   const commit = (): void => {
-    if (draft === committed) return
+    if (draft === committed) {
+      /*
+       * Nothing to write, but there may still be something to withdraw.
+       *
+       * The refusal is about the text in the box, and the text in the box is
+       * back to the value that was written -- so refuse `6px}`, delete the
+       * brace, blur, and this returned early with the alert still up and the
+       * field still `aria-invalid`, describing text nobody could see any more.
+       * The only way out was to type a *different* valid value, because that
+       * is the one path that reaches the write below.
+       */
+      setRefused('')
+      return
+    }
 
     /*
      * The refusal is shown, and the typed text is kept.
