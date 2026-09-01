@@ -12,7 +12,13 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ComponentDef, FormDocument, Language } from '@formsmith/core'
-import { collectKeys as collect, findNode, prop, validateDocument } from '@formsmith/core'
+import {
+  collectKeys as collect,
+  emptyRoot,
+  findNode,
+  prop,
+  validateDocument,
+} from '@formsmith/core'
 
 import { historyOps, useDesigner } from './store.js'
 
@@ -1101,5 +1107,348 @@ describe('a rename that moves the answer name with it', () => {
 
     expect(findNode(result.current.document.root, 'emailAddress')).toBeDefined()
     expect(findNode(result.current.document.root, 'email')).toBeUndefined()
+  })
+})
+
+describe('a refusal that used to be announced as a success', () => {
+  /*
+   * `addComponent` and `moveComponent` returned `void`, so every caller
+   * announced unconditionally -- and both have refusal paths. An insert that
+   * matched no parent, one decided against a document that has since moved, a
+   * definition a kit got wrong, and `moveNode`'s identical-root answer for an
+   * illegal move all reported success.
+   *
+   * `Designer.tsx` announced "Text added to root." for an insert that did not
+   * happen, and that announcement is the only feedback a screen-reader user
+   * gets -- so it was not merely missing, it was wrong.
+   */
+  const def: ComponentDef = {
+    type: 'Field',
+    label: 'Field',
+    icon: 'text',
+    group: 'inputs',
+    defaultProps: {},
+    props: [],
+    events: [],
+  }
+
+  it('says no when the kit definition has no usable type', () => {
+    /*
+     * A real refusal path, and it took two attempts to find one. An unknown
+     * `parentKey` is *not* a refusal: `containerFor` deliberately falls back to
+     * the root, so the component lands there and the answer is rightly true.
+     * The refusals are a definition `instantiate` cannot build from, a document
+     * that moved between the read and the updater, and an insert that matched
+     * nothing.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+    const broken = { ...def, type: '' }
+
+    let landed: boolean | undefined
+    act(() => {
+      landed = result.current.addComponent(broken, 'root')
+    })
+
+    expect(landed).toBe(false)
+  })
+
+  it('lands both of two inserts batched into one tick', () => {
+    /*
+     * This used to assert the opposite, and the opposite was a defect wearing a
+     * test.
+     *
+     * Both calls read `latest.current`, a ref updated in an effect and
+     * therefore a render behind -- so the second was decided against a document
+     * that no longer existed, `commit` refused it, and the component a person
+     * dropped simply did not appear. The `landed` flag was added so at least
+     * nothing was announced for it, which is the right answer to the wrong
+     * question.
+     *
+     * The ref now advances at the moment of the decision, so the second insert
+     * is decided against the first one's result and both land. Answering the
+     * question the flag was covering for.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let first: boolean | undefined
+    let second: boolean | undefined
+    act(() => {
+      first = result.current.addComponent(def, 'root')
+      second = result.current.addComponent(def, 'root')
+    })
+
+    expect(first).toBe(true)
+    expect(second, 'the second insert in a tick was refused').toBe(true)
+
+    /*
+     * And both are really there, which is the claim the booleans stand for.
+     * Counted as a delta, since the fixture already has children of its own,
+     * and checked for distinct keys -- two nodes resolved against the same
+     * stale root would share one, which is the duplicate-key state that makes
+     * every later tree operation edit the first match silently.
+     */
+    const children = result.current.document.root.children ?? []
+    const started = doc().root.children?.length ?? 0
+    expect(children.length - started, 'both inserts did not land').toBe(2)
+    expect(new Set(children.map((child) => child.key)).size, 'two nodes share a key').toBe(
+      children.length,
+    )
+  })
+
+  it('inserts into the replacement rather than the document it replaced', () => {
+    /*
+     * The refusal that is still real, and the one the guard in `commitDecided`
+     * is for: a writer that does not go through it. `replaceDocument` sets the
+     * history directly, so an insert decided against the document before it is
+     * decided against a tree that no longer exists -- and its index means
+     * something else there.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.replaceDocument({ ...doc(), id: 'replaced' })
+    })
+
+    expect(result.current.document.id, 'the replacement did not happen').toBe('replaced')
+
+    let landed: boolean | undefined
+    act(() => {
+      landed = result.current.addComponent(def, 'root')
+    })
+
+    // It lands: the ref advanced with the replacement, so the insert is decided
+    // against the document that is actually there. What must not happen is an
+    // insert into the *old* tree, which is what the id assertion above pins.
+    expect(landed).toBe(true)
+    expect(result.current.document.id).toBe('replaced')
+  })
+
+  it('says yes when it lands, and moves the selection', () => {
+    // The control. Answering false always would pass the row above while
+    // silencing every real insert.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let landed: boolean | undefined
+    act(() => {
+      landed = result.current.addComponent(def, 'root')
+    })
+
+    expect(landed).toBe(true)
+    expect(result.current.selectedKey).toBeDefined()
+  })
+
+  it('does not move the selection when nothing landed', () => {
+    /*
+     * The half that made the next mistake possible: the selection moved to a
+     * key that is not in the document, which is the precondition the Key field
+     * defect in item 3 needed.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.select('email')
+    })
+    act(() => {
+      result.current.addComponent({ ...def, type: '' }, 'root')
+    })
+
+    expect(result.current.selectedKey).toBe('email')
+  })
+
+  it('says no when a move is illegal', () => {
+    // `moveNode` refuses to give a leaf children, and returns the identical
+    // root for it.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let moved: boolean | undefined
+    act(() => {
+      moved = result.current.moveComponent('phone', 'email')
+    })
+
+    expect(moved).toBe(false)
+  })
+
+  it('says yes when a move is legal', () => {
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let moved: boolean | undefined
+    act(() => {
+      moved = result.current.moveComponent('phone', 'group')
+    })
+
+    expect(moved).toBe(true)
+  })
+})
+
+describe('the document a host hands in, checked once', () => {
+  /*
+   * The effect's own comment said "Once, for the document this hook was mounted
+   * with" and its dependency was `[initial]`, which is not that.
+   *
+   * `initialDocument` is read once in a `useState` initializer and ignored
+   * afterwards, so the effect re-ran on every identity change of a prop the
+   * hook does not otherwise look at -- and the README documented
+   * `initialDocument={form} onChange={setForm}`, under which `form` is a new
+   * object per edit. A host following it got a full-document structural walk
+   * plus a repeated console.warn on every keystroke, describing a document
+   * useDesigner had already discarded.
+   */
+  const broken = (): FormDocument => ({
+    ...doc(),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        { key: 'same', type: 'Field', props: {} },
+        { key: 'same', type: 'Field', props: {} },
+      ],
+    },
+  })
+
+  it('warns once about a document that does not validate', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const { rerender } = renderHook((document: FormDocument) => useDesigner(document), {
+        initialProps: broken(),
+      })
+
+      expect(warn.mock.calls.length, 'the fixture validates, so this proves nothing').toBe(1)
+
+      // A new object with the same content, which is what a host following the
+      // documented pattern hands over on every keystroke.
+      rerender(broken())
+      rerender(broken())
+
+      expect(warn.mock.calls.length, 'the check re-ran for a document already discarded').toBe(1)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('says nothing about a document that validates', () => {
+    // The control: warning unconditionally would pass the row above.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      renderHook(() => useDesigner(doc()))
+
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+})
+
+describe('two different writers in one tick', () => {
+  /*
+   * The failure a reviewer found in the first version of this fix, which
+   * replaced the impure updater with a guard that could refuse a commit while
+   * the caller had already returned `true` and moved the selection. That is the
+   * "announced as a success" failure the return value exists to prevent,
+   * reintroduced by the fix for it.
+   *
+   * It was reachable through any writer that did not advance the ref: `apply`
+   * ran its mutation inside the updater, so a `setProp` before an
+   * `addComponent` left the insert deciding against a document that no longer
+   * existed, and the guard then dropped it.
+   *
+   * Every writer advances the ref now, so the state the guard was watching for
+   * cannot arise -- and `commitDecided` throws rather than refusing if it ever
+   * does, because there is no correct thing to write from a stale read.
+   */
+  /** How many children the fixture starts with, so an insert is a delta. */
+  const started = (doc().root.children ?? []).length
+
+  const def: ComponentDef = {
+    type: 'Field',
+    label: 'Field',
+    icon: 'text',
+    group: 'inputs',
+    defaultProps: {},
+    props: [],
+    events: [],
+  }
+
+  it('keeps an edit made just before an insert', () => {
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let landed: boolean | undefined
+    act(() => {
+      result.current.setProp('email', 'label', prop('after'))
+      landed = result.current.addComponent(def, 'root')
+    })
+
+    expect(landed, 'the insert was refused').toBe(true)
+
+    // Both survived: the edit is in the document and so is the new node.
+    expect(propOf(result.current.document, 'email')).toBe('after')
+    expect((result.current.document.root.children ?? []).length - started).toBe(1)
+  })
+
+  it('keeps an insert made just before an edit', () => {
+    // The other order, because the ref is advanced by both and either could
+    // have been the one that did not.
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.addComponent(def, 'root')
+      result.current.setProp('email', 'label', prop('after'))
+    })
+
+    expect(propOf(result.current.document, 'email')).toBe('after')
+    expect((result.current.document.root.children ?? []).length - started).toBe(1)
+  })
+
+  it('inserts into the replacement when a document is replaced in the same tick', () => {
+    /*
+     * `replaceDocument` writes the history directly rather than editing the
+     * document, so it is the writer likeliest to be forgotten when the rule is
+     * "every writer advances the ref". Forgotten, the insert here is decided
+     * against the document that was replaced -- and `commitDecided` refuses to
+     * write from a stale read rather than putting the node in a tree nobody is
+     * looking at.
+     *
+     * Both in one `act`, because with them in separate ones the effect catches
+     * the ref up in between and this proves nothing.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.replaceDocument({ ...doc(), id: 'replaced', root: emptyRoot() })
+      result.current.addComponent(def, 'root')
+    })
+
+    expect(result.current.document.id, 'the replacement was lost').toBe('replaced')
+    expect(
+      result.current.document.root.children ?? [],
+      'the insert went somewhere else',
+    ).toHaveLength(1)
+  })
+
+  it('keeps an edit made just before a duplicate, and gives the copy its own key', () => {
+    /*
+     * `duplicateNode` derives the copy's key from the root it is handed, so a
+     * duplication decided against a stale root is how two nodes come to share a
+     * key -- the state that makes every later tree operation edit the first
+     * match silently. This callback exists to hand back a key nothing else is
+     * using.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    let first: string | undefined
+    let second: string | undefined
+    act(() => {
+      result.current.setProp('email', 'label', prop('after'))
+      first = result.current.duplicateComponent('email')
+      second = result.current.duplicateComponent('email')
+    })
+
+    expect(propOf(result.current.document, 'email')).toBe('after')
+    expect(first).toBeDefined()
+    expect(second).toBeDefined()
+    expect(second, 'two duplications produced one key').not.toBe(first)
+
+    const keys = (result.current.document.root.children ?? []).map((child) => child.key)
+    expect(new Set(keys).size, 'two nodes share a key').toBe(keys.length)
   })
 })

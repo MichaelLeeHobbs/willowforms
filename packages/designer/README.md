@@ -15,13 +15,29 @@ import '@formsmith/designer/styles.css'
 import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
 import type { FormDocument } from '@formsmith/core'
 
-declare const form: FormDocument
-declare const setForm: (next: FormDocument) => void
+declare const saved: FormDocument
+declare const store: (next: FormDocument) => void
 
+/*
+ * `initialDocument` is read once, at mount, and ignored afterwards. `onChange`
+ * is how the document leaves the designer; there is no way to drive it back in.
+ */
 export const builder = (
-  <Designer initialDocument={form} kit={muiKit} rendererKit={muiRendererKit} onChange={setForm} />
+  <Designer initialDocument={saved} kit={muiKit} rendererKit={muiRendererKit} onChange={store} />
 )
 ```
+
+`initialDocument` is **not** a controlled prop. It is read once in a `useState` initializer and every
+later value is ignored, which `docs/spec/12-api.md` states as the contract.
+
+This example used to be written as a controlled component -- `initialDocument={form}` with
+`onChange={setForm}`, where `form` is the state `onChange` sets. That reads as a two-way binding and is
+not one: the document a host holds and the document the designer holds diverge on the first edit that
+does not come from the host, and a reader concludes the designer can be driven from outside when it
+cannot. `apps/playground/src/App.tsx` documents having been bitten by exactly that and keeps its live
+document in a ref.
+
+To replace the document a designer is editing, change its React `key` so a new one mounts.
 
 ## No component library
 

@@ -22,6 +22,8 @@ import { flatten } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from '../Designer.js'
+import { Tree } from './Tree.js'
+import type { TreeProps } from './Tree.js'
 
 function Box({ nodeProps, children }: NodeRendererProps): ReactNode {
   return <div {...nodeProps}>{children}</div>
@@ -894,5 +896,97 @@ describe('what a row promises the keyboard', () => {
     const leaf = view.container.querySelector('[data-fs-tree-row="heading"]')
     expect(leaf, 'the fixture has no heading row').not.toBeNull()
     expect(leaf?.getAttribute('aria-expanded')).toBeNull()
+  })
+})
+
+describe('a keyboard move the tree refuses', () => {
+  /*
+   * `Tree.tsx` called `onMove` and then announced unconditionally, while the
+   * toolbar and the canvas were already gated on the same boolean -- so a
+   * refused move still told a screen-reader user the component had moved. Worse
+   * than silence: it is the only feedback they get, and it was wrong.
+   *
+   * Driven against `Tree` rather than through `Designer`, because the seam is
+   * `onMove`'s answer and this is the component that decides what to say about
+   * it. Reproducing a refusal through the whole builder needs a kit whose
+   * container declaration disagrees with the node it describes -- a real case,
+   * and one whose setup would be most of the test.
+   */
+  function drawTree(onMove: (key: string, parentKey: string, index: number) => boolean): {
+    user: ReturnType<typeof userEvent.setup>
+    row: (key: string) => HTMLElement
+    said: string[]
+  } {
+    const said: string[] = []
+    const user = userEvent.setup()
+    const view = render(
+      <Tree
+        root={makeDocument().root}
+        kit={kit}
+        selectedKey={undefined}
+        onSelect={() => undefined}
+        onRemove={() => undefined}
+        onMove={onMove}
+        onDuplicate={() => undefined}
+        announce={(message) => said.push(message)}
+        drag={
+          {
+            begin: () => undefined,
+            state: undefined,
+            registerZone: () => () => undefined,
+          } as unknown as TreeProps['drag']
+        }
+      />,
+    )
+
+    return {
+      user,
+      row: (key) => {
+        const element = view.container.querySelector<HTMLElement>(`[data-fs-tree-row="${key}"]`)
+        if (!element) throw new Error('no tree row for ' + key)
+        return element
+      },
+      said,
+    }
+  }
+
+  it('says it cannot move rather than announcing a move that did not happen', async () => {
+    const { user, row, said } = drawTree(() => false)
+
+    row('footer').focus()
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
+
+    expect(said, 'nothing was announced at all').not.toEqual([])
+    expect(said.join(' ')).not.toMatch(/footer moved/)
+    expect(said.join(' ')).toMatch(/cannot move/)
+  })
+
+  it('still announces a move that does happen', async () => {
+    /*
+     * The control, and the reason it is needed: gating on a boolean that is
+     * always false would satisfy the row above while silencing every real move.
+     */
+    const { user, row, said } = drawTree(() => true)
+
+    row('footer').focus()
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
+
+    expect(said.join(' ')).toMatch(/footer moved up/)
+  })
+
+  it('asks before it announces, with the target the keyboard chose', async () => {
+    // And the two are about the same move: a panel that announced a refusal for
+    // every key press would pass the first row.
+    const asked: [string, string, number][] = []
+    const { user, row } = drawTree((key, parentKey, index) => {
+      asked.push([key, parentKey, index])
+      return true
+    })
+
+    row('footer').focus()
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
+
+    expect(asked).toHaveLength(1)
+    expect(asked[0]?.[0]).toBe('footer')
   })
 })

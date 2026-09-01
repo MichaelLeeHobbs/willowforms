@@ -121,11 +121,25 @@ export function Designer({
 
   const commitDrop = useCallback(
     (source: DragSource, target: DropCommit) => {
+      /*
+       * Announced only if it happened.
+       *
+       * Both of these reported unconditionally, and both have refusal paths:
+       * `addComponent` declines a definition a kit got wrong, and an insert the
+       * tree refuses because the target cannot hold children; `moveNode`
+       * returns the identical root for an illegal move. So a screen-reader user
+       * was told a component moved into a container that will not hold it,
+       * which is worse than silence -- it is the only feedback they get, and it
+       * was wrong.
+       *
+       * Not "an insert that matched no parent": `containerFor` falls back to
+       * the root for an unknown key, so that insert lands.
+       */
       if (source.kind === 'new') {
-        api.addComponent(source.def, target.parentKey, target.index)
-        announce(source.def.label + ' added to ' + target.parentKey + '.')
-      } else {
-        api.moveComponent(source.key, target.parentKey, target.index)
+        if (api.addComponent(source.def, target.parentKey, target.index)) {
+          announce(source.def.label + ' added to ' + target.parentKey + '.')
+        }
+      } else if (api.moveComponent(source.key, target.parentKey, target.index)) {
         announce(source.key + ' moved into ' + target.parentKey + '.')
       }
     },
@@ -298,8 +312,7 @@ export function Designer({
             drag={drag}
             announce={announce}
             onAdd={(def) => {
-              api.addComponent(def, api.selectedKey)
-              announce(def.label + ' added.')
+              if (api.addComponent(def, api.selectedKey)) announce(def.label + ' added.')
             }}
             onDragStart={(def, event) => drag.begin({ kind: 'new', def }, event)}
           />

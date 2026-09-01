@@ -21,7 +21,17 @@ export interface TreeProps {
   selectedKey: string | undefined
   onSelect: (key: string) => void
   onRemove: (key: string) => void
-  onMove: (key: string, parentKey: string, index: number) => void
+  /**
+   * Answers whether the move happened.
+   *
+   * `void` here, so this panel announced every keyboard move unconditionally
+   * while the toolbar and the canvas were already gated on the same boolean.
+   * `moveNode` returns the identical root for a move the tree refuses -- a kit
+   * that mis-flags a container is the ordinary way in -- so a screen-reader
+   * user was told a component moved when it had not, which is worse than
+   * silence because it is the only feedback they get.
+   */
+  onMove: (key: string, parentKey: string, index: number) => boolean
   /** Copy a component in beside itself. Returns the new key, or nothing if refused. */
   onDuplicate: (key: string) => string | undefined
   /** Text for the live region, so a keyboard move is not silent. */
@@ -227,7 +237,16 @@ export function Tree({
             announce(node.key + ' cannot move that way.')
             return
           }
-          onMove(node.key, target.parentKey, target.index)
+          /*
+           * `moveTarget` said where, and the tree says whether. The two
+           * disagree when a kit declares a container that cannot hold this
+           * node, which is the case this branch was announcing through.
+           */
+          if (!onMove(node.key, target.parentKey, target.index)) {
+            announce(node.key + ' cannot move that way.')
+            return
+          }
+
           announce(describeMove(node.key, direction))
           // The row is re-rendered in its new place; put focus back on it.
           focusRowSoon(node.key)
