@@ -6,7 +6,7 @@
  */
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
-import { keyProblem } from './keys.js'
+import { MAX_KEY_LENGTH, keyProblem } from './keys.js'
 import { rowScopeProblems } from './rows.js'
 import type {
   ActionRef,
@@ -230,7 +230,33 @@ function copyKey(taken: Set<string>, key: string): string {
 
   let n = from
   while (taken.has(base + String(n))) n += 1
-  return base + String(n)
+  const minted = base + String(n)
+
+  /*
+   * Bounded the way `generateKey` is bounded.
+   *
+   * `generateKey` goes through `keyProblem`, which refuses anything over
+   * `MAX_KEY_LENGTH`; this one minted whatever it liked, so duplicating a
+   * component with a 128-character key produced a 129-character key -- a
+   * document this same package's `validateDocument` then reports as
+   * `invalid-key`. A mint that produces a document the gate refuses is not a
+   * mint.
+   *
+   * Trimmed from the base rather than refused, because a duplicate has to be
+   * named something and the digits are what make it unique.
+   */
+  if (minted.length <= MAX_KEY_LENGTH) return minted
+
+  const suffix = String(n)
+  const room = MAX_KEY_LENGTH - suffix.length
+  let trimmed = base.slice(0, Math.max(1, room)) + suffix
+  let bump = n
+  while (taken.has(trimmed)) {
+    bump += 1
+    const next = String(bump)
+    trimmed = base.slice(0, Math.max(1, MAX_KEY_LENGTH - next.length)) + next
+  }
+  return trimmed
 }
 
 /**
@@ -507,7 +533,24 @@ export function insertNode(
   index?: number,
 ): ComponentNode {
   return updateNode(root, parentKey, (parent) => {
-    const children = [...(parent.children ?? [])]
+    /*
+     * A leaf is not given children here either.
+     *
+     * `moveNode` grew this guard and `insertNode` did not, though `moveNode`
+     * composes remove-then-*insert* -- so the rule lived one call above the
+     * function that breaks it, and a host calling `insertNode` directly got a
+     * text field with a field inside it: a subtree no renderer draws, which
+     * `validateForm` and `toJsonSchema` keep walking, so the document asks for
+     * an answer nobody can give. `moveNode`'s comment says the API is "the
+     * worse of the two places to leave it"; this is that place.
+     *
+     * Asked of the node, the way `isRowScope` asks: a container is
+     * instantiated with a `children` array and a leaf is not, so no kit is
+     * needed here.
+     */
+    if (!Array.isArray(parent.children)) return parent
+
+    const children = [...parent.children]
 
     /*
      * A clamp that also handles what a clamp cannot.
