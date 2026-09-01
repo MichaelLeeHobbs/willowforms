@@ -1137,8 +1137,20 @@ describe('which node a duplicate key resolves to', () => {
      */
     const root = twoNamed()
     const resolved = findNode(root, 'x')
+    const atFormLevel = root.children?.[0]
     const insideRepeater = root.children?.[1]?.children?.[0]
 
+    /*
+     * Which node it IS, not only which it is not.
+     *
+     * `expect(resolved).not.toBe(insideRepeater)` passes when `findNode`
+     * returns `undefined`, so the assertion held for a `findNode` that stopped
+     * finding anything at all -- partially vacuous, and raised in review on PR
+     * #45. Naming the expected node makes both halves of "the two agree" say
+     * something.
+     */
+    expect(atFormLevel, 'the fixture has no form-level x').toBeDefined()
+    expect(resolved, 'findNode did not resolve x at all').toBe(atFormLevel)
     expect(resolved).not.toBe(insideRepeater)
     expect(keyScopesFor(root, 'x').row).toBeUndefined()
   })
