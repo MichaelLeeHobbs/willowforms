@@ -560,16 +560,43 @@ export function applyRule(
   if (rule.key === 'required') return isMissing(value) ? fail() : undefined
   if (isEmpty(value)) return undefined
 
+  /*
+   * A measuring rule with nothing to measure against fails, and it silently
+   * passed.
+   *
+   * `lengthOf(value) < rule.value` and `held < rule.value` are both `false`
+   * whenever `rule.value` is `undefined` or a non-number -- every comparison
+   * against `undefined` is -- so `{"key":"min"}` left the field completely
+   * unconstrained on the server while the Rules tab went on listing the rule.
+   * The permissive direction, in a file that hardens against it everywhere
+   * else.
+   *
+   * The `pattern` case a few lines down got exactly this guard, with a comment
+   * saying a valueless rule "reaches here from a paste". The same paste reaches
+   * these four, and they were left. Same answer, same reason: what cannot be
+   * checked has not been satisfied.
+   *
+   * The parameter is typed `number` and the check is still made, because a
+   * document is data: the type describes what a well-formed rule holds, not
+   * what arrives. That is the same reasoning `pattern` states one case down for
+   * a field its own type calls a string.
+   */
+  const measurable = (bound: number): boolean => typeof bound === 'number' && Number.isFinite(bound)
+
   switch (rule.key) {
     case 'minLength':
+      if (!measurable(rule.value)) return fail()
       return lengthOf(value) < rule.value ? fail() : undefined
     case 'maxLength':
+      if (!measurable(rule.value)) return fail()
       return lengthOf(value) > rule.value ? fail() : undefined
     case 'min': {
+      if (!measurable(rule.value)) return fail()
       const held = comparableNumber(value)
       return held === undefined || held < rule.value ? fail() : undefined
     }
     case 'max': {
+      if (!measurable(rule.value)) return fail()
       const held = comparableNumber(value)
       return held === undefined || held > rule.value ? fail() : undefined
     }
