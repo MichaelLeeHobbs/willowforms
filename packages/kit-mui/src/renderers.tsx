@@ -596,8 +596,14 @@ function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
        * text and says why. Without the attribute the element falls back to its
        * `alt`, which is the platform's own answer and the nearest thing to what
        * the link does.
+       *
+       * A plain prop rather than a conditional spread, and it is equivalent
+       * because `safeHref` answers `undefined` for an unsafe address and for an
+       * empty one alike -- `if (!raw) return undefined` is its first line. React
+       * omits an attribute whose value is `undefined`, so this is the same
+       * markup with one call instead of two.
        */
-      {...(safeHref(props['src']) ? { src: safeHref(props['src']) } : {})}
+      src={safeHref(props['src'])}
       alt={str(props['alt'])}
       /*
        * `px(width)`, not the bare number.
