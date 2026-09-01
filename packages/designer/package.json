@@ -11,9 +11,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./package.json": "./package.json",
     "./styles.css": "./dist/designer.css"
   },
   "files": [
+    "LICENSE",
     "dist",
     "src",
     "!src/**/*.test.ts",
