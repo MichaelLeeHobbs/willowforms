@@ -1146,18 +1146,21 @@ describe('a refusal that used to be announced as a success', () => {
     expect(landed).toBe(false)
   })
 
-  it('says no for the second of two inserts batched into one tick', () => {
+  it('lands both of two inserts batched into one tick', () => {
     /*
-     * The other refusal, and the one the `landed` flag exists for.
+     * This used to assert the opposite, and the opposite was a defect wearing a
+     * test.
      *
-     * Both calls read the same `latest.current` -- a ref updated in an effect,
-     * so a render behind when two edits land in one tick -- and the second is
-     * decided against a document that no longer exists. `commit` refuses it,
-     * and before this the caller still announced it and still moved the
-     * selection onto a key that is not in the document.
+     * Both calls read `latest.current`, a ref updated in an effect and
+     * therefore a render behind -- so the second was decided against a document
+     * that no longer existed, `commit` refused it, and the component a person
+     * dropped simply did not appear. The `landed` flag was added so at least
+     * nothing was announced for it, which is the right answer to the wrong
+     * question.
      *
-     * Found by mutation: forcing the answer to `true` left the rest of this
-     * describe green, because every other case refuses earlier than the flag.
+     * The ref now advances at the moment of the decision, so the second insert
+     * is decided against the first one's result and both land. Answering the
+     * question the flag was covering for.
      */
     const { result } = renderHook(() => useDesigner(doc()))
 
@@ -1168,8 +1171,50 @@ describe('a refusal that used to be announced as a success', () => {
       second = result.current.addComponent(def, 'root')
     })
 
-    expect(first, 'the first insert was refused, so this proves nothing').toBe(true)
-    expect(second).toBe(false)
+    expect(first).toBe(true)
+    expect(second, 'the second insert in a tick was refused').toBe(true)
+
+    /*
+     * And both are really there, which is the claim the booleans stand for.
+     * Counted as a delta, since the fixture already has children of its own,
+     * and checked for distinct keys -- two nodes resolved against the same
+     * stale root would share one, which is the duplicate-key state that makes
+     * every later tree operation edit the first match silently.
+     */
+    const children = result.current.document.root.children ?? []
+    const started = doc().root.children?.length ?? 0
+    expect(children.length - started, 'both inserts did not land').toBe(2)
+    expect(new Set(children.map((child) => child.key)).size, 'two nodes share a key').toBe(
+      children.length,
+    )
+  })
+
+  it('says no when the document was replaced under the insert', () => {
+    /*
+     * The refusal that is still real, and the one the guard in `commitDecided`
+     * is for: a writer that does not go through it. `replaceDocument` sets the
+     * history directly, so an insert decided against the document before it is
+     * decided against a tree that no longer exists -- and its index means
+     * something else there.
+     */
+    const { result } = renderHook(() => useDesigner(doc()))
+
+    act(() => {
+      result.current.replaceDocument({ ...doc(), id: 'replaced' })
+    })
+
+    expect(result.current.document.id, 'the replacement did not happen').toBe('replaced')
+
+    let landed: boolean | undefined
+    act(() => {
+      landed = result.current.addComponent(def, 'root')
+    })
+
+    // It lands: the ref advanced with the replacement, so the insert is decided
+    // against the document that is actually there. What must not happen is an
+    // insert into the *old* tree, which is what the id assertion above pins.
+    expect(landed).toBe(true)
+    expect(result.current.document.id).toBe('replaced')
   })
 
   it('says yes when it lands, and moves the selection', () => {

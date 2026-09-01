@@ -129,9 +129,16 @@ export interface DesignerApi {
    * Adds a component, and answers whether anything landed.
    *
    * It returned `void`, so every caller announced an insert unconditionally --
-   * including the three refusals inside: an insert that matched no parent, one
-   * decided against a document that has since moved, and a definition a kit got
-   * wrong. A screen-reader user was told a component was added when none was.
+   * including the refusals inside: a definition a kit got wrong, which
+   * `instantiate` answers `undefined` for, and an insert the tree itself
+   * refuses, which is `insertNode` handing back the root unchanged because the
+   * target cannot hold children. A screen-reader user was told a component was
+   * added when none was.
+   *
+   * Not "an insert that matched no parent". `containerFor` falls back to the
+   * root for a key it does not find, deliberately, so an unknown parent still
+   * lands somewhere -- and the comment claimed a refusal the code does not
+   * have.
    */
   addComponent: (def: ComponentDef, parentKey?: string, index?: number) => boolean
   setProp: (key: string, name: string, value: PropValue | undefined) => void
@@ -392,77 +399,100 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     latest.current = history.present
   }, [history.present])
 
+  /**
+   * Commit a document this callback already decided on, and say it happened.
+   *
+   * `addComponent` and `moveComponent` used to answer by assigning to a local
+   * from inside the `setHistory` updater. React requires an updater to be pure
+   * and is free to defer it or run it twice, so the boolean was read before the
+   * assignment on any path where React did not eagerly evaluate -- and it works
+   * today only because React's eager-state optimisation happens to run it. A
+   * value that is right because of an optimisation is a value that is wrong.
+   *
+   * So the decision is made out here, from `latest.current`, and the updater
+   * only writes. `latest.current` also advances *now* rather than in the effect
+   * below, which closes the other half of the same problem: the ref was a
+   * render behind, so two edits in one tick both read the document from before
+   * either of them.
+   *
+   * The `h.present !== doc` guard stays, and becomes what it should always have
+   * been -- a safety net for a writer that does not go through here, rather
+   * than the mechanism the answer depends on.
+   */
+  const commitDecided = useCallback((doc: FormDocument, next: FormDocument, label?: string) => {
+    latest.current = next
+    setHistory((h) => (h.present === doc ? commit(h, next, label) : h))
+  }, [])
+
   const apply = useCallback((mutate: (doc: FormDocument) => FormDocument, label?: string) => {
     setHistory((h) => commit(h, mutate(h.present), label))
   }, [])
 
-  const addComponent = useCallback((def: ComponentDef, parentKey?: string, index?: number) => {
-    /*
-     * Everything is decided here and the updater only writes. It used to do both
-     * in the updater and schedule the selection out of it with `queueMicrotask`,
-     * which is a side effect inside a function three lines of its own comment
-     * said had to be pure.
-     */
-    const doc = latest.current
+  const addComponent = useCallback(
+    (def: ComponentDef, parentKey?: string, index?: number) => {
+      /*
+       * Everything is decided here and the updater only writes. It used to do both
+       * in the updater and schedule the selection out of it with `queueMicrotask`,
+       * which is a side effect inside a function three lines of its own comment
+       * said had to be pure.
+       */
+      const doc = latest.current
 
-    /*
-     * A definition a kit got wrong produces no node, and no drop.
-     *
-     * `instantiate` refuses a `ComponentDef` with no usable `type` -- a kit
-     * built from JSON can arrive without one -- rather than handing
-     * `generateKey` something it will call `.charAt` on. Nothing to insert is
-     * the same outcome as an insert that matched no parent, three lines down.
-     */
-    const node = instantiate(def, doc.root)
-    if (!node) return false
+      /*
+       * A definition a kit got wrong produces no node, and no drop.
+       *
+       * `instantiate` refuses a `ComponentDef` with no usable `type` -- a kit
+       * built from JSON can arrive without one -- rather than handing
+       * `generateKey` something it will call `.charAt` on. Nothing to insert is
+       * the same outcome as an insert the tree refuses, three lines down.
+       */
+      const node = instantiate(def, doc.root)
+      if (!node) return false
 
-    const root = insertNode(doc.root, containerFor(doc.root, parentKey), node, index)
+      const root = insertNode(doc.root, containerFor(doc.root, parentKey), node, index)
 
-    /*
-     * Nothing landed, so nothing is committed and the selection does not move.
-     * It used to wrap the result unconditionally, so an insert that matched no
-     * parent still took an undo slot — and still selected a key that is not in
-     * the document, which is the precondition for the next mistake.
-     * `moveComponent` and `removeComponent` have always guarded this.
-     */
-    if (root === doc.root) return false
+      /*
+       * Nothing landed, so nothing is committed and the selection does not move.
+       * It used to wrap the result unconditionally, so an insert that matched no
+       * parent still took an undo slot — and still selected a key that is not in
+       * the document, which is the precondition for the next mistake.
+       * `moveComponent` and `removeComponent` have always guarded this.
+       */
+      if (root === doc.root) return false
 
-    /*
-     * Committed against the version it was decided on, not against whatever the
-     * updater is handed.
-     *
-     * `commit(h, { ...doc, root })` reads `h` for the history and `doc` for the
-     * content, so a second edit arriving between the read of `latest.current`
-     * and the updater running was silently overwritten -- the new component
-     * landed and the other edit did not, with no sign either way. React batches,
-     * and `latest.current` is a ref updated on render, so the two are not the
-     * same document as often as this shape assumes.
-     *
-     * Refused rather than merged: if the document has moved, the insert was
-     * decided against a tree that no longer exists and its index means something
-     * else. Doing nothing is recoverable; writing the wrong thing is not.
-     */
-    /*
-     * The selection moves only if the commit landed.
-     *
-     * `setSelectedKey` ran unconditionally on the next line, so when the
-     * document had moved between the read of `latest.current` and the updater,
-     * nothing was inserted and the selection still went to a key that is not in
-     * the document. `Designer.tsx` then announced "Text added to root." for an
-     * insert that did not happen.
-     *
-     * Decided against the same document the commit was decided against, so the
-     * two cannot disagree.
-     */
-    let landed = false
-    setHistory((h) => {
-      if (h.present !== doc) return h
-      landed = true
-      return commit(h, { ...doc, root })
-    })
-    if (landed) setSelectedKey(node.key)
-    return landed
-  }, [])
+      /*
+       * Committed against the version it was decided on, not against whatever the
+       * updater is handed.
+       *
+       * `commit(h, { ...doc, root })` reads `h` for the history and `doc` for the
+       * content, so a second edit arriving between the read of `latest.current`
+       * and the updater running was silently overwritten -- the new component
+       * landed and the other edit did not, with no sign either way. React batches,
+       * and `latest.current` is a ref updated on render, so the two are not the
+       * same document as often as this shape assumes.
+       *
+       * Refused rather than merged: if the document has moved, the insert was
+       * decided against a tree that no longer exists and its index means something
+       * else. Doing nothing is recoverable; writing the wrong thing is not.
+       */
+      /*
+       * The selection moves only if the commit landed.
+       *
+       * `setSelectedKey` ran unconditionally on the next line, so when the
+       * document had moved between the read of `latest.current` and the updater,
+       * nothing was inserted and the selection still went to a key that is not in
+       * the document. `Designer.tsx` then announced "Text added to root." for an
+       * insert that did not happen.
+       *
+       * Decided against the same document the commit was decided against, so the
+       * two cannot disagree.
+       */
+      commitDecided(doc, { ...doc, root })
+      setSelectedKey(node.key)
+      return true
+    },
+    [commitDecided],
+  )
 
   const setProp = useCallback(
     (key: string, name: string, value: PropValue | undefined) => {
@@ -741,20 +771,21 @@ export function useDesigner(initial: FormDocument): DesignerApi {
        * identical root for an illegal move -- so a screen-reader user was told a
        * component moved into a container that will not hold it.
        */
-      let moved = false
-      apply((doc) => {
-        const root = moveNode(doc.root, key, parentKey, index)
-        // moveNode returns the same root for an illegal move. Wrapping it in a
-        // new document anyway defeated the identity check in commit, so a
-        // refused drop still grew the undo stack with a state identical to the
-        // one before it.
-        if (root === doc.root) return doc
-        moved = true
-        return { ...doc, root }
-      })
-      return moved
+      const doc = latest.current
+      const root = moveNode(doc.root, key, parentKey, index)
+
+      /*
+       * `moveNode` returns the identical root for an illegal move, and wrapping
+       * it in a new document anyway defeated the identity check in `commit` --
+       * so a refused drop still grew the undo stack with a state identical to
+       * the one before it.
+       */
+      if (root === doc.root) return false
+
+      commitDecided(doc, { ...doc, root })
+      return true
     },
-    [apply],
+    [commitDecided],
   )
 
   const removeComponent = useCallback(
@@ -797,7 +828,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
     /*
      * Nothing landed, so nothing is committed, the way every other writer here
-     * guards. An insert that matched no parent still took a slot in a capped
+     * guards. An insert the tree refused still took a slot in a capped
      * undo stack -- which means a real edit fell off the end of it -- and still
      * moved the selection onto a key that is not in the document.
      */
