@@ -41,11 +41,16 @@ function manifestOf(name: string): Manifest {
 describe('every package the directory holds', () => {
   it('was actually found', () => {
     /*
-     * The guard `check-dist.mjs` has for the same reason: a readdir that finds
-     * nothing would let every `it.each` below expand to zero cases and report
-     * success having checked no package at all.
+     * The guard `check-dist.mjs` has, for the same reason and in the same
+     * shape: a readdir that finds nothing would let every `it.each` below
+     * expand to zero cases and report success having checked no package at all.
+     *
+     * Non-empty rather than a floor of five. The count is not the invariant --
+     * splitting a package or dropping one is an ordinary change, and a number
+     * here would fail it with a message about packaging when nothing about
+     * packaging had broken.
      */
-    expect(names.length, 'no packages under packages/, so nothing below ran').toBeGreaterThan(4)
+    expect(names, 'no packages under packages/, so nothing below ran').not.toEqual([])
   })
 
   it.each(names)('%s ships the licence it declares', (name) => {
