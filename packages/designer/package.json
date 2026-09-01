@@ -14,6 +14,7 @@
     "./styles.css": "./dist/designer.css"
   },
   "files": [
+    "LICENSE",
     "dist",
     "src",
     "!src/**/*.test.ts",
