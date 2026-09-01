@@ -175,7 +175,20 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                     type="radio"
                     name="fs-default-language"
                     checked={isDefault}
-                    onChange={() => api.setLanguages(doc.languages, tag)}
+                    /*
+                     * The guarded list here too. Passing `doc.languages` back
+                     * would write whatever the document held -- including the
+                     * entries this panel refused to draw -- through an API that
+                     * takes `Language[]`, so a malformed entry would be handed
+                     * on as though it had been read.
+                     *
+                     * Writing `languages` instead does drop the unusable
+                     * entries, and that is the one place in this panel where
+                     * dropping is right: the author has chosen a default
+                     * language, which is an edit, and an edit writes what the
+                     * panel showed them.
+                     */
+                    onChange={() => api.setLanguages(languages, tag)}
                   />
                   Default
                 </label>
@@ -211,7 +224,20 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                   aria-label={'Remove ' + (nameOf(language) || tag)}
                   // A document with no languages renders every translation as its
                   // raw key, so the last one cannot be removed.
-                  disabled={doc.languages.length === 1}
+                  /*
+                   * `languages`, the guarded list, not `doc.languages`.
+                   *
+                   * This read the raw array for its length, so a document whose
+                   * `languages` is not one threw here -- during render, in the
+                   * panel that exists to survive exactly that, three lines after
+                   * the filter that was added for it.
+                   *
+                   * The rule is unchanged: a document with no languages renders
+                   * every translation as its raw key, so the last one cannot be
+                   * removed. It is now the last one this panel can *draw*, which
+                   * is the only one a person can act on anyway.
+                   */
+                  disabled={languages.length === 1}
                   onClick={() => remove(at)}
                 >
                   &times;

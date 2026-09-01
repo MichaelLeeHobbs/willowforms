@@ -18,6 +18,7 @@ import type { ComponentNode, FormDocument, Kit, Language } from '@formsmith/core
 import { languageTag } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
+import { isLanguage } from '../language.js'
 import { Designer } from '../Designer.js'
 import { modesFor, translationKey } from './Binding.js'
 
@@ -65,7 +66,13 @@ function makeDocument(
     root: { key: 'root', type: 'Screen', props: {}, children: [field] },
     actions: {},
     languages,
-    defaultLanguage: languages[0] ? languageTag(languages[0]) : 'en',
+    /*
+     * Guarded, because this fixture is handed malformed `languages` on purpose
+     * by the describe at the end of this file -- and a fixture that throws
+     * while building a bad document cannot test what the panel does with one.
+     */
+    defaultLanguage:
+      Array.isArray(languages) && isLanguage(languages[0]) ? languageTag(languages[0]) : 'en',
     translations: {},
     settings: {},
   }
@@ -759,6 +766,51 @@ describe('a document whose languages are not languages', () => {
     await view.openTab('Settings')
 
     expect(screen.getByText('Languages').textContent).toContain('1')
+  })
+
+  it.each([
+    ['not an array at all', 'en'],
+    ['a number', 5],
+    ['null', null],
+  ])('opens the settings tab when languages is %s', async (_what, languages) => {
+    /*
+     * The Remove button read `doc.languages.length` for its `disabled`, three
+     * lines after the filter added to survive a malformed document -- so a
+     * `languages` that is not an array threw during render, in the panel that
+     * exists to survive exactly that.
+     *
+     * `Array.isArray` in the filter answers `[]`, so the panel draws nothing
+     * and stays up. Which is the right answer: a document with no readable
+     * languages has none to show.
+     */
+    const view = junk(languages)
+    await view.openTab('Settings')
+
+    expect(screen.queryAllByRole('checkbox', { name: 'Right to left' })).toHaveLength(0)
+    // And the tab really is open, rather than the assertion above holding
+    // because nothing rendered.
+    expect(screen.getByText('Languages')).toBeTruthy()
+  })
+
+  it('refuses to remove the last language it can draw', async () => {
+    /*
+     * The Remove button read `doc.languages.length`, so a document with one
+     * usable language and one unusable one counted two and offered to remove
+     * the only one there is -- leaving a document whose every translation
+     * renders as its raw key, which is the state the button is disabled to
+     * prevent.
+     *
+     * Not a crash: the row that reads it only renders when `doc.languages` is
+     * an array, so the raw read never threw. It was simply counting something
+     * other than what the panel had drawn.
+     */
+    const view = junk([{}, { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    const remove = screen.getByRole('button', { name: /^Remove / })
+    expect(remove.hasAttribute('disabled'), 'the only drawable language can still be removed').toBe(
+      true,
+    )
   })
 
   it('leaves an entry it cannot draw in the document', async () => {
