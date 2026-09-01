@@ -116,7 +116,30 @@ export function Rules({ api }: RulesProps): ReactNode {
    * on the canvas and took the whole designer down the moment this tab opened.
    * The panel is where somebody goes to repair such a document.
    */
-  const rules = Array.isArray(schema.validations) ? schema.validations : []
+  /*
+   * And every entry has to be a rule, not only the list an array.
+   *
+   * `Array.isArray` alone was blessed as sufficient and is not: an array whose
+   * entries are junk passes it and crashes one line later at
+   * `new Set(rules.map((r) => r.key))` on `validations: [null]`.
+   *
+   * `validateDocument` does reject that entry -- but `store.ts` only *warns*
+   * for a host-supplied `initialDocument`, which is precisely the path the
+   * docblock above says is ungated. A host restoring
+   * `{"schema":{"type":"string","validations":[null]}}` took the designer down
+   * on opening this tab, and this is the panel somebody opens to repair it.
+   */
+  const rules = (Array.isArray(schema.validations) ? schema.validations : []).filter(
+    (rule): rule is ValidationRule =>
+      // Read through `{ key?: unknown }` rather than through `ValidationRule`.
+      // The static type already says every entry is one, which is the claim
+      // being checked -- asserting to it says nothing and TypeScript rightly
+      // calls the assertion redundant. The document is JSON a host may never
+      // have gated, so the narrower type is what the runtime actually has.
+      Boolean(rule) &&
+      typeof rule === 'object' &&
+      typeof (rule as { key?: unknown }).key === 'string',
+  )
   const write = (next: Partial<FieldSchema>): void =>
     api.setFieldSchema(node.key, { ...schema, ...next })
 

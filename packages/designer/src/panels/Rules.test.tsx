@@ -567,6 +567,22 @@ describe('a schema a paste can produce', () => {
     ['a string', 'required'],
     ['a number', 5],
     ['null', null],
+    /*
+     * An *array* whose entries are junk, which this table did not have -- so it
+     * blessed `Array.isArray(schema.validations)` as a sufficient guard when it
+     * is not. Such a list passes that check and crashes one line later at
+     * `new Set(rules.map((r) => r.key))`.
+     *
+     * `validateDocument` does reject these entries, and `store.ts` only *warns*
+     * for a host-supplied `initialDocument` -- which is exactly the path this
+     * describe's own docblock says is ungated, and the one a restored document
+     * takes.
+     */
+    ['a list holding null', [null]],
+    ['a list holding a string', ['required']],
+    ['a list holding a number', [5]],
+    ['a list holding an object with no key', [{ message: 'nope' }]],
+    ['a list mixing a real rule with junk', [{ key: 'required' }, null]],
   ])('opens the tab with validations %s', async (_what, validations) => {
     const { selectRow, openRules } = setup([], malformed(validations))
     await selectRow('email')
@@ -576,6 +592,41 @@ describe('a schema a paste can produce', () => {
     // to draw its controls rather than take the designer down.
     expect(screen.getByLabelText('Data type')).toBeTruthy()
     expect(screen.getByLabelText('Add a rule')).toBeTruthy()
+  })
+
+  it('still draws the rules a well-formed document has', async () => {
+    /*
+     * The control. Filtering every entry out would pass every row above while
+     * emptying the panel for every real document.
+     */
+    const { selectRow, openRules } = setup([], malformed([{ key: 'required' }]))
+    await selectRow('email')
+    await openRules()
+
+    expect(screen.getAllByRole('button', { name: /^Remove/ }).length).toBeGreaterThan(0)
+  })
+
+  it('keeps the real rule in a list that also holds junk', async () => {
+    /*
+     * The half that says the filter is a filter rather than an early return: a
+     * list of one real rule plus junk draws the same rules as that rule alone.
+     *
+     * Counted as a comparison rather than against a literal, because the panel
+     * draws Remove buttons for things other than rules and pinning a number
+     * would be pinning the panel's whole shape.
+     */
+    const drawn = async (validations: unknown): Promise<number> => {
+      const view = setup([], malformed(validations))
+      await view.selectRow('email')
+      await view.openRules()
+      const count = view.view.container.querySelectorAll('.fs-rule').length
+      view.view.unmount()
+      return count
+    }
+
+    const clean = await drawn([{ key: 'required' }])
+    expect(clean, 'no rule row was drawn at all, so this proves nothing').toBeGreaterThan(0)
+    expect(await drawn([null, { key: 'required' }, 5])).toBe(clean)
   })
 
   it('adds a rule to a schema whose validations were not a list', async () => {
