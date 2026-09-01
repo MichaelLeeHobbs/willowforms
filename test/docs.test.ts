@@ -390,7 +390,29 @@ describe('the specification index', () => {
       expect(at, 'no RESERVED_KEYS array to read').toBeGreaterThan(-1)
 
       const from = text.indexOf('\n', at)
-      const list = text.slice(from, text.indexOf(']', from))
+
+      /*
+       * The bracket that closes a multi-line array is the first one standing at
+       * the start of a line. Plain `indexOf(']')` finds the next bracket
+       * anywhere -- including one belonging to something else further down the
+       * file, which is what made deleting this array's own `]` invisible to an
+       * earlier version of this check.
+       */
+      const found = /^\s*\]/m.exec(text.slice(from))
+      const close = found ? from + found.index : -1
+
+      /*
+       * A missing `]` is a broken read, not an empty list.
+       *
+       * `indexOf` answers -1, and `slice(from, -1)` is the rest of the file
+       * short one character -- so this would have returned every quoted string
+       * below the array and reported a difference that is not there, or, worse,
+       * matched by accident. A guard that cannot find what it is reading has to
+       * say so.
+       */
+      expect(close, 'the RESERVED_KEYS array is not closed').toBeGreaterThan(from)
+
+      const list = text.slice(from, close)
       return [...list.matchAll(/'([^']+)'/g)].map((match) => match[1] ?? '').sort()
     }
 
@@ -411,15 +433,32 @@ describe('the specification index', () => {
      * nor the prose, so a host importing generated documents met `invalid-key`
      * on a name satisfying every rule the contract stated.
      */
+    /*
+     * Read both sides first, then check each is there, then compare.
+     *
+     * `exec(...)?.[1]` is `undefined` when the pattern stops matching, and
+     * `undefined === undefined` passes -- so a whitespace change in either file
+     * would have turned both of these into assertions that compare nothing and
+     * report success. That is the failure this whole test exists to prevent,
+     * one level up.
+     */
+    const figure = (expression: RegExp, text: string, what: string): string => {
+      const found = expression.exec(text)?.[1]
+      expect(found, 'no ' + what + ' to read, so this compared nothing').toBeDefined()
+      return found ?? ''
+    }
+
     const pattern = /KEY_PATTERN = (\S+)/
-    expect(pattern.exec(spec)?.[1], 'the published pattern is not the exported one').toBe(
-      pattern.exec(keys)?.[1],
-    )
+    expect(
+      figure(pattern, spec, 'published KEY_PATTERN'),
+      'the published pattern is not the exported one',
+    ).toBe(figure(pattern, keys, 'exported KEY_PATTERN'))
 
     const bound = /MAX_KEY_LENGTH = (\d+)/
-    expect(bound.exec(spec)?.[1], 'the published length bound is not the exported one').toBe(
-      bound.exec(keys)?.[1],
-    )
+    expect(
+      figure(bound, spec, 'published MAX_KEY_LENGTH'),
+      'the published length bound is not the exported one',
+    ).toBe(figure(bound, keys, 'exported MAX_KEY_LENGTH'))
   })
 
   it.each([
