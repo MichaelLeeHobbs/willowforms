@@ -214,5 +214,5 @@ than the store.
 
 Out of scope for that item because it is a new structural error code, which changes what every host's
 boot gate reports about documents stored today. `docs/decisions.md` records the reasoning under the
-rename entry. The shape is `rowScopeProblems`': walk the tree, collect the data keys anything writes,
+rename entry. The shape is the one `rowScopeProblems` uses: walk the tree, collect the data keys anything writes,
 report each ref that names none of them, under its own code so a host can decide what to do about it.

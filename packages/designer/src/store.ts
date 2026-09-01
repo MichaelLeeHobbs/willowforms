@@ -631,11 +631,32 @@ export function useDesigner(initial: FormDocument): DesignerApi {
        * `docs/decisions.md` records why re-pointing rather than the three other
        * defensible answers.
        */
-      const movedName = dataKeyOf(findNode(history.present.root, key) as ComponentNode)
+      const before = findNode(history.present.root, key) as ComponentNode
+      const movedName = dataKeyOf(before)
       const alsoWrites = writersOf(history.present.root, movedName).filter(
         (each: string) => each !== key,
       )
-      const followsTheRename = alsoWrites.length === 0 && movedName === key
+
+      /*
+       * Three conditions, and `movedName === key` was standing in for two of
+       * them badly.
+       *
+       * The answer only moves when the node has no `dataKey` of its own, since
+       * `dataKeyOf` is `node.dataKey ?? node.key` and an explicit one does not
+       * follow the key. `movedName === key` is true for a node whose `dataKey`
+       * is spelled out and happens to equal its key -- a shape a host's JSON
+       * produces and the designer's own key editor can leave behind -- and for
+       * that node the rename moves nothing, so re-pointing every ref would send
+       * them all at a name nothing writes. Exactly the defect this code exists
+       * to prevent, caused by the fix for it.
+       *
+       * And a node with no `schema` writes no answer at all, so there is
+       * nothing for a ref to have been reading. `writersOf` already tests
+       * `node.schema`, which is why `alsoWrites` is empty for one of these and
+       * the gate read that emptiness as "sole writer".
+       */
+      const followsTheRename =
+        alsoWrites.length === 0 && before.schema !== undefined && before.dataKey === undefined
 
       apply((doc) => {
         const renamed = updateNode(doc.root, key, (node) => ({

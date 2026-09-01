@@ -1018,8 +1018,77 @@ describe('a rename that moves the answer name with it', () => {
       result.current.renameKey('email', 'emailAddress')
     })
 
-    expect(refOf(result.current.document, 'answers')).toBeUndefined()
+    /*
+     * The renamed node kept the answer name it was given.
+     *
+     * This used to read `refOf(document, 'answers')`, which looks up a node
+     * *keyed* `answers` -- there is none, so it answered `undefined` however
+     * the rename behaved. A vacuous assertion sitting next to a real one, which
+     * is the harder kind to notice.
+     */
+    expect(findNode(result.current.document.root, 'emailAddress')?.dataKey).toBe('answers')
     expect(refOf(result.current.document, 'note')).toBe('answers')
+  })
+
+  it('leaves refs alone when the explicit dataKey happens to equal the key', () => {
+    /*
+     * The case the gate got wrong. It asked `dataKeyOf(node) === key`, which is
+     * true both for a node with no `dataKey` -- where the answer really does
+     * follow the rename -- and for one whose `dataKey` is spelled out and
+     * happens to equal its key, where it does not. A host's JSON produces that
+     * shape, and so does the key editor.
+     *
+     * Re-pointing there sends every ref at a name nothing writes, which is
+     * precisely the defect this whole feature exists to prevent.
+     */
+    const pinned: FormDocument = {
+      ...reading('email'),
+      root: {
+        ...reading('email').root,
+        children: (reading('email').root.children ?? []).map((child) =>
+          child.key === 'email' ? { ...child, dataKey: 'email' } : child,
+        ),
+      },
+    }
+
+    const { result } = renderHook(() => useDesigner(pinned))
+
+    act(() => {
+      result.current.renameKey('email', 'emailAddress')
+    })
+
+    // The answer did not move, so the ref must still name it.
+    expect(findNode(result.current.document.root, 'emailAddress')?.dataKey).toBe('email')
+    expect(refOf(result.current.document, 'note')).toBe('email')
+  })
+
+  it('leaves refs alone when the renamed node writes no answer', () => {
+    /*
+     * A node with no `schema` writes nothing, so no ref was reading it and
+     * there is nothing to follow. `writersOf` already tests `schema`, so
+     * `alsoWrites` came back empty for one of these and the gate read that
+     * emptiness as "sole writer" -- absence of writers taken for being the only
+     * one.
+     */
+    const container: FormDocument = {
+      ...reading('email'),
+      root: {
+        ...reading('email').root,
+        children: (reading('email').root.children ?? []).map((child) => {
+          if (child.key !== 'email') return child
+          const { schema: _schema, ...rest } = child
+          return { ...rest, type: 'Box' }
+        }),
+      },
+    }
+
+    const { result } = renderHook(() => useDesigner(container))
+
+    act(() => {
+      result.current.renameKey('email', 'emailAddress')
+    })
+
+    expect(refOf(result.current.document, 'note')).toBe('email')
   })
 
   it('still renames the node itself', () => {
