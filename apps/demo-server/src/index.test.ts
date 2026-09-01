@@ -478,6 +478,34 @@ describe('a store holding something that is not a document', () => {
     listRoot: { id: 'listRoot', root: [] },
     emptyRoot: { id: 'emptyRoot', root: {} },
     rootWithoutType: { id: 'rootWithoutType', root: { key: 'root', props: {} } },
+    /*
+     * A document missing a field its type declares. The guard says
+     * `doc is FormDocument`, so every caller past it may read `settings` or
+     * `translations` without asking -- and a hand-edited file is exactly where
+     * a dropped field comes from. A 404 here is the answer; a `TypeError` in
+     * whichever route reached it first is not.
+     */
+    noSettings: {
+      version: '1',
+      id: 'noSettings',
+      name: 'No settings',
+      root: { key: 'root', type: 'Screen', props: {} },
+      actions: {},
+      languages: [],
+      defaultLanguage: 'en',
+      translations: {},
+    },
+    wrongVersion: {
+      version: '2',
+      id: 'wrongVersion',
+      name: 'From the future',
+      root: { key: 'root', type: 'Screen', props: {} },
+      actions: {},
+      languages: [],
+      defaultLanguage: 'en',
+      translations: {},
+      settings: {},
+    },
   }
 
   const withJunk = async (extra: Record<string, unknown> = {}): Promise<void> => {

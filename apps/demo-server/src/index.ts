@@ -186,26 +186,41 @@ async function withStore<T>(
  * exists for, reproduced one level down, and a hand-edited file is exactly
  * where a scalar in that slot comes from.
  *
- * Still deliberately shallow: `key`, `type` and `props` are what a
- * `ComponentNode` must have for a walk to mean anything, and `validateDocument`
- * is the real check that every write goes through. This is the guard for a file
- * somebody edited behind the server's back.
+ * Every field `FormDocument` declares, because the signature says
+ * `doc is FormDocument` and that is a promise to the compiler. Checking two of
+ * nine and asserting all nine is the shape this repository has already fixed
+ * once in `isLanguage`: after the assertion nothing downstream questions
+ * anything, so a missing field is a `TypeError` in whichever caller reaches it
+ * first rather than a 404 here. The listing three hundred lines below was
+ * already writing `typeof doc.name === 'string' ? doc.name : ''` -- the file
+ * did not believe its own guard, which is the clearest evidence the promise was
+ * not being kept.
+ *
+ * Shallow within each field, deliberately. The root has to be a node for a walk
+ * to mean anything; whether that node's children are well formed is
+ * `validateDocument`'s question, and every write goes through it. This is the
+ * guard for a file somebody edited behind the server's back.
  */
 function isStoredDocument(doc: unknown): doc is FormDocument {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false
-  const shape = doc as { id?: unknown; root?: unknown }
-  if (typeof shape.id !== 'string' || shape.id === '') return false
 
-  const root = shape.root
-  if (!root || typeof root !== 'object' || Array.isArray(root)) return false
+  const object = (value: unknown): boolean =>
+    Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
-  const node = root as { key?: unknown; type?: unknown; props?: unknown }
+  const shape = doc as Record<string, unknown>
+  if (shape['version'] !== '1') return false
+  if (typeof shape['id'] !== 'string' || shape['id'] === '') return false
+  if (typeof shape['name'] !== 'string') return false
+  if (typeof shape['defaultLanguage'] !== 'string') return false
+  if (!Array.isArray(shape['languages'])) return false
+  if (!object(shape['actions'])) return false
+  if (!object(shape['translations'])) return false
+  if (!object(shape['settings'])) return false
+
+  if (!object(shape['root'])) return false
+  const node = shape['root'] as Record<string, unknown>
   return (
-    typeof node.key === 'string' &&
-    typeof node.type === 'string' &&
-    Boolean(node.props) &&
-    typeof node.props === 'object' &&
-    !Array.isArray(node.props)
+    typeof node['key'] === 'string' && typeof node['type'] === 'string' && object(node['props'])
   )
 }
 
@@ -411,7 +426,10 @@ app.get('/api/forms', async (c) => {
    */
   const rows = Object.values(store)
     .filter(isStoredDocument)
-    .map((doc) => ({ id: doc.id, name: typeof doc.name === 'string' ? doc.name : '' }))
+    // `name` is a string, because `isStoredDocument` says so and now checks it.
+    // This read `typeof doc.name === 'string' ? doc.name : ''`, which was the
+    // file hedging against its own type guard.
+    .map((doc) => ({ id: doc.id, name: doc.name }))
 
   return c.json(rows)
 })
