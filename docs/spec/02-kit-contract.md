@@ -162,10 +162,17 @@ A kit built on a design system with its own spacing scale converts at its edge, 
 now. That is the kit's job precisely because the scale is the kit's, and the document belongs to nobody.
 
 **What changed:** `@formsmith/kit-mui` reflows. A document that authored `gap: 2` against it rendered
-16px and now renders 2px. Its _defaults_ are unchanged -- the default was `gap: 2` through MUI's scale,
-which was 16px, and it is 16 pixels now -- so a form that never set a gap looks identical. Only an
-authored value moves, and it moves onto the meaning `kit-html`, `Grid`, `padding`, `radius`, `maxWidth`
-and `width` already had.
+16px and now renders 2px. An authored value moves onto the meaning `kit-html`, `Grid`, `padding`,
+`radius`, `maxWidth` and `width` already had.
+
+The defaults moved with it, and this paragraph used to claim they had not. It said "a form that never
+set a gap looks identical", which was true of `renderers.tsx` -- its fallback is 16px -- and false of
+the kit, because `definitions.ts` writes `defaultProps` into every node the designer creates. Those
+still said `gap: 2`, so a new `Screen`, `Stack`, `Step` or `Repeater` carried an authored 2 and rendered
+at 2px: eight times tighter than the same document on `kit-html`, which is the one thing this contract
+exists to prevent. `Grid` in the same file already said 16, so the kit disagreed with itself as well.
+All five now say 16, and `test/kit-contract.test.tsx` compares a shared prop's default across the two
+kits rather than trusting either.
 
 ## Accessibility is the kit's job
 
