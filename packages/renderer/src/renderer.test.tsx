@@ -1831,3 +1831,265 @@ describe('a translation that is not text', () => {
     expect(labelOf(translated('Courriel'))).toBe('Courriel')
   })
 })
+
+describe('a computed prop inside a repeater', () => {
+  /*
+   * `resolveProp`'s `computed` branch evaluated against top-level `data` only,
+   * so every row resolved the same expression against the same answers and got
+   * the same result. A computed label reading this row's street showed row
+   * one's on all of them, and nothing looked broken enough to report.
+   *
+   * The `condition` branch twelve lines above it already passed `options.row`,
+   * and `visibility.ts` and `validation.ts` both spread the row over `data`
+   * before evaluating -- with a comment in `visibility.ts` saying the branch
+   * below it "has always passed `options.row`". This was the fourth site and
+   * the only one left out.
+   */
+  const labelled = (): FormDocument =>
+    documentOf([
+      {
+        key: 'addressList',
+        dataKey: 'addresses',
+        type: 'Screen',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [
+          {
+            key: 'street',
+            dataKey: 'line1',
+            type: 'Field',
+            // The label is the row's own answer, read through the evaluator.
+            props: { label: { kind: 'computed', expression: 'line1' } },
+            schema: { type: 'string', validations: [] },
+          },
+        ],
+      },
+    ])
+
+  /*
+   * A real evaluator, not a stub returning a constant. A stub would answer the
+   * same for every row whether or not the scope reached it, which is the
+   * failure being tested -- the test would have passed against the defect.
+   */
+  const evaluate = (expression: string, data: FormData): string =>
+    typeof data[expression] === 'string' ? data[expression] : '(none)'
+
+  function Labelled({ nodeProps, props }: NodeRendererProps): ReactNode {
+    return <div {...nodeProps}>{typeof props['label'] === 'string' ? props['label'] : ''}</div>
+  }
+
+  const labelKit: RendererKit = { id: 'fake', renderers: { Screen: Screen_, Field: Labelled } }
+
+  it('reads the row it is in, not the top of the form', () => {
+    const { container } = render(
+      <FormRenderer
+        document={labelled()}
+        kit={labelKit}
+        data={{ addresses: [{ line1: 'one' }, { line1: 'two' }] }}
+        evaluate={evaluate}
+        onChange={() => undefined}
+      />,
+    )
+
+    const drawn = [...container.querySelectorAll('[data-fs-key="street"]')].map(
+      (each) => each.textContent,
+    )
+
+    expect(drawn, 'the repeater drew the wrong number of rows').toHaveLength(2)
+    expect(drawn).toEqual(['one', 'two'])
+  })
+
+  it('still reads the form when there is no row around it', () => {
+    // The control: outside a repeater nothing changes, and a top-level answer
+    // is still what a computed prop sees.
+    const { container } = render(
+      <FormRenderer
+        document={documentOf([
+          {
+            key: 'greeting',
+            type: 'Field',
+            props: { label: { kind: 'computed', expression: 'name' } },
+            schema: { type: 'string', validations: [] },
+          },
+        ])}
+        kit={labelKit}
+        data={{ name: 'Ada' }}
+        evaluate={evaluate}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="greeting"]')?.textContent).toBe('Ada')
+  })
+
+  it('lets the row shadow a form answer of the same name', () => {
+    /*
+     * The precedence `validation.ts` states in its own comment: the row is
+     * spread last, so a key the row holds wins and the form's shows through
+     * underneath. Asserted because "scoped to the row" could mean either
+     * direction and the other three sites already picked one.
+     */
+    const { container } = render(
+      <FormRenderer
+        document={labelled()}
+        kit={labelKit}
+        data={{ line1: 'the form answer', addresses: [{ line1: 'the row answer' }] }}
+        evaluate={evaluate}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-key="street"]')?.textContent).toBe('the row answer')
+  })
+})
+
+describe('the node boundary letting go', () => {
+  /*
+   * `getDerivedStateFromProps` cleared `failed` on a key or type change only,
+   * so the case its own docblock is written about -- "an author writes a
+   * property value that breaks a renderer, fixes it, and the box stays" -- was
+   * the case it did not cover. A prop edit changes neither the key nor the
+   * type.
+   */
+  function Fussy({ nodeProps, props }: NodeRendererProps): ReactNode {
+    if (props['label'] === 'boom') throw new Error('the kit refused this label')
+    return <div {...nodeProps}>{typeof props['label'] === 'string' ? props['label'] : ''}</div>
+  }
+
+  const fussyKit: RendererKit = { id: 'fake', renderers: { Screen: Screen_, Field: Fussy } }
+
+  const withLabel = (label: string): FormDocument =>
+    documentOf([
+      {
+        key: 'one',
+        type: 'Field',
+        props: { label: { kind: 'static', value: label } },
+        schema: { type: 'string', validations: [] },
+      },
+    ])
+
+  it('comes back when the prop that broke it is repaired', () => {
+    const { container, rerender } = render(
+      <FormRenderer
+        document={withLabel('boom')}
+        kit={fussyKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(
+      container.querySelector('[data-fs-failed]'),
+      'the kit did not throw, so nothing below this proves anything',
+    ).not.toBeNull()
+
+    rerender(
+      <FormRenderer
+        document={withLabel('fine')}
+        kit={fussyKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-failed]')).toBeNull()
+    expect(container.querySelector('[data-fs-key="one"]')?.textContent).toBe('fine')
+  })
+
+  it('stays down while the prop is still broken', () => {
+    /*
+     * The reason the retry is keyed on content rather than fired every render:
+     * retrying while the cause is still there is an infinite loop. A host that
+     * rebuilds its document object on each render must not trip it, which is
+     * what a fresh `withLabel('boom')` here is.
+     */
+    const { container, rerender } = render(
+      <FormRenderer
+        document={withLabel('boom')}
+        kit={fussyKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    rerender(
+      <FormRenderer
+        document={withLabel('boom')}
+        kit={fussyKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('[data-fs-failed]')).not.toBeNull()
+  })
+})
+
+describe('a document with no root', () => {
+  /*
+   * `document.root` was the one field `FormRenderer` did not guard, and the
+   * only one whose failure escapes every boundary: `NodeBoundary` reads
+   * `props.node.key` while constructing itself, so the throw happened above the
+   * thing meant to catch it. React 19 unmounts the host's whole tree on an
+   * uncaught render error, so a form that failed to load took the page with it.
+   */
+  const rootless = (root: unknown): FormDocument =>
+    ({ ...documentOf([]), root }) as unknown as FormDocument
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['a string', 'root'],
+    ['an object with no key', { type: 'Screen' }],
+  ])('renders a message rather than throwing when the root is %s', (_name, root) => {
+    /*
+     * The host's tree is what is being protected, so it is what is asserted on:
+     * a sibling rendered beside the form has to survive. Checking only that
+     * `render` did not throw would miss an unmount.
+     */
+    const { container } = render(
+      <div>
+        <span data-testid="host">still here</span>
+        <FormRenderer document={rootless(root)} kit={kit} data={{}} onChange={() => undefined} />
+      </div>,
+    )
+
+    expect(screen.getByTestId('host').textContent).toBe('still here')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('no root component')
+  })
+
+  it('renders the form normally when there is a root', () => {
+    // The control, so the guard cannot pass by refusing every document.
+    render(
+      <FormRenderer
+        document={documentOf([field('email')])}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+
+    expect(screen.getByLabelText('email')).toBeTruthy()
+  })
+})
+
+describe('children that are not nodes', () => {
+  /*
+   * `childrenOf` guarded that `children` was an array and not what was in it, so
+   * a `null` element threw at `child.key` inside `RenderNodeBody` -- above every
+   * child's own boundary. The parent's caught it, and one junk entry replaced
+   * the whole container and every sibling under it. The boundary is per node on
+   * purpose.
+   */
+  it('costs the junk entry and nothing else', () => {
+    const withJunk = documentOf([field('first'), null as unknown as ComponentNode, field('second')])
+
+    const { container } = render(
+      <FormRenderer document={withJunk} kit={kit} data={{}} onChange={() => undefined} />,
+    )
+
+    expect(screen.getByLabelText('first')).toBeTruthy()
+    expect(screen.getByLabelText('second')).toBeTruthy()
+    expect(container.querySelector('[data-fs-failed]'), 'a boundary caught something').toBeNull()
+  })
+})

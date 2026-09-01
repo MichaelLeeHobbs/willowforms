@@ -37,16 +37,23 @@ export const view = (
 A renderer receives resolved props and must spread `nodeProps` onto its outermost DOM element:
 
 ```tsx
+import { jsonToString } from '@formsmith/core'
 import type { NodeRendererProps } from '@formsmith/renderer'
 
 export function TextFieldNode({ nodeProps, value, onChange }: NodeRendererProps) {
   return (
-    <input {...nodeProps} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} />
+    <input {...nodeProps} value={jsonToString(value)} onChange={(e) => onChange(e.target.value)} />
   )
 }
 ```
 
-That puts `data-fs-key` and `data-fs-type` in the output. The designer's canvas selection is built on it,
+`jsonToString`, not `String(value ?? '')`. Both in-repo kits started with the latter and moved off it: a
+value that is an object renders as `[object Object]` straight into the input, which is a form the user
+cannot correct by typing.
+
+That puts `data-fs-key`, `data-fs-type` and `data-fs-scope` in the output. The scope is what keeps two
+forms on one page apart, `02-kit-contract.md` calls it load-bearing, and `test/kit-contract.test.tsx`
+enforces it per kit. The designer's canvas selection is built on it,
 and it doubles as a stable selector for end-to-end tests against a live form. A kit that drops it still
 renders correctly, but its components cannot be selected in the designer.
 

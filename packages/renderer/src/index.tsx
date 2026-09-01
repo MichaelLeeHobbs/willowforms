@@ -129,6 +129,58 @@ const Ctx = createContext<RenderContext | null>(null)
 const NO_ERRORS: FormErrors = Object.freeze({})
 const NO_TRANSLATIONS: Record<string, string> = Object.freeze({})
 
+/*
+ * One frozen empty object, for every node whose props read no answers.
+ *
+ * Frozen so nothing can write into the shared instance, and shared so its
+ * identity holds across renders -- which is the whole point, since the identity
+ * is what lets a props memo survive a keystroke.
+ */
+const NO_DATA: FormData = Object.freeze({})
+
+/**
+ * Whether resolving this node's props needs to look at the form's answers.
+ *
+ * `static` and `i18n` resolve from the node and the translation bundle alone.
+ * `computed` and `condition` read `data`, and so does anything this does not
+ * recognise -- the pessimistic direction on purpose, because being wrong the
+ * other way resolves a prop against an empty form. A missed memo costs a
+ * render; a prop resolved against nothing is a wrong label on screen.
+ */
+function readsData(node: ComponentNode): boolean {
+  const props: unknown = node.props
+  if (!props || typeof props !== 'object') return false
+
+  return Object.values(props as Record<string, unknown>).some((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+    const kind: unknown = (value as { kind?: unknown }).kind
+    return kind !== 'static' && kind !== 'i18n'
+  })
+}
+
+/**
+ * A node's own content, as a string, for deciding whether it has been edited.
+ *
+ * `children` is left out: each child sits inside a boundary of its own, so a
+ * child's repair is that boundary's question and not this one's. Everything
+ * else the renderer reads -- `key`, `type`, `props`, `schema`, `css`, `dataKey`
+ * -- is in, because any of them can be what broke a kit renderer.
+ *
+ * `JSON.stringify` on a document is safe: it is JSON already, so there are no
+ * cycles to trip over. A key holding something unserialisable would throw here
+ * rather than in a kit, so the whole thing is guarded -- a signature that
+ * cannot be computed is one that never matches, which leaves the fallback up
+ * rather than looping.
+ */
+function signatureOf(node: ComponentNode): string {
+  try {
+    const { children: _children, ...own } = node
+    return JSON.stringify(own) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 function useRenderContext(): RenderContext {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error('Formsmith renderer components must be used inside <FormRenderer>.')
@@ -193,7 +245,23 @@ export function resolveProp(
        * evaluator at all.
        */
       try {
-        return options.evaluate(value.expression, data, options.context)
+        /*
+         * Scoped to the row, which this was the last call site not to do.
+         *
+         * `visibility.ts:53` and `validation.ts:734` both spread `options.row`
+         * over `data` before evaluating, and the `condition` branch twelve
+         * lines up passes `options.row` straight through. This one read
+         * top-level `data` only, so a computed prop inside a repeater resolved
+         * the *same* value in every row: a computed label reading `price * qty`
+         * showed row one's answer on all of them, and nothing looked wrong
+         * enough to report.
+         *
+         * The row is spread last for the reason `validation.ts` states: a key
+         * the row holds shadows the form's, and an expression can still reach a
+         * form-level answer no field in the row writes.
+         */
+        const scoped = options.row ? { ...data, ...options.row.values } : data
+        return options.evaluate(value.expression, scoped, options.context)
       } catch {
         return null
       }
@@ -313,11 +381,14 @@ interface NodeBoundaryProps {
   children: ReactNode
 }
 
-class NodeBoundary extends Component<
-  NodeBoundaryProps,
-  { failed: boolean; forKey: string; forType: string }
-> {
-  override state = { failed: false, forKey: this.props.node.key, forType: this.props.node.type }
+type BoundaryState = { failed: boolean; signature: string | null }
+
+class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
+  // `null` is "no failure to compare against yet", not a signature. The
+  // signature is only read while failed, so computing one here would be work
+  // for nothing -- and `getDerivedStateFromError` has no props to compute it
+  // from, which is why the first failed render records it instead.
+  override state: BoundaryState = { failed: false, signature: null }
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true }
@@ -332,17 +403,36 @@ class NodeBoundary extends Component<
    * renderer, fixes it, and the box stays -- with nothing to click that would
    * bring the component back, because the box is what replaced it.
    *
-   * Keyed on the node's identity rather than on every render, because retrying
-   * on each render is an infinite loop when the cause has not gone away. A key
-   * or a type change means this boundary is being asked about a different
-   * component, which is a different question.
+   * Keyed on the node's content rather than on every render, because retrying
+   * on each render is an infinite loop when the cause has not gone away.
+   *
+   * Key and type alone were not enough, and the case they missed is the one the
+   * paragraph above is written about: an author writes a prop value that breaks
+   * a renderer and fixes it, and neither the key nor the type ever changed, so
+   * the box stayed. The retry fired for a *different component* and not for a
+   * repaired one.
+   *
+   * A signature over the node's own fields, so an edit anywhere in it is a new
+   * question. Not reference identity: a host is free to rebuild its document
+   * object on every render, and identity would then retry on every render --
+   * the infinite loop this is guarding against. `children` is excluded because
+   * each child has a boundary of its own.
+   *
+   * Computed only while failed, which is the whole reason this is affordable.
+   * A healthy node returns on the first line and stringifies nothing.
    */
   static getDerivedStateFromProps(
     props: NodeBoundaryProps,
-    state: { failed: boolean; forKey: string; forType: string },
-  ): { failed: boolean; forKey: string; forType: string } | null {
-    if (props.node.key === state.forKey && props.node.type === state.forType) return null
-    return { failed: false, forKey: props.node.key, forType: props.node.type }
+    state: BoundaryState,
+  ): BoundaryState | null {
+    if (!state.failed) return null
+
+    const signature = signatureOf(props.node)
+    // The render right after the throw. Record what failed; do not read the
+    // fallback as a repair.
+    if (state.signature === null) return { failed: true, signature }
+    if (signature === state.signature) return null
+    return { failed: false, signature: null }
   }
 
   override componentDidCatch(error: Error, _info: ErrorInfo): void {
@@ -454,9 +544,23 @@ function Row({
  * shape everywhere it walks a document -- `Array.isArray(node.children)` appears
  * in `rows.ts`, `context.ts` and `tree.ts`. A document is data, so `children`
  * can be a string, and `.map` on one throws during render.
+ *
+ * The elements are checked too, and that is a blast-radius question rather than
+ * a crash one. Guarding only the array left a `null` element to throw at
+ * `child.key` inside `RenderNodeBody` -- above every child's own boundary, so
+ * the *parent's* caught it and one bad entry replaced the whole container and
+ * every sibling under it. The boundary is per node on purpose; a junk element
+ * should cost the junk element.
+ *
+ * Dropped rather than rendered as a fallback box, because there is no node to
+ * describe: an entry with no `key` cannot be named, addressed or selected.
  */
 function childrenOf(node: ComponentNode): ComponentNode[] {
-  return Array.isArray(node.children) ? node.children : []
+  if (!Array.isArray(node.children)) return []
+  return node.children.filter(
+    (child): child is ComponentNode =>
+      Boolean(child) && typeof child === 'object' && typeof child.key === 'string',
+  )
 }
 
 function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
@@ -477,9 +581,27 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
    */
   const visible = isVisible(node, data, scoped)
 
+  /*
+   * `data` only when a prop actually reads it.
+   *
+   * The memo's dependency list held `data`, which is a new object on every
+   * keystroke, so for the case that matters it could never hit: a repeater near
+   * the `MAX_ROWS` cap re-ran `resolveProps` and allocated a fresh props
+   * identity for every node under every row on each keystroke, defeating
+   * exactly the identity comparison a memoising kit component does.
+   *
+   * `static` and `i18n` props resolve without looking at `data` at all, and
+   * that is most props in most documents. For those this passes a frozen empty
+   * object whose identity never changes, and the memo holds across a keystroke.
+   *
+   * `readsData` is deliberately pessimistic -- anything it does not recognise
+   * counts as reading -- so the failure it can have is a missed memo rather
+   * than a prop resolved against the wrong data.
+   */
+  const forProps = readsData(node) ? data : NO_DATA
   const props = useMemo(
-    () => resolveProps(node, translations, data, scoped),
-    [node, translations, data, scoped],
+    () => resolveProps(node, translations, forProps, scoped),
+    [node, translations, forProps, scoped],
   )
 
   // On the derived string, not on the node. Depending on the node re-creates
@@ -614,8 +736,11 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 /**
  * One node's blast radius, and it now covers the whole node.
  *
- * Nothing here can throw for a reason a document controls: it reads a context
- * and returns a boundary. `RenderNodeBody` does the work, inside it.
+ * Almost nothing here can throw for a reason a document controls: it reads a
+ * context and returns a boundary, and `RenderNodeBody` does the work inside it.
+ * Not a guarantee this code enforces, though -- `encodeRow`, `isVisible` and
+ * `NodeBoundary`'s own construction all run out here. Each is total against a
+ * document today, and each is a line that could stop being.
  *
  * This is also what gives the document root a boundary. `FormRenderer` renders
  * `<RenderNode node={document.root} />` with nothing above it, so a throw at the
@@ -634,6 +759,14 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       node={node}
       scope={scope}
       row={row ? encodeRow(row.path) : undefined}
+      /*
+       * Evaluated here and again in `RenderNodeBody`, but only on the canvas.
+       * `revealHidden` short-circuits first, so a host renderer calls
+       * `isVisible` once per node; the designer pays twice to draw the node it
+       * is about to mark hidden, which is the price of the boundary owning the
+       * attribute rather than the body that would otherwise have to hoist it
+       * out through a context.
+       */
       hidden={revealHidden && !isVisible(node, data, { ...options, ...(row ? { row } : {}) })}
       onError={onError}
     >
@@ -793,10 +926,37 @@ export function FormRenderer({
    * Every rule is scoped to a `data-fs-key`, which every renderer already
    * spreads, so this reaches exactly the elements the document names.
    */
+  /*
+   * The one document field that was not guarded, and the only one whose failure
+   * escapes every boundary.
+   *
+   * `translations` gets a full shape check above, with a comment saying a host
+   * "is free not to" call `validateDocument`. `document.root` went straight
+   * into `<RenderNode node={document.root} />`, and `NodeBoundary` reads
+   * `props.node.key` while constructing itself -- so a missing root threw
+   * outside the very boundary meant to contain it, and React 19 unmounts the
+   * host's whole tree on an uncaught render error. A form that fails to load
+   * takes the page around it down with it.
+   *
+   * A message rather than `null`, because a host embedding a form and seeing
+   * nothing has no way to tell "no root" from "the form rendered empty".
+   */
+  const root: unknown = document.root
+  const rooted =
+    Boolean(root) && typeof root === 'object' && typeof (root as { key?: unknown }).key === 'string'
+
   const sheet = useMemo(
-    () => styleSheetFor(document.root, { device, scope }),
-    [document.root, device, scope],
+    () => (rooted ? styleSheetFor(document.root, { device, scope }) : ''),
+    [rooted, document.root, device, scope],
   )
+
+  if (!rooted) {
+    return (
+      <div role="alert" data-fs-scope={scope} data-fs-failed="">
+        This form has no root component.
+      </div>
+    )
+  }
 
   return (
     <Ctx.Provider value={ctx}>
