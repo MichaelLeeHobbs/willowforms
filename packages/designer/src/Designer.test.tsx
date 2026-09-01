@@ -529,3 +529,69 @@ describe('a palette entry pressed and dragged', () => {
     expect(harness.latest().root.children?.length ?? 0).toBe(before + 1)
   })
 })
+
+describe('shell shortcuts and a target they cannot read', () => {
+  /*
+   * `backspaceIsSafe` inverted when `event.target` was not an `HTMLElement`.
+   *
+   * `target` was narrowed with `instanceof HTMLElement`, so anything else made
+   * it `null` -- and `Icon` renders SVG, whose elements are `SVGElement`. Then
+   * `target?.closest('[data-fs-tree-row]')` was `undefined`, and
+   * `undefined !== null` is `true`, so the keystroke was read as *safe* and
+   * removed the selected component. The clause on the line above guards the
+   * same case correctly with `=== true`, which is what made this easy to miss.
+   *
+   * The same `null` also defeated the modal guard, so all three failed open
+   * together -- and the destructive one failed open in the direction that
+   * destroys work.
+   */
+  const selectEmail = async (harness: Harness): Promise<void> => {
+    await harness.user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = harness.shell.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await harness.user.click(row)
+  }
+
+  const keys = (harness: Harness): (string | undefined)[] =>
+    (harness.latest().root.children ?? []).map((child) => child.key)
+
+  it('does not delete on Backspace from a target it cannot attribute', async () => {
+    const harness = setup()
+    await selectEmail(harness)
+
+    const before = keys(harness)
+    expect(before, 'the fixture has no email row, so this proves nothing').toContain('email')
+
+    // An SVG element: an `Element` but not an `HTMLElement`, which is the shape
+    // `Icon` puts on screen throughout the chrome.
+    const svg = harness.shell.querySelector('svg')
+    expect(svg, 'the chrome renders no SVG, so this fixture is wrong').not.toBeNull()
+
+    fireEvent.keyDown(svg as SVGElement, { key: 'Backspace', bubbles: true })
+
+    expect(keys(harness)).toEqual(before)
+  })
+
+  it('still deletes on Backspace from the shell itself', async () => {
+    /*
+     * The control, and the reason the guard is not simply "refuse everything":
+     * the shell and the tree rows are the two places Backspace can only mean
+     * "remove what is selected".
+     */
+    const harness = setup()
+    await selectEmail(harness)
+
+    fireEvent.keyDown(harness.shell, { key: 'Backspace' })
+
+    expect(keys(harness)).not.toContain('email')
+  })
+
+  it('still deletes on Delete, which is unambiguous from anywhere', async () => {
+    const harness = setup()
+    await selectEmail(harness)
+
+    fireEvent.keyDown(harness.shell, { key: 'Delete' })
+
+    expect(keys(harness)).not.toContain('email')
+  })
+})
