@@ -45,10 +45,15 @@ fighting specificity.
 | `--fs-accent`                 | Drop indicators                                     |
 | `--fs-danger`                 | Errors and destructive actions                      |
 | `--fs-radius`                 | Corner radius                                       |
+| `--fs-radius-sm`              | Half of it, for chrome drawn over the form          |
 | `--fs-panel-width`            | Side pane width                                     |
 | `--fs-scrollbar-thumb`        | Scrollbar thumb; the track is transparent           |
 | `--fs-font`, `--fs-font-size` | Type                                                |
 | `--fs-font-mono`              | The JSON editor, the raw CSS box, the code editor   |
+
+`--fs-radius-sm` derives from `--fs-radius` rather than standing on its own, so overriding the one
+squares off the selection frame, the selection toolbar's buttons and the rule count badge along with
+everything else. Six radii used to be written as literals and ignored the override entirely.
 
 ## HTML kit tokens
 

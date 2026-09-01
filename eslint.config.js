@@ -185,6 +185,20 @@ export default tseslint.config(
       // The new JSX transform is on, so React need not be in scope.
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+      /*
+       * `role="group"` alongside the default `tabpanel`.
+       *
+       * The rule's premise -- a non-interactive element should not be a tab
+       * stop -- inverts for a scrollable box. axe's
+       * `scrollable-region-focusable` requires exactly the `tabIndex` this rule
+       * refuses, because a region that scrolls and cannot take focus is content
+       * a keyboard user cannot reach. The preview's Data and Errors dumps are
+       * capped at 180px by `designer.css` and are that shape.
+       *
+       * Widened by one role rather than switched off, so a `tabIndex` on a
+       * `<div>` with no role at all is still an error.
+       */
+      'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['tabpanel', 'group'] }],
     },
   },
 
