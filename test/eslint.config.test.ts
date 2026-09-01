@@ -427,6 +427,18 @@ describe('the invariants are enforced by the linter, not only by CLAUDE.md', () 
       lint,
       '`eslint` exits 0 on warnings, so without --max-warnings 0 any rule at warn severity is unenforced',
     ).toContain('--max-warnings 0')
+
+    /*
+     * `lint:fix` too, or the two scripts disagree about what clean means. A
+     * contributor who runs the fixer, sees it exit 0 and pushes gets the
+     * failure from CI instead -- which is the same "the guard and the gate
+     * disagree, and the one that cannot fail is the one you ran" shape this
+     * whole item is about, one script over.
+     */
+    expect(
+      scripts['lint:fix'] ?? '',
+      'lint:fix exits 0 on warnings that pnpm lint and CI both refuse',
+    ).toContain('--max-warnings 0')
   })
 
   /*
