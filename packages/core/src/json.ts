@@ -45,9 +45,42 @@ export function jsonToString(value: JsonValue | undefined): string {
  * the author did not write.
  */
 const declaredOf = (option: unknown): { declared: JsonValue } | undefined => {
+  /*
+   * A bare scalar declares itself, which is what the branch below in
+   * `optionEntry` has always said and this did not.
+   *
+   * `options: ['Yes', 'No']` is the shortest thing an author writes and the
+   * shape every JSON Schema `enum` has. Passing the list made it render as `0`
+   * and `1` while the same list without one rendered `Yes` and `No` -- so the
+   * change that introduced the list-scoped rule reintroduced, for every caller
+   * that adopted it, the exact defect its own comment describes fixing. Both
+   * kits pass the list.
+   *
+   * `null` is not a scalar for this purpose: it is handled below, as a
+   * *declared* value on an object, and a bare `null` in a list is an option
+   * with no name at all.
+   */
+  if (typeof option === 'string' || typeof option === 'number' || typeof option === 'boolean') {
+    return { declared: option }
+  }
   if (option === null || typeof option !== 'object' || Array.isArray(option)) return undefined
   if (!Object.hasOwn(option, 'value')) return undefined
-  return { declared: (option as Record<string, JsonValue>)['value'] as JsonValue }
+
+  /*
+   * An own `value: undefined` is absent, not declared.
+   *
+   * `Object.hasOwn` alone said `{ label: 'None', value: undefined }` declared
+   * one, so it rendered as the empty string instead of falling back to its
+   * position -- and `undefined` is not a `JsonValue`, so the key is one
+   * `JSON.parse` would never produce and one `JSON.stringify` drops. It comes
+   * from an object literal a caller built, which is exactly where a key spelled
+   * out and left unset comes from.
+   *
+   * `null` is still declared, which is the distinction this function exists for
+   * and the paragraph above is about.
+   */
+  const declared = (option as Record<string, JsonValue | undefined>)['value']
+  return declared === undefined ? undefined : { declared }
 }
 
 /**
@@ -154,6 +187,31 @@ export function optionValue(options: readonly unknown[], submitted: string): Jso
  * declared value falls back to its position — so the value a control submits is
  * the string this returns.
  */
+/**
+ * `optionValues` for one list, computed once however many options ask.
+ *
+ * `optionEntry` is called from inside `options.map(...)` in both kits, and it
+ * called `optionValues(all)` on every one of those calls -- so a list of N
+ * options walked the whole list N times and rendering a long select was
+ * quadratic. The table is a property of the list, so it is cached against the
+ * list.
+ *
+ * Keyed by identity in a `WeakMap`: a list is an array a document holds, so it
+ * is stable across the map that renders it, and it is collected with the
+ * document. Identity rather than contents on purpose -- hashing the list to
+ * find the table would do the walk this exists to avoid.
+ */
+const tables = new WeakMap<readonly unknown[], string[]>()
+
+function valuesFor(all: readonly unknown[]): string[] {
+  const held = tables.get(all)
+  if (held) return held
+
+  const computed = optionValues(all)
+  tables.set(all, computed)
+  return computed
+}
+
 export function optionEntry(
   option: JsonValue | undefined,
   index: number,
@@ -180,9 +238,23 @@ export function optionEntry(
    * position is the only name such an option has.
    */
   const value = all
-    ? (optionValues(all)[index] ?? String(index))
+    ? (valuesFor(all)[index] ?? String(index))
     : (() => {
-        const declared = record ? record['value'] : option
+        /*
+         * `declaredOf`, not `record['value']`.
+         *
+         * The plain lookup read through the prototype chain, so an option
+         * object inheriting a `value` -- which is what a polluted
+         * `Object.prototype` gives every object literal in the process -- took
+         * a value nobody wrote. This branch exists only for a caller that does
+         * not pass the list, and a caller that has not been updated is the last
+         * one that should be reading through the prototype.
+         *
+         * `declaredOf` also settles `null` the same way here as it does above:
+         * declared, and distinct from absent.
+         */
+        const found = record ? declaredOf(record) : undefined
+        const declared = record ? found?.declared : option
         return declared === undefined || declared === null ? String(index) : jsonToString(declared)
       })()
   /*

@@ -601,3 +601,121 @@ describe('a dialect the gate would not call one', () => {
     expect(findLanguage(languages, 'en-US')?.code).toBe('en')
   })
 })
+
+describe('an option list that is not quite an option list', () => {
+  /*
+   * Three edge cases a reviewer found in the list-scoped option rule, none of
+   * which had a test. They are grouped because they are one question asked
+   * three ways: what counts as a value the author declared.
+   */
+  it('reads an own value of undefined as absent', () => {
+    /*
+     * `Object.hasOwn` said this option declared a value, so it rendered as the
+     * empty string rather than falling back to its position -- and `undefined`
+     * is not a `JsonValue`: `JSON.parse` never produces the key and
+     * `JSON.stringify` drops it. It comes from an object literal a caller
+     * built, which is where a key spelled out and left unset comes from.
+     */
+    const options = [
+      { label: 'None', value: undefined },
+      { label: 'One', value: 'one' },
+    ]
+
+    expect(optionEntry(options[0] as JsonValue, 0, options).value).toBe('0')
+    expect(optionEntry(options[1] as JsonValue, 1, options).value).toBe('one')
+  })
+
+  it('still reads an own value of null as declared', () => {
+    // The distinction the whole function exists for, and the control that stops
+    // the fix above from swallowing it.
+    const options = [{ label: 'None', value: null }]
+
+    // `jsonToString(null)` is the empty string, and the point is that it is
+    // that rather than the position: declared, not absent.
+    expect(optionEntry(options[0] as JsonValue, 0, options).value).toBe('')
+  })
+
+  it('does not read a value off the prototype', () => {
+    /*
+     * The compatibility branch -- no list passed -- used a plain lookup, so an
+     * option inheriting a `value` took one nobody wrote. A polluted
+     * `Object.prototype` gives that to every object literal in the process, and
+     * a caller that has not been updated is the last one that should be reading
+     * through the chain.
+     *
+     * Built with an explicit prototype rather than by writing to
+     * `Object.prototype`, so this test cannot leak into any other.
+     */
+    const inherited = Object.create({ value: 'from the prototype' }) as Record<string, JsonValue>
+    inherited['label'] = 'Mine'
+
+    expect(optionEntry(inherited as JsonValue, 3).value).toBe('3')
+    expect(optionEntry(inherited as JsonValue, 3, [inherited]).value).toBe('3')
+  })
+
+  it('computes the value table once for a list, not once per option', () => {
+    /*
+     * `optionEntry` is called from inside `options.map(...)` in both kits and
+     * called `optionValues(all)` on each of those calls, so a list of N options
+     * was walked N times and a long select rendered in quadratic time.
+     *
+     * Counted through a proxy on the list rather than timed: a duration
+     * assertion on a machine under load is a flake, and reads are the thing
+     * that grew.
+     */
+    const options = Array.from({ length: 40 }, (_, i) => ({ label: 'L' + String(i) }))
+    let reads = 0
+    const watched = new Proxy(options, {
+      get(target, key, receiver) {
+        if (typeof key === 'string' && /^\d+$/.test(key)) reads += 1
+        return Reflect.get(target, key, receiver) as unknown
+      },
+    })
+
+    options.forEach((option, i) => optionEntry(option, i, watched))
+
+    /*
+     * One walk of the list, plus one indexed read per option for its own entry.
+     * Quadratic would be 40 walks: over 1600. The bound is deliberately loose
+     * -- what is being pinned is the shape, not an exact count.
+     */
+    expect(reads).toBeLessThan(options.length * 4)
+  })
+
+  it('still answers correctly for two different lists', () => {
+    // The cache is keyed by list identity, so two lists must not share a table.
+    const first = ['Yes', 'No']
+    const second = ['No', 'Yes']
+
+    expect(optionEntry(first[0] as JsonValue, 0, first).value).toBe('Yes')
+    expect(optionEntry(second[0] as JsonValue, 0, second).value).toBe('No')
+  })
+
+  it('gives a bare list the same answer with and without the list', () => {
+    /*
+     * Found while writing the test above, and it is the defect the list-scoped
+     * rule was supposed to fix rather than cause. `declaredOf` returned nothing
+     * for a bare scalar, so with the list passed `['Yes', 'No']` rendered as
+     * `0` and `1` while the same list without one rendered `Yes` and `No` --
+     * and both kits pass the list, so every caller that adopted the new rule
+     * got the old bug back.
+     *
+     * The two branches have to agree, whatever they agree on. That is the whole
+     * claim `optionEntry` and `optionValue` make about being inverses.
+     */
+    const bare = ['Yes', 'No', 7, true]
+
+    bare.forEach((option, index) => {
+      const withList = optionEntry(option, index, bare).value
+      const without = optionEntry(option, index).value
+      expect(withList, 'index ' + String(index)).toBe(without)
+    })
+
+    expect(bare.map((o, i) => optionEntry(o as JsonValue, i, bare).value)).toEqual([
+      'Yes',
+      'No',
+      '7',
+      'true',
+    ])
+  })
+})
