@@ -174,7 +174,10 @@ describe('the prototype-pollution defence the restructure was for', () => {
     const kit: Kit = {
       id: 'k',
       label: 'K',
-      components: [{ ...base, type: '' } as unknown as ComponentDef, { ...base, type: 'Real' }],
+      components: [
+        { ...base, type: '' },
+        { ...base, type: 'Real' },
+      ],
     }
 
     expect(indexKit(kit).get('')).toBeUndefined()
