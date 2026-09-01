@@ -712,3 +712,141 @@ describe('a drop into the second row of a repeater', () => {
     expect(resolveDrop(flat, 380, 30)?.index).toBe(2)
   })
 })
+
+describe('a wrapping container, which both shipped kits have', () => {
+  /*
+   * `resolveDrop` compared the pointer against child midpoints on ONE axis, so
+   * most of a wrapping container's slots were unreachable.
+   *
+   * `inferAxis` collapses a layout to 'row' | 'column' by summing the deltas
+   * between adjacent children, and both kits render `Grid` as
+   * `gridTemplateColumns: repeat(auto-fit, minmax(...))` -- a genuinely 2-D
+   * wrapping layout, `container: true`, with a palette entry in each. A default
+   * `Grid` (columns: 2) holding four children lays them out 2x2; `inferAxis`
+   * answered 'row', and a drop into the bottom-right cell resolved to slot 1 --
+   * between the two children of the TOP row -- with the drop bar drawn a row
+   * away from the pointer.
+   *
+   * `05-canvas.md` promises this case explicitly, and it is covered by neither
+   * jsdom nor e2e/: jsdom has no layout engine, so the geometry is supplied
+   * here as rectangles, which is what `resolveDrop` takes.
+   *
+   * A 2x2 grid, 100 wide and 50 tall per cell, at (0,0):
+   *
+   *     a (0,0)      b (100,0)
+   *     c (0,50)     d (100,50)
+   */
+  function grid(): Candidate[] {
+    const cell = (key: string, index: number, left: number, top: number): Candidate => ({
+      key,
+      parentKey: 'root',
+      index,
+      container: false,
+      depth: 1,
+      row: undefined,
+      rect: { top, left, width: 100, height: 50 },
+    })
+
+    return [
+      {
+        key: 'root',
+        parentKey: undefined,
+        index: 0,
+        container: true,
+        depth: 0,
+        row: undefined,
+        rect: { top: 0, left: 0, width: 200, height: 100 },
+      },
+      cell('a', 0, 0, 0),
+      cell('b', 1, 100, 0),
+      cell('c', 2, 0, 50),
+      cell('d', 3, 100, 50),
+    ]
+  }
+
+  it.each([
+    ['before a, top-left', 10, 10, 0],
+    ['between a and b', 110, 10, 1],
+    ['after b, end of the top row', 190, 10, 2],
+    ['before c, start of the bottom row', 10, 60, 2],
+    ['between c and d', 110, 60, 3],
+    ['after d, the end', 190, 60, 4],
+  ])('resolves %s', (_what, x, y, index) => {
+    expect(resolveDrop(grid(), x, y)?.index).toBe(index)
+  })
+
+  it('reaches every slot, which one axis could not', () => {
+    /*
+     * The point of the row above, stated as the property: on one axis the
+     * pointer could only ever produce slots 0 and 1, so half the grid was
+     * unreachable however carefully somebody aimed.
+     */
+    const reached = new Set(
+      [
+        [10, 10],
+        [110, 10],
+        [190, 10],
+        [10, 60],
+        [110, 60],
+        [190, 60],
+      ].map(([x, y]) => resolveDrop(grid(), x as number, y as number)?.index),
+    )
+
+    expect([...reached].sort((l, r) => (l ?? 0) - (r ?? 0))).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it('still reads a single row as a row', () => {
+    // The control. One band holding several children is a row, and the original
+    // path handles it -- the wrapping branch must not take it over.
+    const oneRow = grid().filter((c) => c.key === 'root' || c.key === 'a' || c.key === 'b')
+
+    expect(resolveDrop(oneRow, 10, 10)?.index).toBe(0)
+    expect(resolveDrop(oneRow, 110, 10)?.index).toBe(1)
+    expect(resolveDrop(oneRow, 190, 10)?.index).toBe(2)
+  })
+
+  it('still reads a stacked column as a column', () => {
+    /*
+     * The other control: several bands each holding one child is a column.
+     *
+     * Built rather than filtered from `grid()`. Filtering left `c` carrying
+     * document index 2 with nothing at 1, so the answers were 0, 1 and 3 --
+     * correct for that document and nothing to do with the axis, which is
+     * exactly the sort of fixture that makes a test say something other than
+     * what it is named for.
+     */
+    const stacked: Candidate[] = [
+      {
+        key: 'root',
+        parentKey: undefined,
+        index: 0,
+        container: true,
+        depth: 0,
+        row: undefined,
+        rect: { top: 0, left: 0, width: 200, height: 100 },
+      },
+      {
+        key: 'a',
+        parentKey: 'root',
+        index: 0,
+        container: false,
+        depth: 1,
+        row: undefined,
+        rect: { top: 0, left: 0, width: 200, height: 50 },
+      },
+      {
+        key: 'b',
+        parentKey: 'root',
+        index: 1,
+        container: false,
+        depth: 1,
+        row: undefined,
+        rect: { top: 50, left: 0, width: 200, height: 50 },
+      },
+    ]
+
+    expect(resolveDrop(stacked, 50, 10)?.index).toBe(0)
+    expect(resolveDrop(stacked, 50, 60)?.index).toBe(1)
+    expect(resolveDrop(stacked, 50, 95)?.index).toBe(2)
+  })
+})
