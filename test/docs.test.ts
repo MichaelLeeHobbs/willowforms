@@ -944,8 +944,6 @@ describe('the accessibility document', () => {
     expect(declared.filter((rule) => !document.includes(rule))).toEqual([])
   })
 
-  const doc = read('docs/accessibility.md')
-
   it('quotes the number of states axe actually audits', () => {
     /*
      * It said six while the suite ran seven, and nothing compared them: the one
@@ -959,8 +957,33 @@ describe('the accessibility document', () => {
     const audits = suite.slice(suite.indexOf("describe('axe audit of the designer'"))
     const states = [...audits.matchAll(/^\s+it\(/gm)].length
 
-    const quoted = doc.match(/axe-core over the whole designer in (\w+) states/)
-    expect(quoted, 'the axe row is gone from the table').not.toBeNull()
+    /*
+     * Every document that states the figure, found rather than listed.
+     *
+     * Three were compared by name and two more said it in prose that no check
+     * read -- `docs/ROADMAP.md` and `docs/spec/00-product.md`. A list of the
+     * documents that happen to mention a number is the same shape as the
+     * hand-written file list this suite already replaced once: it covers what
+     * somebody remembered.
+     *
+     * The pattern is deliberately loose about the verb, because the five sites
+     * word it four different ways, and exact about the shape "<number> states"
+     * so a sentence about something else cannot be swept in.
+     */
+    const SAYS_STATES = /(?:axe(?:-core)?[^.\n]*?) in (\w+) states\b/g
+
+    const stated: { file: string; word: string }[] = []
+    for (const file of ['README.md', ...markdownUnder('docs')]) {
+      if (isDatedRecord(file)) continue
+      for (const match of read(file).matchAll(SAYS_STATES)) {
+        stated.push({ file, word: match[1] ?? '' })
+      }
+    }
+
+    expect(
+      stated.length,
+      'no document states how many states axe audits, so this compared nothing',
+    ).toBeGreaterThan(3)
 
     const words: Record<string, number> = {
       three: 3,
@@ -974,7 +997,12 @@ describe('the accessibility document', () => {
       eleven: 11,
       twelve: 12,
     }
-    expect(words[quoted?.[1] ?? ''], 'the table says ' + String(quoted?.[1])).toBe(states)
+
+    const wrong = stated
+      .filter((entry) => words[entry.word] !== states)
+      .map((entry) => entry.file + ' says ' + entry.word)
+
+    expect(wrong, 'the suite audits ' + String(states) + ' states').toEqual([])
   })
 
   it.each([
@@ -990,6 +1018,44 @@ describe('the accessibility document', () => {
     expect(() => read(path)).not.toThrow()
   })
 })
+
+/**
+ * Whether a document is a dated record rather than live documentation.
+ *
+ * A review states what was true on the day it was written, and a report states
+ * what a run did. Correcting a figure in one to match today would falsify the
+ * record -- the deep review really did say eleven, because the suite really did
+ * report eleven before the count that produced it was fixed.
+ *
+ * The same boundary `.prettierignore` draws for `docs/reviews`, and for the same
+ * reason it gives: these are artefacts, not repo prose. `docs/reports` is
+ * included here because it is the same kind of thing, which the ignore file did
+ * not say.
+ *
+ * Link checking still applies to all of them: a dead link is wrong whenever it
+ * was written.
+ */
+function isDatedRecord(file: string): boolean {
+  return file.startsWith('docs/reviews/') || file.startsWith('docs/reports/')
+}
+
+/** Every markdown file under a directory, repository-relative, sorted. */
+function markdownUnder(directory: string): string[] {
+  const found: string[] = []
+
+  const walk = (relative: string): void => {
+    for (const entry of readdirSync(fileURLToPath(new URL(relative, root)), {
+      withFileTypes: true,
+    })) {
+      const path = relative + '/' + entry.name
+      if (entry.isDirectory()) walk(path)
+      else if (entry.name.endsWith('.md')) found.push(path)
+    }
+  }
+
+  walk(directory)
+  return found.sort()
+}
 
 describe('documentation links', () => {
   const files = [

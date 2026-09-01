@@ -156,9 +156,11 @@ now ends at the next top-level `describe` rather than at the end of the file, an
 no rule -- "A Step's gap default matches the Stack it renders as", which is these two kits agreeing with
 each other rather than an obligation on anybody's kit -- came out of the table.
 
-The second pass went further: the guard also missed the fourteen rules driven per kit from _outside_ that
-block, so the spec presented one table as the whole obligation set while the suite ran nearly twice
-that. There are two tables now, both counted, and the count is of the whole file minus the per-kit block
+The second pass went further: the guard also missed the rules driven per kit from _outside_ that block,
+so the spec presented one table as the whole obligation set while the suite ran nearly twice that. The
+figure was written here as "fourteen" and is now twenty-three, which is the reason it is not a figure
+any more: `test/docs.test.ts` holds the count and compares it, and a number in this file is one nobody
+maintains. There are two tables now, both counted, and the count is of the whole file minus the per-kit block
 minus the describes that are about these two kits rather than about kits. Nothing is left to hand over
 here.
 

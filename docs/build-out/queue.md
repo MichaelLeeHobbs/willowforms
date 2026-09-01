@@ -11,7 +11,11 @@ Paste this to start or resume the run:
 The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointer at this file.
 
 - **Started:** 2026-08-31
-- **Last completed:** nothing yet; the run has not begun
+- **Last completed:** item 30, merged as #65 on 2026-09-01. Items 1-28 and 30 are merged; 29 and 31
+  are in review as #64 and #66; 32-41 are built and waiting for a slot.
+- **How to read the ticks:** an item is ticked when its pull request has merged, not when it is
+  written. Three may be open at once -- `RUN.md` says why -- so the last ticked item is not always the
+  last one worked on.
 - **Base:** every item branches from an updated `origin/main` and merges back into it. There is no
   long-lived run branch this time, and that is the point — see **Why this queue is shaped like this**.
 - **Open PR:** none
@@ -95,7 +99,7 @@ Every item, without exception:
       **Check:** `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && node scripts/check-dist.mjs && pnpm e2e` all green on the base, and the transcript says so. This is the
       only item whose PR may be docs-only, and the only one exempt from the size budget.
 
-- [ ] **1. The lint gate, first, because everything after it is gated by it.**
+- [x] **1. The lint gate, first, because everything after it is gated by it.**
       `eslint.config.js:141` (HIGH, three `react-hooks` rules ship as `warn`), `package.json:15` (HIGH,
       `eslint .` with no `--max-warnings 0`), `test/eslint.config.test.ts:201` (HIGH, records `ruleId` and
       discards `severity`), `eslint.config.js:59-66` (MEDIUM, `ImportExpression[source.value=…]` misses a
@@ -109,7 +113,7 @@ Every item, without exception:
 
 ### Block 1 — the three findings that end in a form reporting success over wrong data
 
-- [ ] **2. `validateForm` is the only unbounded walk in core, on the only path that runs server-side.**
+- [x] **2. `validateForm` is the only unbounded walk in core, on the only path that runs server-side.**
       `validation.ts:644` (HIGH) and the false comment at `:806-808`; `depth.test.ts:98` (HIGH, the
       `WALKERS` table states its own completeness rule and omits this walker); `validation.test.ts` whole
       file (HIGH, no test drives either walk deep).
@@ -117,7 +121,7 @@ Every item, without exception:
       passes after; a new `validation.test.ts` case pins that `validateForm` and `submittedData` agree
       about a tree deeper than 500.
 
-- [ ] **3. `KeyField` edits the previously selected component.**
+- [x] **3. `KeyField` edits the previously selected component.**
       `Properties.tsx:74` (HIGH), `Inspector.tsx:46-50` (MEDIUM, no panel is keyed on the selection and
       the safety of the whole inspector rests on eight independent re-sync guards),
       `Properties.test.tsx:127` (HIGH, no test ever re-renders the panel with a different selected node).
@@ -127,7 +131,7 @@ Every item, without exception:
       deletes `email` while `phone` is selected and asserts committing the box does not rename `phone`.
       Both fail before the fix.
 
-- [ ] **4. The server-parity section documents a snippet that silently accepts invalid submissions.**
+- [x] **4. The server-parity section documents a snippet that silently accepts invalid submissions.**
       `docs/spec/08-validation.md:213-241` (HIGH) and the same false claim in the code comment at
       `apps/demo-server/src/index.ts:414`; `08-validation.md:184-190` (LOW, `NOT_A_LIST` undocumented).
       The demo server uses `validateAcross`/`submittedAcross` per scope and the documented snippet returns
@@ -137,7 +141,7 @@ Every item, without exception:
 
 ### Block 2 — core, the submit path
 
-- [ ] **5. Totality on the submit walk.** `validation.ts:713` (MEDIUM, `children: 5` is not iterable at
+- [x] **5. Totality on the submit walk.** `validation.ts:713` (MEDIUM, `children: 5` is not iterable at
       four sites), `:477` (MEDIUM, `applyRule` dereferences a rule before checking it is one),
       `visibility.ts:60` (LOW, `isVisible` has no node guard and is the first thing the walk calls);
       `validation.test.ts` whole file (HIGH, no malformed-`children` row for either submit function),
@@ -145,7 +149,7 @@ Every item, without exception:
       **Check:** new rows drive `validateForm`, `submittedData` and `isVisible` on `children: 7`,
       `children: {}`, `children: [null]` and `validations: [null]`; each fails before the fix.
 
-- [ ] **6. Four rules that silently pass when their value is missing.** `validation.ts:504` (MEDIUM,
+- [x] **6. Four rules that silently pass when their value is missing.** `validation.ts:504` (MEDIUM,
       `minLength`/`maxLength`/`min`/`max` pass on a valueless rule while `pattern` one line below got the
       guard); `validation.test.ts:102-114` (MEDIUM, invariant-5 table omits `{}` and the `custom` row is
       near-vacuous); `validation.test.ts:1695` (MEDIUM, the row cap is pinned for `validateForm` and not
@@ -153,7 +157,7 @@ Every item, without exception:
       **Check:** a table over the four rules with `{"key":"min"}` and no `value` fails before the fix;
       invariant 5 gains its `{}` row and a live-evaluator `custom` row.
 
-- [ ] **7. The ReDoS analysis and the test that cannot notice.** `validation.ts:263` (MEDIUM,
+- [x] **7. The ReDoS analysis and the test that cannot notice.** `validation.ts:263` (MEDIUM,
       `nestedUnbounded` misses `(?:(a+))+`), `:218` (MEDIUM, alternation is never inspected — decide and
       log whether to detect it or to document the limit honestly, and say what a deployer should do);
       `validation.test.ts:1181-1189` (MEDIUM, the test named for the hole asserts a benign pattern),
@@ -161,7 +165,7 @@ Every item, without exception:
       **Check:** `(?:(a+))+` and `((a+))+` are refused; the "does not catch every blowup" test asserts the
       shape its own comment names; the two author-facing sentences are pinned by text.
 
-- [ ] **8. `submittedAcross` and the prototype key names.** `validation.test.ts:907` (HIGH, the block
+- [x] **8. `submittedAcross` and the prototype key names.** `validation.test.ts:907` (HIGH, the block
       drives `validateAcross` only and `submittedAcross` has no test of any kind); `validation.ts:670`
       (LOW, `NOT_A_LIST` clobbers the repeater's own rule failure), `:749` (LOW, `autoValidateKeys` walks
       with `flatten`), `:718` (LOW, null-prototype objects returned to a host), `:327` (LOW, full pattern
@@ -169,14 +173,14 @@ Every item, without exception:
       **Check:** answers keyed `toString`, `valueOf`, `constructor`, `hasOwnProperty` and `isPrototypeOf`
       survive `submittedAcross`; the test fails against `const merged: FormData = {}`.
 
-- [ ] **9. `tree.ts` walkers: totality and depth.** `tree.ts:114-127` (HIGH, `flatten` is neither total
+- [x] **9. `tree.ts` walkers: totality and depth.** `tree.ts:114-127` (HIGH, `flatten` is neither total
       nor bounded and runs in a React render body on a host document core deliberately does not refuse),
       `:64-94, 376, 430, 475` (MEDIUM, `findNode`/`pathTo`/`updateNode`/`removeNode`/`duplicateNode`
       share the gap); `tree.test.ts:2072` (HIGH, the `flatten` describe pins the happy path only).
       **Check:** every one of those six functions is driven on `children: {}`, `children: 5`,
       `children: "ab"` and a 50 000-deep tree; each row fails before the fix.
 
-- [ ] **10. `tree.ts` remainder, and the gate's own test gaps.** `:188-198, 322` (LOW, `duplicateNode`
+- [x] **10. `tree.ts` remainder, and the gate's own test gaps.** `:188-198, 322` (LOW, `duplicateNode`
       can return a copy keeping its source's key), `:188-198` (LOW, `copyKey` unbounded by
       `MAX_KEY_LENGTH`), `:511-524` vs `442-464` (LOW, the leaf guard was added to `moveNode` only),
       `:430-436` (LOW, `updateNode` walks each subtree twice), `:42-47, 129-133` (LOW, an array passed to `fn` as a node), `:895-931` (NOTE, layering), `:780-795` (NOTE), `:772…1323` (NOTE, `JSON.stringify`
@@ -186,7 +190,7 @@ Every item, without exception:
       **Check:** deleting any one of the four named `malformed(...)` calls turns a test red; a duplicate-key
       plus no-op-update case pins the `found` flag; `moveNode` gains its invariant-4 assertion.
 
-- [ ] **11. `schema.ts`: a depth bound that is defeated.** `:379` (MEDIUM, the schema-carrying branch
+- [x] **11. `schema.ts`: a depth bound that is defeated.** `:379` (MEDIUM, the schema-carrying branch
       recurses with depth reset to zero and the repeater branch re-enters `objectFor`), `:334` (MEDIUM,
       the walk has none of `walk`'s totality guards while `unexportableRules` in the same file borrows
       them), `:262` (LOW, rootless document), `:198` (LOW, `min`/`max` exported onto any type and reported
@@ -196,7 +200,7 @@ Every item, without exception:
       **Check:** 50 000 nested repeaters and a 50 000-deep chain of schema-carrying nodes both survive
       `toJsonSchema`; a top-level `email` and a row-level `email` are not reported as colliding.
 
-- [ ] **12. `rows.ts`, and the two definitions of a repeater.** `:223` (MEDIUM, `keyScopesFor` takes the
+- [x] **12. `rows.ts`, and the two definitions of a repeater.** `:223` (MEDIUM, `keyScopesFor` takes the
       first match _with an enclosing repeater_, not the first match, against its own comment), `:459-461`
       (LOW, `isRowScopeNode` disagrees with `isRowScope` for a truthy non-array `children`), `:308-315`
       (LOW, `formKeys`), `:260` (LOW, `MAX_TREE_DEPTH` redeclared), `:349-449` and `:125-147` (NOTE);
@@ -206,7 +210,7 @@ Every item, without exception:
       predicates; a fixture with a form-level `x` before a row-level `x` pins which one `keyScopesFor`
       resolves.
 
-- [ ] **13. `css.ts`: the backslash bypass.** `:71` (HIGH, `FORBIDDEN` does not treat `\` as significant,
+- [x] **13. `css.ts`: the backslash bypass.** `:71` (HIGH, `FORBIDDEN` does not treat `\` as significant,
       so `background:\75 rl(https://…)` reaches the page — the exfiltration channel the file's own comment
       says was closed), `:118` (MEDIUM, `quotesBalanced` skips the character after a backslash and a
       trailing `\` swallows every later rule), `:251` (MEDIUM, `styleSheetFor` throws on a non-string
@@ -216,7 +220,7 @@ Every item, without exception:
       **Check:** `\75 rl(` and `\5c 75 rl(` are refused; `color:red\` is refused; a node with `key: 42`
       and a `css` block does not throw; each fails before the fix.
 
-- [ ] **14. Core's third-party seams and its published surface.** `factory.ts:87` (LOW, `def.type`
+- [x] **14. Core's third-party seams and its published surface.** `factory.ts:87` (LOW, `def.type`
       unhardened where its two neighbours are), `:38` (NOTE, argument order); `kit.ts:152,181` (LOW,
       `indexKit`/`groupKit` unguarded inside three render bodies); `index.ts:63, 88-105` (LOW, three
       exports the shipped `.d.ts` tells consumers to use); `types.ts:248-259` (MEDIUM, the comment claims
@@ -228,7 +232,7 @@ Every item, without exception:
       **Check:** `instantiate` survives a `defaultProps` key of `__proto__` and a def with no `type`;
       `indexKit`/`groupKit` survive `components: {}`; `npm pack --dry-run` lists a licence file.
 
-- [ ] **15. `condition.ts` and `context.ts`.** `condition.ts:25` (LOW, past the bound `same` returns
+- [x] **15. `condition.ts` and `context.ts`.** `condition.ts:25` (LOW, past the bound `same` returns
       `false`, making `ne`/`notIn` true), `:233` (LOW, the four ordering operators answer `false` rather
       than unreadable, so `not(gt(…))` shows a component on a comparison that never happened);
       `context.ts:40` (LOW, `MAX_CONDITION_DEPTH` redeclared), `:258` (LOW, `contextValues` truncates
@@ -239,7 +243,7 @@ Every item, without exception:
       **Check:** deleting `+ 1` from either `conditions` loop in `context.ts` turns a test red;
       `not(gte(answer, 5))` against `"5"` is pinned.
 
-- [ ] **16. `language.ts` and `json.ts`, and the duplicate option value.** `language.ts:26` (LOW, a
+- [x] **16. `language.ts` and `json.ts`, and the duplicate option value.** `language.ts:26` (LOW, a
       non-string `dialect` validates clean and every translation renders as its raw key); `json.ts:45`
       (LOW, plain lookups where the rest of the package reads own properties) and (NOTE, `?? undefined`);
       `json.test.ts:54` (HIGH — a live source defect: `optionEntry` mints a duplicate `'0'` for
@@ -250,7 +254,7 @@ Every item, without exception:
 
 ### Block 3 — the designer
 
-- [ ] **17. `store.ts`: undo labels that destroy the entry they should stack on.** `:403` (HIGH,
+- [x] **17. `store.ts`: undo labels that destroy the entry they should stack on.** `:403` (HIGH,
       `setProp`'s label omits the binding kind, so a mode switch or a Reset after typing replaces the
       typed value in `past` and `present` at once — this file has already fixed the same defect twice
       elsewhere), the same shape at `:707` and `:745`; `store.test.ts:23` (MEDIUM, the non-mutation
@@ -258,7 +262,7 @@ Every item, without exception:
       **Check:** type a label, switch the binding mode, Ctrl+Z — the typed label comes back. Rewriting
       `undo` to `past.pop()` turns a test red.
 
-- [ ] **18. `store.ts`: a rename that re-points nothing that names it.** `:557` (HIGH, `renameKey` moves
+- [x] **18. `store.ts`: a rename that re-points nothing that names it.** `:557` (HIGH, `renameKey` moves
       the node's data key and every condition elsewhere testing that field silently stops matching, which
       also stops `validateForm` checking anything under it on the server), `setDataKey` at `:734-746`
       from the other direction, `:536` (LOW, decides against the render closure and writes through
@@ -267,7 +271,7 @@ Every item, without exception:
       **Check:** a Paragraph whose `renderWhen` reads `email` still renders after `email` is renamed; a
       test pins whichever answer was chosen, including the refusal path if that is the answer.
 
-- [ ] **19. `store.ts` remainder and the designer README.** `:333` (MEDIUM, the `[initial]` effect re-runs
+- [x] **19. `store.ts` remainder and the designer README.** `:333` (MEDIUM, the `[initial]` effect re-runs
       on every keystroke for a host following the documented pattern), `:387` (MEDIUM, a refused insert
       still moves the selection and is announced as a success), `:216-231`, `:268`, `:305` (NOTE);
       `store.regressions.test.ts:481` (LOW, the test passes because the second duplication is refused),
@@ -278,14 +282,14 @@ Every item, without exception:
       **Check:** a refused insert announces nothing and moves no selection; the four `duplicateComponent`
       refusals each have a test.
 
-- [ ] **20. `keyboard.ts`: the `left` branch reverts to the key match the file argues against.**
+- [x] **20. `keyboard.ts`: the `left` branch reverts to the key match the file argues against.**
       `:145` (HIGH — traced on the repo's own `twoStacks()` fixture, `moveTarget(…, 'c', 'left', …)`
       answers `index: 1` where the correct answer is `2`, and `describeMove` announces the move happily),
       `:139` (LOW, the `right` branch asks the kit where `moveNode` asks the node);
       `keyboard.test.ts:204` (HIGH, the duplicate-key describe covers `up` and `down` only), `:97` (LOW).
       **Check:** the traced assertion is added and fails before the fix.
 
-- [ ] **21. `Designer.tsx`: the shell's shortcuts.** `:663` (MEDIUM, a native listener on `.fs-shell`
+- [x] **21. `Designer.tsx`: the shell's shortcuts.** `:663` (MEDIUM, a native listener on `.fs-shell`
       fires before React's delegated handler, so `Tree.tsx`'s `stopPropagation` cannot suppress it and the
       mitigation everyone credits is incidental), `:638` (MEDIUM, Escape during a drag both abandons and
       clears, against the spec), `:626` (LOW, a non-`HTMLElement` target makes all three guards fail
@@ -296,7 +300,7 @@ Every item, without exception:
       **Check:** deleting the tree-row exemption from `backspaceIsSafe` turns a test red; a test asserts
       `document.activeElement` after clicking chrome; Escape during a drag leaves the selection alone.
 
-- [ ] **22. `dnd.ts`: drops resolved on one axis against a two-dimensional layout.** `:223-238` (HIGH —
+- [x] **22. `dnd.ts`: drops resolved on one axis against a two-dimensional layout.** `:223-238` (HIGH —
       both shipped kits render `Grid` as a wrapping `auto-fit` layout, so most of its slots are
       unreachable and the drop bar draws a row away from the pointer), `:272-276` (MEDIUM, `documentIndex`
       returns the filtered slot for a same-parent move — the review left this one BLOCKED, so **work the
@@ -308,7 +312,7 @@ Every item, without exception:
       replacing the distance loop with `return groups[0]` turns a test red. jsdom has no layout engine, so
       the geometry goes in as a unit test over `resolveDrop` with supplied rectangles.
 
-- [ ] **23. `drag.ts` and `geometry.ts`: the pointer lifecycle.** `drag.ts:189, 344-346` (MEDIUM, nothing
+- [x] **23. `drag.ts` and `geometry.ts`: the pointer lifecycle.** `drag.ts:189, 344-346` (MEDIUM, nothing
       filters by `pointerId` or `isPrimary`, so a second finger's `pointerup` commits the first finger's
       drag at the second finger's coordinates), `:147-160` (LOW, the stated `Map` order invariant is
       false after the first edit), `:138-145` (NOTE); `geometry.ts:193, 105-107` (LOW, O(n·m) measuring,
@@ -319,7 +323,7 @@ Every item, without exception:
       **Check:** a two-pointer fixture proves the second pointer's `pointerup` is ignored; deleting the
       `visibilitychange` registration turns a test red.
 
-- [ ] **24. `Canvas.tsx`.** `:483-523` (MEDIUM, downgraded — the missing bounds check is a documented
+- [x] **24. `Canvas.tsx`.** `:483-523` (MEDIUM, downgraded — the missing bounds check is a documented
       trade-off; the defect is the contradictory dead comment block still describing the removed check as
       present, and if a guard is added it clamps to the scrollable content box), `:380-396` (MEDIUM,
       `pointerdown` is the one interaction event the canvas does not cancel while editing, and the next
@@ -332,7 +336,7 @@ Every item, without exception:
       four pixels does not relocate a component; swapping `top` and `left` in the indicator style turns a
       test red.
 
-- [ ] **25. `Tree.tsx`, `SelectionLayer.tsx`, `Palette.tsx`.** `Tree.tsx:344-345` (LOW, `flatten` per
+- [x] **25. `Tree.tsx`, `SelectionLayer.tsx`, `Palette.tsx`.** `Tree.tsx:344-345` (LOW, `flatten` per
       render including every pointer move), `:82-84` (LOW), `:411-487` (LOW, the `role="group"` sublist
       is a sibling of the treeitem so nothing owns the group); `SelectionLayer.tsx:88,143,171` and
       `:149-161` (NOTE); `Palette.tsx:111` (NOTE); `Tree.test.tsx:681` (MEDIUM, the source-scanning guard
@@ -341,7 +345,7 @@ Every item, without exception:
       **Check:** the row guard also catches a string-literal `data-fs-row=` and a spread; `aria-expanded`
       is asserted; both Ctrl+D refusals are announced and tested.
 
-- [ ] **26. `Properties.tsx` remainder, and the editors nothing drives.**
+- [x] **26. `Properties.tsx` remainder, and the editors nothing drives.**
       `Properties.tsx:379-386` (LOW, the Show-when select has no `other` branch and no final guard),
       `:38-39` (NOTE, an unknown `section` vanishes silently while an unknown `editor` degrades
       gracefully); `Properties.test.tsx:62` (HIGH, the number editor is declared and never touched, so
@@ -351,7 +355,7 @@ Every item, without exception:
       **Check:** deleting the `Number.isFinite` arm or the `JsonEditor` re-sync block each turn a test
       red; Reset is clicked.
 
-- [ ] **27. `ConditionEditor.tsx` and `Rules.tsx`.** `ConditionEditor.tsx:735-738` (MEDIUM, "Add
+- [x] **27. `ConditionEditor.tsx` and `Rules.tsx`.** `ConditionEditor.tsx:735-738` (MEDIUM, "Add
       condition" mints the empty-`dataKey` shape `switchKind` was changed to stop producing, and core's
       gate accepts it, so the component is permanently hidden and every rule beneath it skipped),
       `:451-455` (LOW, an uncontrolled input that flips to controlled), `:121` (NOTE, shadowing);
@@ -363,7 +367,7 @@ Every item, without exception:
       **Check:** `validations: [null]` does not take the designer down; deleting `setDraft(String(next))`
       turns a test red.
 
-- [ ] **28. `Binding.tsx`.** `:356` (MEDIUM, a nameless language produces an input with no accessible
+- [x] **28. `Binding.tsx`.** `:356` (MEDIUM, a nameless language produces an input with no accessible
       name, which `docs/accessibility.md` lists as a build-failing check that no fixture exercises),
       `:251-268` (MEDIUM, renaming onto a key another component uses silently overwrites its text, per
       language), `:317-336` (MEDIUM, one rename produces `1 + 2n` individually-undoable entries),
@@ -385,7 +389,7 @@ Every item, without exception:
       **Check:** `languages: {}`, `name: 42` and `css: 5` each leave the designer standing; a refused
       Radius value shows the reason.
 
-- [ ] **30. The panel suites for those three.** `StyleTab.test.tsx:210` (HIGH, every refusal test types
+- [x] **30. The panel suites for those three.** `StyleTab.test.tsx:210` (HIGH, every refusal test types
       into the raw box and nothing ever types a brace into a structured control, here or in
       `e2e/style.spec.ts`), `:135` ×2 (MEDIUM, LOW), `:322` (MEDIUM), `:388` (NOTE);
       `DocumentDialog.test.tsx:510` (HIGH, "copies the draft and says it did" cannot tell the draft from

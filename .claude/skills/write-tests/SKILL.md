@@ -169,7 +169,7 @@ partial edit and an undo all survive.
 ## Trap 11 — a fixture that collapses the distinction under test
 
 Every repeater fixture in the repository set `key` and `dataKey` to the same string. So the
-row-addressing design and its opposite produced **byte-identical output across all 911 unit tests
+row-addressing design and its opposite produced **byte-identical output across the whole unit suite
 and 78 tests in a real browser** — a patched build of the alternative design was run and the whole suite
 stayed green. The suite could not have caught the defect that prompted the question: a repeater
 whose two names differ silently discarded every keystroke in its rows.

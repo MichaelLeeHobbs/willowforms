@@ -138,9 +138,14 @@ that only shows up in a long authoring session.
 
 ## CSS isolation
 
-Every selector in the designer's stylesheet names a class the designer itself renders -- there are about
-forty of them, `.fs-toolbar`, `.fs-panel`, `.fs-tree__row` and the rest -- and no selector that descends
-from a scope containing the form may end on anything else.
+Every selector in the designer's stylesheet names a class the designer itself renders -- a hundred or so
+of them, `.fs-toolbar`, `.fs-panel`, `.fs-tree__row` and the rest -- and no selector that descends from a
+scope containing the form may end on anything else.
+
+"About forty" is what this said, against 102 the day it was counted. A figure in prose is true when it is
+written and never again, so this one is deliberately not a number:
+`packages/designer/src/designer.css.test.ts` is what actually holds the rule, and it derives the class
+list from the stylesheet rather than from a count anybody maintains.
 
 `.fs-shell` is one of those scopes and is not forbidden: it carries the theme tokens and the shell's own
 layout, which is what a scope is for. What is forbidden is reaching _through_ it. `.fs-shell input` is

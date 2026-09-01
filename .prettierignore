@@ -8,6 +8,13 @@ pnpm-lock.yaml
 .claude/skills/codebase-design
 .claude/skills/steelman
 
-# Review reports are received artefacts, not repo prose. Reformatting one would change
-# the line numbers its own findings cite, and every queue item cites them too.
+# Reviews and reports are dated records, not repo prose. Reformatting a review would
+# change the line numbers its own findings cite, and every queue item cites them too;
+# a report describes what one run did and is finished the day it is written.
+#
+# `test/docs.test.ts` draws the same boundary for the figures it checks, and for the
+# same reason: a document that states what was true then must not be corrected to
+# match now. This file listed only `docs/reviews`, so the two disagreed about
+# `docs/reports` -- which is exactly the drift the tests here exist to catch.
 docs/reviews
+docs/reports

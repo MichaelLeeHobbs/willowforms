@@ -77,7 +77,11 @@ saying "in that order" here was wrong about a workflow anybody can read. Anythin
 positional belongs there: jsdom has no layout engine, so drop geometry, selection frames, and focus
 order cannot be checked anywhere else. `pnpm typecheck` is two passes on purpose: the per-package configs exclude tests so
 they stay out of `dist`, which left every test file unchecked until `tsconfig.eslint.json` picked them
-up. It found a type error in the first test file it ever saw.
+up. It found a type error in the first test file it ever saw. Each of the five packages excludes both
+`*.test.ts` and `*.test.tsx`; core excluded only the first until a packaging pass caught it, so the
+first `.test.tsx` anybody wrote there would have been compiled into `dist` and published.
+`test/packaging.test.ts` reads the five manifests off the directory rather than a list, which is what
+stops that being a thing somebody has to remember.
 
 `aliases.ts` at the root maps `@formsmith/*` to `src` for vitest and the playground, so in-repo edits
 need no rebuild. Published packages resolve through `dist`. The five bare package entries are anchored
