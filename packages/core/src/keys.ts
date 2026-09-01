@@ -90,9 +90,21 @@ export const RESERVED_KEYS: readonly string[] = Object.freeze([
 /**
  * Why this key is not allowed, or nothing if it is.
  *
- * A message rather than a boolean, because every caller shows it to someone: the
- * Properties panel refuses a rename with it, and `validateDocument` reports it
- * against a pasted document. One rule, so a rename and a paste are judged the
+ * A message rather than a boolean, because the callers a person hears from need
+ * one: `renameKey` and `setDataKey` hand the reason back for the Properties
+ * panel to show, and `validateDocument` reports `invalid-key` or
+ * `invalid-data-key` against a pasted document.
+ *
+ * Three others call it and answer with nothing. `generateKey` falls back to
+ * `field`; `decodeRow` and `decodeAddress` return `undefined`, and the second of
+ * those is why `applyChange` drops a write whose address holds a refused name --
+ * `applyChange` never calls this itself, which is exactly what makes that
+ * silence hard to trace from here.
+ *
+ * The wording above is a correction: this docblock used to say every caller
+ * shows the message to someone, which was true of half of them.
+ *
+ * One rule, so a rename and a paste are judged the
  * same way.
  */
 export function keyProblem(key: unknown): string | undefined {

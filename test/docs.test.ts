@@ -356,6 +356,111 @@ describe('the specification index', () => {
     return [...body.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1] ?? '').sort()
   }
 
+  it('publishes the key grammar core actually enforces', () => {
+    /*
+     * `12-api.md` is the contract a consumer reads, and it published
+     * `RESERVED_KEYS` as three names where the export has thirteen, with no
+     * length bound mentioned at all.
+     *
+     * The ten missing names are not incidental. The list's own docblock records
+     * a required field keyed `toString` having its error merged with
+     * `merged[key] ??= message`, compared against `Object.prototype.toString`,
+     * found not nullish and dropped -- a form with a missing required answer
+     * submitting clean. A consumer generating documents checks against what the
+     * contract publishes, emits `toString` as a `dataKey`, and is refused by
+     * `validateDocument` with nothing in the specification to explain it.
+     *
+     * Read out of the fenced block rather than out of the prose around it, and
+     * compared as sets: this is the block a reader copies.
+     */
+    const keys = read('packages/core/src/keys.ts')
+    const spec = read('docs/spec/12-api.md')
+
+    /*
+     * From the end of the line that opens the array to the `]` that closes it.
+     *
+     * Not from the first `[` after the name: the export is typed
+     * `readonly string[]`, so that bracket belongs to the type, and reading from
+     * it produced an empty list. It failed loudly only because the other side
+     * was full, which is luck rather than design -- hence the emptiness check on
+     * both sides below.
+     */
+    const namesIn = (text: string): string[] => {
+      const at = text.search(/^.*RESERVED_KEYS[^\n]*\[\s*$/m)
+      expect(at, 'no RESERVED_KEYS array to read').toBeGreaterThan(-1)
+
+      const from = text.indexOf('\n', at)
+
+      /*
+       * The bracket that closes a multi-line array is the first one standing at
+       * the start of a line. Plain `indexOf(']')` finds the next bracket
+       * anywhere -- including one belonging to something else further down the
+       * file, which is what made deleting this array's own `]` invisible to an
+       * earlier version of this check.
+       */
+      const found = /^\s*\]/m.exec(text.slice(from))
+      const close = found ? from + found.index : -1
+
+      /*
+       * A missing `]` is a broken read, not an empty list.
+       *
+       * `indexOf` answers -1, and `slice(from, -1)` is the rest of the file
+       * short one character -- so this would have returned every quoted string
+       * below the array and reported a difference that is not there, or, worse,
+       * matched by accident. A guard that cannot find what it is reading has to
+       * say so.
+       */
+      expect(close, 'the RESERVED_KEYS array is not closed').toBeGreaterThan(from)
+
+      const list = text.slice(from, close)
+      return [...list.matchAll(/'([^']+)'/g)].map((match) => match[1] ?? '').sort()
+    }
+
+    const published = namesIn(spec)
+    const exported = namesIn(keys)
+
+    expect(
+      published.length,
+      'the published list is empty, so this compared nothing',
+    ).toBeGreaterThan(0)
+    expect(published, 'the specification publishes a different reserved list').toEqual(exported)
+    expect(exported.length, 'the exported list is empty, so this compared nothing').toBeGreaterThan(
+      0,
+    )
+
+    /*
+     * And the two figures beside it. `MAX_KEY_LENGTH` was in neither the block
+     * nor the prose, so a host importing generated documents met `invalid-key`
+     * on a name satisfying every rule the contract stated.
+     */
+    /*
+     * Read both sides first, then check each is there, then compare.
+     *
+     * `exec(...)?.[1]` is `undefined` when the pattern stops matching, and
+     * `undefined === undefined` passes -- so a whitespace change in either file
+     * would have turned both of these into assertions that compare nothing and
+     * report success. That is the failure this whole test exists to prevent,
+     * one level up.
+     */
+    const figure = (expression: RegExp, text: string, what: string): string => {
+      const found = expression.exec(text)?.[1]
+      expect(found, 'no ' + what + ' to read, so this compared nothing').toBeDefined()
+      return found ?? ''
+    }
+
+    const pattern = /KEY_PATTERN = (\S+)/
+    expect(
+      figure(pattern, spec, 'published KEY_PATTERN'),
+      'the published pattern is not the exported one',
+    ).toBe(figure(pattern, keys, 'exported KEY_PATTERN'))
+
+    const bound = /MAX_KEY_LENGTH = (\d+)/
+    expect(
+      figure(bound, spec, 'published MAX_KEY_LENGTH'),
+      'the published length bound is not the exported one',
+    ).toBe(figure(bound, keys, 'exported MAX_KEY_LENGTH'))
+  })
+
   it.each([
     ['03-components.md', 'ComponentDef', 'packages/core/src/kit.ts'],
     ['01-document-model.md', 'ComponentNode', 'packages/core/src/types.ts'],

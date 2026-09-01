@@ -232,3 +232,15 @@ with `button: 2` does not reach the handler the way `button: 0` does -- a questi
 rather than about this component. The tree's equivalent guard has a working pair of tests, so comparing
 the two harnesses is the obvious place to start. `e2e/` is the other option: a real browser has real
 buttons, and this is the class of thing `CLAUDE.md` says belongs there.
+
+## `instantiate`'s docblock still reads as though it always returns a node
+
+Copilot raised it against PR #67: the signature returns `ComponentNode | undefined` -- a definition
+whose `type` is unusable produces nothing -- and the docblock above it describes a function that
+returns a node. A consumer reading the comment writes no undefined branch, and the first malformed kit
+definition they meet is a `TypeError` one call later.
+
+Out of scope for the item that pull request carries, which is documentation figures and the queue's own
+record. It belongs with `packages/core/src/factory.ts` and whatever else in that file makes a claim about
+what it returns; the fix is a sentence, but the question of how many other docblocks describe a
+pre-`undefined` signature is worth asking once rather than one file at a time.

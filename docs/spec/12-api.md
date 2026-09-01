@@ -22,7 +22,10 @@ in the project as the only undocumented one.
 A kit package brings its own two halves and depends on the first two. Most consumers never install the
 designer, which is the point of the split.
 
-`@formsmith/designer` also exports `useDesigner`, `DesignerApi`, `RenameResult` and `MAX_HISTORY`.
+`@formsmith/designer` also exports `DesignerProps`, `useDesigner`, `DesignerApi`, `RenameResult` and
+`MAX_HISTORY`. `DesignerProps` is the type of the props table below, and listing everything except the
+type of the thing being documented has an obvious cost: a TypeScript host writing a wrapper component
+has to redeclare it.
 `Designer` is the supported surface and the rest of this section is about it; the hook is what `Designer`
 is built on, and it is exported so a host that wants its own chrome around the same document model can
 have one. Two things follow from that and are worth saying rather than discovering: the hook's
@@ -67,20 +70,20 @@ filling in a form.
 import { FormRenderer } from '@formsmith/renderer'
 ```
 
-| Prop           | Type                                          | Required | Meaning                                                       |
-| -------------- | --------------------------------------------- | -------- | ------------------------------------------------------------- |
-| `document`     | `FormDocument`                                | yes      | The form                                                      |
-| `kit`          | `RendererKit`                                 | yes      | Renderers                                                     |
-| `data`         | `FormData`                                    | yes      | Current values, keyed by node; rows nest under the repeater   |
-| `onChange`     | `(address: string, value: JsonValue) => void` | yes      | One field changed, at an address                              |
-| `errors`       | `FormErrors`                                  | no       | Messages to display, keyed by address                         |
-| `language`     | `string`                                      | no       | BCP 47 tag; defaults to the document                          |
-| `evaluate`     | `Evaluator`                                   | no       | Sandbox for computed props                                    |
-| `device`       | `Device`                                      | no       | Render `css` for one device, not by media query               |
-| `context`      | `FormContext`                                 | no       | What the host knows and does not submit                       |
-| `revealHidden` | `boolean`                                     | no       | Draw what `renderWhen` hides. Authoring surfaces only         |
-| `onError`      | `(error: Error, key: string) => void`         | no       | A component threw while rendering; the rest of the form stays |
-| `nonce`        | `string`                                      | no       | CSP nonce for the per-component `<style>` element             |
+| Prop           | Type                                          | Required | Meaning                                                         |
+| -------------- | --------------------------------------------- | -------- | --------------------------------------------------------------- |
+| `document`     | `FormDocument`                                | yes      | The form                                                        |
+| `kit`          | `RendererKit`                                 | yes      | Renderers                                                       |
+| `data`         | `FormData`                                    | yes      | Current values, keyed by data key; rows nest under the repeater |
+| `onChange`     | `(address: string, value: JsonValue) => void` | yes      | One field changed, at an address                                |
+| `errors`       | `FormErrors`                                  | no       | Messages to display, keyed by address                           |
+| `language`     | `string`                                      | no       | BCP 47 tag; defaults to the document                            |
+| `evaluate`     | `Evaluator`                                   | no       | Sandbox for computed props                                      |
+| `device`       | `Device`                                      | no       | Render `css` for one device, not by media query                 |
+| `context`      | `FormContext`                                 | no       | What the host knows and does not submit                         |
+| `revealHidden` | `boolean`                                     | no       | Draw what `renderWhen` hides. Authoring surfaces only           |
+| `onError`      | `(error: Error, key: string) => void`         | no       | A component threw while rendering; the rest of the form stays   |
+| `nonce`        | `string`                                      | no       | CSP nonce for the per-component `<style>` element               |
 
 `nonce` is the one on that list a host cannot discover by its absence. The renderer emits one `<style>`
 element for everything `node.css` authored, and a host serving `style-src 'self'` drops it with no error
@@ -142,11 +145,53 @@ closing must not destroy what someone typed. Visibility comes from the same `isV
 
 It builds its result on a null prototype and copies it into a plain object at the end. `out[key] = value`
 for a key of `__proto__` sets the prototype instead of adding a property, so the answer would vanish from
-the payload and the payload would inherit whatever it pointed at. Data keys come out of a document and
-the [grammar for them](#keys) is still only planned, so that is reachable today rather than in theory.
+the payload and the payload would inherit whatever it pointed at. The [grammar](#keys) refuses that name
+now, and this still builds on a null prototype: the grammar is enforced by `validateDocument`, which
+nothing on the render or submit path calls, so a document reaching here has been gated by the host or not
+at all.
 
 `FieldSchema.autoValidate` is the per-field hint that a field wants validating while it is typed into.
 The host decides whether to honour it, and `autoValidateKeys(root)` names the fields that asked.
+
+### Four core functions a host has to call
+
+**Status: built.** This file opens by saying none of the other twelve said what a consumer imports, and
+then omitted these four. All are exported from `@formsmith/core` and all four are used by the reference
+server.
+
+```ts
+export declare function validateAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormErrors
+export declare function submittedAcross(
+  root: ComponentNode,
+  data: FormData,
+  scopes: EvalOptions[],
+): FormData
+export declare function contextValues(root: ComponentNode, path: string): JsonValue[]
+export declare function evaluatorKeys(root: ComponentNode): string[]
+```
+
+The first two are what a wizard needs, and they come as a pair for a reason. A step is a container behind
+a `renderWhen`, so validating the document in one environment checks the step the user is on and skips
+every other — correct for a hidden field, wrong for a step already completed. `validateAcross` runs the
+existing walk once per scope and merges. `submittedAcross` does the same for the payload, and a host that
+takes only the first drops every answer given from step two onwards: the demo server validated across all
+scopes and then projected under `scopes[0]`, which is a form that validates a required field and then
+submits without it. See [03-components.md](03-components.md#steps).
+
+`contextValues(root, path)` reads one context path across every row of repeated scope, which is what a
+condition inside a repeater needs.
+
+`evaluatorKeys(root)` names every node that cannot be evaluated without a sandbox, and it is a startup
+question rather than a runtime one. A `computed` binding with no evaluator makes `isVisible` answer
+false, so the node and its subtree leave `validateForm` entirely. A host can inject an evaluator in the
+browser and not on the server: the browser then shows a section, validates it and submits, and the server
+validates nothing beneath it and answers that the form is fine. Nothing at evaluation time can notice,
+which is why a host asks this once, at startup, and refuses to run without an evaluator if the answer is
+not empty.
 
 ### State that is not an answer
 
@@ -281,8 +326,29 @@ awkward everything-else.
 
 ```
 KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
-RESERVED_KEYS = ['__proto__', 'constructor', 'prototype']
+MAX_KEY_LENGTH = 128
+RESERVED_KEYS = [
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
+  '__proto__',
+  'constructor',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'prototype',
+  'toLocaleString',
+  'toString',
+  'valueOf',
+]
 ```
+
+All three are exported, and this block is compared against them by
+`test/docs.test.ts` -- it published three of the thirteen reserved names and no length bound at all,
+which is the kind of wrong a specification can be for months. A consumer generating documents
+programmatically checks against what the contract publishes, emits `toString` as a `dataKey`, and gets
+`invalid-key` from `validateDocument` with nothing here to explain it.
 
 It judges the key **as stored**, not a trimmed reading of it. Trimming is an input convenience in the
 panel, which stores what it trimmed, so a key that reaches a document still wearing spaces was never
@@ -290,10 +356,15 @@ typed through the panel — and it is not the same string as its trimmed twin an
 rename of the same field would produce the trimmed one. Two components could otherwise hold what
 everything downstream treats as one name, with the duplicate check unable to see it.
 
-`keyProblem(key)` returns the reason or nothing, and both callers show it to someone: the Properties
-panel refuses a rename with it, and `validateDocument` reports `invalid-key` or `invalid-data-key`
-against a pasted document. One rule, so a rename and a paste are judged the same way — which is what the
-previous version of this section said was missing.
+`keyProblem(key)` returns the reason or nothing. Three callers hand it to somebody: `renameKey` and `setDataKey` give it back for the Properties panel to show, and `validateDocument` reports `invalid-key`
+or `invalid-data-key` against a pasted document. One rule decides all three, so a rename, a data key and
+a paste are judged the same way.
+
+Three more call it and answer with nothing, which is worth knowing rather than discovering.
+`generateKey` falls back to `field` when the name it derived fails, and `decodeRow` and `decodeAddress`
+return nothing -- the second is why `applyChange` drops a write whose address holds a refused name,
+though `applyChange` never calls `keyProblem` itself. A host that sends an edit addressed to a reserved
+key gets no error and no change. This section said "both callers", which reads as the complete surface.
 
 **The grammar is the JavaScript identifier subset, and the reason is the evaluator rather than
 tidiness.** A hyphen is the tempting addition, because real forms are full of `first-name`, and it is
@@ -309,6 +380,22 @@ exist is how the libraries that had to break their addressing twice got there. S
 prototype, so an answer under that key vanishes from the payload and the payload inherits whatever it
 pointed at. `submittedData` builds on a null prototype to survive that; refusing the name is the other
 half, and the cheaper one.
+
+The rest of `Object.prototype` is the same hazard one notch quieter, and it has bitten once: a required
+field keyed `toString` had its error merged with `merged[key] ??= message`, compared against
+`Object.prototype.toString`, found not nullish, and dropped — a form with a missing required answer
+submitting clean. `toString`, `valueOf`, `hasOwnProperty`, `constructor` and `isPrototypeOf` all satisfy
+`KEY_PATTERN`, so nothing has to be bypassed to author one.
+
+**The list is the second lock, never the first.** Nothing on the render or validate path calls
+`validateDocument`, so a document carrying one of these keys reaches the code that has to survive it
+anyway. The fix is always a null prototype at the accumulator; refusing the names only stops an author
+creating such a document by hand.
+
+The length bound is the same kind of rule and was not written down here at all. The grammar bounds
+characters, not length, so a megabyte-long `dataKey` in an imported document passed every gate and then
+appeared in `data-fs-key`, in a CSS selector, in `FormData` and as a property name in exported JSON
+Schema.
 
 This is a breaking change for a document holding a key outside the grammar, and it is deliberate while
 nothing is published.
