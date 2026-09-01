@@ -677,8 +677,36 @@ describe('the tree rows and the canvas rows are told apart', () => {
           continue
         }
         if (!/\.tsx?$/.test(entry.name)) continue
-        // `data-fs-row` and nothing longer: `data-fs-tree-row` is this panel's.
-        if (/data-fs-row=\{/.test(readFileSync(path, 'utf8'))) offenders.push(entry.name)
+        /*
+         * Source only. A test reads the attribute to assert on it -- that is
+         * this file doing its job, not a second author writing it -- and the
+         * widened pattern below matches a quoted string, so without this the
+         * guard reports its own suite.
+         */
+        if (/\.test\.tsx?$/.test(entry.name)) continue
+        /*
+         * `data-fs-row` and nothing longer: `data-fs-tree-row` is this panel's.
+         *
+         * Any spelling of the attribute, not only a JSX expression. This
+         * matched `/data-fs-row=\{/`, so it saw `data-fs-row={...}` and nothing
+         * else -- a string literal `data-fs-row="addresses[0]"` passed it, and
+         * so did the attribute arriving through a spread, while re-introducing
+         * the two-authors-of-one-attribute collision this whole describe is
+         * about.
+         *
+         * Three shapes now: the JSX expression, a quoted literal, and a
+         * property named in an object that is about to be spread.
+         */
+        const source = readFileSync(path, 'utf8')
+        /*
+         * A write, not a read. `(?<!\[)` excludes an attribute *selector* --
+         * `[data-fs-row="..."]` -- which is how `geometry.ts` legitimately
+         * finds a row it did not write. Everything else that assigns the
+         * attribute is a second author for it.
+         */
+        const writes =
+          /(?<!\[)data-fs-row\s*=\s*[{'"`]/.test(source) || /['"`]data-fs-row['"`]\s*:/.test(source)
+        if (writes) offenders.push(entry.name)
       }
     }
     walk(src)
@@ -826,5 +854,45 @@ describe('Backspace and where it is aimed', () => {
     fireEvent.keyDown(undo, { key: 'Delete', bubbles: true })
 
     expect(harness.keys()).not.toContain('first')
+  })
+})
+
+describe('what a row promises the keyboard', () => {
+  /*
+   * `aria-expanded` is asserted nowhere, though `keyboard.ts:38-53` states that
+   * Right stepping into the first child depends on every node being expanded
+   * and names this attribute as "the other half of this promise".
+   *
+   * A tree that never collapses has to say so, or a screen-reader user is told
+   * a row might be closed and given no way to open it.
+   */
+  it('marks every row that has children as expanded', async () => {
+    const { user, view } = setup()
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+
+    const rows = [...view.container.querySelectorAll('[data-fs-tree-row]')]
+    expect(rows.length, 'no rows were drawn, so this proves nothing').toBeGreaterThan(1)
+
+    const withChildren = rows.filter((row) => row.getAttribute('aria-expanded') !== null)
+    expect(withChildren.length, 'no row claims to be expandable at all').toBeGreaterThan(0)
+
+    const collapsed = withChildren
+      .filter((row) => row.getAttribute('aria-expanded') !== 'true')
+      .map((row) => row.getAttribute('data-fs-tree-row'))
+
+    expect(collapsed, 'these rows say they are collapsed and nothing can open them').toEqual([])
+  })
+
+  it('does not claim expandability on a row with no children', async () => {
+    /*
+     * The other half: `aria-expanded` on a leaf tells a screen reader there is
+     * something to open, and there is not.
+     */
+    const { user, view } = setup()
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+
+    const leaf = view.container.querySelector('[data-fs-tree-row="heading"]')
+    expect(leaf, 'the fixture has no heading row').not.toBeNull()
+    expect(leaf?.getAttribute('aria-expanded')).toBeNull()
   })
 })
