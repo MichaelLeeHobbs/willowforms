@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ComponentNode, Condition, FormData, ValidationRule } from './types.js'
+import type { ComponentNode, Condition, FormData, JsonValue, ValidationRule } from './types.js'
 import { contextValues } from './context.js'
 import { MAX_TREE_DEPTH } from './tree.js'
 import type { EvalOptions, Evaluator } from './validation.js'
@@ -2045,6 +2045,27 @@ describe('a rule with no value to check against', () => {
     ['NaN', Number.NaN],
   ]
 
+  /*
+   * A value each rule would otherwise accept, which is the whole point of the
+   * row.
+   *
+   * The first version passed one non-numeric string to all four, and for
+   * `min`/`max` that makes `comparableNumber(value)` return undefined -- so
+   * those rows failed on the *value* and would have failed with the new bound
+   * check deleted. They proved nothing about a missing bound. Raised in review
+   * on PR #39.
+   *
+   * A number satisfies a real `min`/`max`; a four-character string satisfies a
+   * real `minLength: 3` / `maxLength: 9`. So a row that still reports can only
+   * be reporting because the bound itself was unusable.
+   */
+  const SATISFYING: Record<string, JsonValue> = {
+    minLength: 'abcd',
+    maxLength: 'abcd',
+    min: 7,
+    max: 7,
+  }
+
   const MEASURING = ['minLength', 'maxLength', 'min', 'max'] as const
 
   it.each(MEASURING.flatMap((key) => VALUELESS.map((bound) => [key, bound[0], bound[1]] as const)))(
@@ -2052,9 +2073,21 @@ describe('a rule with no value to check against', () => {
     (key, _shape, bound) => {
       const rule = { key, value: bound } as unknown as ValidationRule
 
-      expect(applyRule(rule, 'a value that would satisfy a real bound', {})).toBeDefined()
+      expect(applyRule(rule, SATISFYING[key], {})).toBeDefined()
     },
   )
+
+  it('and each of those values really does satisfy the rule when the bound is usable', () => {
+    /*
+     * The control for the control. Without it the rows above could still be
+     * reporting for a reason with nothing to do with the bound -- which is
+     * exactly the defect they were rewritten for.
+     */
+    expect(applyRule({ key: 'minLength', value: 3 }, SATISFYING['minLength'], {})).toBeUndefined()
+    expect(applyRule({ key: 'maxLength', value: 9 }, SATISFYING['maxLength'], {})).toBeUndefined()
+    expect(applyRule({ key: 'min', value: 3 }, SATISFYING['min'], {})).toBeUndefined()
+    expect(applyRule({ key: 'max', value: 9 }, SATISFYING['max'], {})).toBeUndefined()
+  })
 
   it('still applies each of them when the bound is a real number', () => {
     /*
