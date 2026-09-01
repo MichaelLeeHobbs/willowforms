@@ -1565,12 +1565,18 @@ describe('the icons the kits ask for', () => {
 /**
  * The properties whose values are CSS pixels in both kits.
  *
- * A kit is entitled to its own sensible default, which is why the rule above
- * leaves `defaultProps` alone. It is not entitled to its own *unit*:
- * `02-kit-contract.md` says a length in a document is CSS pixels, and a kit
- * built on a design system with its own spacing scale "converts at its edge".
- * So two kits may default a gap to different numbers of pixels for good
- * reasons, and a difference of exactly eight times is not one of them.
+ * The rule above leaves `defaultProps` alone, on the ground that a kit is
+ * entitled to its own sensible default. That is true of a prop nobody sees in
+ * the document and false of a length: `02-kit-contract.md` says a length in a
+ * document is CSS pixels, and a kit built on a design system with its own
+ * spacing scale "converts at its edge".
+ *
+ * So the rule below is equality, not merely agreement about the unit. A
+ * `defaultProps` value is written into every node the designer creates, before
+ * any renderer fallback is consulted, so it leaves with the document -- and the
+ * catalogue's promise is that a document authored against one kit renders
+ * against the other. A kit that wants a roomier form changes what it renders,
+ * not the number it writes into somebody else's document.
  *
  * Named rather than inferred from the editor, because `columns`, `index` and
  * `maxLength` are numbers too and none of them is a length.
