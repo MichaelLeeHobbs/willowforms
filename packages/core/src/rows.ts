@@ -272,16 +272,9 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
  * boot-time answer `missingContext` takes. Unlike context, this one is decidable
  * from the tree alone, so `validateDocument` reports it rather than a host.
  */
-/**
- * How deep this will walk before stopping.
- *
- * Same reason as the gate's own bound, and the same number: this runs from
- * `validateDocument`, so an unbounded walk here throws a `RangeError` out of the
- * function whose whole job is never to throw on a document. Stopping quietly is
- * right — the gate has already refused a document this deep, and reporting the
- * depth twice helps nobody.
- */
-// Imported, not re-declared -- see the import block.
+// `MAX_TREE_DEPTH` is imported, not re-declared -- see the import block. The
+// docblock that used to sit here belonged to the local constant and documented
+// nothing once that went.
 
 export function rowScopeProblems(root: ComponentNode): { key: string; problem: string }[] {
   const problems: { key: string; problem: string }[] = []

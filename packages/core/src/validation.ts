@@ -23,11 +23,6 @@ import {
   isRowScope,
   validationsOf,
 } from './tree.js'
-
-// Re-exported so `@formsmith/core`'s entry point keeps offering it from here,
-// which is where it was public from. The definition moved to `tree.ts` because
-// `rows.ts` had a second, differing copy; see that docblock.
-export { isRowScope }
 import { unreadableTag } from './exhaustive.js'
 import { isVisible } from './visibility.js'
 import type {
@@ -69,6 +64,17 @@ export interface EvalOptions {
    */
   row?: RowContext | undefined
 }
+
+/*
+ * Re-exported so `@formsmith/core`'s entry point keeps offering `isRowScope`
+ * from here, which is where it was public from. The definition moved to
+ * `tree.ts` because `rows.ts` had a second, differing copy; see that docblock.
+ *
+ * Below the imports rather than inside them: an `export` between two `import`
+ * lines breaks the contiguous import block every other file here keeps, and is
+ * the sort of thing import-order tooling trips on.
+ */
+export { isRowScope }
 
 export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
   required: 'This field is required.',
