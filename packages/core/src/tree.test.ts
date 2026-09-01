@@ -1582,6 +1582,37 @@ describe('the tree and keys that repeat or are quoted', () => {
     expect(kinds).toEqual(['Changed', 'Field', 'Field'])
   })
 
+  it('stops at the first match even when that update changes nothing', () => {
+    /*
+     * The case the test above cannot see, and the one the `found` flag exists
+     * for.
+     *
+     * `updateNode` documents the distinction itself: it stopped at the first
+     * child whose subtree came back a *different object*, so an update that
+     * returns its input unchanged left the flag down and the walk carried on
+     * into the next sibling. Every `updateNode` call in this repository's tests
+     * either mutates the node or targets a missing key -- so restoring the
+     * pre-fix `changed`-only implementation left all six of them green.
+     *
+     * A controlled property editor writing the value the node already holds is
+     * exactly this: a no-op update, on every keystroke that does not change
+     * anything. With a duplicate key -- which `validateDocument` reports and
+     * cannot prevent -- the second node was silently edited instead.
+     *
+     * Observed through identity rather than through a value, because a no-op
+     * update by definition leaves no value to look at.
+     */
+    const before = twice()
+    const seen: ComponentNode[] = []
+    const next = updateNode(before, 'same', (n) => {
+      seen.push(n)
+      return n
+    })
+
+    expect(seen, 'the update ran on more than the first match').toHaveLength(1)
+    expect(next, 'a no-op update rebuilt the tree').toBe(before)
+  })
+
   it('removes the first match only', () => {
     const next = removeNode(twice(), 'same')
 
@@ -2236,5 +2267,138 @@ describe('the lookup and mutation family on a document nothing gated', () => {
     expect(findParent(root, 'x')?.key).toBe('root')
     expect(pathTo(root, 'x')).toEqual(['root', 'x'])
     expect(removeNode(root, 'x').children).toEqual([])
+  })
+})
+
+describe('the gate branches nothing ever drove', () => {
+  /*
+   * Four `malformed(...)` calls in `validateDocument` that no test in this
+   * repository reaches.
+   *
+   * The nearest thing was a test building the exact document one of them has a
+   * branch for -- `schema.validations: 'required'` -- and asserting only that
+   * three consumers do not throw, never that the gate reports it. A repo-wide
+   * grep for the message string found nothing. Delete any one of these four
+   * calls and the whole suite stays green, which makes the gate's report a
+   * claim nothing checks.
+   *
+   * Asserted on the message, not only on the code: `malformed` is the code all
+   * four share, so a `codes.some(c => c === 'malformed')` assertion is
+   * satisfied by whichever other problem the fixture happens to have. That is
+   * the shape of the `key: 42` row elsewhere in this file, where the key error
+   * is itself coded `malformed` and only the length check does any work.
+   */
+  const doc = (root: unknown): FormDocument =>
+    ({ ...createDocument('Gate', 'gate'), root }) as unknown as FormDocument
+
+  const node = (extra: Record<string, unknown>): unknown => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    ...extra,
+  })
+
+  const CASES: [string, unknown, RegExp][] = [
+    ['children that are not an array', node({ children: 5 }), /children must be an array/],
+    ['a schema that is not an object', node({ schema: 'string' }), /schema must be an object/],
+    [
+      'validations that are not an array',
+      node({ schema: { type: 'string', validations: 'required' } }),
+      /validations must be an array/,
+    ],
+    [
+      'a validations entry that is not a rule',
+      node({ schema: { type: 'string', validations: [null] } }),
+      /validations holds an entry that is not a rule/,
+    ],
+  ]
+
+  it.each(CASES)('reports %s', (_what, root, says) => {
+    const messages = validateDocument(doc(root)).map((error) => error.message)
+
+    expect(messages.join(' | ')).toMatch(says)
+  })
+
+  it('reports params that are not an object on an action', () => {
+    const document = {
+      ...createDocument('Gate', 'gate'),
+      actions: { save: { kind: 'submit', params: 5 } },
+    } as unknown as FormDocument
+
+    expect(
+      validateDocument(document)
+        .map((error) => error.message)
+        .join(' | '),
+    ).toMatch(/has params that are not an object/)
+  })
+
+  it('says nothing about a document that is fine', () => {
+    // The control. A gate that reported on everything would pass every row
+    // above while refusing every real document.
+    expect(validateDocument(doc(node({ children: [] })))).toEqual([])
+  })
+})
+
+describe('invariant 4 on the operations that had no assertion for it', () => {
+  const tree = (): ComponentNode => ({
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      { key: 'box', type: 'Screen', props: {}, children: [{ key: 'x', type: 'Field', props: {} }] },
+      { key: 'y', type: 'Field', props: {} },
+    ],
+  })
+
+  it('moveNode leaves its input alone on a move that succeeds', () => {
+    /*
+     * `insertNode`, `removeNode` and `updateNode` each pin invariant 4 and
+     * `moveNode` had no immutability assertion at all -- the operation that
+     * composes remove-then-insert, and the one drag-and-drop calls. Undo holds
+     * references to prior documents, so a mutation here is an undo that
+     * silently does nothing.
+     *
+     * On a *successful* move specifically: a refused move returns the same root
+     * and would satisfy any comparison trivially.
+     */
+    const before = tree()
+    const snapshot = JSON.stringify(before)
+
+    const after = moveNode(before, 'y', 'box')
+
+    expect(after, 'the move was refused, so this proves nothing').not.toBe(before)
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('duplicateNode does not alias the records it copies', () => {
+    /*
+     * The existing assertion compares JSON before and after on a fixture whose
+     * nodes carry no `css`, `events`, `schema` or nested props -- none of the
+     * records `duplicateNode` actually copies -- so it is the one invariant-4
+     * check for this function and it cannot observe aliasing. This fixture
+     * carries all four and mutates the copy.
+     */
+    const source: ComponentNode = {
+      key: 'rich',
+      type: 'Field',
+      props: {},
+      css: { any: 'color:red' },
+      events: { onChange: [{ name: 'save', type: 'code' }] },
+      schema: { type: 'string', validations: [{ key: 'required' }] },
+    }
+    const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [source] }
+
+    const copy = duplicateNode(root, 'rich')
+    expect(copy, 'nothing was duplicated').toBeDefined()
+    expect(copy?.key, 'the copy kept its source key').not.toBe('rich')
+
+    // Mutate every record on the copy; none of it may reach the source.
+    copy?.events?.onChange?.push({ name: 'other', type: 'code' })
+    copy?.schema?.validations?.push({ key: 'email' })
+    if (copy?.css) copy.css['any'] = 'color:blue'
+
+    expect(source.events?.onChange).toEqual([{ name: 'save', type: 'code' }])
+    expect(source.schema?.validations).toEqual([{ key: 'required' }])
+    expect(source.css?.['any']).toBe('color:red')
   })
 })
