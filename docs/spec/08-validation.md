@@ -166,6 +166,16 @@ validateField(node, data, options?): string | undefined
 validateForm(root, data, options?): FormErrors          // key -> message
 applyRule(rule, value, data, options?): string | undefined
 
+// What a form actually submits: the answers to questions it is still asking.
+// A server that stores the raw body stores whatever the browser sent.
+submittedData(root, data, options?): FormData
+
+// A form validated once per scope. See Server parity: a wizard needs these
+// two, and calling `validateForm`/`submittedData` on one instead is a submit
+// that reports success over answers it never looked at.
+validateAcross(root, data, scopes): FormErrors
+submittedAcross(root, data, scopes): FormData
+
 interface EvalOptions {
   evaluate?: Evaluator      // absent means every `custom` rule and `computed` guard is skipped
   context?: FormContext     // what the host knows: the user, the step, the tenant
@@ -188,6 +198,19 @@ nest multiplicatively. Over the cap, `validateForm` records `TOO_MANY_ROWS` agai
 validates none of its rows, so the response carries one generic message where a server operator might
 expect per-field ones. Both constants are exported, so a body-size limit can be sized against the same
 number the engine uses.
+
+There are **three** refusals a repeater can report, not two. The third is `NOT_A_LIST`, recorded when a
+repeater's submitted value is a non-null value that is not an array. It is exported alongside the other
+two and was documented nowhere. Its docblock records why it exists: reading such a body as "no rows"
+meant the rules inside the repeater never ran, so `"addresses": "nope"` turned every required field
+inside it optional, on the server, with nothing to see.
+
+**A document nested deeper than `MAX_TREE_DEPTH` (500) is refused too**, under `TOO_DEEP`. Nothing on the
+validate path calls `validateDocument`, so a stored document of any depth reaches `validateForm`
+directly. Past the bound it reports rather than returning, for the same reason as the row cap: a subtree
+nobody checked is not a subtree that passed. `submittedData` stops silently at the same bound instead,
+which is the one place the two deliberately differ -- the form has already refused, so there is no
+payload for the projection to be wrong about.
 
 `FormErrors` is keyed by component key outside a repeater, and by a row address inside one --
 `addresses[1].street`, where the prefix is built from the repeater's _data_ key and the leaf is the
@@ -212,29 +235,95 @@ A rule that silently never fires is worse than one that visibly cannot run.
 ## Server parity
 
 **Status: built**, and demonstrated by `apps/demo-server`, which is five routes over a JSON file whose
-only purpose is to prove that `validateForm` is the same function in both places.
+only purpose is to prove that a form's rules are one rule set, run in both places.
+
+### The single-scope case
+
+A form with no steps validates once, and this is the whole of it:
 
 ```ts
-import { missingContext, validateForm } from '@formsmith/core'
+import { missingContext, submittedData, validateForm } from '@formsmith/core'
 
 const context = { user: { role: session.role } }
 
+// Once, at startup. A visibility rule reading a path the server does not supply
+// is not a rejected submit, it is an accepted one that skipped a required
+// answer -- see The evaluator below.
+const missing = missingContext(document.root, context)
+if (missing.length) throw new Error('context missing: ' + missing.join(', '))
+
 const errors = validateForm(document.root, submitted, { context })
 if (Object.keys(errors).length > 0) return respond(422, { errors })
+
+const payload = submittedData(document.root, submitted, { context })
 ```
+
+`submittedData` is not optional decoration. It is what drops answers to questions the form did not ask,
+and a server that stores `submitted` directly stores whatever the browser sent.
+
+### The wizard case, which is not the same call
+
+This section used to stop at the snippet above and say the demo server was built on it. It is not, and
+following it on a wizard document produces a submit that reports success over missing answers.
+
+Every `Step` carries a `renderWhen` comparing `context.step` to its own key. With a context holding no
+`step`, every one of those comparisons is false, `isVisible` is false, and `validateForm` skips every
+step's subtree — returning `{}` for a submission missing every required answer. Add the boot-time assert
+below and the other outcome appears instead: `missingContext` reports `step` and the server refuses to
+start.
+
+A multi-step form validates **once per scope**, and the scopes come out of the document:
+
+```ts
+import { contextValues, missingContext, submittedAcross, validateAcross } from '@formsmith/core'
+
+const steps = contextValues(document.root, 'step').filter(
+  (step): step is string => typeof step === 'string',
+)
+const scopes = steps.length
+  ? steps.map((step) => ({ context: { ...context, step } }))
+  : [{ context }]
+
+const errors = validateAcross(document.root, submitted, scopes)
+if (Object.keys(errors).length > 0) return respond(422, { errors })
+
+const payload = submittedAcross(document.root, submitted, scopes)
+```
+
+Three things in that are load-bearing and each has its own silent failure:
+
+- **The steps come out of the document, never out of the request.** Asking the browser which steps exist
+  lets a client name one and have the rest go unchecked, and the submit then succeeds with required
+  answers missing.
+- **`submittedAcross`, not `submittedData`.** Its own docblock records what the projection did before it
+  existed: the demo server validated across all scopes and then projected under `scopes[0]`, so every
+  answer given on step two onwards was dropped from the payload. A form that validated a required field
+  and then submitted without it.
+- **`missingContext` runs per scope, not against the bare session context.** `step` is a path the server
+  fills in itself, so against the base context it reads as missing and every wizard is refused.
+
+```ts
+const missing = [
+  ...new Set(scopes.flatMap((scope) => missingContext(document.root, scope.context))),
+]
+if (missing.length) throw new Error('context missing: ' + missing.join(', '))
+```
+
+### The evaluator
 
 The server must inject the same evaluator as the client for `custom` rules and guards to behave
 identically. With none injected they pass, which means **a `custom` rule is not a security control**. A
 server that needs one must supply the sandbox.
 
-Parity now has a second half, and it fails more quietly than the first. A visibility rule reading
-`FormContext` decides whether a field is validated at all, so a server that does not supply the context
-does not reject the submit, it accepts one that skipped a required answer. Assert once at startup:
+A `computed` visibility rule is the sharper case, because it fails in the other direction: `isVisible`
+reads one as _hidden_ when there is nothing to evaluate it with, so the node and its whole subtree leave
+validation entirely. `evaluatorKeys` is the check for it. `apps/demo-server` injects no evaluator
+deliberately — there is no `eval` default anywhere in this project — and refuses a document that needs
+one rather than validating less of it than the browser did.
 
-```ts
-const missing = missingContext(document.root, context)
-if (missing.length) throw new Error('context missing: ' + missing.join(', '))
-```
+Parity's second half fails more quietly than the first. A visibility rule reading `FormContext` decides
+whether a field is validated at all, so a server that does not supply the context does not reject the
+submit — it accepts one that skipped a required answer.
 
 The context is the server's, never the request's. A payload carrying `user.role` is a claim from the
 browser, and the only way it cannot be believed is if the server never reads it from there. See

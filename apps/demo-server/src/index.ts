@@ -411,7 +411,15 @@ const contextFor = (): FormContext => ({ user: { role: 'guest' } })
 
 /**
  * Re-runs the form's own rules against submitted data. The point of this route is
- * that it imports the same validateForm the browser used: one rule set, no drift.
+ * that it runs the form's own rules, from the same package the browser used: one
+ * rule set, no drift.
+ *
+ * It does not import `validateForm`, and this comment said it did. That was the
+ * whole basis for `docs/spec/08-validation.md`'s parity snippet, which was built
+ * on `validateForm` and would return `{}` for a wizard submission missing every
+ * required answer -- every `Step` is hidden by a context the snippet never
+ * builds. What this route actually calls is `validateAcross` and
+ * `submittedAcross`, once per step scope, and the spec now says so.
  *
  * A visibility rule reading context is where that claim gets tested, because the
  * browser had a context and this has to reach the same answer. When it cannot,

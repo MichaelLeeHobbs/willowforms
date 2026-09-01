@@ -1094,3 +1094,124 @@ describe('a section that calls itself planned is still planned', () => {
     expect(found, name + ' says planned, but ' + entry.because).toEqual([])
   })
 })
+
+/**
+ * The parity contract against the server it points at.
+ *
+ * `08-validation.md`'s "Server parity" section is marked built and said the
+ * demo server's "only purpose is to prove that `validateForm` is the same
+ * function in both places". The demo server does not import `validateForm`. It
+ * uses `validateAcross` and `submittedAcross`, once per step scope, and a host
+ * copying the documented snippet onto a wizard document got `{}` back for a
+ * submission missing every required answer -- every `Step` is hidden by a
+ * context the snippet never builds.
+ *
+ * Checked against the import block rather than against a hand-kept list,
+ * because a hand-kept list is what drifted. The section is the reference a
+ * server implementer reads, and the reference server is the thing it describes,
+ * so if they stop naming the same functions one of the two is wrong.
+ */
+describe('the server parity section and the server it cites', () => {
+  /** Everything the demo server imports from core, from the import block. */
+  /*
+   * Parsed once per describe rather than per call. Four assertions each
+   * re-reading and re-scanning the same file is work with one answer, and the
+   * answer cannot change inside a run.
+   */
+  let cached: Set<string> | undefined
+  const imported = (): Set<string> => {
+    if (cached) return cached
+    const source = read('apps/demo-server/src/index.ts')
+    const names = new Set<string>()
+    for (const block of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@formsmith\/core'/g)) {
+      for (const name of (block[1] ?? '').split(',')) {
+        const trimmed = name.replace(/^type\s+/, '').trim()
+        if (trimmed) names.add(trimmed)
+      }
+    }
+    cached = names
+    return names
+  }
+
+  /** The "Server parity" section of the validation contract, on its own. */
+  const parity = (): string => {
+    const text = read('docs/spec/08-validation.md')
+    const from = text.indexOf('## Server parity')
+    expect(from, 'the Server parity section is gone or renamed').toBeGreaterThan(-1)
+    const next = text.indexOf('\n## ', from + 1)
+    return text.slice(from, next === -1 ? text.length : next)
+  }
+
+  it('reads the demo server import block at all', () => {
+    // The control. An empty set would satisfy every assertion below by having
+    // nothing to disagree with -- the same vacuous green this run keeps finding.
+    const names = imported()
+
+    expect(names.size).toBeGreaterThan(3)
+    expect([...names]).toContain('validateDocument')
+  })
+
+  /*
+   * The per-scope half of the contract, named once. Both directions below are
+   * about these four.
+   */
+  const PER_SCOPE = ['validateAcross', 'submittedAcross', 'contextValues', 'missingContext']
+
+  it('names the functions the reference server actually calls', () => {
+    const section = parity()
+    const names = imported()
+    const missing = PER_SCOPE.filter((name) => names.has(name)).filter(
+      (name) => !section.includes(name),
+    )
+
+    expect(missing, 'the parity section does not mention these, and the server calls them').toEqual(
+      [],
+    )
+  })
+
+  it('does not name one the reference server has stopped calling', () => {
+    /*
+     * The other direction, which the check above does not cover.
+     *
+     * It asserts only that an imported name is mentioned, so the spec could get
+     * *ahead* of the server -- keep teaching `validateAcross` after the route
+     * stopped calling it -- and nothing would fail. That is the same drift this
+     * whole item is about, pointing the other way: the section claimed
+     * `validateForm` was what the server used long after it was not.
+     *
+     * Raised in review on PR #37.
+     */
+    const section = parity()
+    const names = imported()
+    const stale = PER_SCOPE.filter((name) => section.includes(name)).filter(
+      (name) => !names.has(name),
+    )
+
+    expect(stale, 'the parity section teaches these and the server no longer imports them').toEqual(
+      [],
+    )
+  })
+
+  it('does not offer a function the reference server does not import', () => {
+    /*
+     * The direction that actually bit. `validateForm` is a real export and a
+     * correct call for a single-scope form, so the section may still teach it
+     * -- but it may not do so while claiming the demo server is the proof, and
+     * the wizard half has to be there beside it.
+     */
+    const section = parity()
+    const teachesSingleScope = section.includes('validateForm')
+    const teachesPerScope = section.includes('validateAcross')
+
+    /*
+     * Stated as one unconditional expectation rather than as an `if` around an
+     * `expect`. `vitest/no-conditional-expect` refuses that shape and is right
+     * to: a guarded assertion passes having asserted nothing the moment the
+     * guard stops holding, which is this run's whole subject.
+     */
+    expect(
+      teachesSingleScope && !teachesPerScope,
+      'the section teaches validateForm as the parity example while the server it cites validates per scope',
+    ).toBe(false)
+  })
+})
