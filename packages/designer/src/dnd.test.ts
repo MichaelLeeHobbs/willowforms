@@ -299,13 +299,51 @@ describe('resolveDrop', () => {
     expect(target?.index).toBe(0)
   })
 
-  it('reads a slot as a slot when the dragged node is a sibling', () => {
+  it('translates a sibling move too, then accounts for the removal', () => {
     /*
-     * The other branch, and the reason it is a branch: `moveNode` removes the
-     * node before it inserts, so for a sibling the index is measured in the list
-     * that already excludes it.
+     * This pinned 1 and asserted the wrong thing, under a name that described
+     * the defect as the design: "reads a slot as a slot when the dragged node
+     * is a sibling". `moveNode` does remove before it inserts -- but the index
+     * it removes from is the *document's* list, and the slot is a position in
+     * the drawn one. Those agree only when every sibling drew an element, and
+     * this fixture is the one built to separate them.
+     *
+     * Worked by hand and then confirmed by running `removeNode` and
+     * `insertNode` for every candidate index. Children are `[a, ?, ?, d, e]`
+     * with two drawing nothing; the pointer at y=105 is below `d`'s midpoint
+     * (80) and above `e`'s (130), so the author is placing `a` between them:
+     *
+     *   1 -> h1, a, h2, d, e
+     *   2 -> h1, h2, a, d, e
+     *   3 -> h1, h2, d, a, e   <- where the pointer was
+     *   4 -> h1, h2, d, e, a
+     *
+     * The old code answered 2 and this test pinned 1. Both put the component
+     * somewhere the author did not aim, silently.
      */
     const target = resolveDrop(withHidden(), 200, 105, 'a')
+    expect(target?.index).toBe(3)
+  })
+
+  it('does not subtract for a sibling being moved forward', () => {
+    /*
+     * The other half of the removal adjustment, and the reason it is
+     * conditional: when the dragged node sits *after* the target position,
+     * removing it shifts nothing before that position, so there is nothing to
+     * subtract.
+     *
+     * `e` is last in the document and is dropped between `a` and `d`. Slot 1
+     * translates to document index 1, and `e`'s own index (4) is not before it,
+     * so the answer stands. Confirmed by running the operation: the children
+     * become `a, e, h1, h2, d`, whose drawn list is `a, e, d` -- `e` between the
+     * two the pointer was between.
+     *
+     * My first expectation here was 3, by analogy with the row above rather
+     * than by computing this case. The analogy is exactly what the conditional
+     * exists to break.
+     */
+    const target = resolveDrop(withHidden(), 200, 55, 'e')
+
     expect(target?.index).toBe(1)
   })
 

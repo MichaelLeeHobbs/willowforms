@@ -271,8 +271,39 @@ function documentIndex(
    */
   if (!draggedKey) return indexInParent(filtered, slot)
 
-  const draggedIsSibling = candidates.some((c) => c.key === draggedKey && c.parentKey === parentKey)
-  return draggedIsSibling ? slot : indexInParent(filtered, slot)
+  const dragged = candidates.find((c) => c.key === draggedKey && c.parentKey === parentKey)
+  if (!dragged) return indexInParent(filtered, slot)
+
+  /*
+   * A same-parent move is translated too, and then adjusted for the removal.
+   *
+   * This returned the raw `slot` on the theory that "for a sibling the index is
+   * measured in the list that already excludes it". That is true of the *drawn*
+   * list and false of the document, and the two agree only when every sibling
+   * drew an element -- `measureTree` skips a node with no `[data-fs-key]`
+   * element and its whole subtree, which `ARCHITECTURE.md` names as a supported
+   * kit outcome.
+   *
+   * Computed by hand against this file's own `withHidden()` fixture, which is
+   * the shape that separates them, and then confirmed by running `removeNode`
+   * and `insertNode` for every candidate index. Children `[a, ?, ?, d, e]` where
+   * two drew nothing; drop `a` between `d` and `e`:
+   *
+   *   1 -> h1, a, h2, d, e
+   *   2 -> h1, h2, a, d, e
+   *   3 -> h1, h2, d, a, e   <- where the pointer was
+   *   4 -> h1, h2, d, e, a
+   *
+   * The old code answered 2 and the test pinned 1. Both put the component
+   * somewhere the author did not aim, silently, and `dnd.test.ts` was the guard
+   * for exactly this fixture.
+   *
+   * `- 1` because `moveNode` is `insertNode(removeNode(...))`: when the dragged
+   * node sat before the target position, removing it has already shifted
+   * everything after it down by one.
+   */
+  const target = indexInParent(filtered, slot)
+  return dragged.index < target ? target - 1 : target
 }
 
 /** The document index a new node takes when inserted at `slot`. */
