@@ -201,6 +201,79 @@ describe('moveTarget when two parents share a key', () => {
 
   const isContainer = (type: string): boolean => type === 'Stack' || type === 'Screen'
 
+  it('moves out to the grandparent past the right parent, not the first namesake', () => {
+    /*
+     * The `left` arm of this describe, which covered `up` and `down` only --
+     * and the branch still had the exact defect the block was written about.
+     *
+     * `moveTarget` found the parent with `rows.find((r) => r.node.key ===
+     * row.parentKey)`, and `find` answers the *first* row carrying the name.
+     * Both fields read off it are positional. Traced against this fixture
+     * before the fix: `moveTarget(flatten(twoStacks()), 'c', 'left',
+     * isContainer)` answered `index: 1` where `c` lives in the second stack and
+     * the correct answer is `2`. `moveNode` performs that happily and
+     * `describeMove` announces "moved out one level."
+     *
+     * The second stack sits at index 1 of the root, so a child moving out of it
+     * lands at index 2.
+     */
+    const rows = flatten(twoStacks())
+
+    expect(moveTarget(rows, 'c', 'left', isContainer)).toEqual({ parentKey: 'root', index: 2 })
+  })
+
+  it('still moves out of the first namesake correctly', () => {
+    /*
+     * The control, and it is what makes the row above mean something: the first
+     * stack is at index 0, so its children move out to index 1 -- which is the
+     * answer the broken version gave for *both* stacks.
+     */
+    const rows = flatten(twoStacks())
+
+    expect(moveTarget(rows, 'a', 'left', isContainer)).toEqual({ parentKey: 'root', index: 1 })
+  })
+
+  it('does not offer a move into a container that cannot hold children', () => {
+    /*
+     * `right` asked the *kit* whether the previous sibling is a container while
+     * `moveNode` asks the *node*: a type the kit marks `container: true` that
+     * carries no `children` array yields a MoveTarget `moveNode` silently
+     * refuses, after which `Tree.tsx` announces a move that did not happen.
+     */
+    const hollow: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        // The kit calls Stack a container; this one has no children array.
+        { key: 'hollow', type: 'Stack', props: {} },
+        leaf('after'),
+      ],
+    }
+
+    expect(moveTarget(flatten(hollow), 'after', 'right', isContainer)).toBeUndefined()
+  })
+
+  it('still offers a move into a container that can', () => {
+    // The control. Refusing every right-move would pass the row above while
+    // removing the gesture.
+    const rows = flatten(twoStacks())
+
+    expect(moveTarget(rows, 'd', 'right', isContainer)).toBeUndefined()
+
+    const nested: ComponentNode = {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [{ key: 'box', type: 'Stack', props: {}, children: [] }, leaf('after')],
+    }
+
+    expect(moveTarget(flatten(nested), 'after', 'right', isContainer)).toEqual({
+      parentKey: 'box',
+      index: 0,
+    })
+  })
+
   it('counts a position among this parent children, not every namesake parent', () => {
     const rows = flatten(twoStacks())
 
