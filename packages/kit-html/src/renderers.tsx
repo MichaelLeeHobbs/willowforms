@@ -381,7 +381,7 @@ function SelectNode({
              * round-trip. Read inline here, it also threw on a `null` in the
              * array, and a document is data.
              */
-            const { value: v, label } = optionEntry(option, i)
+            const { value: v, label } = optionEntry(option, i, options)
             return (
               <option key={String(i) + ':' + v} value={v}>
                 {label}
@@ -683,7 +683,7 @@ function RadioGroupNode({
           }
         >
           {options.map((option, i) => {
-            const { value: v, label } = optionEntry(option, i)
+            const { value: v, label } = optionEntry(option, i, options)
             return (
               <label key={String(i) + ':' + v} className="fsh-radio">
                 <input

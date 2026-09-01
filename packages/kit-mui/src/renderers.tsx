@@ -419,7 +419,7 @@ function SelectNode({
          * to agree on what an entry means or a choice cannot round-trip. Read
          * inline here, it also threw on a `null` in the array.
          */
-        const { value: v, label } = optionEntry(option, i)
+        const { value: v, label } = optionEntry(option, i, options)
         return (
           <MenuItem key={String(i) + ':' + v} value={v}>
             {label}
@@ -674,7 +674,7 @@ function RadioGroupNode({
         onChange={(e) => onChange(optionValue(options, e.target.value))}
       >
         {options.map((option, i) => {
-          const { value: v, label } = optionEntry(option, i)
+          const { value: v, label } = optionEntry(option, i, options)
           return (
             <FormControlLabel
               // Position first, so two options sharing a value are still two
