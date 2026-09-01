@@ -142,6 +142,28 @@ export const NOT_A_LIST = 'This list was not sent as a list.'
  */
 export const TOO_DEEP = 'This form is nested too deeply to check.'
 
+/**
+ * A node's children, for the two walks a server runs.
+ *
+ * `node.children ?? []` guards nullish and nothing else, so a truthy non-array
+ * -- `children: 5`, `children: {}`, `children: "ab"` -- reached `for...of` and
+ * threw `TypeError: node.children is not iterable`, and a `children: [null]`
+ * entry reached `isVisible`, which dereferenced it. Both on the submit path,
+ * both out of a route handler, both from a document nothing on that path gates.
+ *
+ * `walk` in `tree.ts` has had exactly this guard for a while, under a comment
+ * naming the same incident -- "one node missing `props` used to take the whole
+ * form with it". These two walks are the ones that did not borrow it. A node
+ * that is not a node contributes nothing, which is what `validateDocument`
+ * reports about it.
+ */
+const childrenOfNode = (node: ComponentNode): ComponentNode[] =>
+  Array.isArray(node.children)
+    ? node.children.filter(
+        (child): child is ComponentNode => Boolean(child) && typeof child === 'object',
+      )
+    : []
+
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 
 /*
@@ -499,6 +521,20 @@ export function applyRule(
   data: FormData,
   options: EvalOptions = {},
 ): string | undefined {
+  /*
+   * The rule is checked before it is read, and it was not.
+   *
+   * `rule.when` on line one dereferenced whatever arrived, so a document
+   * holding `"validations": [null]` threw `TypeError` out of `validateForm` --
+   * on the server, per submit. `validationsOf` only checks that the array is an
+   * array, and both `isRequired` and `context.ts` read rules with `rule?.`, so
+   * nullish entries were already known to be reachable here.
+   *
+   * Reported rather than skipped, for the reason `UNREADABLE_RULE` exists a few
+   * lines down: an entry this code cannot read is not a rule that passed.
+   */
+  if (!rule || typeof rule !== 'object') return UNREADABLE_RULE
+
   if (!guardPasses(rule.when, data, options)) return undefined
 
   /*
@@ -756,12 +792,12 @@ export function validateForm(
           ...scope,
           row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
-        for (const child of node.children ?? []) visit(child, inner, depth + 1)
+        for (const child of childrenOfNode(node)) visit(child, inner, depth + 1)
       })
       return
     }
 
-    for (const child of node.children ?? []) visit(child, scope, depth + 1)
+    for (const child of childrenOfNode(node)) visit(child, scope, depth + 1)
   }
 
   visit(root, options)
@@ -899,7 +935,7 @@ export function submittedData(
           row: rowContext(pushRow(path, { key: dataKeyOf(node), index }), row),
         }
         const kept: FormData = Object.create(null) as FormData
-        for (const child of node.children ?? []) collect(child, inner, kept, depth + 1)
+        for (const child of childrenOfNode(node)) collect(child, inner, kept, depth + 1)
         return { ...kept }
       })
       return
@@ -910,7 +946,7 @@ export function submittedData(
       const value = valueOf(held, key)
       if (value !== undefined) into[key] = value
     }
-    for (const child of node.children ?? []) collect(child, scope, into, depth + 1)
+    for (const child of childrenOfNode(node)) collect(child, scope, into, depth + 1)
   }
 
   const kept: FormData = Object.create(null) as FormData

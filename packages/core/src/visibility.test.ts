@@ -432,3 +432,70 @@ describe('a computed renderWhen inside a row', () => {
     ])
   })
 })
+
+/**
+ * The two shapes this function is handed by a walk that does not filter.
+ *
+ * `isVisible` is the first thing `validateForm`'s walk calls and the renderer
+ * calls it per node, and it dereferenced whatever arrived -- unlike every other
+ * document walker in the package. `validateForm` filters its children now, so
+ * the node guard is unreachable from there; the renderer's `childrenOf` guards
+ * that `children` is an array and not what is in it, so it is reachable from
+ * the other caller. Driven directly here rather than through either, because a
+ * guard tested only through a caller that filters is a guard nothing executes.
+ */
+describe('a node or a condition that is not there at all', () => {
+  it('does not throw on a child that is not a node', () => {
+    const notANode = null as unknown as ComponentNode
+
+    expect(() => isVisible(notANode, {})).not.toThrow()
+  })
+
+  it('shows it rather than hiding it', () => {
+    /*
+     * Visible, in the direction this file argues for everywhere else. Hidden
+     * would take a subtree out of validation, and there is nothing here to
+     * hide in the first place.
+     */
+    expect(isVisible(null as unknown as ComponentNode, {})).toBe(true)
+    expect(isVisible(7 as unknown as ComponentNode, {})).toBe(true)
+  })
+
+  it('shows a condition kind that carries no condition', () => {
+    /*
+     * The case the malformed-condition test above does not reach: it varies the
+     * `op` inside a condition that is present. This one has no `condition`
+     * property at all, which `tree.ts` permits into a document and nothing on
+     * the validate path gates.
+     *
+     * By this file's stated rule -- asked whether a rule was *expressed*, not
+     * whether one holds -- that is shown. It answered hidden, so the node and
+     * everything under it left validateForm and a required answer became
+     * advisory on the server.
+     */
+    // Cast on the whole node: `exactOptionalPropertyTypes` is on, so a
+    // `renderWhen` typed as possibly-undefined is not assignable to the
+    // optional property, and the shape under test is one the type forbids.
+    const bare = {
+      key: 'x',
+      type: 'Field',
+      props: {},
+      renderWhen: { kind: 'condition' },
+    } as unknown as ComponentNode
+
+    expect(isVisible(bare, {})).toBe(true)
+  })
+
+  it('still hides on a condition that is present and false', () => {
+    // The control. Answering true for everything would pass all three above.
+    const when = { op: 'truthy', value: { kind: 'literal', value: false } } as unknown as Condition
+    const guarded: ComponentNode = {
+      key: 'x',
+      type: 'Field',
+      props: {},
+      renderWhen: { kind: 'condition', condition: when },
+    }
+
+    expect(isVisible(guarded, {})).toBe(false)
+  })
+})
