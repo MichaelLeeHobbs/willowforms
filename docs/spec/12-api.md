@@ -348,15 +348,15 @@ typed through the panel — and it is not the same string as its trimmed twin an
 rename of the same field would produce the trimmed one. Two components could otherwise hold what
 everything downstream treats as one name, with the duplicate check unable to see it.
 
-`keyProblem(key)` returns the reason or nothing. Two callers show it to someone — the Properties panel
-refuses a rename with it, and `validateDocument` reports `invalid-key` or `invalid-data-key` against a
-pasted document — and one rule decides both, so a rename and a paste are judged the same way.
+`keyProblem(key)` returns the reason or nothing. Three callers hand it to somebody: `renameKey` and `setDataKey` give it back for the Properties panel to show, and `validateDocument` reports `invalid-key`
+or `invalid-data-key` against a pasted document. One rule decides all three, so a rename, a data key and
+a paste are judged the same way.
 
-The other four callers show nobody anything, and that is worth knowing rather than discovering.
-`generateKey` falls back to `field` when the name it derived fails; `decodeRow` and `decodeAddress`
-return nothing, and the latter is what makes `applyChange` drop a write whose address holds a refused
-name. A host that sends an edit addressed to a reserved key gets no error and no change. This section
-said "both callers", which reads as the complete surface.
+Three more call it and answer with nothing, which is worth knowing rather than discovering.
+`generateKey` falls back to `field` when the name it derived fails, and `decodeRow` and `decodeAddress`
+return nothing -- the second is why `applyChange` drops a write whose address holds a refused name,
+though `applyChange` never calls `keyProblem` itself. A host that sends an edit addressed to a reserved
+key gets no error and no change. This section said "both callers", which reads as the complete surface.
 
 **The grammar is the JavaScript identifier subset, and the reason is the evaluator rather than
 tidiness.** A hyphen is the tempting addition, because real forms are full of `first-name`, and it is
