@@ -232,6 +232,43 @@ describe('the Style tab', () => {
     expect(harness.latest()?.css?.any ?? '').not.toContain('}')
   })
 
+  it('drops the refusal when the value moves underneath it', async () => {
+    /*
+     * `refused` survived the resync that runs when the `value` prop moves, so a
+     * field that had refused something stayed `aria-invalid` with its alert on
+     * screen after an undo, a redo or an edit through the raw box put a valid
+     * value back. The control then said the text in it was wrong when it was
+     * not, and a message that outlives its cause is how somebody learns to
+     * ignore the messages.
+     *
+     * A commit first, then the refusal. A refusal writes nothing, so with
+     * nothing committed before it the undo has no edit for this declaration to
+     * step back over and `value` never moves -- which is why the obvious
+     * version of this test passes against the defect.
+     */
+    const harness = setup(field())
+    await harness.openStyle()
+
+    const radius = screen.getByLabelText('Radius')
+    await harness.user.clear(radius)
+    await harness.user.type(radius, '4px')
+    await harness.user.tab()
+
+    await harness.user.clear(radius)
+    await harness.user.type(radius, '6px}')
+    await harness.user.tab()
+
+    expect(screen.getByRole('alert'), 'the refusal never happened').toBeTruthy()
+    expect(radius).toHaveProperty('ariaInvalid', 'true')
+
+    // Undo through the toolbar, which is what a person does and what moves the
+    // `value` prop the resync watches.
+    await harness.user.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(screen.queryByRole('alert'), 'the refusal outlived the value it was about').toBeNull()
+    expect(radius).not.toHaveProperty('ariaInvalid', 'true')
+  })
+
   it('keeps the refused text in the box so it can be repaired', async () => {
     // Refusing is not the same as deleting what somebody typed: the text stays,
     // flagged, so the stray brace can be taken out rather than retyped.

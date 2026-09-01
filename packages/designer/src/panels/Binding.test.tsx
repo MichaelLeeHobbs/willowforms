@@ -792,6 +792,34 @@ describe('a document whose languages are not languages', () => {
     expect(screen.getByText('Languages')).toBeTruthy()
   })
 
+  it.each([
+    ['no name', { code: 'en', bidi: 'ltr' }],
+    ['a name that is not a string', { code: 'en', name: {}, bidi: 'ltr' }],
+    ['no bidi', { code: 'en', name: 'English' }],
+    ['a bidi outside the union', { code: 'en', name: 'English', bidi: 'sideways' }],
+    ['a dialect that is not a string', { code: 'en', dialect: 5, name: 'English', bidi: 'ltr' }],
+    ['an empty code', { code: '', name: 'English', bidi: 'ltr' }],
+  ])('does not treat %s as a language', async (_what, entry) => {
+    /*
+     * `isLanguage` is written `language is Language`, which is a promise to the
+     * compiler, and checking `code` alone made it a false one: `{ code: 'en' }`
+     * went on as a `Language`, the toolbar rendered `entry.name` as nothing,
+     * and `api.setLanguages` -- typed `Language[]` -- took it back. After that
+     * the compiler has no reason to question `.name` or `.bidi` anywhere
+     * downstream, which is worse than having no predicate.
+     *
+     * The dialect case is the one with a recorded history: `{"code":"en",
+     * "dialect":5}` builds the tag `en-5`, which `findLanguage` matches against
+     * nothing, and `languageTag`'s own docblock in core records fixing exactly
+     * that once already.
+     */
+    const view = junk([entry, { code: 'fr', name: 'French', bidi: 'ltr' }])
+    await view.openTab('Settings')
+
+    // Only the real one is drawn.
+    expect(screen.getAllByRole('checkbox', { name: 'Right to left' })).toHaveLength(1)
+  })
+
   it('refuses to remove the last language it can draw', async () => {
     /*
      * The Remove button read `doc.languages.length`, so a document with one

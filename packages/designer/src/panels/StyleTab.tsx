@@ -189,12 +189,22 @@ function DeclarationField({
    * progress: only the version this control last saw is replaced. Undo, redo,
    * and the raw field rewriting this same declaration all reach here.
    */
+  const [refused, setRefused] = useState('')
+
   if (value !== committed) {
     setCommitted(value)
     setDraft(value)
+    /*
+     * And the refusal goes with the value it was about.
+     *
+     * `refused` survived this resync, so a field that had refused `6px}` stayed
+     * `aria-invalid` with its alert on screen after an undo, a redo or an edit
+     * through the raw box put a *valid* value back. The control then said the
+     * text in it was wrong when it was not -- and a message that outlives its
+     * cause is how somebody learns to ignore the messages.
+     */
+    setRefused('')
   }
-
-  const [refused, setRefused] = useState('')
 
   const commit = (): void => {
     if (draft === committed) return
