@@ -53,6 +53,28 @@ const box: ComponentNode = {
   children: [],
 }
 
+/**
+ * Does this stylesheet carry a rule for exactly this class?
+ *
+ * `text.includes('.' + name)` is the substring trap the write-tests skill
+ * names. Emotion class names are hashes and one is freely a prefix of another,
+ * so `.css-1ab` matches the rule written for `.css-1abc` and the assertion
+ * reads a rule belonging to some other element on the page. Every test below
+ * renders several styled components into one document and reads one of them,
+ * which is the arrangement where that goes wrong quietly.
+ *
+ * The name has to end where the selector ends: anything but another name
+ * character after it.
+ */
+function carriesRule(text: string, className: string): boolean {
+  const needle = '.' + className
+  for (let at = text.indexOf(needle); at !== -1; at = text.indexOf(needle, at + 1)) {
+    const next = text.charAt(at + needle.length)
+    if (next === '' || !/[\w-]/.test(next)) return true
+  }
+  return false
+}
+
 /** The emotion rule this render emitted for the Box, whitespace removed. */
 function ruleFor(theme: ReturnType<typeof createTheme> | undefined): string {
   const form = (
@@ -80,7 +102,7 @@ function ruleFor(theme: ReturnType<typeof createTheme> | undefined): string {
    */
   return Array.from(document.querySelectorAll('style'))
     .map((tag) => tag.textContent ?? '')
-    .filter((text) => classes.some((c) => text.includes('.' + c)))
+    .filter((text) => classes.some((c) => carriesRule(text, c)))
     .join('')
     .replace(/\s+/g, '')
 }
@@ -95,7 +117,7 @@ function rulesFor(container: HTMLElement, key: string): string {
 
   return Array.from(document.querySelectorAll('style'))
     .map((tag) => tag.textContent ?? '')
-    .filter((text) => classes.some((c) => text.includes('.' + c)))
+    .filter((text) => classes.some((c) => carriesRule(text, c)))
     .join('')
     .replace(/\s+/g, '')
 }
