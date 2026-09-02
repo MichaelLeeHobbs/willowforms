@@ -856,7 +856,7 @@ function FileUploadNode({
   const id = useId()
   /** How many files the last choice dropped for being over `maxSize`. */
   const [dropped, setDropped] = useState(0)
-  /** How many choices have been made, so a repeated refusal is a new string. */
+  /** How many refusals there have been, so a repeated one is a new string. */
   const [attempt, setAttempt] = useState(0)
   /*
    * The names the document holds, drawn beside the input.

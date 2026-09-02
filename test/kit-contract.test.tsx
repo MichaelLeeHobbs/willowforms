@@ -1693,7 +1693,17 @@ describe('a length means the same number of pixels in both kits', () => {
  * counts. That is the gap the counter's docblock is about.
  */
 const SEAM_CASES = KITS.flatMap(({ name, kit, renderers }) =>
-  ['TextField', 'NumberField', 'Select', 'TextArea', 'Checkbox', 'Switch'].map((type) => ({
+  [
+    'TextField',
+    'NumberField',
+    'Select',
+    'TextArea',
+    'Checkbox',
+    'Switch',
+    'DatePicker',
+    'FileUpload',
+    'RadioGroup',
+  ].map((type) => ({
     name,
     kit,
     renderers,
