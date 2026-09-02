@@ -293,6 +293,7 @@ Belongs in `e2e/`, which is what `CLAUDE.md` says about anything jsdom cannot re
 case typing `1e999` into a number property and asserting the stored document holds no `null` would
 settle it. The same shape as the canvas's primary-button guard recorded above -- both are guards whose
 input the test environment refuses to produce.
+
 ## `validateDocument` takes `FormDocument`, and its whole job is untrusted input
 
 Copilot raised it against PR #74, one level away from what it was pointing at. Its finding was that the
