@@ -2328,14 +2328,26 @@ describe('the number editor, which the fixture kit declares and nothing drove', 
    * in place.
    */
   /*
-   * Queried by type rather than by label. The row renders a "Padding" label and
-   * a "Padding binding" one, and the accessible-name lookups pick neither
-   * cleanly -- and the control under test is the number input itself, which is
-   * the only one on the panel.
+   * By role, not by label and not by tag.
+   *
+   * The row renders a "Padding" label and a "Padding binding" one, so a
+   * name-based lookup matches neither cleanly -- but the first version of this
+   * reached for `document.querySelector` to get around that, which searches the
+   * whole document and silently returns the first hit. Two number editors on
+   * the panel and this drives one while asserting about the other, with nothing
+   * to say it happened. That is the unscoped-query trap in the write-tests
+   * skill.
+   *
+   * `getByRole` is the accessible query without the name problem: a number
+   * input is a `spinbutton`, and Testing Library throws when a lookup matches
+   * more than one element rather than picking. If a second number editor ever
+   * lands on this panel, this fails and says so.
    */
   const numberBox = (): HTMLInputElement => {
-    const box = document.querySelector<HTMLInputElement>('input[type="number"]')
-    if (!box) throw new Error('the panel rendered no number editor')
+    const box = screen.getByRole('spinbutton')
+    if (!(box instanceof HTMLInputElement)) {
+      throw new Error('the panel number editor is not an input')
+    }
     return box
   }
 
