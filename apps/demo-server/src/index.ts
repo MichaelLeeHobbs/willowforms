@@ -282,10 +282,21 @@ const MAX_BODY = 1_000_000
  */
 export type BodyRefusal = 'too-large' | 'not-json' | 'too-deep'
 
-export interface BodyResult {
-  value?: unknown
-  refused?: BodyRefusal
-}
+/**
+ * A parsed body or a refusal, and never a value that might be both or neither.
+ *
+ * Two independent optional fields let a caller read `value` without asking
+ * about `refused` first, and the compiler had nothing to say about it: on a
+ * refusal `value` is `undefined`, so the route that skipped the check would
+ * have handed `undefined` to `validateDocument` and answered 422 for a body it
+ * never looked at. Both routes below happen to check, which is exactly the kind
+ * of "happens to be right" the types should be carrying instead.
+ *
+ * `?: never` on each side rather than two bare members, so `body.refused` stays
+ * readable without an `in` narrowing and the check reads the way it did.
+ */
+export type BodyResult =
+  { refused: BodyRefusal; value?: never } | { refused?: never; value: unknown }
 
 /**
  * The request body as JSON, or why not.
