@@ -246,3 +246,33 @@ Out of scope for the item that pull request carries, which is documentation figu
 record. It belongs with `packages/core/src/factory.ts` and whatever else in that file makes a claim about
 what it returns; the fix is a sentence, but the question of how many other docblocks describe a
 pre-`undefined` signature is worth asking once rather than one file at a time.
+
+## The MUI image's refused `src` is unguarded, and the reported defect does not happen
+
+The review said `kit-mui`'s `ImageNode` renders `<img src="">` for an address the allowlist refuses --
+a request for the current page in several browsers -- while `LinkNode`, reading the same allowlist,
+degrades to plain text and says why. One allowlist, two behaviours.
+
+Building the test showed the DOM outcome does not occur. React refuses an empty `src` outright and
+leaves the attribute off, so `hasAttribute('src')` is `false` whether the line reads
+`src={safeHref(...) ?? ''}` or omits the attribute, and every assertion about the markup passes against
+the defect. React does warn instead -- "An empty string (\"\") was passed to the src attribute" -- and
+that fires when the whole file runs and not when the test runs alone, so a gate built on it would
+depend on what else is in the suite.
+
+The line was changed anyway, because omitting the attribute is what it means and it is what stops the
+warning. It is unguarded. A Playwright case is the honest home if anybody wants one: a real browser is
+where "requests the page again" would be observable at all, and `e2e/` is where `CLAUDE.md` says this
+class of thing goes. `kit-html` has the identical line at `renderers.tsx:511` and was not changed,
+because item 37 owns that file and the same reasoning applies to it.
+
+## `Repeater` has no label, so its group is named after the data key
+
+`kit-mui`'s repeater wraps its rows in `role="group"` with no accessible name, which a screen reader
+announces as an unnamed group around every list. It is now named from `node.dataKey ?? node.key`,
+because that is the only author-written string a repeater has: the component declares one property,
+`gap`.
+
+The real fix is a `label` property on `Repeater` in both kits, which is a contract change --
+`03-components.md`'s "built means both kits implement it" -- and so out of scope for a remediation run.
+`kit-html`'s repeater has the same shape.
