@@ -896,9 +896,11 @@ hidden, and its rules never run.
 
 - **Decided:** `tmp/formsmith-review-2026-08-30.md` becomes
   `docs/reviews/2026-08-30-deep-review-a.md`, and `docs/reviews/2026-08-30-second-pass.md` becomes
-  `docs/reviews/2026-08-30-deep-review-b.md`. Both are byte-identical to what they were, so every line
-  citation in the queues, `triage.md` and `found.md` still resolves. This reverses **The second review
-  is committed; the first one is not**, above.
+  `docs/reviews/2026-08-30-deep-review-b.md`. Both are byte-identical, so the content every downstream
+  document was written against is unchanged. Nothing downstream depended on the paths either: the
+  queues, `triage.md` and `found.md` cite source locations such as `Canvas.tsx:439`, not lines in a
+  review, so the rename does not reach them. This reverses **The second review is committed; the first
+  one is not**, above.
 - **Why:** four reviews now exist and only one of the four names said what it was. The provenance
   argument that kept the first pass in `tmp/` assumed it would stay in one working copy, which stopped
   being true the moment a fourth review compared all of them: a review the repository cannot open is a
