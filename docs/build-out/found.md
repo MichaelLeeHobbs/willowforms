@@ -276,6 +276,7 @@ because that is the only author-written string a repeater has: the component dec
 The real fix is a `label` property on `Repeater` in both kits, which is a contract change --
 `03-components.md`'s "built means both kits implement it" -- and so out of scope for a remediation run.
 `kit-html`'s repeater has the same shape.
+
 ## The number editor's overflow guard cannot be driven in jsdom
 
 `Properties.tsx`'s number editor refuses a value `Number.isFinite` rejects, because `Number('1e999')` is
