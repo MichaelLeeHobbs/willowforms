@@ -14,6 +14,24 @@ second review re-derived five of those independently, which is worth knowing bef
 
 ## Second pass (from 2026-08-31)
 
+## The two kits hang a layout length on different elements, and one of them has nowhere to hang it
+
+Measured in item 39, by widening the CSS-pixels rule to every length-valued prop either kit declares.
+Two rows failed on the first run and neither was a unit bug: `kit-html`'s `Repeater` sets `gap` on an
+inner `div.fsh-stack` while spreading `nodeProps` onto an unclassed wrapper around it, and `kit-mui`'s
+`Screen` sets it on the layout it wraps. Both are correct pixels, so the rule now searches the subtree
+and the contract obligation is unchanged.
+
+What the measurement exposed is structural rather than numeric. `kit-html`'s `Repeater` is the one
+data-bound component whose `[data-fs-key]` element carries no class of its own, so per-node CSS from the
+Style tab and any `data-fs-key` selector land on a bare wrapper, and the authored `gap` never spaces the
+group from its error message the way `kit-mui` spaces it. `test/kit-contract.test.tsx`'s seam rule lists
+nine field types and `Repeater` is not among them, so nothing catches it.
+
+Out of scope because item 39 is about conformance rules that cannot fail, not about what the kits draw,
+and item 40 owns `kit-html`'s definitions and stylesheet. Worth doing because it is the same
+"two DOM shapes in one kit" defect the seam rule was written for, one component outside its list.
+
 ## The JSON-dialog case in the axe suite audits one rule out of twenty
 
 `test/a11y.test.tsx` — the ninth of its nine states opens the JSON dialog and audits the shell. With the

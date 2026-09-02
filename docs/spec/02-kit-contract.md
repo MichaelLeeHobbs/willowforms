@@ -111,6 +111,8 @@ met a suite naming rules that did not exist on paper. Both counts are checked ag
 | The palette index has no colliding types                         | The type is how a node finds its renderer                                    |
 | A length-valued prop is CSS pixels                               | A number that means two things is a document that renders two ways           |
 | Two different lengths render differently                         | A kit hard-coding the tested value would satisfy the rule above              |
+| Every length-valued prop the kit declares is driven              | The rows were hand-written, so a prop escaped by not being listed            |
+| There are lengths to drive at all                                | A derived list that came back empty would report a clean sweep of nothing    |
 | A radio group carries `role="radiogroup"`                        | A `<fieldset>` maps to `group`, which has no invalid or required state       |
 | A required control is marked where a screen reader reads it      | A marking inside `aria-hidden` reaches nobody                                |
 | A progress value that is not a number is not reported            | `NaN` is a number, and `aria-valuenow="NaN"` is worse than none              |

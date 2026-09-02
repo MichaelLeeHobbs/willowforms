@@ -946,3 +946,23 @@ hidden, and its rules never run.
   not cheap is re-deciding it wrongly: dropping `RadioGroup` back out would restore a hole that reads as
   covered, which is the shape this file keeps finding.
 - **When:** 2026-09-02, queue item 38.
+
+### A length is pixels anywhere in the component, not on the keyed element
+
+- **Decided:** the CSS-pixels rule derives its rows from the props each kit declares, and looks for the
+  value anywhere in what the component drew rather than on the `[data-fs-key]` element.
+- **Why:** widening the hand-written table to every declared length immediately failed two rows,
+  `kit-mui`'s `Screen.gap` and `kit-html`'s `Repeater.gap`, and neither was a unit bug. Both put the gap
+  on an inner element, correctly in pixels. The obligation `02-kit-contract.md` states is that the number
+  means CSS pixels; which element carries it is composition, and a different rule owns that.
+- **Rejected: requiring the keyed element.** It would have failed both kits for a divergence in
+  structure, under a message about pixels, which sends the next reader to the wrong problem.
+- **Rejected: keeping the hand-written rows.** They carried a `Container` row for a type neither kit
+  ships, so `has()` answered false and two tests passed having asserted nothing, and they missed five
+  real pairs that escaped by not being listed rather than by any decision.
+- **What it costs:** the rule no longer says where the property lands, so a kit could satisfy it by
+  putting a length on any descendant. Each row uses a different number, so a kit cannot hardcode its way
+  through two of them, and a spacing-scale multiplier still reads back as eight times the number. The
+  structural half is recorded in `found.md`.
+- **Reversal:** cheap, and the derivation is the part worth keeping either way.
+- **When:** 2026-09-02, queue item 39.

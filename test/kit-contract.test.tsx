@@ -161,17 +161,24 @@ const DIVERGENT_VOCABULARY = new Set(['Button.variant'])
  * suite must never let a kit do". The list is here so the turning-off is a
  * failure with a name, in one place, rather than four quiet exits.
  */
-const DRIVEN = [
-  'Alert',
-  'Breadcrumbs',
-  'NumberField',
-  'RadioGroup',
-  'Select',
-  'Stack',
-  'Text',
-  'TextArea',
-  'TextField',
-] as const
+/*
+ * Types alone were not enough. A rule drives a component *through a property*,
+ * and a renamed property turns the rule off as quietly as a renamed type did:
+ * the fixture still sets `variant` on the node, because a node's props are free
+ * form, and the kit simply stops reading it. So each entry names the properties
+ * its rules depend on, and both halves are asserted together.
+ */
+const DRIVEN: Record<string, readonly string[]> = {
+  Alert: ['severity'],
+  Breadcrumbs: ['label'],
+  NumberField: [],
+  RadioGroup: ['options'],
+  Select: ['options'],
+  Stack: ['gap'],
+  Text: ['text', 'variant'],
+  TextArea: [],
+  TextField: [],
+}
 
 /**
  * Ask before driving a component, and fail rather than skip when it is missing.
@@ -204,7 +211,22 @@ describe('the two kits in this repository agree', () => {
 
   it.each(KITS)('$name offers every component this suite drives', ({ kit }) => {
     const offered = new Set(kit.components.map((def) => def.type))
-    expect(DRIVEN.filter((type) => !offered.has(type))).toEqual([])
+    expect(Object.keys(DRIVEN).filter((type) => !offered.has(type))).toEqual([])
+  })
+
+  it.each(KITS)('$name still declares every property this suite drives through', ({ kit }) => {
+    const missing = Object.entries(DRIVEN).flatMap(([type, names]) => {
+      const declared = new Set(
+        kit.components.find((def) => def.type === type)?.props.map((p) => p.name),
+      )
+      return names.filter((name) => !declared.has(name)).map((name) => type + '.' + name)
+    })
+
+    expect(
+      missing,
+      'a property this suite drives through was renamed or dropped: that turns a rule off rather ' +
+        'than failing it, because a node carries whatever props a fixture sets',
+    ).toEqual([])
   })
 
   it.each([...DIVERGENT_VOCABULARY])(
@@ -819,6 +841,20 @@ describe('a document value a kit puts somewhere structural', () => {
     return element
   }
 
+  /**
+   * An element's markup with the per-render scope replaced by a fixed token.
+   *
+   * `data-fs-scope` is a `useId` value, so it differs between any two renders,
+   * and every `id` and `aria-*` attribute built from it differs with it. That
+   * makes raw `outerHTML` unequal for two renders of the *same* component, which
+   * is why the variant control below could not fail.
+   */
+  function withoutScope(element: HTMLElement): string {
+    const scope = element.getAttribute('data-fs-scope')
+    if (!scope) throw new Error('no data-fs-scope to normalise: the seam this relies on has moved')
+    return element.outerHTML.split(scope).join('«scope»')
+  }
+
   it.each(KITS)('$name does not let a Text variant add classes of its own', ({ renderers }) => {
     /*
      * `'fsh-text fsh-text--' + variant` with an unnarrowed variant. React
@@ -863,7 +899,19 @@ describe('a document value a kit puts somewhere structural', () => {
     const a = draw(renderers, nodeWith('Text', { text: 'hello', variant: first }))
     const b = draw(renderers, nodeWith('Text', { text: 'hello', variant: second }))
 
-    expect(a.outerHTML).not.toBe(b.outerHTML)
+    /*
+     * Compared with the scope taken out, because comparing raw `outerHTML` made
+     * this control unable to fail. `data-fs-scope` is a `useId` value
+     * (`renderer/index.tsx`), so two renders never agree on it and the
+     * inequality below held whatever the kit drew. Measured by collapsing
+     * `kit-html`'s `Text` variant to the default: both this rule and the
+     * narrowing rule it is the control for stayed green.
+     *
+     * The scope also appears inside `id` and the `aria-*` attributes built from
+     * it, so replacing the value everywhere is what makes the two comparable
+     * rather than deleting the one attribute.
+     */
+    expect(withoutScope(a), 'two declared variants drew the same thing').not.toBe(withoutScope(b))
   })
 
   it.each(KITS)('$name gives an unrecognised Alert severity a role anyway', ({ renderers }) => {
@@ -1267,31 +1315,102 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
    * its row rather than failing, because which components a kit ships is its own
    * business; what a number means is not.
    */
-  const LENGTHS: { type: string; name: string; css: string; value: number }[] = [
-    { type: 'Stack', name: 'gap', css: 'gap', value: 4 },
-    { type: 'Container', name: 'gap', css: 'gap', value: 6 },
-    { type: 'Grid', name: 'gap', css: 'gap', value: 12 },
-    { type: 'Box', name: 'padding', css: 'padding-top', value: 9 },
-    { type: 'Box', name: 'radius', css: 'border-radius', value: 7 },
-  ]
+  /*
+   * The CSS property each length-valued prop has to read back as.
+   *
+   * The rows below used to be hand-written, and a hand-written list of
+   * obligations is a list of the ones somebody remembered. It carried a
+   * `Container` row for a type neither kit ships, so `has()` answered false, the
+   * body returned, and vitest reported a passing test that asserted nothing --
+   * twice, once per kit. It also missed `Screen.maxWidth`, `Screen.gap`,
+   * `Step.gap`, `Repeater.gap` and `Image.width`, which escaped by not being
+   * listed rather than by any decision.
+   *
+   * So the rows are derived from what the kit declares, and this map is the only
+   * thing maintained by hand. A length-valued prop that is neither mapped here
+   * nor excluded below fails the completeness rule, which is the point: a new one
+   * cannot join by being forgotten.
+   */
+  const PIXEL_PROPERTY: Record<string, string> = {
+    gap: 'gap',
+    padding: 'padding-top',
+    radius: 'border-radius',
+    maxWidth: 'max-width',
+    width: 'width',
+  }
 
-  it.each(LENGTHS.map((length) => [length.type + '.' + length.name, length] as const))(
-    '%s is in CSS pixels',
-    (_what, length) => {
-      if (!has(length.type, length.name)) return
+  /*
+   * `minColumnWidth` feeds `repeat(auto-fill, minmax(Npx, 1fr))`, so its pixels
+   * land inside `grid-template-columns` rather than in a property that reads
+   * back as `Npx`. Excluded with a reason rather than silently absent.
+   */
+  const NOT_A_PROPERTY = new Set(['minColumnWidth'])
 
-      const element = drawWith(length.type, { [length.name]: length.value })
-      const read = getComputedStyle(element).getPropertyValue(length.css)
-
-      expect(read, length.type + '.' + length.name + ' is not in CSS pixels').toBe(
-        String(length.value) + 'px',
-      )
-    },
+  const declaredLengths = kit.components.flatMap((def) =>
+    def.props
+      .filter((p) => LENGTHS.includes(p.name))
+      .map((p) => ({ type: def.type, name: p.name })),
   )
 
+  it('maps every length-valued prop the kit declares, or excludes it with a reason', () => {
+    const unmapped = declaredLengths
+      .filter(({ name }) => !(name in PIXEL_PROPERTY) && !NOT_A_PROPERTY.has(name))
+      .map(({ type, name }) => type + '.' + name)
+
+    expect(
+      unmapped,
+      'a length-valued prop with no CSS property here is one this rule skips: map it, or put it in ' +
+        'NOT_A_PROPERTY with a reason',
+    ).toEqual([])
+  })
+
+  const PIXEL_CASES = declaredLengths
+    .filter(({ name }) => name in PIXEL_PROPERTY)
+    .map(({ type, name }, index) => ({
+      what: type + '.' + name,
+      type,
+      name,
+      css: PIXEL_PROPERTY[name] as string,
+      // A different number per row, so a kit hardcoding one cannot satisfy two.
+      value: 4 + index * 3,
+    }))
+
+  it.each(PIXEL_CASES)('$what is in CSS pixels', ({ what, type, name, css, value }) => {
+    const element = drawWith(type, { [name]: value })
+
+    /*
+     * Anywhere in the component, not on the keyed element specifically. The
+     * obligation is that the number means CSS pixels, and a kit is free to put
+     * the property on whatever element it composes the component from:
+     * `kit-html`'s `Repeater` sets `gap` on an inner stack and `kit-mui`'s
+     * `Screen` on the layout it wraps, both correctly in pixels. Requiring the
+     * keyed element would have failed both for a divergence in structure, which
+     * a different rule owns.
+     *
+     * Still a strong claim, because each row uses a different number: a kit
+     * hardcoding one cannot answer two, and a spacing-scale multiplier reads
+     * back as 8x the number rather than the number.
+     */
+    const wanted = String(value) + 'px'
+    const carries = (node: Element): boolean =>
+      getComputedStyle(node).getPropertyValue(css) === wanted
+    const found = carries(element) || [...element.querySelectorAll('*')].some(carries)
+
+    expect(found, what + ' is not ' + wanted + ' anywhere in what the kit drew').toBe(true)
+  })
+
+  it('found lengths to drive at all', () => {
+    /*
+     * The rows are derived now, so an empty derivation would report a clean
+     * sweep having rendered nothing. This is the same guard the sibling describe
+     * carries for its own table.
+     */
+    expect(PIXEL_CASES.length, 'no length-valued props were found to drive').toBeGreaterThan(4)
+  })
+
   it('reads a different number differently, so the rows above are not a fixed value', () => {
-    // The control. A kit hardcoding 4px would pass the `Stack.gap` row exactly.
-    if (!has('Stack', 'gap')) return
+    // The control. A kit hardcoding 4px would pass a `Stack.gap` row exactly.
+    expect(has('Stack', 'gap'), 'Stack.gap is the control for the rows above').toBe(true)
 
     expect(getComputedStyle(drawWith('Stack', { gap: 24 })).gap).toBe('24px')
   })
