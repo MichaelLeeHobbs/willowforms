@@ -668,12 +668,13 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
       role="group"
       direction={vertical ? 'column' : 'row'}
       /*
-       * `px()`, like every other length. This was a bare number, which MUI
-       * multiplies by `theme.spacing` -- so a host that set spacing to 4 got a
-       * 4px button gap and one that set 16 got 64px, from a document that said
-       * nothing. `renderers.test.tsx` states the rule as "a length the document
-       * authored is not the host theme's to rescale" and tested it on
-       * `Box.padding` and `Box.radius` only; this was the length it missed.
+       * `px()`, like every other length. This was `gap={1}`, a bare number,
+       * which MUI resolves through `theme.spacing` -- so the 8px the default
+       * theme drew became 4px under `spacing: 4` and 16px under `spacing: 16`,
+       * from a document that said nothing. `renderers.test.tsx` states the rule
+       * as "a length the document authored is not the host theme's to rescale"
+       * and tested it on `Box.padding` and `Box.radius` only; this was the
+       * length it missed.
        */
       gap={px(8)}
       sx={{ alignItems: vertical ? 'stretch' : 'center' }}

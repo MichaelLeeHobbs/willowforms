@@ -242,10 +242,11 @@ describe('a length the host theme must not rescale', () => {
 
   it('keeps a button group gap out of the theme spacing scale', () => {
     /*
-     * `ButtonGroup` passed `gap={1}`, a bare number, which MUI multiplies by
-     * `theme.spacing`. A host that set spacing to 3 got a 24px gap from a
-     * document that said nothing at all. This file's stated rule was tested on
-     * `Box.padding` and `Box.radius` only, and this is the length it missed.
+     * `ButtonGroup` passed `gap={1}`, a bare number, which MUI resolves
+     * through `theme.spacing`. A host that set spacing to 3 got a 3px gap
+     * where the default theme drew 8px, from a document that said nothing at
+     * all. This file's stated rule was tested on `Box.padding` and
+     * `Box.radius` only, and this is the length it missed.
      */
     const buttons: ComponentNode = {
       key: 'actions',
