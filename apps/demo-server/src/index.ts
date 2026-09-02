@@ -59,7 +59,15 @@ const PORT = (() => {
   return port
 })()
 
-type Store = Record<string, FormDocument>
+/*
+ * What the file holds, which is whatever somebody put in it.
+ *
+ * This said `Record<string, FormDocument>` about JSON parsed off disk, so
+ * `readStore` cast to it and every indexing expression downstream looked safe
+ * to the compiler. The type was the reason a guard could be forgotten rather
+ * than the thing reminding anyone to write one.
+ */
+type Store = Record<string, unknown>
 
 /**
  * The stored forms, or nothing at all if there is no file yet.
@@ -201,6 +209,24 @@ async function withStore<T>(
  * `validateDocument`'s question, and every write goes through it. This is the
  * guard for a file somebody edited behind the server's back.
  */
+/**
+ * One entry of `languages`, checked against what `Language` declares.
+ *
+ * `dialect` is optional and the other three are not. `bidi` is a union of two
+ * strings rather than any string, because it becomes the `dir` attribute.
+ */
+function isLanguageShape(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+
+  const language = value as Record<string, unknown>
+  return (
+    typeof language['code'] === 'string' &&
+    typeof language['name'] === 'string' &&
+    (language['bidi'] === 'ltr' || language['bidi'] === 'rtl') &&
+    (language['dialect'] === undefined || typeof language['dialect'] === 'string')
+  )
+}
+
 function storageFaults(doc: unknown): StructuralError[] {
   const faults: StructuralError[] = []
   const fault = (message: string): void => {
@@ -221,7 +247,23 @@ function storageFaults(doc: unknown): StructuralError[] {
     fault('id must be text, and not empty.')
   if (typeof shape['name'] !== 'string') fault('name must be text.')
   if (typeof shape['defaultLanguage'] !== 'string') fault('defaultLanguage must be text.')
-  if (!Array.isArray(shape['languages'])) fault('languages must be an array.')
+  /*
+   * The elements too, not just the array.
+   *
+   * `Language` declares `code`, `name` and `bidi`, and this checked only that
+   * the list was a list -- so `languages: [5]` satisfied a predicate that then
+   * announced `doc is FormDocument`, and the first thing to read
+   * `language.code` got the `TypeError` this guard exists to prevent. The
+   * docblock above argues that checking some fields and asserting all of them
+   * is the mistake `isLanguage` already cost this project once, and then this
+   * line did it one level down.
+   */
+  const languages = shape['languages']
+  if (!Array.isArray(languages)) {
+    fault('languages must be an array.')
+  } else if (!languages.every(isLanguageShape)) {
+    fault('every language needs a string code, a string name, and bidi of "ltr" or "rtl".')
+  }
   if (!object(shape['actions'])) fault('actions must be an object.')
   if (!object(shape['translations'])) fault('translations must be an object.')
   if (!object(shape['settings'])) fault('settings must be an object.')

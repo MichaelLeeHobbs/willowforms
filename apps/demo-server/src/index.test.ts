@@ -495,6 +495,36 @@ describe('a store holding something that is not a document', () => {
       defaultLanguage: 'en',
       translations: {},
     },
+    /*
+     * A languages array whose elements are not languages. The array was checked
+     * and its contents were not, so this satisfied a predicate that announces
+     * `doc is FormDocument` -- and the first caller to read `language.code` or
+     * `language.bidi` off it gets the `TypeError` the guard exists to prevent.
+     * The write path never sees this one: `validateDocument` rejects it, which
+     * is why only a hand-edited file can produce it.
+     */
+    scalarLanguage: {
+      version: '1',
+      id: 'scalarLanguage',
+      name: 'Scalar language',
+      root: { key: 'root', type: 'Screen', props: {} },
+      actions: {},
+      languages: [5],
+      defaultLanguage: 'en',
+      translations: {},
+      settings: {},
+    },
+    languageWithoutBidi: {
+      version: '1',
+      id: 'languageWithoutBidi',
+      name: 'No bidi',
+      root: { key: 'root', type: 'Screen', props: {} },
+      actions: {},
+      languages: [{ code: 'en', name: 'English' }],
+      defaultLanguage: 'en',
+      translations: {},
+      settings: {},
+    },
     wrongVersion: {
       version: '2',
       id: 'wrongVersion',
