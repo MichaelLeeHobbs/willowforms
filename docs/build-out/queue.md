@@ -11,8 +11,13 @@ Paste this to start or resume the run:
 The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointer at this file.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 30, merged as #65 on 2026-09-01. Items 1-28 and 30 are merged; 29 and 31
-  are in review as #64 and #66; 32-41 are built and waiting for a slot.
+- **Last completed:** item 37, merged as #75 on 2026-09-02. Items 0 through 37 are merged, plus 42, 50,
+  51 and 52 taken out of order. **Twelve remain: 38, 39, 40, 41, 43, 44, 45, 46, 47, 48, 49 and 53.**
+- **The run is stopped, not paused.** No pull request is open and none is in flight. Restarting means
+  pasting the line at the top of this file into a fresh session.
+- **Reconciled 2026-09-02.** This block had said "last completed: item 30" while items up to 52 were
+  merged, and six merged items (0, 34, 35, 36, 37, 42) were never ticked. Ticks and prose now both
+  match `git log`. Nothing was added to the queue or dropped from it.
 - **How to read the ticks:** an item is ticked when its pull request has merged, not when it is
   written. Three may be open at once -- `RUN.md` says why -- so the last ticked item is not always the
   last one worked on.
@@ -21,7 +26,7 @@ The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointe
 - **Open PR:** none
 - **Work list:** `docs/reviews/2026-08-31-deep-review.md`, committed by item 0
 
-Keep all five current as items are ticked off.
+Keep every line above current as items are ticked off.
 
 ---
 
@@ -93,7 +98,7 @@ Every item, without exception:
 
 ### Block 0 — the base and the gate that cannot fail
 
-- [ ] **0. The base.** Commit `docs/reviews/2026-08-31-deep-review.md` unmodified, this queue, `RUN.md`,
+- [x] **0. The base.** Commit `docs/reviews/2026-08-31-deep-review.md` unmodified, this queue, `RUN.md`,
       the `CLAUDE.md` resume pointer, and archive the previous queue with a "do not run" header
       (`archive/queue-2026-08-30-first-pass.md` NOTE).
       **Check:** `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && node scripts/check-dist.mjs && pnpm e2e` all green on the base, and the transcript says so. This is the
@@ -435,7 +440,7 @@ Every item, without exception:
       **Check:** a computed label inside a repeater reads the row's value; an edited prop retries the
       boundary; `root: undefined` renders a message rather than unmounting.
 
-- [ ] **34. `renderer.test.tsx`.** `:396` (HIGH, nothing anywhere renders a repeater inside a repeater, so
+- [x] **34. `renderer.test.tsx`.** `:396` (HIGH, nothing anywhere renders a repeater inside a repeater, so
       the renderer's only nested-row line is unfailable and an inner-row field would emit a truncated
       address), `:1381` (MEDIUM, `kit.fallback` never exercised), `:146` (MEDIUM, the `device` prop has no
       test anywhere in the repo), `:1551` (LOW, an assertion the boundary guarantees), `:424` (LOW),
@@ -443,7 +448,7 @@ Every item, without exception:
       **Check:** changing `path={row?.path ?? NO_ROWS}` to `path={NO_ROWS}` turns a test red; dropping
       `device` from the options object turns a test red.
 
-- [ ] **35. The MUI gap defaults, 8× too tight since the renderer moved gaps to pixels.**
+- [x] **35. The MUI gap defaults, 8× too tight since the renderer moved gaps to pixels.**
       `kit-mui/definitions.ts:50` (HIGH, `gap: 2` on `Screen`, `Stack`, `Step` and `Repeater` against
       `kit-html`'s 16, with `Grid` at 16 in the same file, so the kit disagrees with itself),
       `docs/spec/02-kit-contract.md:164-168` (HIGH, the paragraph that says a form which never set a gap
@@ -453,7 +458,7 @@ Every item, without exception:
       the rule item 38 has to make possible, so if it cannot be written yet, write it as a plain
       cross-kit assertion here and let item 38 generalise it.
 
-- [ ] **36. `kit-mui/renderers.tsx`.** `:708` (HIGH, every `RadioItem` child renders pre-checked while its
+- [x] **36. `kit-mui/renderers.tsx`.** `:708` (HIGH, every `RadioItem` child renders pre-checked while its
       group is unanswered, all at once, because `'' === ''` — `kit-html` fixed exactly this and says so),
       `:820` (MEDIUM, the "too large" notice can never be announced: the message is produced only when
       `error` is undefined and the alert role only when it is set), `:142` and `:459` (LOW, `maxWidth`
@@ -464,7 +469,7 @@ Every item, without exception:
       **Check:** an unanswered radio group has no checked item in either kit; `maxWidth: 1` renders `1px`
       in both; the file notice is announced.
 
-- [ ] **37. `kit-html/renderers.tsx`.** `:977` + `definitions.ts:636-643` (MEDIUM, `BreadcrumbsNode` reads
+- [x] **37. `kit-html/renderers.tsx`.** `:977` + `definitions.ts:636-643` (MEDIUM, `BreadcrumbsNode` reads
       a `label` prop the kit does not declare, so the localisation fix its comment describes is
       unreachable — and `03-components.md:182` plus `test/docs.test.ts` mean the three move together),
       `:863` (MEDIUM, the only statement of what a `FileUpload` will submit is not in
@@ -521,7 +526,7 @@ Every item, without exception:
 
 ### Block 5 — the apps
 
-- [ ] **42. The demo server and the playground.** `demo-server/src/index.ts:341-344, 430-431` (MEDIUM, two
+- [x] **42. The demo server and the playground.** `demo-server/src/index.ts:341-344, 430-431` (MEDIUM, two
       routes apply no shape guard to what comes out of the store while `GET /api/forms` guards the
       identical hazard with a comment saying why, so a hand-edited `forms.json` gets a submit answered
       `200 {ok:true}` against a document that is not one), `:336` (LOW), `:348, 498` (LOW, one 400 for

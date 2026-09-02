@@ -9,8 +9,9 @@ This is the **third** remediation run.
 
 - The first closed 402 of 428 findings. Digest: `docs/reports/2026-08-30-review-remediation.md`.
 - The second closed the 2026-08-30 second pass. Digest: `docs/reports/2026-08-31-second-pass-remediation.md`.
-  Its most useful page is the reconciliation section at the end of `docs/reviews/2026-08-30-second-pass.md`,
-  which is about how the first run failed rather than about the code. Read it.
+  Its most useful page is the reconciliation section at the end of
+  `docs/reviews/2026-08-30-deep-review-b.md`, which is about how the first run failed rather than about
+  the code. Read it.
 - This one works `docs/reviews/2026-08-31-deep-review.md`, committed by item 0. 416 findings, 179 files.
 
 ## What is different this time, and why
