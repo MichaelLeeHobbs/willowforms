@@ -126,6 +126,8 @@ because each drives its own fixture rather than sweeping every component.
 | A failing control is marked invalid                                          | A control that looks wrong and does not say so is announced as fine              |
 | A required control is marked required                                        | WCAG 3.3.2, and the first anybody heard of it was a rejected submit              |
 | An unrequired control is left unmarked                                       | Marking everything required would satisfy the rule above                         |
+| A data-bound control hands back what the person entered                      | A kit that drew every control and dropped every keystroke passed everything else |
+| Every data-bound control has a driver in the rule above                      | A control with no driver is one that rule skips in silence                       |
 | A `Text` variant adds no classes of its own                                  | A document's string interpolated into a class name is a document styling the app |
 | Two declared variants still render differently                               | Narrowing to nothing would satisfy the rule above                                |
 | An unrecognised `Alert` severity still carries a role                        | A typo in a severity drew the banner and announced nothing                       |

@@ -679,7 +679,7 @@ describe('a data-bound control hands back what the person entered', () => {
   const answered = (kit: Kit): ComponentDef[] =>
     kit.components.filter((def) => def.dataBound && !NOT_ENTERED.has(def.type))
 
-  const CASES = KITS.flatMap(({ name, kit, renderers }) =>
+  const ENTERED_CASES = KITS.flatMap(({ name, kit, renderers }) =>
     answered(kit).map((def) => ({ name, type: def.type, def, renderers })),
   )
 
@@ -695,14 +695,18 @@ describe('a data-bound control hands back what the person entered', () => {
     ).toEqual([])
   })
 
-  it.each(CASES)('$name reports what was entered into $type', ({ type, def, renderers }) => {
-    const entry = ENTERED[type]
-    if (!entry) throw new Error(type + ' has no driver, which the rule above exists to catch')
+  it.each(ENTERED_CASES)(
+    '$name reports what was entered into $type',
+    ({ type, def, renderers }) => {
+      const entry = ENTERED[type]
+      if (!entry) throw new Error(type + ' has no driver, which the rule above exists to catch')
 
-    expect(reported(renderers, def, entry), type + ' never told the form what was entered').toEqual(
-      [entry.is],
-    )
-  })
+      expect(
+        reported(renderers, def, entry),
+        type + ' never told the form what was entered',
+      ).toEqual([entry.is])
+    },
+  )
 
   it('reports nothing for a kit that drops the answer, which is what the rules above rest on', () => {
     /*

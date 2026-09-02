@@ -610,7 +610,7 @@ const CONTRACT_RULES = 25
  * `it.each(KITS.flatMap(...))` inline matches neither half of the pattern
  * below, so it would be an obligation this count never sees.
  */
-const CONTRACT_RULES_PER_KIT = 21
+const CONTRACT_RULES_PER_KIT = 23
 
 /**
  * The describes that are about this repository rather than about a kit.
