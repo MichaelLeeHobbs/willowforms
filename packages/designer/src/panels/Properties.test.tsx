@@ -2315,3 +2315,79 @@ describe('moving the selection from one component to another', () => {
     expect(stale, 'these editors kept the previous selection value').toEqual([])
   })
 })
+
+describe('the number editor, which the fixture kit declares and nothing drove', () => {
+  /*
+   * The `padding` prop carries the comment "so what this panel stores for one
+   * can be checked", and nothing in this file or in `e2e/` ever touched it.
+   *
+   * Delete the `Number.isFinite` arm and the suite stays green while `Infinity`
+   * and `NaN` land in `node.props` -- which `JSON.stringify` writes as `null`,
+   * so the export and the submitted payload disagree with what the author
+   * typed. The comment there names that as a fixed defect; nothing held the fix
+   * in place.
+   */
+  /*
+   * By role, not by label and not by tag.
+   *
+   * The row renders a "Padding" label and a "Padding binding" one, so a
+   * name-based lookup matches neither cleanly -- but the first version of this
+   * reached for `document.querySelector` to get around that, which searches the
+   * whole document and silently returns the first hit. Two number editors on
+   * the panel and this drives one while asserting about the other, with nothing
+   * to say it happened. That is the unscoped-query trap in the write-tests
+   * skill.
+   *
+   * `getByRole` is the accessible query without the name problem: a number
+   * input is a `spinbutton`, and Testing Library throws when a lookup matches
+   * more than one element rather than picking. If a second number editor ever
+   * lands on this panel, this fails and says so.
+   */
+  const numberBox = (): HTMLInputElement => {
+    const box = screen.getByRole('spinbutton')
+    if (!(box instanceof HTMLInputElement)) {
+      throw new Error('the panel number editor is not an input')
+    }
+    return box
+  }
+
+  it('stores a number the author types', async () => {
+    const { user, select, latest } = setup(dataField())
+    await select()
+
+    await user.clear(numberBox())
+    await user.type(numberBox(), '24')
+
+    expect(latest()?.props['padding']).toEqual({ kind: 'static', value: 24 })
+  })
+
+  /*
+   * The `Number.isFinite` arm is NOT covered here, and that is said rather than
+   * papered over.
+   *
+   * It exists for `1e999`, which a real browser accepts into a `type="number"`
+   * input and hands over as the raw string, so `Number(value)` is `Infinity` --
+   * a value `JSON.stringify` writes as `null`, which is the defect the comment
+   * beside it records. jsdom sanitises an invalid number-input value to `''`
+   * before any handler sees it, so the empty-string branch fires instead and no
+   * test driven here can tell the two apart. Two attempts confirmed it:
+   * `user.type` never reaches the handler, and `fireEvent.change` with the same
+   * string arrives as `''`.
+   *
+   * Recorded in `docs/build-out/found.md`. It belongs in `e2e/`, which is what
+   * `CLAUDE.md` says about anything jsdom cannot represent.
+   */
+
+  it('clears the property when the box is emptied', async () => {
+    // The control for the other half of the same branch: an empty box removes
+    // the property so the component default applies again.
+    const { user, select, latest } = setup(dataField())
+    await select()
+
+    await user.clear(numberBox())
+    await user.type(numberBox(), '24')
+    await user.clear(numberBox())
+
+    expect(latest()?.props['padding']).toBeUndefined()
+  })
+})

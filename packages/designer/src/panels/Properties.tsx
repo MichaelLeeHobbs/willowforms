@@ -428,9 +428,30 @@ function VisibilityRow({
           className="fs-binding__mode"
           value={mode}
           onChange={(e) => {
-            if (e.target.value === 'always') return onChange(undefined)
-            if (e.target.value === 'never') return onChange({ kind: 'static', value: false })
-            if (e.target.value === 'computed') return onChange({ kind: 'computed', expression: '' })
+            /*
+             * Every option named, and a chosen value this row does not know
+             * does nothing.
+             *
+             * The last branch was a fallthrough: anything that is not
+             * `always`/`never`/`computed` authored a condition, so `other` --
+             * which is a real option value, rendered whenever the document
+             * holds a rule this row cannot read -- would have replaced that
+             * rule with an empty condition. Unreachable today only because the
+             * option is rendered only when the select's value is already
+             * `other`, so choosing it is a no-op change event; a fifth option
+             * would have silently overwritten the document.
+             *
+             * `other` is deliberately inert rather than mapped to something:
+             * the row cannot read the rule it stands for, so it has nothing to
+             * put back, and the JSON dialog is where such a document is
+             * repaired.
+             */
+            const chosen = e.target.value
+            if (chosen === 'always') return onChange(undefined)
+            if (chosen === 'never') return onChange({ kind: 'static', value: false })
+            if (chosen === 'computed') return onChange({ kind: 'computed', expression: '' })
+            if (chosen !== 'condition') return
+
             if (inRow !== undefined) {
               return onChange({ kind: 'condition', condition: emptyCondition(inRow, 'row') })
             }
