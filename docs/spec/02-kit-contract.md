@@ -140,6 +140,10 @@ because each drives its own fixture rather than sweeping every component.
 | A select still shows an option it can read                                   | Dropping every entry would satisfy the rule above                                |
 | A select holding a number shows the option the data names                    | `str` answers `''` for a number, so a stored answer rendered as nothing          |
 | A select shows nothing when the data names no option                         | Showing the first option would satisfy the rule above                            |
+| A field puts the seam on one element, not on a wrapper around it             | Two DOM shapes in one kit is two shapes for anything keyed off `data-fs-key`     |
+| `Breadcrumbs` declares the landmark name its renderer reads                  | A property no kit declares has no editor and no translation                      |
+| A breadcrumb landmark is named from the document                             | The English word on a component whose every other string is translatable         |
+| A breadcrumb landmark still falls back when the document says nothing        | Reading the property must not cost the default                                   |
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two

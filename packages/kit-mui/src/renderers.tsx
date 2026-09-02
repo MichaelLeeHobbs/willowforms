@@ -33,7 +33,7 @@ import Typography from '@mui/material/Typography'
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import type { ComponentNode } from '@formsmith/core'
+import type { ComponentNode, JsonValue } from '@formsmith/core'
 import {
   isRequired,
   jsonToString,
@@ -54,7 +54,24 @@ type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
  * natural way to try to remove a label. A button with no text, an `aria-label`
  * of `''`.
  */
-const str = (v: unknown, fallback = ''): string => (typeof v === 'string' && v ? v : fallback)
+const str = (v: unknown, fallback = ''): string => {
+  /*
+   * A non-string that is still text renders as its text, not as the fallback.
+   *
+   * This read `typeof v === 'string' && v ? v : fallback`, which collapses "not
+   * a string" and "the empty string" into one answer -- so a label, text,
+   * helper or placeholder arriving as a number showed the fallback instead of
+   * itself. A `computed` binding is evaluated by the host at render time, so a
+   * number genuinely arrives: `label: { kind: 'computed', expression: 'year' }`
+   * drew nothing.
+   *
+   * `jsonToString` is the project's one answer to "what does this value look
+   * like", which both kits already use for a field's value. An empty result
+   * still falls back, because an empty label is a label nobody wrote.
+   */
+  const text = typeof v === 'string' ? v : jsonToString(v as JsonValue | undefined)
+  return text === '' ? fallback : text
+}
 const bool = (v: unknown): boolean => v === true
 /*
  * A finite number, or the fallback.
@@ -1062,7 +1079,18 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const last = items.length - 1
 
   return (
-    <Breadcrumbs {...nodeProps} aria-label="Breadcrumb">
+    /*
+     * The landmark's name, from the document.
+     *
+     * This was the English word `"Breadcrumb"` whatever the form's language, on
+     * a component whose every other string is translatable. `kit-html` already
+     * read a `label` prop here -- and neither kit *declared* one, so the panel
+     * rendered no editor for it and there was no i18n binding mode either: the
+     * fix its comment described was unreachable from the designer. Both kits
+     * declare it now, so the prop the renderers read is a prop an author can
+     * write and translate.
+     */
+    <Breadcrumbs {...nodeProps} aria-label={str(props['label'], 'Breadcrumb')}>
       {items.map((item, i) => {
         /*
          * Guarded like an option, and for the same reason: a crumb comes out of

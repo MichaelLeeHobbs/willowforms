@@ -632,13 +632,20 @@ export const htmlKit: Kit = {
       label: 'Breadcrumbs',
       icon: 'tabs',
       group: 'navigation',
-      defaultProps: { items: [] },
+      defaultProps: { items: [], label: '' },
       props: [
         {
           name: 'items',
           label: 'Items',
           editor: 'json',
           hint: 'Array of { label, href }. The last one is the current page and is not a link.',
+        },
+        {
+          name: 'label',
+          label: 'Landmark name',
+          editor: 'string',
+          localizable: true,
+          hint: 'What a screen reader calls this navigation. Defaults to "Breadcrumb".',
         },
       ],
       events: [],

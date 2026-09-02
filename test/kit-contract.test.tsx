@@ -20,7 +20,14 @@ import type { ComponentProps, ReactElement } from 'react'
 import { prop } from '@formsmith/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IconName } from '@formsmith/core'
-import type { ComponentDef, ComponentNode, FormDocument, JsonValue, Kit } from '@formsmith/core'
+import type {
+  ComponentDef,
+  ComponentNode,
+  FormDocument,
+  JsonValue,
+  Kit,
+  PropValue,
+} from '@formsmith/core'
 import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
@@ -1673,5 +1680,150 @@ describe('a length means the same number of pixels in both kits', () => {
         ).toBe(false)
       }
     }
+  })
+})
+
+/**
+ * Every kit crossed with the field components whose seam element is checked.
+ *
+ * Named, like `LIST_CASES` and `VALUE_CASES`, rather than built inline: the
+ * counter in `test/docs.test.ts` recognises a per-kit rule by
+ * `it.each(KITS)` or `it.each(SOMETHING_CASES)`, so a rule written as
+ * `it.each(KITS.flatMap(...))` is an obligation the spec's own table never
+ * counts. That is the gap the counter's docblock is about.
+ */
+const SEAM_CASES = KITS.flatMap(({ name, kit, renderers }) =>
+  [
+    'TextField',
+    'NumberField',
+    'Select',
+    'TextArea',
+    'Checkbox',
+    'Switch',
+    'DatePicker',
+    'FileUpload',
+    'RadioGroup',
+  ].map((type) => ({
+    name,
+    kit,
+    renderers,
+    type,
+  })),
+)
+
+describe('the seam a document is addressed through', () => {
+  /*
+   * `nodeProps` is how everything outside a kit finds a component: the
+   * designer's canvas selection, the per-node stylesheet the renderer emits
+   * against `data-fs-key`, and every end-to-end selector. A kit's one
+   * obligation is to spread it onto a root element -- and `kit-html` had two
+   * answers to what that element is. Seven of its nine field renderers spread it
+   * onto an unclassed wrapper `<div>` with `.fsh-field` one level in, while
+   * `SwitchNode` and `RadioGroupNode` spread it onto `.fsh-field` itself.
+   *
+   * The visible cost was `min-width: 0` in `kit-html.css`, written on
+   * `.fsh-field` and inert for the seven, because the flex item was the wrapper
+   * and the rule was on its child. The deeper cost is that a rule anybody writes
+   * against the seam has two shapes to cover in one kit.
+   *
+   * Pinned as a shape rather than as a class name, so it holds for a kit that
+   * names its classes anything: the element carrying `data-fs-key` must be the
+   * element the kit styles, which means it carries a class of its own.
+   */
+  it.each(SEAM_CASES)(
+    '$name puts $type on one element, not on a wrapper around it',
+    ({ kit, renderers, type }) => {
+      if (!requires(kit, type)) return
+
+      const def = kit.components.find((each) => each.type === type)
+      if (!def) return
+
+      const root = emptyRoot()
+      const node = made(def, root)
+      const { container } = render(
+        <FormRenderer
+          document={documentOf({ ...root, children: [node] })}
+          kit={renderers}
+          data={{}}
+          onChange={() => undefined}
+        />,
+      )
+
+      const seam = container.querySelector('[data-fs-key="' + node.key + '"]')
+      expect(seam, type + ' rendered nothing carrying data-fs-key').not.toBeNull()
+
+      /*
+       * The seam element is the kit's own element. A bare wrapper -- an element
+       * with the seam attributes, no class of its own and exactly one child that
+       * carries all the styling -- is the shape this rules out.
+       */
+      const bare =
+        (seam?.getAttribute('class') ?? '') === '' &&
+        seam?.children.length === 1 &&
+        (seam.children[0]?.getAttribute('class') ?? '') !== ''
+
+      expect(bare, type + ' spreads nodeProps onto an unclassed wrapper').toBe(false)
+    },
+  )
+})
+
+describe('a breadcrumb landmark in the form language', () => {
+  /*
+   * `kit-html`'s `BreadcrumbsNode` read `props['label']` for the landmark's
+   * accessible name, with a comment saying the English word "Breadcrumb" on a
+   * component whose every other string is translatable was the defect being
+   * fixed. Neither kit *declared* a `label` property, so `Properties.tsx` --
+   * which builds the panel from `def?.props ?? []` -- rendered no editor for
+   * it, and with no declared property there was no i18n binding mode either.
+   * The fix was unreachable from the designer, and `kit-mui` still hard-coded
+   * the English word.
+   *
+   * Three things had to move together: both kits' definitions, `kit-mui`'s
+   * renderer, and `03-components.md`'s table, which `test/docs.test.ts` checks
+   * against what the kits declare.
+   */
+  const crumbs = (label: PropValue | undefined): ComponentNode => ({
+    key: 'trail',
+    type: 'Breadcrumbs',
+    props: {
+      items: prop([{ label: 'Accueil', href: 'https://example.com' }, { label: 'Profil' }]),
+      ...(label === undefined ? {} : { label }),
+    },
+  })
+
+  const landmarkIn = (renderers: RendererKit, node: ComponentNode, root: ComponentNode): string => {
+    const { container } = render(
+      <FormRenderer
+        document={documentOf({ ...root, children: [node] })}
+        kit={renderers}
+        data={{}}
+        onChange={() => undefined}
+      />,
+    )
+    const nav = container.querySelector('[data-fs-key="trail"]')
+    expect(nav, 'no breadcrumbs rendered').not.toBeNull()
+    return nav?.getAttribute('aria-label') ?? ''
+  }
+
+  it.each(KITS)('$name declares the property its renderer reads', ({ kit }) => {
+    const def = kit.components.find((each) => each.type === 'Breadcrumbs')
+    expect(def, 'this kit has no Breadcrumbs').toBeDefined()
+
+    const label = def?.props.find((each) => each.name === 'label')
+    expect(label, 'the renderer reads a label the kit does not declare').toBeDefined()
+    // Localizable, or the translation the whole finding is about is impossible.
+    expect(label?.localizable).toBe(true)
+  })
+
+  it.each(KITS)('$name names the landmark from the document', ({ renderers }) => {
+    const root = emptyRoot()
+    expect(landmarkIn(renderers, crumbs(prop("Fil d'Ariane")), root)).toBe("Fil d'Ariane")
+  })
+
+  it.each(KITS)('$name falls back when the document says nothing', ({ renderers }) => {
+    // The control: reading the prop must not cost the default, which is what a
+    // form that never sets one still needs.
+    const root = emptyRoot()
+    expect(landmarkIn(renderers, crumbs(undefined), root)).toBe('Breadcrumb')
   })
 })
