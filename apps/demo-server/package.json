@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Minimal persistence for the demo. Deliberately tiny: Formsmith is a frontend library.",
   "scripts": {
+    "predev": "pnpm --filter @formsmith/core build",
     "dev": "node --experimental-strip-types --watch src/index.ts",
+    "prestart": "pnpm --filter @formsmith/core build",
     "start": "node --experimental-strip-types src/index.ts"
   },
   "dependencies": {

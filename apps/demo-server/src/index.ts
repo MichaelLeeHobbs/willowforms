@@ -20,7 +20,7 @@ import { pathToFileURL } from 'node:url'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import type { FormContext, FormData, FormDocument } from '@formsmith/core'
+import type { FormContext, FormData, FormDocument, StructuralError } from '@formsmith/core'
 import {
   MAX_CONDITION_DEPTH,
   contextValues,
@@ -59,7 +59,15 @@ const PORT = (() => {
   return port
 })()
 
-type Store = Record<string, FormDocument>
+/*
+ * What the file holds, which is whatever somebody put in it.
+ *
+ * This said `Record<string, FormDocument>` about JSON parsed off disk, so
+ * `readStore` cast to it and every indexing expression downstream looked safe
+ * to the compiler. The type was the reason a guard could be forgotten rather
+ * than the thing reminding anyone to write one.
+ */
+type Store = Record<string, unknown>
 
 /**
  * The stored forms, or nothing at all if there is no file yet.
@@ -163,8 +171,124 @@ async function withStore<T>(
  * passed the not-found guard and answered 200 with a function's worth of
  * nothing — and the submit route then reached `flatten(undefined)` and 500ed.
  */
+/**
+ * Whether a value out of the store is a document this server will act on.
+ *
+ * One predicate, because "what counts as a stored document" is one question and
+ * two answers to it is how these came apart. The listing had a version of this
+ * -- with a comment calling the mistake "reading a shape as a document because
+ * it is truthy" -- and the two routes that read one by id had none, so a
+ * hand-edited `forms.json` holding `{"x": 5}` was handed to `validateForm` as a
+ * document. The submit route then answered `200 {ok:true}` for a form that does
+ * not exist, which is the worst of the three possible answers: a client is told
+ * its data was accepted.
+ *
+ * `root` as well as `id`, because the listing only ever needed the name and the
+ * other two routes walk the tree. A row in a listing for a document nothing can
+ * open is a row that 404s when it is clicked.
+ *
+ * The root has to be a node, not merely present. `Boolean(shape.root)` was the
+ * first version and it let `{"id":"x","root":5}` through -- a truthy value that
+ * every walker then finds no fields on, so the tree is empty, nothing fails,
+ * and `/submit` answers `200 {ok:true}` again. That is the finding this guard
+ * exists for, reproduced one level down, and a hand-edited file is exactly
+ * where a scalar in that slot comes from.
+ *
+ * Every field `FormDocument` declares, because the signature says
+ * `doc is FormDocument` and that is a promise to the compiler. Checking two of
+ * nine and asserting all nine is the shape this repository has already fixed
+ * once in `isLanguage`: after the assertion nothing downstream questions
+ * anything, so a missing field is a `TypeError` in whichever caller reaches it
+ * first rather than a 404 here. The listing three hundred lines below was
+ * already writing `typeof doc.name === 'string' ? doc.name : ''` -- the file
+ * did not believe its own guard, which is the clearest evidence the promise was
+ * not being kept.
+ *
+ * Shallow within each field, deliberately. The root has to be a node for a walk
+ * to mean anything; whether that node's children are well formed is
+ * `validateDocument`'s question, and every write goes through it. This is the
+ * guard for a file somebody edited behind the server's back.
+ */
+/**
+ * One entry of `languages`, checked against what `Language` declares.
+ *
+ * `dialect` is optional and the other three are not. `bidi` is a union of two
+ * strings rather than any string, because it becomes the `dir` attribute.
+ */
+function isLanguageShape(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+
+  const language = value as Record<string, unknown>
+  return (
+    typeof language['code'] === 'string' &&
+    typeof language['name'] === 'string' &&
+    (language['bidi'] === 'ltr' || language['bidi'] === 'rtl') &&
+    (language['dialect'] === undefined || typeof language['dialect'] === 'string')
+  )
+}
+
+function storageFaults(doc: unknown): StructuralError[] {
+  const faults: StructuralError[] = []
+  const fault = (message: string): void => {
+    faults.push({ code: 'malformed', message })
+  }
+
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    fault('A form document must be an object.')
+    return faults
+  }
+
+  const object = (value: unknown): boolean =>
+    Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+  const shape = doc as Record<string, unknown>
+  if (shape['version'] !== '1') fault('version must be "1".')
+  if (typeof shape['id'] !== 'string' || shape['id'] === '')
+    fault('id must be text, and not empty.')
+  if (typeof shape['name'] !== 'string') fault('name must be text.')
+  if (typeof shape['defaultLanguage'] !== 'string') fault('defaultLanguage must be text.')
+  /*
+   * The elements too, not just the array.
+   *
+   * `Language` declares `code`, `name` and `bidi`, and this checked only that
+   * the list was a list -- so `languages: [5]` satisfied a predicate that then
+   * announced `doc is FormDocument`, and the first thing to read
+   * `language.code` got the `TypeError` this guard exists to prevent. The
+   * docblock above argues that checking some fields and asserting all of them
+   * is the mistake `isLanguage` already cost this project once, and then this
+   * line did it one level down.
+   */
+  const languages = shape['languages']
+  if (!Array.isArray(languages)) {
+    fault('languages must be an array.')
+  } else if (!languages.every(isLanguageShape)) {
+    fault('every language needs a string code, a string name, and bidi of "ltr" or "rtl".')
+  }
+  if (!object(shape['actions'])) fault('actions must be an object.')
+  if (!object(shape['translations'])) fault('translations must be an object.')
+  if (!object(shape['settings'])) fault('settings must be an object.')
+
+  if (!object(shape['root'])) {
+    fault('root must be a component node.')
+    return faults
+  }
+  const node = shape['root'] as Record<string, unknown>
+  if (typeof node['key'] !== 'string') fault('root.key must be text.')
+  if (typeof node['type'] !== 'string') fault('root.type must be text.')
+  if (!object(node['props'])) fault('root.props must be an object.')
+
+  return faults
+}
+
+function isStoredDocument(doc: unknown): doc is FormDocument {
+  return storageFaults(doc).length === 0
+}
+
 function held(store: Store, id: string): FormDocument | undefined {
-  return Object.hasOwn(store, id) ? store[id] : undefined
+  if (!Object.hasOwn(store, id)) return undefined
+
+  const doc: unknown = store[id]
+  return isStoredDocument(doc) ? doc : undefined
 }
 
 const app = new Hono()
@@ -191,23 +315,49 @@ app.use(
 const MAX_BODY = 1_000_000
 
 /**
- * The request body as JSON, or nothing.
+ * Why a body was refused, so the answer can say which of four things happened.
  *
- * Neither parse-guarded nor size-limited: malformed JSON was a 500 rather than
- * a 400 — the failure `validateDocument` was made total to fix, reachable one
- * layer earlier — and a route that writes what it receives to disk had no cap
- * on what it would write.
+ * All four were one 400 reading "Send a JSON document under 1 MB", which is a
+ * sentence a caller cannot act on: it does not distinguish a body that was too
+ * large from one that was not JSON, and the first of those has a status of its
+ * own that tells a client to stop rather than to fix its syntax.
+ */
+export type BodyRefusal = 'too-large' | 'not-json' | 'too-deep'
+
+/**
+ * A parsed body or a refusal, and never a value that might be both or neither.
+ *
+ * Two independent optional fields let a caller read `value` without asking
+ * about `refused` first, and the compiler had nothing to say about it: on a
+ * refusal `value` is `undefined`, so the route that skipped the check would
+ * have handed `undefined` to `validateDocument` and answered 422 for a body it
+ * never looked at. Both routes below happen to check, which is exactly the kind
+ * of "happens to be right" the types should be carrying instead.
+ *
+ * `?: never` on each side rather than two bare members, so `body.refused` stays
+ * readable without an `in` narrowing and the check reads the way it did.
+ */
+export type BodyResult =
+  { refused: BodyRefusal; value?: never } | { refused?: never; value: unknown }
+
+/**
+ * The request body as JSON, or why not.
+ *
+ * Neither parse-guarded nor size-limited once: malformed JSON was a 500 rather
+ * than a 400 — the failure `validateDocument` was made total to fix, reachable
+ * one layer earlier — and a route that writes what it receives to disk had no
+ * cap on what it would write.
  */
 async function bodyOf(c: {
   req: { text: () => Promise<string>; header: (name: string) => string | undefined; raw: Request }
-}): Promise<unknown> {
+}): Promise<BodyResult> {
   const text = await textOf(c)
-  if (text === undefined) return undefined
+  if (text === undefined) return { refused: 'too-large' }
   let parsed: unknown
   try {
     parsed = JSON.parse(text) as unknown
   } catch {
-    return undefined
+    return { refused: 'not-json' }
   }
   /*
    * And refused if it is nested deeper than anything downstream will walk.
@@ -226,8 +376,25 @@ async function bodyOf(c: {
    * already known to be unreadable. Refusing at the door is what the rest of
    * this project does with input it cannot honour.
    */
-  if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return undefined
-  return parsed
+  if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return { refused: 'too-deep' }
+  return { value: parsed }
+}
+
+/**
+ * The answer for a refused body, with the status the refusal earns.
+ *
+ * 413 for a body over the cap, because that is the code that tells a client the
+ * request itself was too big rather than that it was written wrongly -- a
+ * client retrying a 400 with corrected syntax retries forever.
+ */
+function refusalOf(refused: BodyRefusal): { message: string; status: 400 | 413 } {
+  if (refused === 'too-large') {
+    return { message: 'Body is larger than 1 MB', status: 413 }
+  }
+  if (refused === 'too-deep') {
+    return { message: 'JSON is nested deeper than this server will read', status: 400 }
+  }
+  return { message: 'Body is not valid JSON', status: 400 }
 }
 
 /**
@@ -320,20 +487,20 @@ app.get('/api/forms', async (c) => {
    * first -- so a single bad entry took the whole listing down instead of
    * appearing as one missing row.
    */
+  /*
+   * `isStoredDocument`, the same question the two by-id routes ask.
+   *
+   * This had its own copy of the check -- not an array, named by text -- which
+   * is how it came to accept an entry with no `root` that `GET /api/forms/:id`
+   * refuses. A row in a listing for a document nothing can open is a row that
+   * 404s when it is clicked.
+   */
   const rows = Object.values(store)
-    /*
-     * Not an array, and named by text.
-     *
-     * `typeof [] === 'object'`, so a hand-edited `{"x": []}` became a row -- and
-     * `String(doc.id)` on an object renders `[object Object]`, which is a row
-     * the playground then asks for and cannot find. Both are the same mistake
-     * one level apart: reading a shape as a document because it is truthy.
-     */
-    .filter(
-      (doc): doc is FormDocument => Boolean(doc) && typeof doc === 'object' && !Array.isArray(doc),
-    )
-    .filter((doc) => typeof doc.id === 'string' && doc.id !== '')
-    .map((doc) => ({ id: doc.id, name: typeof doc.name === 'string' ? doc.name : '' }))
+    .filter(isStoredDocument)
+    // `name` is a string, because `isStoredDocument` says so and now checks it.
+    // This read `typeof doc.name === 'string' ? doc.name : ''`, which was the
+    // file hedging against its own type guard.
+    .map((doc) => ({ id: doc.id, name: doc.name }))
 
   return c.json(rows)
 })
@@ -345,11 +512,35 @@ app.get('/api/forms/:id', async (c) => {
 
 app.put('/api/forms/:id', async (c) => {
   const body = await bodyOf(c)
-  if (body === undefined) return c.json({ error: 'Send a JSON document under 1 MB' }, 400)
+  if (body.refused) {
+    const { message, status } = refusalOf(body.refused)
+    return c.json({ error: message }, status)
+  }
 
-  const doc = body as FormDocument
+  const doc = body.value as FormDocument
   const errors = validateDocument(doc)
   if (errors.length > 0) return c.json({ error: 'Invalid document', errors }, 422)
+
+  /*
+   * The same question the reads ask, because a write this server cannot read
+   * back is worse than a refused one.
+   *
+   * `validateDocument` treats the envelope as optional -- `settings`, `actions`
+   * and `translations` are checked only when they are present -- while
+   * `isStoredDocument` requires all three. So a body carrying nothing but
+   * `version`, `id`, `name` and a root passed the gate above, was written, and
+   * then disappeared: `held()` refuses it, `GET /api/forms/:id` 404s, and the
+   * listing drops the row. A 200 followed by a 404 for the same id is the
+   * worst of the available answers, because the client has been told the write
+   * succeeded.
+   *
+   * Reconciled towards the stricter side deliberately. The other direction is
+   * to relax the read guard, and that guard is the one keeping a hand-edited
+   * file from reaching the walkers -- which is the finding this whole item
+   * exists for.
+   */
+  const faults = storageFaults(doc)
+  if (faults.length > 0) return c.json({ error: 'Invalid document', errors: faults }, 422)
 
   /*
    * The id the URL names has to be the id the document claims, or the listing
@@ -502,11 +693,17 @@ app.post('/api/forms/:id/submit', async (c) => {
   }
 
   const body = await bodyOf(c)
-  if (body === undefined || typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return c.json({ error: 'Send a JSON object of answers, under 1 MB' }, 400)
+  if (body.refused) {
+    const { message, status } = refusalOf(body.refused)
+    return c.json({ error: message }, status)
+  }
+  // A fourth refusal, and it is not about the body being unreadable: it is
+  // readable and is not a set of answers.
+  if (!body.value || typeof body.value !== 'object' || Array.isArray(body.value)) {
+    return c.json({ error: 'Send a JSON object of answers' }, 400)
   }
 
-  const data = body as FormData
+  const data = body.value as FormData
   const errors = validateAcross(doc.root, data, scopes)
   if (Object.keys(errors).length > 0) return c.json({ ok: false, errors }, 422)
 

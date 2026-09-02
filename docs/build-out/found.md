@@ -293,3 +293,25 @@ Belongs in `e2e/`, which is what `CLAUDE.md` says about anything jsdom cannot re
 case typing `1e999` into a number property and asserting the stored document holds no `null` would
 settle it. The same shape as the canvas's primary-button guard recorded above -- both are guards whose
 input the test environment refuses to produce.
+
+## `validateDocument` takes `FormDocument`, and its whole job is untrusted input
+
+Copilot raised it against PR #74, one level away from what it was pointing at. Its finding was that the
+demo server's `BodyResult` let a caller read `value` without asking about `refused` first, which was true
+and is fixed there: the type is a union now, and both `{}` and `{refused, value}` are compile errors.
+
+What that does not fix is the branch itself. `body.value` is `unknown`, so both routes cast --
+`as FormDocument`, `as FormData` -- and with the cast there, deleting the refusal check still compiles.
+I checked, expecting an error, and got none. The union documents the invariant and does not enforce it
+at the only place it matters.
+
+The enforcement belongs in core. `validateDocument(doc: FormDocument)` opens with
+`if (!isRecord(candidate))` and is total by design -- it exists to be pointed at a request body -- so the
+parameter type is the thing that is wrong, not the cast at the call site. Every caller that has already
+narrowed passes a `FormDocument` and is unaffected; every caller holding a parsed body stops casting and
+starts getting the branch checked for it.
+
+Out of scope for item 42, which is a demo-server item, and this is core's published signature. Worth
+doing as its own item, and worth asking the same question of `validateAcross` and `submittedData` while
+the answer is fresh: any function whose contract is "safe on anything" and whose parameter says
+otherwise is inviting the cast that hides the missing check.
