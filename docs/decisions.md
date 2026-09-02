@@ -916,7 +916,8 @@ hidden, and its rules never run.
   queues and `docs/reports/2026-08-31-symmetry-audit.md` still name the old paths on purpose. A decision
   log that edits itself to look consistent is no longer a record of what was decided, and
   `deep-review-b.md` cites the `tmp/` path twice in its own body, which `RUN.md` forbids editing. This
-  entry is the redirect for all of them.
+  entry records the mapping for all of them. Nothing redirects: a link to an old path 404s, and this is
+  the page a reader lands on to find out where the file went.
 - **Reversal:** two `git mv` commands and this entry, unless the exposure matters, in which case it is a
   history rewrite and expensive.
 - **When:** 2026-09-02.

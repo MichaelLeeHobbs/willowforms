@@ -10,12 +10,12 @@ a bug, a premature-abstraction warning with no defect behind it, and a guard tha
 Security and correctness findings do **not** get triaged for tidiness. If one is wrong, say what makes it
 wrong; if it is merely inconvenient, fix it.
 
-Second-pass entries cite `docs/reviews/2026-08-30-second-pass.md`, now
-`docs/reviews/2026-08-30-deep-review-b.md`; first-pass entries cite
-`tmp/formsmith-review-2026-08-30.md`, now `docs/reviews/2026-08-30-deep-review-a.md`. Both files were
-renamed on 2026-09-02 and the first pass was published at the same time. Content is unchanged, so every
-line citation in this file still resolves. See `docs/decisions.md` for why, and for the paths the older
-records still use.
+Second-pass entries are derived from `docs/reviews/2026-08-30-deep-review-b.md`, named
+`2026-08-30-second-pass.md` when they were written; first-pass entries from
+`docs/reviews/2026-08-30-deep-review-a.md`, which was then `tmp/formsmith-review-2026-08-30.md` and
+gitignored. Both were renamed on 2026-09-02 and the first pass was published at the same time, with the
+content of each unchanged. The entries below cite source locations rather than the reviews, so the
+rename does not reach them. `docs/decisions.md` records why, and the paths the older records still use.
 
 ---
 
