@@ -20,7 +20,7 @@ import { pathToFileURL } from 'node:url'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import type { FormContext, FormData, FormDocument } from '@formsmith/core'
+import type { FormContext, FormData, FormDocument, StructuralError } from '@formsmith/core'
 import {
   MAX_CONDITION_DEPTH,
   contextValues,
@@ -201,27 +201,45 @@ async function withStore<T>(
  * `validateDocument`'s question, and every write goes through it. This is the
  * guard for a file somebody edited behind the server's back.
  */
-function isStoredDocument(doc: unknown): doc is FormDocument {
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false
+function storageFaults(doc: unknown): StructuralError[] {
+  const faults: StructuralError[] = []
+  const fault = (message: string): void => {
+    faults.push({ code: 'malformed', message })
+  }
+
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    fault('A form document must be an object.')
+    return faults
+  }
 
   const object = (value: unknown): boolean =>
     Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
   const shape = doc as Record<string, unknown>
-  if (shape['version'] !== '1') return false
-  if (typeof shape['id'] !== 'string' || shape['id'] === '') return false
-  if (typeof shape['name'] !== 'string') return false
-  if (typeof shape['defaultLanguage'] !== 'string') return false
-  if (!Array.isArray(shape['languages'])) return false
-  if (!object(shape['actions'])) return false
-  if (!object(shape['translations'])) return false
-  if (!object(shape['settings'])) return false
+  if (shape['version'] !== '1') fault('version must be "1".')
+  if (typeof shape['id'] !== 'string' || shape['id'] === '')
+    fault('id must be text, and not empty.')
+  if (typeof shape['name'] !== 'string') fault('name must be text.')
+  if (typeof shape['defaultLanguage'] !== 'string') fault('defaultLanguage must be text.')
+  if (!Array.isArray(shape['languages'])) fault('languages must be an array.')
+  if (!object(shape['actions'])) fault('actions must be an object.')
+  if (!object(shape['translations'])) fault('translations must be an object.')
+  if (!object(shape['settings'])) fault('settings must be an object.')
 
-  if (!object(shape['root'])) return false
+  if (!object(shape['root'])) {
+    fault('root must be a component node.')
+    return faults
+  }
   const node = shape['root'] as Record<string, unknown>
-  return (
-    typeof node['key'] === 'string' && typeof node['type'] === 'string' && object(node['props'])
-  )
+  if (typeof node['key'] !== 'string') fault('root.key must be text.')
+  if (typeof node['type'] !== 'string') fault('root.type must be text.')
+  if (!object(node['props'])) fault('root.props must be an object.')
+
+  return faults
+}
+
+function isStoredDocument(doc: unknown): doc is FormDocument {
+  return storageFaults(doc).length === 0
 }
 
 function held(store: Store, id: string): FormDocument | undefined {
@@ -449,6 +467,27 @@ app.put('/api/forms/:id', async (c) => {
   const doc = body.value as FormDocument
   const errors = validateDocument(doc)
   if (errors.length > 0) return c.json({ error: 'Invalid document', errors }, 422)
+
+  /*
+   * The same question the reads ask, because a write this server cannot read
+   * back is worse than a refused one.
+   *
+   * `validateDocument` treats the envelope as optional -- `settings`, `actions`
+   * and `translations` are checked only when they are present -- while
+   * `isStoredDocument` requires all three. So a body carrying nothing but
+   * `version`, `id`, `name` and a root passed the gate above, was written, and
+   * then disappeared: `held()` refuses it, `GET /api/forms/:id` 404s, and the
+   * listing drops the row. A 200 followed by a 404 for the same id is the
+   * worst of the available answers, because the client has been told the write
+   * succeeded.
+   *
+   * Reconciled towards the stricter side deliberately. The other direction is
+   * to relax the read guard, and that guard is the one keeping a hand-edited
+   * file from reaching the walkers -- which is the finding this whole item
+   * exists for.
+   */
+  const faults = storageFaults(doc)
+  if (faults.length > 0) return c.json({ error: 'Invalid document', errors: faults }, 422)
 
   /*
    * The id the URL names has to be the id the document claims, or the listing

@@ -11,7 +11,7 @@
  * run, so importing it registers routes and starts nothing.
  */
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -561,6 +561,110 @@ describe('a store holding something that is not a document', () => {
     try {
       expect((await app.request('/api/forms/deep')).status).toBe(200)
       expect((await submit('{"name":"Ada"}')).status).toBe(200)
+    } finally {
+      await restore()
+    }
+  })
+})
+
+/*
+ * A write this server cannot read back.
+ *
+ * `PUT` gated on `validateDocument`, which checks the envelope only where it is
+ * present, and the reads gate on `isStoredDocument`, which requires it. Two
+ * answers to "what counts as a document" again, one route apart -- the same
+ * split that put a truthy shape in front of the walkers. The write won, so the
+ * store took a document that `GET` then 404s and the listing leaves out.
+ */
+describe('a document PUT that the read guard would refuse', () => {
+  /**
+   * Everything `validateDocument` insists on, and nothing more.
+   *
+   * The gap is exactly two fields wide. That gate requires `translations`,
+   * `languages` and a `defaultLanguage` those languages name, so all three are
+   * here; it checks `actions` and `settings` only when they are present, and
+   * `isStoredDocument` requires both. So this is a document one route calls
+   * valid and the next three call missing.
+   *
+   * `noSettings` in the junk store above is this same document arriving the
+   * other way, by hand-edit rather than by write. It was already known to be
+   * unreadable; nothing checked that the server would decline to create one.
+   */
+  const thin = {
+    version: '1',
+    id: 'thin',
+    name: 'Thin',
+    root: { key: 'root', type: 'Screen', props: {} },
+    translations: {},
+    languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
+    defaultLanguage: 'en-US',
+  }
+
+  const put = async (id: string, body: unknown): Promise<Response> =>
+    app.request('/api/forms/' + id, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  const restore = async (): Promise<void> => {
+    await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
+  }
+
+  it('is refused rather than stored', async () => {
+    try {
+      /*
+       * The gate it passes, stated so a regression cannot claim the body was
+       * malformed all along: this is refused by the storage check specifically.
+       */
+      expect((await put('thin', thin)).status, 'the thin document was accepted').toBe(422)
+    } finally {
+      await restore()
+    }
+  })
+
+  it('names the fields it is missing, rather than answering "invalid"', async () => {
+    try {
+      const body = (await (await put('thin', thin)).json()) as {
+        errors?: { message: string }[]
+      }
+      const said = (body.errors ?? []).map((e) => e.message).join(' ')
+
+      // A 422 for a body the previous gate just accepted is unactionable
+      // without these, and naming them is also what proves which gate answered:
+      // `validateDocument` has no complaint to make about either field.
+      for (const field of ['actions', 'settings']) {
+        expect(said, field + ' was not named').toContain(field)
+      }
+    } finally {
+      await restore()
+    }
+  })
+
+  it('leaves nothing behind in the store', async () => {
+    try {
+      await put('thin', thin)
+
+      /*
+       * The store, not the routes. Every read already refuses this document --
+       * that is the defect being fixed, not evidence of the fix -- so asserting
+       * a 404 here passes just as well against the bug, which is the shape the
+       * write-tests skill calls a test that proves nothing. What actually
+       * differs is whether the entry was written at all.
+       */
+      const held = JSON.parse(await readFile(store, 'utf8')) as Record<string, unknown>
+      expect(Object.keys(held), 'the refused document was written anyway').not.toContain('thin')
+    } finally {
+      await restore()
+    }
+  })
+
+  it('still stores a whole document, which is what stops this being "refuse everything"', async () => {
+    try {
+      expect((await put('deep', { ...FORM, name: 'Renamed' })).status).toBe(200)
+
+      const read = (await (await app.request('/api/forms/deep')).json()) as { name: string }
+      expect(read.name).toBe('Renamed')
     } finally {
       await restore()
     }
