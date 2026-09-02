@@ -1404,8 +1404,15 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
      * The rows are derived now, so an empty derivation would report a clean
      * sweep having rendered nothing. This is the same guard the sibling describe
      * carries for its own table.
+     *
+     * `> 0`, matching what this rule and its row in `02-kit-contract.md` both
+     * claim. An earlier `> 4` was a floor nobody had stated, so it would have
+     * failed a kit that legitimately declares fewer lengths for a reason the
+     * message does not mention. The narrower question, whether the derivation
+     * still sees everything the kit declares, is the completeness rule above,
+     * and that one fails on a single missed prop rather than on a count.
      */
-    expect(PIXEL_CASES.length, 'no length-valued props were found to drive').toBeGreaterThan(4)
+    expect(PIXEL_CASES.length, 'no length-valued props were found to drive').toBeGreaterThan(0)
   })
 
   it('reads a different number differently, so the rows above are not a fixed value', () => {
