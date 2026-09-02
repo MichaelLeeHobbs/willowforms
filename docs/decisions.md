@@ -923,3 +923,26 @@ hidden, and its rules never run.
 - **Reversal:** two `git mv` commands and this entry, unless the exposure matters, in which case it is a
   history rewrite and expensive.
 - **When:** 2026-09-02.
+
+### The collection rules cover `RadioGroup`, and ship the kit that fails them
+
+- **Decided:** the new conformance rules in `test/kit-contract.test.tsx` select data-bound components
+  with `NOT_ENTERED = new Set(['Repeater'])` rather than reusing the `dataBound && !container` filter the
+  aria rules use, so `RadioGroup` is covered. And the proof that the rules can fail is a checked-in
+  renderer kit that draws a control and never calls `onChange`, asserted to report nothing.
+- **Why:** `RadioGroup` is a container, because it holds `RadioItem`s, and it is also the control a
+  person picks an answer in. Reusing the aria filter would have dropped the one component whose
+  collection this file already half-covered: the single `fireEvent` call in the whole suite before this
+  item was a radio click. `Repeater` is the real exclusion, because its value is the list of rows and
+  nobody enters it. Proved by breaking `kit-html`'s radio handler and watching only that case go red,
+  with the message naming the declared value `2` rather than a DOM string, so the rule also pins the
+  `optionValue` round trip.
+- **Rejected: reusing `bound()`.** Fewer moving parts, and it silently excludes a control the item
+  exists to cover. A shared filter that is right for one rule and wrong for another is worth splitting.
+- **Rejected: performing the break-it-and-watch-it-fail check once and describing it in a comment.**
+  That is what leaves a suite full of rules nobody has seen fail, which is the defect this item is
+  fixing. The deaf kit runs both directions of the check on every suite instead.
+- **Reversal:** cheap. `NOT_ENTERED` is one set and the deaf kit is fifteen lines in one test. What is
+  not cheap is re-deciding it wrongly: dropping `RadioGroup` back out would restore a hole that reads as
+  covered, which is the shape this file keeps finding.
+- **When:** 2026-09-02, queue item 38.
