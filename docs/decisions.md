@@ -903,10 +903,13 @@ hidden, and its rules never run.
   argument that kept the first pass in `tmp/` assumed it would stay in one working copy, which stopped
   being true the moment a fourth review compared all of them: a review the repository cannot open is a
   review nobody can check the others against.
-- **What it costs:** this is a public MIT repository, so a 1045-line audit naming three CRITICALs,
-  including a confirmed document-to-CSS injection in the MUI kit, is now public. All three were fixed by
-  the first remediation run. Michael was asked and chose to publish, the same call he made for the
-  second pass and on the same terms.
+- **What it costs:** a 1045-line audit naming three CRITICALs, including a confirmed document-to-CSS
+  injection in the MUI kit, is now in the repository's history. All three were fixed by the first
+  remediation run. The GitHub repository is private today and `CLAUDE.md` states the intent to publish
+  under MIT, so the exposure is deferred rather than immediate: it lands the moment the repository is
+  made public, and by then removing it is a history rewrite rather than a delete. That is the real shape
+  of this cost and it is why it is worth writing down now rather than at publication. Michael was asked
+  and chose to commit it, the same call he made for the second pass and on the same terms.
 - **Rejected: renaming without publishing the first pass.** It leaves `triage.md` citing a path that
   exists on one machine, which is the failure the earlier entry was written about.
 - **Rejected: rewriting the older records to the new paths.** `docs/decisions.md`, the two archived
