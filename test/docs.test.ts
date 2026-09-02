@@ -593,7 +593,7 @@ describe('the specification index', () => {
 })
 
 /** How many obligations the kit contract states. See the assertion that uses it. */
-const CONTRACT_RULES = 25
+const CONTRACT_RULES = 27
 
 /**
  * And how many are driven per kit from outside the per-kit block.

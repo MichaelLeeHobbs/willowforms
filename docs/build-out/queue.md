@@ -11,10 +11,12 @@ Paste this to start or resume the run:
 The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointer at this file.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 37, merged as #75 on 2026-09-02. Items 0 through 37 are merged, plus 42, 50,
-  51 and 52 taken out of order. **Twelve remain: 38, 39, 40, 41, 43, 44, 45, 46, 47, 48, 49 and 53.**
-- **The run is stopped, not paused.** No pull request is open and none is in flight. Restarting means
-  pasting the line at the top of this file into a fresh session.
+- **Last completed:** item 38, merged as #77 on 2026-09-02. Items 0 through 38 are merged, plus 42, 50,
+  51 and 52 taken out of order. **Eleven remain: 39, 40, 41, 43, 44, 45, 46, 47, 48, 49 and 53.**
+- **The run is going again** as of 2026-09-02, after stopping with the pointer twenty-two items behind
+  what had merged. Items are ticked here in the following item's pull request, because an item's own
+  pull request lands before it is merged and so cannot tick itself. That is the gap the six unticked
+  items came through.
 - **Reconciled 2026-09-02.** This block had said "last completed: item 30" while items up to 52 were
   merged, and six merged items (0, 34, 35, 36, 37, 42) were never ticked. Ticks and prose now both
   match `git log`. Nothing was added to the queue or dropped from it.
@@ -482,7 +484,7 @@ Every item, without exception:
       **Check:** a French document renders a translated breadcrumb landmark; the two DOM shapes converge
       and `test/kit-contract.test.tsx` pins the seam.
 
-- [ ] **38. The kit conformance suite never checks that a kit collects an answer.**
+- [x] **38. The kit conformance suite never checks that a kit collects an answer.**
       `test/kit-contract.test.tsx:18` (HIGH — the file imports `fireEvent` once and uses it once, for a
       radio click; `onChange={() => undefined}` appears 18 times; replace every real `onChange` in
       `kit-html` with a no-op and the kit passes 100% of the suite bar one rule). This is the single
