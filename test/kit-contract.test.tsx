@@ -536,6 +536,214 @@ describe('what a data-bound control has to say about itself', () => {
 })
 
 /**
+ * Whether a kit hands the answer back at all.
+ *
+ * Everything above this asks how a kit *draws*. Nothing asked whether it
+ * *collects*, and the gap was total: this file imported `fireEvent` once and
+ * used it once, for a radio click, while `onChange={() => undefined}` appeared
+ * eighteen times. Replacing every real `onChange` in a kit with a no-op left the
+ * whole suite green bar one rule. A kit that draws every control, labels it,
+ * announces its errors and drops every keystroke was a conforming kit.
+ *
+ * The rules below drive each data-bound control the way a person would and
+ * assert the value reached `onChange`. Two things keep them honest. Every driver
+ * throws when it cannot find something to drive, because a driver that silently
+ * does nothing turns this into eighteen more tests that pass on silence. And the
+ * last rule runs the same code against a deliberately deaf kit and requires it to
+ * report nothing, so the failure path these rules exist for runs on every suite
+ * rather than having been checked once by whoever wrote them.
+ */
+describe('a data-bound control hands back what the person entered', () => {
+  const OPTIONS: JsonValue = [
+    { label: 'One', value: 1 },
+    // A number, not a string. The value a kit reports has to survive the round
+    // trip through `optionValue`, and a string-valued fixture cannot tell the
+    // declared value apart from the DOM string that stands in for it.
+    { label: 'Two', value: 2 },
+  ]
+
+  /*
+   * The element a driver is about to act on, or a loud failure.
+   *
+   * Answers `HTMLElement` rather than a type the caller names. The first version
+   * took a generic and ended in `as unknown as T`, which is a claim rather than
+   * a check: `'input, textarea'` was asked for as an `HTMLInputElement` and
+   * answers a `<textarea>` for both kits' `TextArea`. `fireEvent` takes an
+   * `Element`, so nothing here needed the narrower type and the cast bought only
+   * the chance to be wrong about it.
+   */
+  function must(element: HTMLElement, selector: string, what: string): HTMLElement {
+    const hit = element.matches(selector) ? element : element.querySelector<HTMLElement>(selector)
+    if (!hit) {
+      throw new Error(
+        'no ' +
+          what +
+          ' to drive. The driver did nothing, so the rule would have passed on silence.',
+      )
+    }
+    return hit
+  }
+
+  const enterText =
+    (text: string) =>
+    (element: HTMLElement): void => {
+      fireEvent.change(must(element, 'input, textarea', 'text control'), {
+        target: { value: text },
+      })
+    }
+
+  const toggle = (element: HTMLElement): void => {
+    fireEvent.click(must(element, 'input[type="checkbox"]', 'checkbox'))
+  }
+
+  /* Native `select` in one kit, a combobox opening a listbox in the other. */
+  const chooseTwo = (element: HTMLElement): void => {
+    const native = element.querySelector<HTMLSelectElement>('select')
+    if (native) {
+      const option = [...native.options].find((o) => o.textContent === 'Two')
+      if (!option) throw new Error('the select never offered the option this drives')
+      fireEvent.change(native, { target: { value: option.value } })
+      return
+    }
+    fireEvent.mouseDown(must(element, '[role="combobox"]', 'select control'))
+    const listed = screen.getAllByRole('option').find((o) => o.textContent === 'Two')
+    if (!listed) throw new Error('the listbox never opened, so nothing was chosen')
+    fireEvent.click(listed)
+  }
+
+  const pickTwo = (): void => {
+    fireEvent.click(screen.getByLabelText('Two'))
+  }
+
+  const attach = (element: HTMLElement): void => {
+    const input = must(element, 'input[type="file"]', 'file input')
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] },
+    })
+  }
+
+  type Entry = {
+    props?: Record<string, JsonValue>
+    enter: (el: HTMLElement) => void
+    is: JsonValue
+  }
+
+  const ENTERED: Record<string, Entry> = {
+    TextField: { enter: enterText('typed'), is: 'typed' },
+    TextArea: { enter: enterText('typed'), is: 'typed' },
+    NumberField: { enter: enterText('42'), is: 42 },
+    DatePicker: { enter: enterText('2026-09-02'), is: '2026-09-02' },
+    Checkbox: { enter: toggle, is: true },
+    Switch: { enter: toggle, is: true },
+    Select: { props: { options: OPTIONS }, enter: chooseTwo, is: 2 },
+    RadioGroup: { props: { options: OPTIONS }, enter: pickTwo, is: 2 },
+    FileUpload: { enter: attach, is: 'notes.txt' },
+  }
+
+  /** Every value the kit reported for `target`, in order. */
+  function reported(renderers: RendererKit, def: ComponentDef, entry: Entry): JsonValue[] {
+    const base = made(def, { key: 'r', type: 'r', props: {} })
+    const node: ComponentNode = {
+      ...base,
+      key: 'target',
+      props: {
+        ...base.props,
+        ...Object.fromEntries(
+          Object.entries(entry.props ?? {}).map(([name, value]) => [name, prop(value)]),
+        ),
+      },
+    }
+    const seen: JsonValue[] = []
+    const { container } = render(
+      <FormUnderTest
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        onChange={(address, value) => {
+          if (address === 'target') seen.push(value)
+        }}
+      />,
+    )
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error(def.type + ' did not render')
+    entry.enter(element)
+    return seen
+  }
+
+  /*
+   * Data-bound, and answered by a person rather than assembled by the form.
+   *
+   * The aria rules above filter on `dataBound && !container`, which is right for
+   * them and wrong here. `RadioGroup` is a container, because it holds
+   * `RadioItem`s, and it is also the control somebody picks an answer in, so
+   * that filter would drop the one component whose collection this file already
+   * half-covered: the single `fireEvent` call in the whole suite before this
+   * describe existed was a radio click.
+   *
+   * `Repeater` is the genuine exclusion. It is data-bound because its value is
+   * the list of rows, and nobody enters that value; the form builds it from the
+   * rows beneath. Anything else data-bound needs a driver, and the rule below
+   * fails until it has one, so a tenth control cannot join by being forgotten.
+   */
+  const NOT_ENTERED = new Set(['Repeater'])
+  const answered = (kit: Kit): ComponentDef[] =>
+    kit.components.filter((def) => def.dataBound && !NOT_ENTERED.has(def.type))
+
+  const ENTERED_CASES = KITS.flatMap(({ name, kit, renderers }) =>
+    answered(kit).map((def) => ({ name, type: def.type, def, renderers })),
+  )
+
+  it.each(KITS)('$name has a driver for every control this rule covers', ({ kit }) => {
+    const undriven = answered(kit)
+      .map((def) => def.type)
+      .filter((type) => !(type in ENTERED))
+
+    expect(
+      undriven,
+      'a data-bound control with no driver here is one this rule silently skips: teach it how to be ' +
+        'driven, or exclude it in NOT_ENTERED with a reason, rather than letting it opt out quietly',
+    ).toEqual([])
+  })
+
+  it.each(ENTERED_CASES)(
+    '$name reports what was entered into $type',
+    ({ type, def, renderers }) => {
+      const entry = ENTERED[type]
+      if (!entry) throw new Error(type + ' has no driver, which the rule above exists to catch')
+
+      expect(
+        reported(renderers, def, entry),
+        type + ' never told the form what was entered',
+      ).toEqual([entry.is])
+    },
+  )
+
+  it('reports nothing for a kit that drops the answer, which is what the rules above rest on', () => {
+    /*
+     * The proof, checked in rather than performed once. This is the exact kit
+     * the eighteen `onChange={() => undefined}` renders could not tell from a
+     * working one: it draws the control and never calls `onChange`. The rules
+     * above run this same function and require a value; this one requires
+     * silence, so both directions of the check execute on every run.
+     */
+    const deaf: RendererKit = {
+      ...htmlRendererKit,
+      renderers: {
+        ...htmlRendererKit.renderers,
+        TextField: ({ nodeProps }) => <input {...nodeProps} defaultValue="" />,
+      },
+    }
+    const def = htmlKit.components.find((c) => c.type === 'TextField')
+    if (!def) throw new Error('the HTML kit stopped offering a TextField')
+    const entry = ENTERED['TextField']
+    if (!entry) throw new Error('TextField lost its driver')
+
+    expect(reported(deaf, def, entry)).toEqual([])
+    expect(reported(htmlRendererKit, def, entry)).toEqual([entry.is])
+  })
+})
+
+/**
  * A value a host seeded, shown in the control that holds it.
  *
  * `str(value)` answers `''` for anything that is not a string, so a host
