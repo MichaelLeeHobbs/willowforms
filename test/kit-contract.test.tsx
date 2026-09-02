@@ -562,8 +562,18 @@ describe('a data-bound control hands back what the person entered', () => {
     { label: 'Two', value: 2 },
   ]
 
-  function must<T extends Element>(element: HTMLElement, selector: string, what: string): T {
-    const hit = element.matches(selector) ? element : element.querySelector<T>(selector)
+  /*
+   * The element a driver is about to act on, or a loud failure.
+   *
+   * Answers `HTMLElement` rather than a type the caller names. The first version
+   * took a generic and ended in `as unknown as T`, which is a claim rather than
+   * a check: `'input, textarea'` was asked for as an `HTMLInputElement` and
+   * answers a `<textarea>` for both kits' `TextArea`. `fireEvent` takes an
+   * `Element`, so nothing here needed the narrower type and the cast bought only
+   * the chance to be wrong about it.
+   */
+  function must(element: HTMLElement, selector: string, what: string): HTMLElement {
+    const hit = element.matches(selector) ? element : element.querySelector<HTMLElement>(selector)
     if (!hit) {
       throw new Error(
         'no ' +
@@ -571,19 +581,19 @@ describe('a data-bound control hands back what the person entered', () => {
           ' to drive. The driver did nothing, so the rule would have passed on silence.',
       )
     }
-    return hit as unknown as T
+    return hit
   }
 
   const enterText =
     (text: string) =>
     (element: HTMLElement): void => {
-      fireEvent.change(must<HTMLInputElement>(element, 'input, textarea', 'text control'), {
+      fireEvent.change(must(element, 'input, textarea', 'text control'), {
         target: { value: text },
       })
     }
 
   const toggle = (element: HTMLElement): void => {
-    fireEvent.click(must<HTMLInputElement>(element, 'input[type="checkbox"]', 'checkbox'))
+    fireEvent.click(must(element, 'input[type="checkbox"]', 'checkbox'))
   }
 
   /* Native `select` in one kit, a combobox opening a listbox in the other. */
@@ -595,7 +605,7 @@ describe('a data-bound control hands back what the person entered', () => {
       fireEvent.change(native, { target: { value: option.value } })
       return
     }
-    fireEvent.mouseDown(must<HTMLElement>(element, '[role="combobox"]', 'select control'))
+    fireEvent.mouseDown(must(element, '[role="combobox"]', 'select control'))
     const listed = screen.getAllByRole('option').find((o) => o.textContent === 'Two')
     if (!listed) throw new Error('the listbox never opened, so nothing was chosen')
     fireEvent.click(listed)
@@ -606,7 +616,7 @@ describe('a data-bound control hands back what the person entered', () => {
   }
 
   const attach = (element: HTMLElement): void => {
-    const input = must<HTMLInputElement>(element, 'input[type="file"]', 'file input')
+    const input = must(element, 'input[type="file"]', 'file input')
     fireEvent.change(input, {
       target: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] },
     })
