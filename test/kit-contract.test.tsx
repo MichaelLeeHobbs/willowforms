@@ -205,6 +205,35 @@ const made = (def: ComponentDef, root: ComponentNode): ComponentNode => {
   return node
 }
 
+/**
+ * The properties whose values are CSS pixels in both kits.
+ *
+ * Read by two describes: the pixels rule inside the per-kit block derives its
+ * rows from these, and `a length means the same number of pixels in both kits`
+ * compares the defaults. Declared here, above both, rather than beside the
+ * second one. It used to sit below the first, which worked only because this
+ * runner invokes a `describe` callback after the module has finished
+ * evaluating; a runner that invokes it during evaluation would have hit the
+ * temporal dead zone and failed to load the file at all.
+ *
+ * The agreement rules leave `defaultProps` alone, on the ground that a kit is
+ * entitled to its own sensible default. That is true of a prop nobody sees in
+ * the document and false of a length: `02-kit-contract.md` says a length in a
+ * document is CSS pixels, and a kit built on a design system with its own
+ * spacing scale "converts at its edge".
+ *
+ * So the defaults rule is equality, not merely agreement about the unit. A
+ * `defaultProps` value is written into every node the designer creates, before
+ * any renderer fallback is consulted, so it leaves with the document -- and the
+ * catalogue's promise is that a document authored against one kit renders
+ * against the other. A kit that wants a roomier form changes what it renders,
+ * not the number it writes into somebody else's document.
+ *
+ * Named rather than inferred from the editor, because `columns`, `index` and
+ * `maxLength` are numbers too and none of them is a length.
+ */
+const LENGTHS = ['gap', 'padding', 'radius', 'maxWidth', 'width', 'minColumnWidth']
+
 describe('the two kits in this repository agree', () => {
   const html = new Map(htmlKit.components.map((c) => [c.type, c]))
   const mui = new Map(muiKit.components.map((c) => [c.type, c]))
@@ -1902,27 +1931,6 @@ describe('the icons the kits ask for', () => {
     expect(blank).toEqual([])
   })
 })
-
-/**
- * The properties whose values are CSS pixels in both kits.
- *
- * The rule above leaves `defaultProps` alone, on the ground that a kit is
- * entitled to its own sensible default. That is true of a prop nobody sees in
- * the document and false of a length: `02-kit-contract.md` says a length in a
- * document is CSS pixels, and a kit built on a design system with its own
- * spacing scale "converts at its edge".
- *
- * So the rule below is equality, not merely agreement about the unit. A
- * `defaultProps` value is written into every node the designer creates, before
- * any renderer fallback is consulted, so it leaves with the document -- and the
- * catalogue's promise is that a document authored against one kit renders
- * against the other. A kit that wants a roomier form changes what it renders,
- * not the number it writes into somebody else's document.
- *
- * Named rather than inferred from the editor, because `columns`, `index` and
- * `maxLength` are numbers too and none of them is a length.
- */
-const LENGTHS = ['gap', 'padding', 'radius', 'maxWidth', 'width', 'minColumnWidth']
 
 describe('a length means the same number of pixels in both kits', () => {
   /*
