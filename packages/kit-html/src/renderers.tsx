@@ -942,19 +942,26 @@ function FileUploadNode({
            * appeared. A refusal nobody can see is indistinguishable from a
            * bug in the picker.
            */
-          setDropped(chosen.length - kept.length)
+          const refused = chosen.length - kept.length
+          setDropped(refused)
           /*
-           * Bumped whether or not the count changed.
+           * Bumped on a refusal, not on every choice.
            *
-           * A live region only announces on mutation, and
-           * `setDropped(chosen.length - kept.length)` writes the same number
-           * for a second identical refusal -- React re-renders the same text
-           * and a screen reader says nothing, so the second attempt looked
-           * like the picker had stopped working. `docs/accessibility.md`
-           * records the same fix for the designer's own live region: an
-           * unchanged announcement is never read.
+           * A live region only announces on mutation, and `setDropped` writes
+           * the same number for a second identical refusal -- React re-renders
+           * the same text and a screen reader says nothing, so the second
+           * attempt looked like the picker had stopped working.
+           *
+           * It counts refusals rather than choices because a choice that drops
+           * nothing lands between two identical refusals and, counted, returns
+           * the parity to where it started. That the notice also unmounts on
+           * the clean choice is not the guarantee: this string has to differ
+           * from the last one on its own, without resting on how a screen
+           * reader treats a re-inserted `role="alert"`.
+           * `docs/accessibility.md` records the same fix for the designer's own
+           * live region: an unchanged announcement is never read.
            */
-          setAttempt((n) => n + 1)
+          if (refused > 0) setAttempt((n) => n + 1)
           onChange(multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null))
         }}
       />
