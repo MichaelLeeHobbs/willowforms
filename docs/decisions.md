@@ -891,3 +891,29 @@ hidden, and its rules never run.
 - **Reversal:** Cheap, and it is the bargain `KeyField` already makes with a name that is taken: refuse,
   say why, correct in place.
 - **When:** 2026-08-31, on `build-out/review-b`.
+
+### The first pass is published, and both 2026-08-30 reviews are renamed
+
+- **Decided:** `tmp/formsmith-review-2026-08-30.md` becomes
+  `docs/reviews/2026-08-30-deep-review-a.md`, and `docs/reviews/2026-08-30-second-pass.md` becomes
+  `docs/reviews/2026-08-30-deep-review-b.md`. Both are byte-identical to what they were, so every line
+  citation in the queues, `triage.md` and `found.md` still resolves. This reverses **The second review
+  is committed; the first one is not**, above.
+- **Why:** four reviews now exist and only one of the four names said what it was. The provenance
+  argument that kept the first pass in `tmp/` assumed it would stay in one working copy, which stopped
+  being true the moment a fourth review compared all of them: a review the repository cannot open is a
+  review nobody can check the others against.
+- **What it costs:** this is a public MIT repository, so a 1045-line audit naming three CRITICALs,
+  including a confirmed document-to-CSS injection in the MUI kit, is now public. All three were fixed by
+  the first remediation run. Michael was asked and chose to publish, the same call he made for the
+  second pass and on the same terms.
+- **Rejected: renaming without publishing the first pass.** It leaves `triage.md` citing a path that
+  exists on one machine, which is the failure the earlier entry was written about.
+- **Rejected: rewriting the older records to the new paths.** `docs/decisions.md`, the two archived
+  queues and `docs/reports/2026-08-31-symmetry-audit.md` still name the old paths on purpose. A decision
+  log that edits itself to look consistent is no longer a record of what was decided, and
+  `deep-review-b.md` cites the `tmp/` path twice in its own body, which `RUN.md` forbids editing. This
+  entry is the redirect for all of them.
+- **Reversal:** two `git mv` commands and this entry, unless the exposure matters, in which case it is a
+  history rewrite and expensive.
+- **When:** 2026-09-02.

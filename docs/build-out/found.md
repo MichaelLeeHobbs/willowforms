@@ -6,8 +6,9 @@ here gates completion. This file is the starting point for normal work on the pr
 Add an entry as: what it is, where, why it is out of scope, and how bad it would be to leave.
 
 Entries below the second-pass heading came from the run against
-`docs/reviews/2026-08-30-second-pass.md`. Everything above it came from the first pass and is still open;
-the second review re-derived five of those independently, which is worth knowing before closing one.
+`docs/reviews/2026-08-30-deep-review-b.md`, named `2026-08-30-second-pass.md` at the time. Everything
+above it came from the first pass, `docs/reviews/2026-08-30-deep-review-a.md`, and is still open; the
+second review re-derived five of those independently, which is worth knowing before closing one.
 
 ---
 
