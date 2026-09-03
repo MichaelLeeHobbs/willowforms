@@ -159,7 +159,18 @@ describe('the classes this kit renders', () => {
     readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8')
 
   const source = read('./renderers.tsx')
-  const css = read('./kit-html.css')
+
+  /*
+   * Comments stripped before anything is read out of the stylesheet.
+   *
+   * `declared` is a scan for `.fsh-…`, and a comment explaining a rule names
+   * the class it explains -- the forced-colours block below mentions
+   * `.fsh-progress` in its own prose. Counting those would mean a class could
+   * satisfy this guard by being *described* rather than styled, which is the
+   * failure mode the guard exists to catch, one level up. The same strip is
+   * what `designer.css.test.ts` does for the same reason.
+   */
+  const css = read('./kit-html.css').replace(/\/\*[\s\S]*?\*\//g, '')
 
   const declared = new Set([...css.matchAll(/\.(fsh-[a-z0-9_-]+)/g)].map((m) => m[1] as string))
   const emitted = [...new Set([...source.matchAll(/fsh-[a-z0-9_-]+/g)].map((m) => m[0]))]
