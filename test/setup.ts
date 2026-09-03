@@ -8,12 +8,19 @@ installConsoleErrorGate()
  * How many elements the stubbed observers are watching, and how often they let
  * go.
  *
- * On `globalThis` rather than in module scope. This file runs once per test
- * file, while the stub it installs is set on `globalThis` and therefore
- * installed by whichever file ran first -- so counters held in a module would be
- * incremented by that file's instance and read as zero by every other one. A
- * counter that always reads zero is precisely the silent pass the counting was
- * added to prevent.
+ * `observing` is live targets rather than a lifetime total: `observe` counts a
+ * target once, `unobserve` takes it away, and `disconnect` subtracts whatever
+ * that observer still held. A number that only ever went up could not show a
+ * leak, which was the one thing it was here to show.
+ *
+ * On `globalThis` rather than in module scope. The pool is `forks` with
+ * isolation on, so each test file is its own process and module scope would in
+ * fact do; this is belt and braces against a second module instance, and it
+ * costs nothing. The comment that used to be here claimed the counters were
+ * incremented by whichever file ran first and read as zero everywhere else.
+ * They did read zero, but that was not why -- see
+ * `SelectionLayer.tsx`, where a layout effect read a ref its ancestor had not
+ * attached yet and no observer was ever constructed.
  */
 interface Counts {
   made: number
@@ -42,33 +49,42 @@ if (typeof document !== 'undefined') {
    * asks.
    */
   /*
-   * Installed always, not only when jsdom has none.
+   * Installed unconditionally, overwriting anything already there.
    *
-   * The guard used to be `if (!('ResizeObserver' in globalThis))`, and the
-   * environment now provides one -- so the stub was never installed, the
-   * counters read zero forever, and the leak this file says it can see became
-   * invisible. That is the same always-reads-zero silent pass the paragraph
-   * above describes, arriving through the other door.
-   *
-   * Overwriting a real implementation is right for this suite: jsdom has no
-   * layout, so a real `ResizeObserver` here observes elements that never
-   * change size and reports nothing. What a test can ask is how many were made
-   * and how many were let go.
+   * jsdom 30 ships no `ResizeObserver`, so the old `if (!('ResizeObserver' in
+   * globalThis))` guard did install this -- the comment claiming the
+   * environment now provides one, and that the stub was therefore never
+   * installed, was wrong about the environment as well as about the zero it was
+   * written to explain. Dropping the guard is still right: overwriting a real
+   * implementation is what this suite wants, because jsdom has no layout, so a
+   * real observer here watches elements that never change size and reports
+   * nothing. What a test can ask is how many were made, how many targets are
+   * live, and how many were let go.
    */
-  {
-    globalThis.ResizeObserver = class implements ResizeObserver {
-      constructor() {
-        counts.made += 1
-      }
-      observe(): void {
+  globalThis.ResizeObserver = class implements ResizeObserver {
+    /** This observer's own targets, so `disconnect` knows what to give back. */
+    private readonly targets = new Set<Element>()
+
+    constructor() {
+      counts.made += 1
+    }
+
+    observe(target: Element): void {
+      // Observing the same element twice is one target, as it is in a browser.
+      if (!this.targets.has(target)) {
+        this.targets.add(target)
         counts.observing += 1
       }
-      unobserve(): void {
-        counts.observing -= 1
-      }
-      disconnect(): void {
-        counts.disconnects += 1
-      }
+    }
+
+    unobserve(target: Element): void {
+      if (this.targets.delete(target)) counts.observing -= 1
+    }
+
+    disconnect(): void {
+      counts.observing -= this.targets.size
+      this.targets.clear()
+      counts.disconnects += 1
     }
   }
 
