@@ -966,12 +966,12 @@ function FileUploadNode({
         }}
       />
       {filesHeld ? (
-        <p id={heldId} className="fsh-field__hint">
+        <p id={heldId} className="fsh-field__message">
           Holding {filesHeld}
         </p>
       ) : null}
       {dropped > 0 ? (
-        <p id={refusedId} className="fsh-field__error" role="alert">
+        <p id={refusedId} className="fsh-field__message is-error" role="alert">
           {(dropped === 1
             ? 'One file was too large and was not added.'
             : String(dropped) + ' files were too large and were not added.') +

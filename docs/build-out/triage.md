@@ -867,3 +867,20 @@ are worth the same treatment when the stylesheet or the kit next needs it.
 - `docs/prior-art`'s anonymity is nominal, because `README.md` names the products two tables earlier.
   Correct, and the answer taken in item 32 is the other direction: the measured figures moved out of the
   README, so the naming and the measurements are no longer in the same document.
+
+## Three notes in `kit-html`'s definitions and stylesheet — item 40
+
+**NOTE ×3.** `definitions.ts:86` (`Heading` defaults to `h2` here and `h5` in `kit-mui`),
+`definitions.ts:136` (the `Checkbox` `helperText` declaration), and `kit-html.css:62-89` (the dark
+palette block).
+
+**Not fixed, and this is the entry.** The heading default is a palette choice each kit is entitled to
+make, and the thing that actually matters -- the rank a document with no `level` renders at -- is
+already pinned for both kits by `a heading whose document names no rank` in the contract suite. The
+`Checkbox` note is a declaration whose reason is written beside it. The palette block is duplicated
+across two theme selectors, which `docs/reviews/2026-09-02-deep-review.md` also names for
+`designer.css`; deduplicating a palette is one job across both stylesheets rather than half of it here,
+and `test/contrast.test.ts` measures both blocks either way, so the drift this invites is caught.
+
+`kit-html.css:529-533`, the circular progress being a disc rather than an arc, is already triaged above
+from the first pass and is unchanged.

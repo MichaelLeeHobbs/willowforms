@@ -107,6 +107,17 @@
   line-height: 1.25;
 }
 
+/*
+ * `min-width: 0` does nothing for a field in the usual column layout, and is
+ * what stops one overflowing in a row.
+ *
+ * A flex item defaults to `min-width: auto`, which refuses to shrink below its
+ * content. A field dropped into a `Stack` with `direction: row`, or into a
+ * `Grid` column narrower than its own label or its longest option, pushes the
+ * track wider rather than wrapping, and the row scrolls sideways. Left
+ * unexplained this reads as a line to delete during a tidy-up, so: it is
+ * inert for the common case on purpose, and load-bearing for the row one.
+ */
 .fsh-field {
   display: flex;
   flex-direction: column;
@@ -562,4 +573,58 @@ fieldset.fsh-field {
   content: '/';
   margin-inline-end: 8px;
   color: var(--fsh-border);
+}
+
+/*
+ * State that survives the operating system repainting everything.
+ *
+ * Windows High Contrast and its equivalents replace author colours with a
+ * system palette, so any state signalled only by `background` stops being
+ * signalled. Two controls here said everything with background alone: the
+ * switch is `--fsh-border` when off and `--fsh-accent` when on, and the
+ * progress bar fills with `--fsh-accent` against `--fsh-field`. Under forced
+ * colours both halves became the same colour and neither control said anything
+ * at all.
+ *
+ * `forced-color-adjust: none` opts the two elements that carry the state out of
+ * the automatic substitution, and they are then repainted in system colours:
+ * `Highlight` for on or filled, `Canvas` for off or empty. That keeps the
+ * meaning rather than the palette, which is the point.
+ *
+ * `outline` rather than `border` because this stylesheet sets no `box-sizing`,
+ * so a border would resize both controls, and rather than `box-shadow` because
+ * forced colours suppress shadows. An outline at a negative offset draws inside
+ * the box, changes no layout, and is preserved.
+ */
+@media (forced-colors: active) {
+  .fsh-switch__track {
+    forced-color-adjust: none;
+    background: Canvas;
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  .fsh-switch__input:checked + .fsh-switch__track {
+    background: Highlight;
+  }
+
+  /* The thumb inverts with the track, so the two never share a colour. */
+  .fsh-switch__track::after {
+    background: CanvasText;
+  }
+
+  .fsh-switch__input:checked + .fsh-switch__track::after {
+    background: Canvas;
+  }
+
+  .fsh-progress {
+    forced-color-adjust: none;
+    background: Canvas;
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  .fsh-progress__fill {
+    background: Highlight;
+  }
 }

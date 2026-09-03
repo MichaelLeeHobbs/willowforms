@@ -26,6 +26,11 @@ It ships the same 27 component types as `@formsmith/kit-mui`, so a document auth
 renders against the other. Nothing in the kit contract requires that; it is a courtesy this repo keeps
 so swapping kits is a one-line change in the host.
 
+One property is not shared. `Button.variant` is `solid`, `outline` or `plain` here and `contained`,
+`outlined` or `text` in `@formsmith/kit-mui`, so a button authored in one kit falls back to the other
+kit's default variant rather than carrying its appearance across. Every other property means the same
+thing in both, and `test/kit-contract.test.tsx` fails if a second one diverges without being named.
+
 ## Accessibility is the kit's job
 
 Each field owns a real `<label for>`, errors are announced through `aria-describedby` with
