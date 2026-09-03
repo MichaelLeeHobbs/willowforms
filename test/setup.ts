@@ -1,5 +1,9 @@
 import { afterEach } from 'vitest'
 
+import { installConsoleErrorGate } from './console-errors.js'
+
+installConsoleErrorGate()
+
 /**
  * How many elements the stubbed observers are watching, and how often they let
  * go.
