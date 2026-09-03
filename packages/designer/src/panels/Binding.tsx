@@ -368,7 +368,7 @@ export function TranslationEditor({
       />
 
       <ul className="fs-binding__languages">
-        {languages.map((language) => {
+        {languages.map((language, at) => {
           /*
            * Bundles are keyed by BCP 47 tag, which is what the renderer looks up.
            * Writing to the bare code put every translation authored here into a
@@ -376,9 +376,17 @@ export function TranslationEditor({
            */
           const tag = languageTag(language)
           const text = textFor(bundleFor(translations, tag), value.key)
-          const fieldId = id + '-' + tag
+          const fieldId = id + '-' + String(at) + '-' + tag
           return (
-            <li key={tag}>
+            /*
+             * Position and tag, because two languages can carry the same tag:
+             * nothing dedupes `languages` and the gate checks only that
+             * `defaultLanguage` is present. Keyed by tag alone, a document with
+             * `en` twice gave React two children with one key, and the id built
+             * from the tag gave two inputs one `id` -- so `label for` resolved
+             * to the first and the second box had no accessible name.
+             */
+            <li key={String(at) + ':' + tag}>
               {/*
                 The badge sits outside the label so the field's accessible name
                 is exactly the language, not "English default".

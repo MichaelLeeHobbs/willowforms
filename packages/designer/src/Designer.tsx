@@ -510,8 +510,18 @@ function Toolbar({
               onChange={(e) => onLanguage(e.target.value || undefined)}
             >
               <option value="">Default language</option>
-              {languages.map((entry) => (
-                <option key={languageTag(entry)} value={languageTag(entry)}>
+              {/*
+               * Keyed by position and tag, not by tag.
+               *
+               * Two languages can carry the same tag: nothing dedupes
+               * `languages`, and `validateDocument` checks only that
+               * `defaultLanguage` is present. A document with `en` twice made
+               * React see two children with one key here, which it warns about
+               * and then reconciles by guessing. `FormSettings` already keys
+               * this list the same way; this picker and `Binding`'s did not.
+               */}
+              {languages.map((entry, at) => (
+                <option key={String(at) + ':' + languageTag(entry)} value={languageTag(entry)}>
                   {entry.name}
                 </option>
               ))}

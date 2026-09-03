@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 
 import { formsmithAliases } from './aliases.js'
-import DocumentedCountReporter from './test/count-reporter.js'
+import DocumentedCountReporter, { UNCOLLECTED_TEST_DIRS } from './test/count-reporter.js'
 
 export default defineConfig({
   resolve: { alias: formsmithAliases },
@@ -24,9 +24,20 @@ export default defineConfig({
       'apps/*/src/**/*.test.ts',
       'apps/*/src/**/*.test.tsx',
     ],
-    // Playwright owns e2e/. Vitest would load those specs and fail on an import
-    // it cannot resolve, which reads as a broken suite rather than a mistake.
-    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
+    /*
+     * Playwright owns e2e/. Vitest would load those specs and fail on an import
+     * it cannot resolve, which reads as a broken suite rather than a mistake.
+     *
+     * `test/fixtures/` holds suites that are meant to be red:
+     * `console-errors.test.ts` runs one through its own config and reads the
+     * failure, which is how the console gate proves it can fire.
+     */
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      'e2e/**',
+      ...UNCOLLECTED_TEST_DIRS.map((dir) => 'test/' + dir + '/**'),
+    ],
     // Node by default, because core must keep proving it runs without a DOM.
     // Component tests opt in per file with an `@vitest-environment jsdom` docblock.
     environment: 'node',

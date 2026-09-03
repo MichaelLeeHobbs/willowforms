@@ -63,6 +63,18 @@ export function totals(text: string): number[] {
   return counts
 }
 
+/**
+ * Directories under `test/` holding suites vitest must not collect.
+ *
+ * `vitest.config.ts` builds its `exclude` out of this, and the walk below skips
+ * the same names. One list. Two would drift, and the way they drift is silent:
+ * a directory excluded from the run but counted on disk makes `collected` and
+ * `onDisk` permanently unequal, so every full run reports itself as filtered and
+ * the documented-count check never runs again. That is this reporter going quiet
+ * rather than failing, which is the thing the marker file above exists to catch.
+ */
+export const UNCOLLECTED_TEST_DIRS = ['fixtures']
+
 /** Every test file vitest would collect, counted without collecting it. */
 function testFilesOnDisk(): number {
   let found = 0
@@ -70,6 +82,7 @@ function testFilesOnDisk(): number {
   const walk = (dir: string): void => {
     for (const entry of readdirSync(fileURLToPath(new URL(dir, root)), { withFileTypes: true })) {
       if (entry.name === 'node_modules' || entry.name === 'dist') continue
+      if (dir === 'test/' && UNCOLLECTED_TEST_DIRS.includes(entry.name)) continue
       const path = dir + entry.name
       if (entry.isDirectory()) {
         walk(path + '/')

@@ -14,6 +14,8 @@
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+
+import { expectConsoleError } from '../../../test/console-errors.js'
 import type { ReactNode } from 'react'
 import type { ComponentNode, FormContext, FormData, FormDocument, PropValue } from '@formsmith/core'
 import { MAX_ROWS, applyChange } from '@formsmith/core'
@@ -1032,26 +1034,18 @@ describe('a component that throws while rendering', () => {
       { key: 'after', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
     ])
 
-  /** React logs a caught error itself; the test is not interested in the noise. */
-  function quietly<T>(fn: () => T): T {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    try {
-      return fn()
-    } finally {
-      spy.mockRestore()
-    }
-  }
+  /** React logs a caught error itself, and the gate in test/setup.ts makes each test say so. */
+  const boomLogged = /The above error occurred in the <Boom> component\./
 
   it('keeps the rest of the form on the page', () => {
-    quietly(() =>
-      render(
-        <FormRenderer
-          document={documentWithBoom()}
-          kit={boomKit}
-          data={{ before: 'kept', after: 'also kept' }}
-          onChange={() => undefined}
-        />,
-      ),
+    expectConsoleError(boomLogged)
+    render(
+      <FormRenderer
+        document={documentWithBoom()}
+        kit={boomKit}
+        data={{ before: 'kept', after: 'also kept' }}
+        onChange={() => undefined}
+      />,
     )
 
     // Both siblings render, and the answers already in them are still there.
@@ -1060,6 +1054,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('keeps the row coordinate on the fallback, so the right row stays selectable', () => {
+    expectConsoleError(boomLogged)
     /*
      * The `boom` fixture is flat and the repeater fixtures never throw, so the
      * one place these two meet had no test. The fallback carries `data-fs-key`,
@@ -1081,15 +1076,13 @@ describe('a component that throws while rendering', () => {
       },
     ])
 
-    const { container } = quietly(() =>
-      render(
-        <FormRenderer
-          document={doc}
-          kit={boomKit}
-          data={{ addresses: [{}, {}] }}
-          onChange={() => undefined}
-        />,
-      ),
+    const { container } = render(
+      <FormRenderer
+        document={doc}
+        kit={boomKit}
+        data={{ addresses: [{}, {}] }}
+        onChange={() => undefined}
+      />,
     )
 
     const fallbacks = [...container.querySelectorAll('[data-fs-key="boom"]')]
@@ -1101,6 +1094,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('marks a revealed component that failed as revealed', () => {
+    expectConsoleError(boomLogged)
     /*
      * The fallback carries `data-fs-key`, `data-fs-type` and `data-fs-scope` so
      * a broken component stays selectable, and it carried neither of the two
@@ -1118,16 +1112,14 @@ describe('a component that throws while rendering', () => {
       },
     ])
 
-    const { container } = quietly(() =>
-      render(
-        <FormRenderer
-          document={doc}
-          kit={boomKit}
-          data={{}}
-          revealHidden
-          onChange={() => undefined}
-        />,
-      ),
+    const { container } = render(
+      <FormRenderer
+        document={doc}
+        kit={boomKit}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
     )
 
     const fallback = container.querySelector('[data-fs-key="boom"]')
@@ -1135,17 +1127,16 @@ describe('a component that throws while rendering', () => {
   })
 
   it('leaves the mark off a failed component the form really asks for', () => {
+    expectConsoleError(boomLogged)
     // The control: marking every fallback hidden would make the attribute mean
     // nothing, which is the same as not having it.
-    const { container } = quietly(() =>
-      render(
-        <FormRenderer
-          document={documentWithBoom()}
-          kit={boomKit}
-          data={{}}
-          onChange={() => undefined}
-        />,
-      ),
+    const { container } = render(
+      <FormRenderer
+        document={documentWithBoom()}
+        kit={boomKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
     )
 
     expect(container.querySelector('[data-fs-key="boom"]')?.hasAttribute('data-fs-hidden')).toBe(
@@ -1154,15 +1145,14 @@ describe('a component that throws while rendering', () => {
   })
 
   it('says so where the component would have been', () => {
-    const { container } = quietly(() =>
-      render(
-        <FormRenderer
-          document={documentWithBoom()}
-          kit={boomKit}
-          data={{}}
-          onChange={() => undefined}
-        />,
-      ),
+    expectConsoleError(boomLogged)
+    const { container } = render(
+      <FormRenderer
+        document={documentWithBoom()}
+        kit={boomKit}
+        data={{}}
+        onChange={() => undefined}
+      />,
     )
 
     const fallback = container.querySelector('[data-fs-key="boom"]')
@@ -1173,16 +1163,15 @@ describe('a component that throws while rendering', () => {
   })
 
   it('keeps the node selectable, which is how an author removes it', () => {
-    const { container } = quietly(() =>
-      render(
-        <FormRenderer
-          document={documentWithBoom()}
-          kit={boomKit}
-          data={{}}
-          revealHidden
-          onChange={() => undefined}
-        />,
-      ),
+    expectConsoleError(boomLogged)
+    const { container } = render(
+      <FormRenderer
+        document={documentWithBoom()}
+        kit={boomKit}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />,
     )
 
     // The canvas hit-tests with `closest('[data-fs-key]')` and there is nothing
@@ -1192,17 +1181,16 @@ describe('a component that throws while rendering', () => {
   })
 
   it('hands the error to the host rather than swallowing it', () => {
+    expectConsoleError(boomLogged)
     const onError = vi.fn()
-    quietly(() =>
-      render(
-        <FormRenderer
-          document={documentWithBoom()}
-          kit={boomKit}
-          data={{}}
-          onError={onError}
-          onChange={() => undefined}
-        />,
-      ),
+    render(
+      <FormRenderer
+        document={documentWithBoom()}
+        kit={boomKit}
+        data={{}}
+        onError={onError}
+        onChange={() => undefined}
+      />,
     )
 
     expect(onError).toHaveBeenCalledTimes(1)
@@ -1445,6 +1433,7 @@ describe('a throw from RenderNode before it reaches the kit component', () => {
   })
 
   it('draws the fallback for the node that threw', () => {
+    expectConsoleError(/the kit blew up looking up Field/)
     const onError = vi.fn()
     const { container } = render(
       <FormRenderer
@@ -1463,6 +1452,7 @@ describe('a throw from RenderNode before it reaches the kit component', () => {
   })
 
   it('keeps the rest of the form, which is what per-node means', () => {
+    expectConsoleError(/the kit blew up looking up Field/)
     /*
      * The whole argument for a boundary per node rather than one around the
      * form: a form-level boundary saves the host's page and throws away every
@@ -1483,6 +1473,7 @@ describe('a throw from RenderNode before it reaches the kit component', () => {
   })
 
   it('draws a fallback when the document root itself throws, rather than a blank tree', () => {
+    expectConsoleError(/the kit blew up looking up Screen/)
     /*
      * The root had nothing above it. React 19 unmounts the whole tree on an
      * uncaught throw, so this was a blank page in whatever host embedded the
@@ -1720,6 +1711,7 @@ describe('a document shaped in ways the type forbids', () => {
  */
 describe('a boundary after the cause has gone', () => {
   it('draws the component again when the node it wraps changes', () => {
+    expectConsoleError(/this type never renders/)
     const throwing: RendererKit = {
       id: 'sometimes',
       renderers: {
@@ -1756,6 +1748,7 @@ describe('a boundary after the cause has gone', () => {
   })
 
   it('keeps the fallback while the cause is still there', () => {
+    expectConsoleError(/this type never renders/)
     // The control. Clearing on every render would retry forever when the cause
     // has not gone away.
     const throwing: RendererKit = {
@@ -1977,6 +1970,7 @@ describe('the node boundary letting go', () => {
     ])
 
   it('comes back when the prop that broke it is repaired', () => {
+    expectConsoleError(/the kit refused this label/)
     const { container, rerender } = render(
       <FormRenderer
         document={withLabel('boom')}
@@ -2005,6 +1999,7 @@ describe('the node boundary letting go', () => {
   })
 
   it('stays down while the prop is still broken', () => {
+    expectConsoleError(/the kit refused this label/)
     /*
      * The reason the retry is keyed on content rather than fired every render:
      * retrying while the cause is still there is an infinite loop. A host that

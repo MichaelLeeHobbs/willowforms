@@ -11,8 +11,8 @@ Paste this to start or resume the run:
 The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointer at this file.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 39, merged as #78 on 2026-09-02. Items 0 through 39 are merged, plus 42, 50,
-  51 and 52 taken out of order. **Ten remain: 40, 41, 43, 44, 45, 46, 47, 48, 49 and 53.**
+- **Last completed:** item 40, merged as #79 on 2026-09-02. Items 0 through 40 are merged, plus 42, 50,
+  51 and 52 taken out of order. **Nine remain: 41, 43, 44, 45, 46, 47, 48, 49 and 53.**
 - **The run is going again** as of 2026-09-02, after stopping with the pointer twenty-two items behind
   what had merged. Items are ticked here in the following item's pull request, because an item's own
   pull request lands before it is merged and so cannot tick itself. That is the gap the six unticked
@@ -502,7 +502,7 @@ Every item, without exception:
       **Check:** collapsing every declared variant to the default in either kit turns the variant rule
       red; the `Container` row either names a real type or fails; `DRIVEN` asserts the prop still exists.
 
-- [ ] **40. `kit-html`'s definitions and stylesheet.** `definitions.ts:193-200` (LOW, `Button.variant`
+- [x] **40. `kit-html`'s definitions and stylesheet.** `definitions.ts:193-200` (LOW, `Button.variant`
       is the one vocabulary the two kits do not share, against the README's cross-kit claim), `:86`
       (NOTE, heading rank), `:136` (NOTE); `kit-html.css:156-169` (MEDIUM, `.fsh-field__error` and
       `.fsh-field__hint` are used by the renderer and declared in no stylesheet, so the error renders in

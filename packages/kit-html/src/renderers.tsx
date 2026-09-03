@@ -552,7 +552,7 @@ function Image({ props, nodeProps }: NodeRendererProps): ReactNode {
     <img
       {...nodeProps}
       className="fsh-image"
-      src={safeHref(props['src']) ?? ''}
+      src={safeHref(props['src'])}
       alt={str(props['alt'])}
       style={{
         objectFit: fit,
