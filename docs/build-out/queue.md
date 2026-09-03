@@ -11,8 +11,8 @@ Paste this to start or resume the run:
 The mutable half of the resume pointer. `CLAUDE.md` carries only a stable pointer at this file.
 
 - **Started:** 2026-08-31
-- **Last completed:** item 38, merged as #77 on 2026-09-02. Items 0 through 38 are merged, plus 42, 50,
-  51 and 52 taken out of order. **Eleven remain: 39, 40, 41, 43, 44, 45, 46, 47, 48, 49 and 53.**
+- **Last completed:** item 39, merged as #78 on 2026-09-02. Items 0 through 39 are merged, plus 42, 50,
+  51 and 52 taken out of order. **Ten remain: 40, 41, 43, 44, 45, 46, 47, 48, 49 and 53.**
 - **The run is going again** as of 2026-09-02, after stopping with the pointer twenty-two items behind
   what had merged. Items are ticked here in the following item's pull request, because an item's own
   pull request lands before it is merged and so cannot tick itself. That is the gap the six unticked
@@ -492,7 +492,7 @@ Every item, without exception:
       **Check:** a rule drives every data-bound component in both kits and asserts `onChange` fired with
       the typed value; stubbing `kit-html`'s handlers turns the suite red.
 
-- [ ] **39. The conformance rules that structurally cannot fail.**
+- [x] **39. The conformance rules that structurally cannot fail.**
       `:1483` (HIGH, three rules are each built so they cannot see a kit's `defaultProps`, which is why
       the item-35 divergence shipped), `:639` (HIGH, `expect(a.outerHTML).not.toBe(b.outerHTML)` can never
       fail because `useId`-derived `data-fs-scope` differs on every run, and it is the control for the

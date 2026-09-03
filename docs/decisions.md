@@ -966,3 +966,41 @@ hidden, and its rules never run.
   structural half is recorded in `found.md`.
 - **Reversal:** cheap, and the derivation is the part worth keeping either way.
 - **When:** 2026-09-02, queue item 39.
+
+### The file-upload notices join the kit's one message shape rather than getting rules of their own
+
+- **Decided:** `FileUploadNode` renders both notices as `fsh-field__message`, with `is-error` on the
+  refusal, instead of the `fsh-field__hint` and `fsh-field__error` it invented. A new rule in
+  `packages/kit-html/src/renderers.test.tsx` fails when the renderer emits any class the stylesheet
+  does not declare.
+- **Why:** the two names existed in no stylesheet, so the one message this component writes when it
+  silently drops a file rendered at body size in body colour, carrying the user agent's `1em` block
+  margins inside a container whose gap is 4px. It read as prose rather than as an error. Every other
+  field in the kit already says exactly this with `fsh-field__message`, including the `Repeater` two
+  hundred lines above, so the shape existed and this component had drifted from it.
+- **Rejected: adding `.fsh-field__hint` and `.fsh-field__error` to the stylesheet.** It fixes the
+  colour and keeps two vocabularies for one thing, and the second would have to be kept in step with
+  the first by hand for ever.
+- **What the guard does not check:** the other direction, a declared class nobody renders, which is
+  dead style rather than a broken control. And a class the renderer builds by concatenation is checked
+  as a family, because the modifier comes from a document and is not in the source to compare.
+- **Reversal:** cheap both ways. Proved by putting the two class names back and watching the rule
+  report them by name.
+- **When:** 2026-09-02, queue item 40.
+
+### Forced colours get an explicit block rather than being left to the automatic substitution
+
+- **Decided:** a `@media (forced-colors: active)` block repaints the switch track, its thumb, and the
+  progress fill in system colours, with `forced-color-adjust: none` on the elements that carry state.
+- **Why:** both controls said everything with `background` alone, and forced colours replace author
+  backgrounds, so on and off became the same colour and the control stopped signalling. Nothing in
+  either stylesheet handled forced colours before this, and `docs/accessibility.md` never claimed it
+  did, so this adds coverage rather than correcting a false claim.
+- **Rejected: `border` for the outline.** This stylesheet sets no `box-sizing`, so a border resizes both
+  controls. Rejected `box-shadow` too, which is what `.fsh-progress` uses for its ordinary edge:
+  forced colours suppress shadows, so the edge would vanish exactly when it is needed. An `outline` at
+  a negative offset draws inside the box, changes no layout, and is preserved.
+- **Reversal:** cheap, and untested by any automated gate. jsdom cannot evaluate a media query and the
+  browser suite runs one colour scheme, so this is verified by reading and by the rule that its classes
+  are declared. Worth knowing before trusting it.
+- **When:** 2026-09-02, queue item 40.
