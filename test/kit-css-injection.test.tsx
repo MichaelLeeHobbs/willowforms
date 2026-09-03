@@ -6,7 +6,8 @@
  * A document's style value cannot author a rule, in either kit.
  *
  * `background` on `Box` is the only string-typed style value either kit has,
- * and a document is data. The two kits reach the page by different routes, so
+ * and a document is data. That sentence is checked rather than remembered --
+ * see the first test below, which reads it back off `kit.components`. The two kits reach the page by different routes, so
  * the obligation is one sentence with two sinks:
  *
  * - `@formsmith/kit-mui` puts the value in `sx`, which emotion concatenates
@@ -21,6 +22,13 @@
  * against server-rendered markup. Neither reads CSSOM, deliberately: jsdom's CSS
  * parser is a subset of a browser's and rejects values Chromium accepts, so an
  * assertion routed through it agrees with the right answer for the wrong reason.
+ *
+ * Which is also why each kit is checked on one path rather than both. The other
+ * path for `kit-html` is the client, where React writes the value through
+ * `el.style` and jsdom's parser decides what survives -- the browser's decision,
+ * not this kit's. The other path for MUI is the server, where the stylesheet
+ * does not exist in the markup at all: emotion hands it to a host-side extractor
+ * this suite does not run. Both would be assertions about somebody else's code.
  */
 
 import type { ReactElement } from 'react'
@@ -31,8 +39,8 @@ import type { ComponentNode, FormDocument } from '@formsmith/core'
 import { prop } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
 import type { RendererKit } from '@formsmith/renderer'
-import { htmlRendererKit } from '@formsmith/kit-html'
-import { muiRendererKit } from '@formsmith/kit-mui'
+import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
+import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
 
 /** The payload from the report, which emitted a second top-level rule. */
 const INJECTION = 'red}html{display:none}.x{'
@@ -133,15 +141,64 @@ function emittedRules(background: string, padding = 2): { selector: string; body
   )
 }
 
-/** The `style` attribute the server renderer wrote onto the Box. */
+/**
+ * The `style` attribute the server renderer wrote onto the Box.
+ *
+ * With the floor its MUI sibling already had. Every assertion downstream is a
+ * `not`, and `''` satisfies all of them: an attribute that never rendered, a
+ * regex that stopped matching, a renamed key -- each of those would have turned
+ * this whole describe green while reading nothing. So the read has to prove it
+ * found something first, and `padding` is the declaration that is always there
+ * and never the thing under test.
+ */
 function serverStyleAttribute(kit: RendererKit, background: string): string {
   const markup = renderToStaticMarkup(formOf(kit, background))
   const at = markup.indexOf('data-fs-key="target"')
   expect(at, 'the Box did not render').toBeGreaterThanOrEqual(0)
-  return /style="([^"]*)"/.exec(markup.slice(at))?.[1] ?? ''
+  const style = /style="([^"]*)"/.exec(markup.slice(at))?.[1] ?? ''
+  expect(style, 'the Box rendered no style attribute to inspect').toContain('padding')
+  return style
+}
+
+/**
+ * Editors whose value a document cannot choose freely.
+ *
+ * `number` and `boolean` are not strings by the time they reach the page, and
+ * `select` is a closed list the designer offers. What is left in a `style`
+ * section is a free string that becomes CSS, and that is the sink this file is
+ * about.
+ */
+const CONSTRAINED = new Set(['number', 'select', 'boolean'])
+
+/** Every style prop in a kit whose value a document writes as it likes. */
+function freeStyleValues(kit: {
+  components: readonly {
+    type: string
+    props: readonly { name: string; editor: string; section?: string }[]
+  }[]
+}): string[] {
+  return kit.components.flatMap((component) =>
+    component.props
+      .filter((entry) => entry.section === 'style' && !CONSTRAINED.has(entry.editor))
+      .map((entry) => component.type + '.' + entry.name),
+  )
 }
 
 describe('a document CSS value cannot author a rule', () => {
+  /**
+   * The file's premise, read off the kits rather than remembered.
+   *
+   * Everything below tests one property on one component, on the strength of a
+   * sentence at the top of this file saying that is the only one there is. A
+   * sentence cannot notice a kit gaining a second. This can: add a `string` or
+   * `color` prop in a `style` section and this fails, naming it, before the new
+   * sink has been anywhere near a page.
+   */
+  it('has one free-text style value per kit, which is the one the rest of this file uses', () => {
+    expect(freeStyleValues(muiKit), '@formsmith/kit-mui').toEqual(['Box.background'])
+    expect(freeStyleValues(htmlKit), '@formsmith/kit-html').toEqual(['Box.background'])
+  })
+
   beforeEach(() => {
     // Emotion caches by content hash across renders in one file, and a stale
     // tag from an earlier case would be counted as this case's output.

@@ -9,7 +9,7 @@
  * disturb the kit's layout.
  */
 
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { FormDocument } from '@formsmith/core'
 
@@ -142,7 +142,35 @@ export function SelectionLayer({
     remeasure()
   }, [remeasure, document, selectedKey, selectedRow, hoverKey, hoverRow])
 
-  useLayoutEffect(() => {
+  /*
+   * An ordinary effect, not a layout one, and that is what makes it run at all.
+   *
+   * This component is rendered inside the div that carries `surfaceRef`, and
+   * React attaches host refs during the layout phase in tree order, children
+   * before their ancestors. So a layout effect here runs before that div's ref
+   * is attached and reads `surfaceRef.current === null`. This effect's other
+   * dependencies -- `surfaceRef` and `remeasure` -- never change, so it did not
+   * re-run either: from mount until the first edit to the document there was no
+   * `ResizeObserver`, no scroll listener and no resize listener at all.
+   *
+   * What that cost is not established, and the honest answer is less than it
+   * sounds. The playground runs under `StrictMode`, which remounts and runs
+   * every effect a second time with the refs attached, so the observer does get
+   * built there and only a production build went without. The browser check
+   * written for the obvious symptom -- select a component, resize the window,
+   * watch the frame go stale -- passes with this effect deleted outright, which
+   * was measured rather than assumed: a resize also disturbs the hover, and that
+   * path remeasures. So no user-visible symptom was demonstrated. It was fixed
+   * anyway, because an effect that silently never runs is a defect whatever
+   * today's blast radius is, and the next person to add one here would inherit
+   * the same null ref.
+   *
+   * A passive effect runs after the whole commit, refs included. Installing
+   * listeners has no reason to block paint, so nothing is given up. If a third
+   * effect in here ever needs the element, move `surfaceRef` to a callback ref
+   * held in state instead, so every effect sees it by way of the deps.
+   */
+  useEffect(() => {
     const surface = surfaceRef.current
     if (!surface) return
 

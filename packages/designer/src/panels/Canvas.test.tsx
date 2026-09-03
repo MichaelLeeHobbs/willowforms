@@ -24,6 +24,7 @@ import type { ReactNode } from 'react'
 import type { ComponentNode, FormDocument, Kit, PropValue } from '@formsmith/core'
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
+import { observerCount } from '../../../../test/setup.js'
 import { Designer } from '../Designer.js'
 
 const staticProp = (value: string): PropValue => ({ kind: 'static', value })
@@ -877,5 +878,68 @@ describe('a press that is not the primary button', () => {
     expect(view.container.querySelector('.fs-drag-label')).not.toBeNull()
 
     fireEvent.pointerUp(window, { clientX: 14, clientY: 60, pointerId: 1 })
+  })
+})
+
+/**
+ * The selection layer's `ResizeObserver`, which for a while was never built.
+ *
+ * `test/setup.ts` stubs the observer and counts what it is asked to do, and
+ * until this block nothing read those counters -- an obligation written down
+ * with nothing executing it. What it was hiding: the layer is rendered inside
+ * the div carrying `surfaceRef`, React attaches host refs children-first, so
+ * the layout effect that built the observer read a null ref and returned. Its
+ * deps never changed, so it never ran again until the document was first
+ * edited. No observer, no scroll listener, no resize listener, and a green
+ * suite.
+ *
+ * Deltas rather than absolutes, because the counters are per process and every
+ * jsdom test in this file adds to them.
+ *
+ * Geometry stays out of it. jsdom has no layout engine, so what the observer
+ * would report is a browser question; what it observed is answerable here.
+ */
+describe('the selection layer and the elements it watches', () => {
+  it('observes the surface and the form root as soon as it mounts', () => {
+    const before = observerCount()
+    setup()
+    const after = observerCount()
+
+    expect(after.made - before.made, 'observers built on mount').toBe(1)
+    // The scrolling surface and the form root, which is the pair the effect
+    // observes. Watching the frames it draws itself would loop.
+    expect(after.observing - before.observing, 'elements watched on mount').toBe(2)
+  })
+
+  it('does not rebuild the observer while the pointer sweeps across components', async () => {
+    const { user, node } = setup()
+    const before = observerCount()
+
+    // `quiet` is the fixture that drops `nodeProps`, so it carries no key and
+    // cannot be hovered by one. Back and forth across the two that can.
+    await user.hover(node('first'))
+    await user.hover(node('second'))
+    await user.hover(node('first'))
+    await user.click(node('second'))
+
+    /*
+     * The comment above `remeasure` says a hover used to tear the observer down
+     * and build it again, because `remeasure` closed over the hover and so was
+     * a new function on every move. Nothing executed that claim until now.
+     */
+    expect(observerCount().made - before.made, 'observers rebuilt by hovering').toBe(0)
+  })
+
+  it('lets go of every element it watched when the canvas goes away', () => {
+    const before = observerCount()
+    const { view } = setup()
+    view.unmount()
+    const after = observerCount()
+
+    expect(after.disconnects - before.disconnects, 'observers disconnected').toBe(1)
+    // Back where it started. A residue here is an observer still holding an
+    // element after the component that made it is gone, which is the leak these
+    // counters exist to show.
+    expect(after.observing - before.observing, 'elements still watched after unmount').toBe(0)
   })
 })
