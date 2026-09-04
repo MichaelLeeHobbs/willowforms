@@ -116,7 +116,7 @@
 }
 
 /*
- * Inset, because the grip is a 14px strip flush against its neighbours: a ring
+ * Inset, because the grip is a 15px strip flush against its neighbours: a ring
  * offset outwards would be drawn underneath the pane and the canvas.
  */
 .fs-pane-handle:focus-visible {
@@ -894,11 +894,13 @@
  * pane is a large, easy target and a 16px handle in the middle of it is not.
  */
 .fs-pane-handle {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 14px;
+  /* Fourteen pixels for the glyph and one for the divider, within border-box. */
+  width: 15px;
   padding: 0;
   border: 0;
   border-radius: 0;

@@ -2,6 +2,30 @@ import { expect, test } from './harness.js'
 
 test.use({ colorScheme: 'dark' })
 
+test('the full-screen demo keeps scrolling inside the designer', async ({ designer }) => {
+  for (const size of [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 720 },
+    { width: 1600, height: 900 },
+  ]) {
+    await designer.page.setViewportSize(size)
+
+    const documentSize = await designer.page.locator('html').evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      clientHeight: element.clientHeight,
+      scrollWidth: element.scrollWidth,
+      scrollHeight: element.scrollHeight,
+    }))
+
+    expect(documentSize.scrollWidth, 'the page has a horizontal scrollbar').toBe(
+      documentSize.clientWidth,
+    )
+    expect(documentSize.scrollHeight, 'the page has a vertical scrollbar').toBe(
+      documentSize.clientHeight,
+    )
+  }
+})
+
 test('light mode applies to the MUI form while editing and previewing', async ({ designer }) => {
   await designer.page.getByLabel('Designer theme').selectOption('light')
 
@@ -45,4 +69,19 @@ test('setting a boolean property leaves its checkbox visible beside the reset ac
   await expect(checkbox).toBeChecked()
   await expect(checkbox).toBeVisible()
   await expect(designer.page.getByRole('button', { name: 'Reset Multiline' })).toBeVisible()
+})
+
+test('resetting Screen max width shows the effective kit default', async ({ designer }) => {
+  await designer.select('root')
+  await designer.openTab('Style')
+
+  const stylePanel = designer.page.getByRole('tabpanel', { name: 'Style' })
+  const maxWidth = stylePanel.getByRole('spinbutton', { name: /^Max width/ })
+  const reset = stylePanel.getByRole('button', { name: 'Reset Max width' })
+
+  await expect(maxWidth).toHaveValue('560')
+  await reset.click()
+
+  await expect(maxWidth).toHaveValue('640')
+  await expect(reset).toHaveCount(0)
 })
