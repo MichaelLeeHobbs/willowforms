@@ -13,7 +13,7 @@
   "dependencies": {
     "@formsmith/core": "workspace:*",
     "@hono/node-server": "^1.13.7",
-    "hono": "^4.6.14"
+    "hono": "^4.13.5"
   },
   "engines": {
     "node": ">=22.6.0"
