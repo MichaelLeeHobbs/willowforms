@@ -18,6 +18,11 @@ A kit brings its own theming or inherits its component library's. `@formsmith/ki
 its own because MUI's `ThemeProvider` already owns that; `@formsmith/kit-html` has a full set because
 nothing else does.
 
+The kit root owns an opaque surface and its matching text colour. The designer canvas is intentionally
+theme-independent, so relying on its background can place a dark-system kit's light controls over light
+designer chrome. The HTML Screen uses its surface token; the MUI Screen uses `background.default` and
+`text.primary`. Browser coverage holds that boundary in both editing and preview modes.
+
 ## Designer tokens
 
 Every value is a custom property on `.fs-shell`, so a host restyles by overriding tokens rather than

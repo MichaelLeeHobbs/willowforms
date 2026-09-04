@@ -161,6 +161,10 @@
   background: var(--fs-bg-panel);
 }
 
+.fs-panel[hidden] {
+  display: none;
+}
+
 .fs-panel--left {
   border-inline-end: 1px solid var(--fs-border);
 }
@@ -1160,25 +1164,6 @@
 .fs-prop-row__control input[type='checkbox'] {
   align-self: start;
   width: auto;
-}
-
-.fs-prop-row__control--inline {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
-/*
- * The picker keeps its natural width; the checkbox beside it needs almost none.
- * Letting it shrink is what clipped it to nothing in the first place, and a row
- * is the one place it can happen again.
- */
-.fs-prop-row__control--inline .fs-binding__modes {
-  flex: 0 0 auto;
-}
-
-.fs-prop-row__control--inline input[type='checkbox'] {
-  align-self: center;
 }
 
 .fs-prop-row label {

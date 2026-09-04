@@ -613,16 +613,7 @@ function PropRow({
         )}
       </label>
 
-      {/*
-        A checkbox is small enough to sit beside the mode picker. Everything
-        else needs the width, so it goes underneath.
-      */}
-      <div
-        className={
-          'fs-prop-row__control' +
-          (schema.editor === 'boolean' ? ' fs-prop-row__control--inline' : '')
-        }
-      >
+      <div className="fs-prop-row__control">
         {mode}
 
         {schema.editor === 'multiline' ? (

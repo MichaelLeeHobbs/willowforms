@@ -135,6 +135,24 @@ function draw(root: ComponentNode, theme?: ReturnType<typeof createTheme>): HTML
   return render(theme ? <ThemeProvider theme={theme}>{form}</ThemeProvider> : form).container
 }
 
+describe('the screen surface', () => {
+  const screenNode: ComponentNode = {
+    key: 'screen',
+    type: 'Screen',
+    props: {},
+    children: [],
+  }
+
+  it.each([
+    ['light', '#fff'],
+    ['dark', '#121212'],
+  ] as const)('owns its %s theme background', (mode, background) => {
+    const container = draw(screenNode, createTheme({ palette: { mode } }))
+
+    expect(rulesFor(container, 'screen')).toContain('background-color:' + background)
+  })
+})
+
 describe('an unanswered radio group', () => {
   /*
    * Every `RadioItem` child rendered pre-checked, and all of them at once.

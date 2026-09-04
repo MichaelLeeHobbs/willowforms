@@ -99,8 +99,10 @@ cannot share one line, and the first attempt gave the picker the flexible column
 natural width, which collapsed the picker to about 38px and clipped "Value" to nothing. A working
 control that reads as an empty box is worse than one that is obviously absent.
 
-A boolean is the exception: a checkbox needs almost no width, so it sits beside the picker, and the
-picker is told not to shrink there. Shrinking is exactly what clipped it the first time.
+Booleans use the same vertical arrangement. Although a checkbox needs little width, putting it beside
+the picker fails as soon as a modified value adds Reset in the row's third column: the picker keeps its
+readable width and the checkbox is clipped. Keeping the checkbox below the picker leaves both controls
+visible before and after the property is modified.
 
 ### The JSON editor is controlled
 

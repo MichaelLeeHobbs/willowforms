@@ -140,7 +140,16 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // Children need spacing of their own: MUI's outlined label sits on the border
   // and collides with the next field when siblings are flush against each other.
   return (
-    <Box {...nodeProps} sx={{ maxWidth: px(num(props['maxWidth'], 640)), mx: 'auto', p: 2 }}>
+    <Box
+      {...nodeProps}
+      sx={{
+        maxWidth: px(num(props['maxWidth'], 640)),
+        mx: 'auto',
+        p: 2,
+        color: 'text.primary',
+        bgcolor: 'background.default',
+      }}
+    >
       <Stack gap={px(num(props['gap'], GAP))}>{children}</Stack>
     </Box>
   )
