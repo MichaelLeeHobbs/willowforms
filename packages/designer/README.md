@@ -60,4 +60,21 @@ rather than fighting specificity:
 Light is the base. Dark is a token swap under both `prefers-color-scheme` and an explicit
 `[data-fs-theme="dark"]`, so a host that manages its own theme can force either.
 
+`theme` controls the toolbar choice and designer chrome. `onThemeChange` reports changes so the host can
+apply the same mode to the renderer kit's own theme provider:
+
+```tsx
+import { Designer } from '@formsmith/designer'
+import type { DesignerProps, DesignerTheme } from '@formsmith/designer'
+
+declare const mode: DesignerTheme
+declare const setMode: (mode: DesignerTheme) => void
+declare const props: Omit<DesignerProps, 'theme' | 'onThemeChange'>
+
+;<Designer theme={mode} onThemeChange={setMode} {...props} />
+```
+
+The themes remain independently owned: this callback aligns them without making the designer depend on
+the component library used by the kit.
+
 MIT.

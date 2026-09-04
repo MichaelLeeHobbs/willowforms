@@ -2,6 +2,8 @@
 
 **Status: built.** Both stylesheets are token-driven, both themes clear WCAG AA in CI, the toolbar can
 force either, and the public token vocabulary is documented here and linked from the project README.
+The playground keeps its host-owned MUI palette aligned with the toolbar choice in both editing and
+preview modes.
 
 Two independent theme systems, deliberately. The designer's chrome and the form on the canvas are
 different things owned by different people, and a host that restyles its builder has not thereby restyled
@@ -17,6 +19,11 @@ every form it produces.
 A kit brings its own theming or inherits its component library's. `@formsmith/kit-mui` has no tokens of
 its own because MUI's `ThemeProvider` already owns that; `@formsmith/kit-html` has a full set because
 nothing else does.
+
+That ownership boundary does not make the toolbar a dead end. `Designer` accepts a controlled `theme`
+and reports toolbar choices through `onThemeChange`; an embedding host uses that event to update its kit
+theme. The playground does this for MUI. Keeping the bridge in the host lets a branded MUI theme retain
+its own palette instead of the designer replacing it with a generic one.
 
 The kit root owns an opaque surface and its matching text colour. The designer canvas is intentionally
 theme-independent, so relying on its background can place a dark-system kit's light controls over light
@@ -86,9 +93,9 @@ explicit attribute, so a host managing its own theme can force either:
 }
 ```
 
-The toolbar sets that attribute. **System is the absence of it**, not a third palette: the stylesheet
-already answers `prefers-color-scheme`, so writing an explicit value would override the media query with
-nothing. See [04-shell.md](04-shell.md#toolbar).
+The toolbar sets that designer attribute and reports the same choice to the host. **System is the absence
+of it**, not a third palette: the stylesheet already answers `prefers-color-scheme`, so writing an
+explicit value would override the media query with nothing. See [04-shell.md](04-shell.md#toolbar).
 
 ## Contrast is enforced, not intended
 

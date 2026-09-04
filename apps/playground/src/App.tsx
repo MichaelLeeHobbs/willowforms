@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import CssBaseline from '@mui/material/CssBaseline'
-import { createTheme, ThemeProvider } from '@mui/material/styles'
+import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles'
 import { loadDocument as parseDocument } from '@formsmith/core'
 import type { FormDocument, Kit } from '@formsmith/core'
 import { Designer } from '@formsmith/designer'
+import type { DesignerTheme } from '@formsmith/designer'
 import type { RendererKit } from '@formsmith/renderer'
 import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
 import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
@@ -60,6 +61,17 @@ function loadDraft(): FormDocument {
 
 const theme = createTheme({ colorSchemes: { dark: true } })
 
+/** Keep the host-owned MUI palette aligned with the designer's view preference. */
+function ThemeModeSync({ mode }: { mode: DesignerTheme }): null {
+  const { setMode } = useColorScheme()
+
+  useEffect(() => {
+    setMode(mode)
+  }, [mode, setMode])
+
+  return null
+}
+
 /**
  * The kit chosen last time, or MUI.
  *
@@ -89,6 +101,7 @@ export function App(): ReactNode {
    */
   const [initial, setInitial] = useState(loadDraft)
   const [kitId, setKitId] = useState<string>(loadKit)
+  const [themeMode, setThemeMode] = useState<DesignerTheme>('system')
 
   /*
    * The latest document, for the remount to start from.
@@ -136,6 +149,7 @@ export function App(): ReactNode {
 
   return (
     <ThemeProvider theme={theme}>
+      <ThemeModeSync mode={themeMode} />
       <CssBaseline />
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div className="pg-kit-switch">
@@ -165,6 +179,8 @@ export function App(): ReactNode {
             kit={active.kit}
             rendererKit={active.renderers}
             onChange={persist}
+            theme={themeMode}
+            onThemeChange={setThemeMode}
           />
         </div>
       </div>

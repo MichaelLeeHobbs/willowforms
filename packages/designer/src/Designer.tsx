@@ -51,6 +51,15 @@ export interface DesignerProps {
    * from that.
    */
   onSave?: (document: FormDocument) => void
+  /**
+   * Controlled colour mode for the designer chrome.
+   *
+   * A renderer kit owns its own theme, so a host that wants the canvas to
+   * follow this choice can mirror it into that theme from `onThemeChange`.
+   */
+  theme?: DesignerTheme
+  /** Reports a colour-mode choice made in the toolbar. */
+  onThemeChange?: (theme: DesignerTheme) => void
 }
 
 /**
@@ -61,7 +70,7 @@ export interface DesignerProps {
  * host managing its own theme can force either. See
  * [11-theming.md](../../../docs/spec/11-theming.md).
  */
-type Theme = 'system' | 'light' | 'dark'
+export type DesignerTheme = 'system' | 'light' | 'dark'
 
 export function Designer({
   initialDocument,
@@ -69,6 +78,8 @@ export function Designer({
   rendererKit,
   onChange,
   onSave,
+  theme: controlledTheme,
+  onThemeChange,
 }: DesignerProps): ReactNode {
   /*
    * `initialDocument` is read once, at mount, and the name says so: the designer
@@ -153,7 +164,15 @@ export function Designer({
    * them last looked at it on a phone.
    */
   const [viewport, setViewport] = useState<Viewport>('desktop')
-  const [theme, setTheme] = useState<Theme>('system')
+  const [uncontrolledTheme, setUncontrolledTheme] = useState<DesignerTheme>('system')
+  const theme = controlledTheme ?? uncontrolledTheme
+  const chooseTheme = useCallback(
+    (next: DesignerTheme) => {
+      if (controlledTheme === undefined) setUncontrolledTheme(next)
+      onThemeChange?.(next)
+    },
+    [controlledTheme, onThemeChange],
+  )
 
   /*
    * Which breakpoint the Style tab edits. It follows the viewport, because
@@ -262,7 +281,7 @@ export function Designer({
           setStyleDevice(next)
         }}
         theme={theme}
-        onTheme={setTheme}
+        onTheme={chooseTheme}
         language={activeLanguage}
         onLanguage={setLanguage}
         {...(onSave ? { onSave: () => onSave(api.document) } : {})}
@@ -437,8 +456,8 @@ function Toolbar({
   onSave?: () => void
   viewport: Viewport
   onViewport: (next: Viewport) => void
-  theme: Theme
-  onTheme: (next: Theme) => void
+  theme: DesignerTheme
+  onTheme: (next: DesignerTheme) => void
   language: string | undefined
   onLanguage: (next: string | undefined) => void
 }): ReactNode {

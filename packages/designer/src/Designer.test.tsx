@@ -19,6 +19,7 @@ import type { ComponentNode, FormDocument, Kit, Language } from '@formsmith/core
 import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
 
 import { Designer } from './Designer.js'
+import type { DesignerProps } from './Designer.js'
 
 function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
   return <div {...nodeProps}>{children}</div>
@@ -92,10 +93,11 @@ interface Harness {
 function setup(
   languages: Language[] = [ENGLISH, FRENCH],
   onSave?: (document: FormDocument) => void,
+  viewProps?: Pick<DesignerProps, 'theme' | 'onThemeChange'>,
 ): Harness {
   const user = userEvent.setup()
   let current = documentOf(languages)
-  const view = render(
+  const rendered = render(
     <Designer
       initialDocument={current}
       kit={kit}
@@ -104,9 +106,10 @@ function setup(
         current = doc
       }}
       {...(onSave ? { onSave } : {})}
+      {...viewProps}
     />,
   )
-  const shell = view.container.querySelector<HTMLElement>('.fs-shell')
+  const shell = rendered.container.querySelector<HTMLElement>('.fs-shell')
   if (!shell) throw new Error('no shell')
   return { user, shell, latest: () => current }
 }
@@ -140,6 +143,22 @@ describe('the theme control', () => {
     await user.selectOptions(screen.getByLabelText('Designer theme'), 'dark')
 
     expect(JSON.stringify(latest())).toBe(before)
+  })
+
+  it('can be controlled by a host and reports toolbar choices', async () => {
+    const onThemeChange = vi.fn()
+    const { user, shell } = setup([ENGLISH, FRENCH], undefined, {
+      theme: 'dark',
+      onThemeChange,
+    })
+
+    expect(shell.getAttribute('data-fs-theme')).toBe('dark')
+    expect(screen.getByLabelText<HTMLSelectElement>('Designer theme').value).toBe('dark')
+
+    await user.selectOptions(screen.getByLabelText('Designer theme'), 'light')
+
+    expect(onThemeChange).toHaveBeenCalledWith('light')
+    expect(shell.getAttribute('data-fs-theme')).toBe('dark')
   })
 })
 

@@ -2,20 +2,18 @@ import { expect, test } from './harness.js'
 
 test.use({ colorScheme: 'dark' })
 
-test('light designer chrome keeps MUI fields visible while editing and previewing', async ({
-  designer,
-}) => {
+test('light mode applies to the MUI form while editing and previewing', async ({ designer }) => {
   await designer.page.getByLabel('Designer theme').selectOption('light')
 
   const screen = designer.node('root')
   const input = designer.node('email').locator('input')
 
-  await expect(screen).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(screen).toHaveCSS('background-color', 'rgb(255, 255, 255)')
   await expect(input).toBeVisible()
 
   await designer.page.getByRole('button', { name: 'Preview' }).click()
 
-  await expect(screen).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(screen).toHaveCSS('background-color', 'rgb(255, 255, 255)')
   await expect(input).toBeVisible()
 })
 

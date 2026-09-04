@@ -22,10 +22,10 @@ in the project as the only undocumented one.
 A kit package brings its own two halves and depends on the first two. Most consumers never install the
 designer, which is the point of the split.
 
-`@formsmith/designer` also exports `DesignerProps`, `useDesigner`, `DesignerApi`, `RenameResult` and
-`MAX_HISTORY`. `DesignerProps` is the type of the props table below, and listing everything except the
-type of the thing being documented has an obvious cost: a TypeScript host writing a wrapper component
-has to redeclare it.
+`@formsmith/designer` also exports `DesignerProps`, `DesignerTheme`, `useDesigner`, `DesignerApi`,
+`RenameResult` and `MAX_HISTORY`. `DesignerProps` is the type of the props table below, and listing
+everything except the type of the thing being documented has an obvious cost: a TypeScript host writing
+a wrapper component has to redeclare it.
 `Designer` is the supported surface and the rest of this section is about it; the hook is what `Designer`
 is built on, and it is exported so a host that wants its own chrome around the same document model can
 have one. Two things follow from that and are worth saying rather than discovering: the hook's
@@ -42,13 +42,15 @@ import { Designer } from '@formsmith/designer'
 import '@formsmith/designer/styles.css'
 ```
 
-| Prop              | Type                               | Required | Meaning                           |
-| ----------------- | ---------------------------------- | -------- | --------------------------------- |
-| `initialDocument` | `FormDocument`                     | yes      | Starting document                 |
-| `kit`             | `Kit`                              | yes      | Palette metadata                  |
-| `rendererKit`     | `RendererKit`                      | yes      | Canvas renderers for the same kit |
-| `onChange`        | `(document: FormDocument) => void` | no       | Fires on every change             |
-| `onSave`          | `(document: FormDocument) => void` | no       | Shows a Save button when passed   |
+| Prop              | Type                               | Required | Meaning                                 |
+| ----------------- | ---------------------------------- | -------- | --------------------------------------- |
+| `initialDocument` | `FormDocument`                     | yes      | Starting document                       |
+| `kit`             | `Kit`                              | yes      | Palette metadata                        |
+| `rendererKit`     | `RendererKit`                      | yes      | Canvas renderers for the same kit       |
+| `onChange`        | `(document: FormDocument) => void` | no       | Fires on every change                   |
+| `onSave`          | `(document: FormDocument) => void` | no       | Shows a Save button when passed         |
+| `theme`           | `'system' \| 'light' \| 'dark'`    | no       | Controlled designer colour mode         |
+| `onThemeChange`   | `(theme: DesignerTheme) => void`   | no       | Reports a toolbar colour-mode selection |
 
 `initialDocument` is a starting value, not a controlled prop. The designer owns the document from mount,
 and observing it means `onChange`; passing a different `initialDocument` later does nothing. A host that
@@ -56,6 +58,10 @@ needs to replace the document from outside needs an API that does not exist yet.
 
 The stylesheet is a separate import so a host theming by token override can load it once, in its own
 order. See [11-theming.md](11-theming.md).
+
+`theme` is controlled when supplied; without it the toolbar keeps its own view preference.
+`onThemeChange` lets a host mirror that preference into the renderer kit's independently owned theme.
+The playground uses the pair to keep MUI fields aligned with the designer in editing and preview modes.
 
 `onSave` is what makes the toolbar show a Save button, and its absence is why there is no button by
 default: Formsmith does not persist, and one it cannot honour is worse than none. See

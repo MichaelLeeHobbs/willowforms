@@ -1,5 +1,5 @@
 export { Designer } from './Designer.js'
-export type { DesignerProps } from './Designer.js'
+export type { DesignerProps, DesignerTheme } from './Designer.js'
 export { useDesigner, MAX_HISTORY } from './store.js'
 export type { DesignerApi, RenameResult } from './store.js'
 export { Icon } from './Icon.js'
