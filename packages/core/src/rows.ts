@@ -196,23 +196,6 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
   const form: string[] = []
   let row: string[] | undefined
 
-  /*
-   * Bounded, and the first match.
-   *
-   * The bound is the one `rowScopeProblems` below already carries, and this
-   * function is the one that runs during render -- the Properties panel and the
-   * Style tab both call it in their component bodies, and a `RangeError` thrown
-   * from a React render in React 19 unmounts the whole designer rather than one
-   * panel. `store.ts` gates on `validateDocument`'s cap, so this was a hazard
-   * behind a guard; a walk with no bound of its own is still a walk that only
-   * works because something else remembered.
-   *
-   * The first match, because `findNode`, `findParent` and `pathTo` all take the
-   * first and say why. This took the last -- an unconditional assignment inside
-   * a walk that keeps going -- so with duplicate keys, which `validateDocument`
-   * reports but cannot prevent, the panel offered the row keys of one node
-   * while every other lookup in the session resolved to another.
-   */
   let matched = false
   const visit = (
     node: ComponentNode,
@@ -221,26 +204,7 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
   ): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     if (!enclosing && node.schema) form.push(dataKeyOf(node))
-    /*
-     * The first match, full stop -- and the guard above did not express that.
-     *
-     * It was `node.key === nodeKey && enclosing && row === undefined`, so when
-     * the first node in document order carrying this key is *not* inside a
-     * repeater, `enclosing` is undefined, the assignment is skipped, and a
-     * later duplicate that is inside one sets it. What that takes is the first
-     * match with an enclosing repeater, which is a different rule from the one
-     * the comment above states and from the one `findNode` follows.
-     *
-     * Failure scenario: two nodes keyed `x`, the first at form level and the
-     * second inside a repeater. `findNode` resolves `x` to the form-level node,
-     * the Properties panel and Style tab offer a row scope for it, the author
-     * picks `scope: 'row'` on a node in no row -- and the read is `undefined`,
-     * the condition false, the component hidden, and never validated.
-     *
-     * `matched` is separate from `row` because "we have seen the first match"
-     * and "that match was inside a repeater" are two questions, and only the
-     * first decides whether to keep looking.
-     */
+
     if (!matched && node.key === nodeKey) {
       matched = true
       if (enclosing) row = rowKeysOf(enclosing)
@@ -369,13 +333,6 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
           ? Object.values(node.props)
           : []
 
-      /*
-       * All three places a document holds a condition, which is what
-       * `contextKeys` already sweeps. A rule's `when` guard was the one missing,
-       * and it is the worst of the three to miss: the failure is not a component
-       * quietly disappearing, it is a rule that never applies — on the server,
-       * where nobody is looking.
-       */
       const guards = validationsOf(node).map((rule) => rule?.when)
 
       for (const value of [node.renderWhen, ...props, ...guards]) {
@@ -392,6 +349,23 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
                 'or it will read nothing and quietly hide the component.',
             })
           }
+        }
+      }
+
+      for (const rule of validationsOf(node)) {
+        if (!rule || typeof rule !== 'object') continue
+        if ((rule.key !== 'matches' && rule.key !== 'after') || typeof rule.field !== 'string') {
+          continue
+        }
+        if (rule.scope !== 'row' && enclosing.has(rule.field) && !formKeys.has(rule.field)) {
+          problems.push({
+            key: node.key,
+            problem:
+              node.key +
+              ' compares with ' +
+              rule.field +
+              ', which only exists inside this row. Set the comparison scope to row.',
+          })
         }
       }
     }
@@ -424,22 +398,22 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
           })
         }
       }
+
+      for (const rule of validationsOf(node)) {
+        if (!rule || typeof rule !== 'object') continue
+        if ((rule.key === 'matches' || rule.key === 'after') && rule.scope === 'row') {
+          problems.push({
+            key: node.key,
+            problem:
+              node.key +
+              ' compares with ' +
+              rule.field +
+              " as this row's answer, but it is not inside a repeater.",
+          })
+        }
+      }
     }
 
-    /*
-     * The third mismatch, and the last one that can be told apart from a
-     * deliberate choice: a `scope: 'row'` ref, inside a repeater, naming a key
-     * no node in this row writes while a node outside every repeater does. The
-     * read is undefined, the condition is false, the component is hidden and its
-     * rules never run — the same silent-permissive ending as the other two,
-     * reached by moving a conditional field *into* a repeater instead of out of
-     * one.
-     *
-     * Conservative in the same way as the check above it: reported only when the
-     * key demonstrably lives at the other scope. A row's data can carry keys no
-     * component authors, so a ref naming a key that exists nowhere in the
-     * document is left alone rather than guessed at.
-     */
     if (enclosing) {
       const props =
         node.props && typeof node.props === 'object' && !Array.isArray(node.props)
@@ -463,6 +437,26 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
           }
         }
       }
+
+      for (const rule of validationsOf(node)) {
+        if (!rule || typeof rule !== 'object') continue
+        if (
+          (rule.key === 'matches' || rule.key === 'after') &&
+          rule.scope === 'row' &&
+          typeof rule.field === 'string' &&
+          !enclosing.has(rule.field) &&
+          formKeys.has(rule.field)
+        ) {
+          problems.push({
+            key: node.key,
+            problem:
+              node.key +
+              ' compares with ' +
+              rule.field +
+              " as this row's answer, but only the form has that answer.",
+          })
+        }
+      }
     }
 
     const scope = isRowScope(node) ? rowKeys(node) : enclosing
@@ -473,23 +467,6 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
   return problems
 }
 
-/**
- * Every data key a condition reads at one scope, however deeply nested.
- *
- * One function with a `wanted` scope rather than two that differ by a single
- * predicate. They were two, character-for-character identical apart from
- * `if (shape.scope === 'row')` reading one way in one and the other way in the
- * other -- so a fix to either was a fix to one side of a symmetry, which is the
- * exact shape the whole of this remediation run exists to remove. Neither was
- * bounded, and both had to be found to know that.
- *
- * Bounded at the depth the evaluator stops at. Past it there is nothing to
- * collect: a ref nested deeper than `MAX_CONDITION_DEPTH` is one `evaluate`
- * never reads, so it cannot be the cause of the silently-hidden component this
- * check reports. `truncated` says the walk stopped, because a caller that
- * reports problems must not report "no problem" when what happened was "did not
- * look".
- */
 function refsAtScope(
   condition: Condition | undefined,
   wanted: 'row' | 'form',

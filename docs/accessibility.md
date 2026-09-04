@@ -20,11 +20,11 @@ These fail the build, not a review.
 | Arrow-key navigation and keyboard moves                                       | same, plus `packages/designer/src/keyboard.test.ts` |
 | The live region is polite, is a status region, and repeats identical messages | same                                                |
 | Inspector tabs are a real tablist with roving tabindex and arrow keys         | `packages/designer/src/panels/Rules.test.tsx`       |
-| axe-core over the whole designer in eleven states                             | `test/a11y.test.tsx`                                |
+| axe-core over the whole designer in twelve states                             | `test/a11y.test.tsx`                                |
 | Focus really lands where it should, in a real browser                         | `e2e/keyboard.spec.ts`                              |
 | The JSON dialog is modal, traps focus and closes on Escape                    | `e2e/document.spec.ts`                              |
 
-Two of those eleven axe states draw the form with `@formsmith/kit-mui` rather than the HTML kit. Nothing
+Two of those twelve axe states draw the form with `@formsmith/kit-mui` rather than the HTML kit. Nothing
 in this repository put a MUI form in front of axe before, so the kit most consumers will use was covered
 only by the hand-written rules in `test/kit-contract.test.tsx` -- which are, by construction, the ones
 somebody thought of.
@@ -119,7 +119,7 @@ word is visually hidden text inside the label.
 
 Honest list. None of these are hard, they are simply not done.
 
-- **The automated audit cannot see layout.** axe-core runs over the designer in eleven states: at rest,
+- **The automated audit cannot see layout.** axe-core runs over the designer in twelve states: at rest,
   with a component selected, on the Rules, Settings and Style tabs, with a condition being edited, in
   validated preview, with both panes collapsed, and with the JSON dialog open. jsdom has no
   rendering engine, so `color-contrast`, `target-size`, and `scrollable-region-focusable` are disabled by

@@ -1,26 +1,3 @@
-/**
- * What a key is allowed to be.
- *
- * A node's `key` is its identity and a `dataKey` is what the payload calls an
- * answer. Between them they are the property name in exported JSON Schema, the
- * key in `FormData` and `FormErrors`, the value of `data-fs-key`, part of a CSS
- * selector, and a name an expression can mention. Uniqueness was the only rule
- * enforced, so a key holding a space, a quote or a newline made a legal document
- * and an awkward everything-else.
- *
- * The grammar is the JavaScript identifier subset, and the reason is the
- * evaluator rather than tidiness. A hyphen is the tempting addition — real forms
- * are full of `first-name` — and it is exactly the one that breaks: `computed`
- * bindings are host-evaluated JavaScript, so `first-name` in an expression is a
- * subtraction, silently, with no error anywhere. A key namespace that expressions
- * can name has to be an identifier namespace.
- *
- * `.`, `[` and `]` are left free deliberately. Row addressing needs them, and
- * settling this before repeated scope is the whole reason the key grammar comes
- * first: a path grammar layered on a key grammar that does not exist is how the
- * libraries that had to break their addressing twice got there.
- */
-
 /** The stated grammar. Anything outside it was working by accident. */
 export const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 
@@ -87,26 +64,6 @@ export const RESERVED_KEYS: readonly string[] = Object.freeze([
   'valueOf',
 ])
 
-/**
- * Why this key is not allowed, or nothing if it is.
- *
- * A message rather than a boolean, because the callers a person hears from need
- * one: `renameKey` and `setDataKey` hand the reason back for the Properties
- * panel to show, and `validateDocument` reports `invalid-key` or
- * `invalid-data-key` against a pasted document.
- *
- * Three others call it and answer with nothing. `generateKey` falls back to
- * `field`; `decodeRow` and `decodeAddress` return `undefined`, and the second of
- * those is why `applyChange` drops a write whose address holds a refused name --
- * `applyChange` never calls this itself, which is exactly what makes that
- * silence hard to trace from here.
- *
- * The wording above is a correction: this docblock used to say every caller
- * shows the message to someone, which was true of half of them.
- *
- * One rule, so a rename and a paste are judged the
- * same way.
- */
 export function keyProblem(key: unknown): string | undefined {
   if (typeof key !== 'string') return 'A key must be text.'
 
@@ -123,17 +80,6 @@ export function keyProblem(key: unknown): string | undefined {
     )
   }
 
-  /*
-   * The stored key, not a trimmed reading of it.
-   *
-   * Trimming is an input convenience in the panel, which stores what it
-   * trimmed. A key that reaches a document still wearing spaces was never typed
-   * through the panel, and it is not the same string as its trimmed twin
-   * anywhere it is used: `data-fs-key=" email "` and `FormData[' email ']` keep
-   * the spaces, while a rename of the same field would not. Two components can
-   * then hold what everything downstream treats as one name, and the duplicate
-   * check would not see it.
-   */
   if (!KEY_PATTERN.test(key)) {
     return (
       'A key must start with a letter or underscore and hold only letters, numbers and underscores. ' +

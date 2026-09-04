@@ -20,22 +20,6 @@ import type { Condition, FormContext, FormData, JsonValue, Operand } from './typ
 
 /** Deep equality over JSON, which is the only equality a document can express. */
 export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth = 0): boolean {
-  /*
-   * The identity shortcut first, then the bound.
-   *
-   * It was the other way round, so past the bound two references to the *same
-   * object* compared unequal -- and the comment below claims the answer avoids
-   * making `ne` true, which it does not: `false` from `same` is exactly what
-   * makes `ne` and `notIn` answer true, showing a component whose rule could
-   * not be read. Answering the one question that needs no recursion before
-   * giving up on it costs nothing and is right more often.
-   *
-   * Past the bound and genuinely different, `false` stands. It is the least
-   * bad of the three available answers: `true` would merge things that are not
-   * equal, and there is no `undefined` in this signature to say "unreadable"
-   * with. The asymmetry is recorded rather than hidden -- `ne` past the bound
-   * is the one place this function's answer is arguable.
-   */
   if (a === b) return true
   if (depth > MAX_CONDITION_DEPTH) return false
   if (a === undefined || b === undefined || a === null || b === null) return false
@@ -82,32 +66,10 @@ export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth =
  */
 export const MAX_CONDITION_DEPTH = 200
 
-/**
- * An operand this code cannot read at all.
- *
- * Told apart from an operand that reads `undefined`, and the two are genuinely
- * different questions. A `ref` naming a field nobody has filled in is perfectly
- * readable and reads as nothing — that is an unanswered question, and `empty`
- * on it is true. An operand whose `kind` is a typo is not an operand.
- *
- * Collapsing the two is how `not` turned "I could not read this" into "show
- * it": `truthy` on an unreadable operand was false, and negating false is true.
- * This file already made that distinction for a malformed *condition*, with a
- * comment saying exactly why; it never reached the operands inside one.
- */
 const UNREADABLE = Symbol('unreadable operand')
 
 type Reading = JsonValue | undefined | typeof UNREADABLE
 
-/**
- * Both operand shapes, and anything else.
- *
- * A document is data and reaches here straight from the JSON editor, so an
- * operand can be missing, a string, or a shape nobody designed. Saying so keeps
- * this function total. `validateDocument` is the place to tell an author their
- * condition is malformed; the renderer's job is to stay on screen, because a
- * form that crashes cannot be fixed by the person filling it in.
- */
 function operand(
   value: Operand | undefined,
   data: FormData,
@@ -191,19 +153,6 @@ export function evaluateCondition(
   return evaluate(condition, data, context, row) ?? false
 }
 
-/**
- * The same question, with "cannot read this" told apart from "false".
- *
- * The distinction exists for `not`, and only for `not`. Negating a malformed
- * condition turned false into true and **showed** a component whose rule the
- * code could not read, which is the opposite of the invariant above. Collapsing
- * unreadable to false at the boundary and inverting it inside is exactly the
- * bug, so the inversion has to happen where the difference is still visible.
- *
- * Unreadable propagates through `and` and `or` too. A group containing a part
- * nobody can read is a group nobody can read, and answering from the remainder
- * would be guessing.
- */
 function evaluate(
   condition: Condition,
   data: FormData,
@@ -244,19 +193,7 @@ function evaluate(
       const right = read(condition.right)
       if (unreadable(left, right)) return undefined
       const delta = order(left as JsonValue | undefined, right as JsonValue | undefined)
-      /*
-       * Unreadable, not false, when the two cannot be compared at all.
-       *
-       * `false` here meant `not(gt(x, y))` was *true* for operands that were
-       * never compared -- so a component appeared on the strength of a
-       * comparison that did not happen. The `in`/`notIn` branch below was
-       * changed from `false` to `undefined` because that exact shape was a bug;
-       * this branch was not.
-       *
-       * Failure scenario: `renderWhen: not(gte(answer, 5))` where the answer
-       * arrives as the string "5". `order` cannot compare a string to a number,
-       * answered `false`, and `not` turned that into shown.
-       */
+
       if (delta === undefined) return undefined
       if (condition.op === 'gt') return delta > 0
       if (condition.op === 'gte') return delta >= 0

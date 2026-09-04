@@ -881,6 +881,68 @@ describe('a rule guard inside a repeater', () => {
   })
 })
 
+describe('a cross-field rule and repeated scope', () => {
+  const doc = (scope: 'form' | 'row' | undefined): FormDocument => ({
+    ...createDocument('Rows', 'rows'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'accountList',
+          dataKey: 'accounts',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array' },
+          children: [
+            {
+              key: 'password',
+              type: 'TextField',
+              props: {},
+              schema: { type: 'string' },
+            },
+            {
+              key: 'confirmation',
+              type: 'TextField',
+              props: {},
+              schema: {
+                type: 'string',
+                validations: [{ key: 'matches', field: 'password', ...(scope ? { scope } : {}) }],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  })
+
+  it('reports a row field read at form scope', () => {
+    expect(validateDocument(doc(undefined)).map((error) => error.code)).toEqual(['row-scope'])
+  })
+
+  it('accepts the comparison when it reads the enclosing row', () => {
+    expect(validateDocument(doc('row'))).toEqual([])
+  })
+
+  it('reports a row-scoped comparison outside a repeater', () => {
+    const top = createDocument('Top', 'top')
+    top.root.children = [
+      {
+        key: 'confirmation',
+        type: 'TextField',
+        props: {},
+        schema: {
+          type: 'string',
+          validations: [{ key: 'matches', field: 'password', scope: 'row' }],
+        },
+      },
+    ]
+
+    expect(validateDocument(top).map((error) => error.code)).toEqual(['row-scope'])
+  })
+})
+
 /**
  * The mirror of the quiet failure, which was skipped by design.
  *

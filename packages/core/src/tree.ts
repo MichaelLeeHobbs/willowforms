@@ -6,6 +6,7 @@
  */
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
+import { BUILTIN_ACTION_NAMES } from './actions.js'
 import { MAX_KEY_LENGTH, keyProblem } from './keys.js'
 import { rowScopeProblems } from './rows.js'
 import type {
@@ -15,7 +16,6 @@ import type {
   Device,
   EventName,
   FieldSchema,
-  FormDocument,
   Language,
   Operand,
   PropValue,
@@ -27,18 +27,6 @@ export function walk(
   node: ComponentNode,
   fn: (node: ComponentNode, parent?: ComponentNode) => void,
 ): void {
-  /*
-   * Total and bounded, because a document is data and this is the walk every
-   * other module borrows.
-   *
-   * `for (const child of n.children ?? [])` throws "is not iterable" for a
-   * `children` that is an object or a string, and recurses without a bound for
-   * one nested past the stack -- and `styleSheetFor` walks with this on the
-   * render path, where the renderer hardened its own layer for exactly that
-   * ("one node missing `props` used to take the whole form with it") and this
-   * one was left. A node that is not a node contributes nothing; a subtree past
-   * the bound contributes nothing. Both are what `validateDocument` reports.
-   */
   const visit = (n: ComponentNode, parent: ComponentNode | undefined, depth: number): void => {
     if (!n || typeof n !== 'object' || depth > MAX_TREE_DEPTH) return
     fn(n, parent)
@@ -48,57 +36,6 @@ export function walk(
   visit(node, undefined, 0)
 }
 
-/*
- * First match, in document order.
- *
- * Keys are unique — `validateDocument` reports a duplicate and the panel refuses
- * a rename that would make one — but reporting is not preventing, and a host can
- * render a document it never validated. These used to assign on every match with
- * no early exit, so they returned the *last* one while `pathTo` below returned
- * the first. Two functions in this file disagreeing about which node a key means
- * is a bug with no defensible reading, whichever answer is right.
- *
- * First, because that is what `pathTo` already does and what `querySelector`
- * does in `geometry.ts`, so all three now agree.
- */
-/**
- * A node's children, guarded the way `walk` guards them.
- *
- * `node.children ?? []` and `node.children?.forEach` both guard nullish and
- * nothing else, so a truthy non-array reached the iteration: `children: {}` and
- * `children: "ab"` threw `TypeError`, and `children: [null]` handed a non-node
- * to the next level. `walk` above has carried exactly this check for a while,
- * under a comment naming the incident it came from -- "one node missing `props`
- * used to take the whole form with it" -- and the lookup and mutation family
- * below it never borrowed it.
- *
- * That matters here more than it looks. `store.ts` deliberately only warns
- * about an invalid `initialDocument`, arguing that a library which will not
- * open a host's own saved document is worse than one that opens it and says
- * what is wrong. That is a good decision, and it makes every one of these
- * walkers load-bearing: `flatten` runs in `Tree.tsx`'s render body, and a throw
- * during render unmounts the whole designer in React 19 -- including the JSON
- * dialog that was the repair route.
- */
-/**
- * A node whose children are drawn once per row.
- *
- * Recognised from the node rather than from a type string, because component
- * types are kit-scoped and core must not learn the word `Repeater`. A
- * data-bound container holding a list is the only thing that shape can mean.
- *
- * It lives here, in the module both `rows.ts` and `validation.ts` already
- * import, because there were two of it. `validation.ts` asked
- * `children !== undefined` and `rows.ts` asked `Array.isArray`, so the two
- * disagreed about any truthy non-array `children`: a node with
- * `schema.type: 'array'` and `children: 5` was a repeater to `validateForm`
- * and not to `rowScopeProblems` or `keyScopesFor`. The submit path then
- * expected a list and walked children that are not iterable. The leaf guard in
- * `moveNode` compounded it by writing `Array.isArray` under a comment saying it
- * asks "the way `isRowScope` asks", which was not what `isRowScope` asked.
- *
- * `Array.isArray` is the answer all three now give.
- */
 export function isRowScope(node: ComponentNode): boolean {
   return node?.schema?.type === 'array' && Array.isArray(node.children)
 }
@@ -233,17 +170,6 @@ function baseOf(key: string): string {
   return key.replace(/\d+$/, '') || key
 }
 
-/**
- * The first free key at or after the source's own number.
- *
- * `freeKey(taken, baseOf('website2'))` is `'website'` whenever nothing has
- * taken it -- so in a document where `website` was renamed away and `website2`
- * remains, duplicating `website2` produced `website`: a copy named *below* its
- * source, which contradicts the rule the comment above states and reads as the
- * duplicate having replaced the original.
- *
- * A copy is named after its source and never before it.
- */
 function copyKey(taken: Set<string>, key: string): string {
   const base = baseOf(key)
   const digits = /(\d+)$/.exec(key)?.[1]
@@ -281,32 +207,6 @@ function copyKey(taken: Set<string>, key: string): string {
   }
   return trimmed
 }
-
-/**
- * A copy of the subtree at `key`, with every key in it replaced by a free one.
- *
- * Keys are unique within a document, so a copy cannot keep the originals. Each
- * is re-keyed from the original's own name rather than its type, because the
- * name is the part worth keeping: `website` copies to `website2`, not to
- * `textField7`.
- *
- * Every key generated is reserved before the next is chosen. Without that, a
- * container holding two `textField` children produces a copy whose children are
- * both named `textField3`, and the document fails its own validation.
- *
- * The copy is returned rather than inserted. Where a duplicate belongs is a
- * question about the tree the caller is holding, not about the node.
- *
- * Property values and rules are shared by reference, not cloned. Tree operations
- * are immutable, so an edit to either copy replaces the value rather than
- * writing through to the other.
- *
- * (This block documents `duplicateNode`, which is further down the file: three
- * JSDoc comments used to stack here and only the last attached to anything, so
- * neither `duplicateNode` nor `repointBinding` had documentation in an IDE or
- * in the generated `.d.ts`. It stays here, where the reasoning was written,
- * with the function's own one-line summary at its declaration.)
- */
 
 /**
  * A binding with every literal naming `from` changed to name `to`.
@@ -399,27 +299,6 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
   return { kind: 'condition', condition: inCondition(value.condition) }
 }
 
-/**
- * Every ref naming one data key, pointed at another.
- *
- * The counterpart to `repointBinding`, and deliberately not the same function.
- * That one rewrites *literals* inside comparisons that read `context`, and says
- * why it leaves refs alone: "a `ref` names a data key, which the copy shares
- * deliberately". True for `duplicateNode`, its other caller -- a copy really
- * does answer under the same name. False for a rename, where the data key
- * genuinely moved.
- *
- * That gap is the defect. `dataKeyOf` is `node.dataKey ?? node.key` and
- * `instantiate` never writes a `dataKey`, so a freshly dropped component's
- * answer name *is* its key -- and renaming the key renamed the answer while
- * every condition elsewhere in the document went on naming the old one. The
- * ref reads an answer nothing writes, the condition is false, the component is
- * permanently hidden, and because `renderWhen` gates validation, `validateForm`
- * skips whatever is inside it on the server too. Nothing reports any of it.
- *
- * Bounded like its sibling, and total for the same reason: this runs on a
- * document a host may never have gated.
- */
 export function repointDataKey(value: PropValue, from: string, to: string): PropValue {
   if (!value || typeof value !== 'object' || value.kind !== 'condition') return value
 
@@ -488,31 +367,8 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
 
     const next: ComponentNode = { ...node, key: nextKey, props: { ...node.props } }
 
-    /*
-     * A condition that names this node's own key follows the copy.
-     *
-     * `Step` ships with a `renderWhen` comparing `context.step` against its own
-     * key — that is what makes it a step. Copied by reference, the duplicate was
-     * shown by the *original's* name: two steps render at once and the copy can
-     * never be reached by its own. `factory.ts` applies `defaultRenderWhen`
-     * after the key for exactly this reason, and duplication is the same moment
-     * arriving by a different route.
-     *
-     * Only a literal equal to the old key, only in `renderWhen`, and only where
-     * the comparison reads the context. Rewriting every literal that happens to
-     * match corrupts a condition testing an answer whose value is the copied
-     * key, which is what it used to do: this comment described the rule the
-     * function did not have until a test asked it for one.
-     */
     if (node.renderWhen) next.renderWhen = repointBinding(node.renderWhen, node.key, nextKey)
-    /*
-     * The rules are copied, and only if the document has any.
-     *
-     * `[...node.schema.validations]` threw on a schema without them, which
-     * `validateDocument` accepts. Defaulting to `[]` would fix the throw and
-     * quietly give the copy a field the original did not have -- a duplicate
-     * should be the same document twice, including where it is silent.
-     */
+
     if (node.schema) {
       next.schema = Array.isArray(node.schema.validations)
         ? { ...node.schema, validations: [...node.schema.validations] }
@@ -534,22 +390,7 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
         ]),
       )
     }
-    /*
-     * A copy differs from its source in its keys and in nothing else.
-     *
-     * `if (node.children)` is truthy for a non-array, so `children: {}` and
-     * `children: "ab"` were silently coerced into `children: []` on the copy --
-     * turning a malformed leaf into an empty container, which is a *different*
-     * malformed document rather than the same one. `updateNode` and
-     * `removeNode` both leave a non-array `children` exactly as they found it.
-     *
-     * Raised in review on PR #42, which suggested `Array.isArray` so the copy
-     * carries no `children` at all in that case. This goes one step further and
-     * carries the value through unchanged, because dropping it is also a
-     * structural difference between a node and its duplicate -- and a document
-     * this shape is one somebody is about to repair, where a copy that quietly
-     * differs from what they are looking at is the worst thing to hand them.
-     */
+
     if (Array.isArray(node.children)) next.children = childNodesOf(node).map(copy)
     else if (node.children !== undefined) next.children = node.children
     return next
@@ -584,33 +425,6 @@ export function updateNode(
   if (root.key === key) return update(root)
   if (!Array.isArray(root.children)) return root
 
-  /*
-   * The first match, and only the first.
-   *
-   * `findNode`, `findParent` and `pathTo` all deliberately take the first, with
-   * a comment above them saying why: two functions disagreeing about which node
-   * a key means is a bug whichever answer is right. This one edited *every*
-   * match, so with duplicate keys — which `validateDocument` reports but cannot
-   * prevent, because a host can render a document it never validated — one edit
-   * landed twice, and `moveNode` composes remove and insert, so a single node
-   * ended up at two places in the tree.
-   */
-  /*
-   * `found`, not `changed`, and the difference is a real case.
-   *
-   * This stopped at the first child whose subtree came back a *different
-   * object*, so an update that returns its input unchanged -- setting a property
-   * to the value it already holds, which every controlled editor in the panel
-   * does on a no-op edit -- left the flag down and the walk carried on into the
-   * next sibling. With a duplicate key, which `validateDocument` reports and
-   * cannot prevent, the second match was then edited instead.
-   *
-   * Whether the node was found and whether the result differs are two questions,
-   * and each decides a different thing: `found` decides where to stop walking,
-   * `changed` decides whether to rebuild this level at all. Structural sharing
-   * depends on the second and correctness on the first, which is why the one
-   * flag could not serve both.
-   */
   let found = false
   let changed = false
   const children = childNodesOf(root).map((child) => {
@@ -713,19 +527,6 @@ export function moveNode(
   const parent = findNode(root, newParentKey)
   if (!parent) return root
 
-  /*
-   * And the target has to be able to hold children.
-   *
-   * `insertNode` will happily give a leaf a `children` array, which produces a
-   * subtree no renderer draws -- a text field with a field inside it -- while
-   * `validateForm` and `toJsonSchema` keep walking it, so the document asks for
-   * an answer nobody can give. The designer's own drop paths refuse this, so it
-   * was unreachable from the UI and reachable from the API, which is the worse
-   * of the two places to leave it.
-   *
-   * Asked of the node, the way `isRowScope` asks: a container is instantiated
-   * with a `children` array and a leaf is not, so no kit is needed here.
-   */
   if (!Array.isArray(parent.children)) return root
 
   // Dropping a subtree into its own descendant would detach the tree.
@@ -746,21 +547,6 @@ export function dataKeyOf(node: ComponentNode): string {
   return node.dataKey ?? node.key
 }
 
-/**
- * A node's validation rules, whatever the document actually holds there.
- *
- * One helper for the same reason `dataKeyOf` is one: the alternative is thirteen
- * call sites each deciding for itself, and ten of them had already decided the
- * same way while three had not. `duplicateNode` spread it, `validateField`
- * iterated it and `toJsonSchema` iterated it, so a document `validateDocument`
- * accepts -- a schema with no `validations` at all, which its own check allows
- * by returning early -- threw a `TypeError` out of the duplicate action, out of
- * `validateForm`, and out of the schema export.
- *
- * `Array.isArray` rather than `?? []`, because absent is not the only thing it
- * can be. A document is data: `validations` can arrive as a string, and `?? []`
- * would hand that straight to a `for...of`.
- */
 export function validationsOf(node: ComponentNode): ValidationRule[] {
   const rules = node.schema?.validations
   return Array.isArray(rules) ? rules : []
@@ -781,18 +567,6 @@ export interface StructuralError {
   key?: string
 }
 
-/**
- * Structural checks that do not need a kit registry.
- *
- * Total by design: this is the gate untrusted documents pass through, both in
- * the designer's JSON editor and in `apps/demo-server`, so it reports malformed
- * structure as an error and never throws. It used to assume its argument really
- * was a `FormDocument`, which meant a pasted `"children": 5` took the builder
- * down and the same body reached the server as an unhandled 500.
- *
- * The type says `FormDocument` because that is what callers should have. The
- * checks assume nothing.
- */
 /**
  * Every tag the two closed unions in a document actually have.
  *
@@ -822,8 +596,12 @@ const RULE_KEY_LIST = [
   'required',
   'minLength',
   'maxLength',
+  'minItems',
+  'maxItems',
   'min',
   'max',
+  'matches',
+  'after',
   'pattern',
   'email',
   'url',
@@ -931,6 +709,7 @@ const EVENT_NAMES: ReadonlySet<string> = new Set(EVENT_NAME_LIST)
 const CONDITION_OPS: ReadonlySet<string> = new Set(CONDITION_OP_LIST)
 const OPERAND_KINDS: ReadonlySet<string> = new Set(OPERAND_KIND_LIST)
 const ACTION_REF_TYPES: ReadonlySet<string> = new Set(ACTION_REF_TYPE_LIST)
+const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(BUILTIN_ACTION_NAMES)
 const BIDI: ReadonlySet<string> = new Set(BIDI_LIST)
 const ROW_SCOPES: ReadonlySet<string> = new Set(ROW_SCOPE_LIST)
 
@@ -946,7 +725,7 @@ const ROW_SCOPES: ReadonlySet<string> = new Set(ROW_SCOPE_LIST)
  */
 export const MAX_TREE_DEPTH = 500
 
-export function validateDocument(doc: FormDocument): StructuralError[] {
+function inspectDocument(doc: unknown): StructuralError[] {
   const errors: StructuralError[] = []
   const seen = new Set<string>()
 
@@ -963,15 +742,6 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
     return errors
   }
 
-  /*
-   * The envelope. Everything outside the tree that something reads without
-   * asking whether it is there — `version` decides how the rest is interpreted,
-   * `settings.errorType` is looked up in a kit, `name` is rendered.
-   *
-   * `id` and `name` have to be text and `name` may be empty: a form nobody has
-   * titled yet is a real state, and refusing it would make the panel unable to
-   * open the document you were about to name.
-   */
   if (candidate['version'] !== '1') {
     malformed(
       'version is ' +
@@ -986,13 +756,8 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
   if (settings !== undefined) {
     if (!isRecord(settings)) {
       malformed('settings must be an object.')
-    } else {
-      for (const field of ['errorType', 'tooltipType'] as const) {
-        const value = settings[field]
-        if (value !== undefined && typeof value !== 'string') {
-          malformed('settings.' + field + ' must be a component type.')
-        }
-      }
+    } else if (Object.keys(settings).length > 0) {
+      malformed('version 1 does not define document settings.')
     }
   }
 
@@ -1015,25 +780,6 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
     }
   }
 
-  /*
-   * The bundles a translation is looked up in, checked all the way down.
-   *
-   * The renderer reads `document.translations[tag]` on every render, so a
-   * document that is missing the field entirely throws during render rather
-   * than rendering wrong — and a throw during render in React 19 unmounts the
-   * whole tree, not the one node. Required rather than optional, because
-   * `createDocument` writes `{}` and an absent field is what a hand-edited
-   * document looks like when a key was deleted.
-   *
-   * The leaves are checked too. `resolveProp` hands a translation straight to a
-   * kit as a label, so a number renders as a number and an object renders as
-   * `[object Object]` — wrong in a way nobody reports, which is the failure
-   * this project treats as worse than a crash.
-   *
-   * Which languages the bundles name is deliberately not checked: a bundle for
-   * an undeclared language is a half-finished translation, and deleting a
-   * language should not make the document invalid.
-   */
   const translations = candidate['translations']
   if (!isRecord(translations)) {
     malformed('translations must be an object mapping each language tag to its bundle.')
@@ -1135,18 +881,6 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
       visitEvents(value['events'], key, path)
     }
 
-    /*
-     * Outside the key chain, because a bad key is not a reason to stop looking.
-     *
-     * These two used to sit inside the final `else`, so a node with an empty or
-     * non-string key had its props, conditions, css and rules go unchecked
-     * entirely: fixing the key produced a *second* round of errors about a
-     * document the first report had called broken for one reason. The children
-     * recursion was already outside for the same reason.
-     *
-     * `key` is what the messages name, so a node without a usable one is
-     * described by its path instead.
-     */
     visitShape(value, typeof key === 'string' && key.trim() ? key : path, path)
 
     const children = value['children']
@@ -1160,34 +894,6 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
     )
   }
 
-  /**
-   * Tags nothing can read, refused before anything has to guess.
-   *
-   * `PropValue` and `ValidationRule` are closed unions, so every `switch` over
-   * one is exhaustive and TypeScript allows it to have no tail. That proof holds
-   * for a value the compiler made. A document is data, so `kind: 'conditon'` is
-   * one keystroke away, and it used to fall off two of those switches and come
-   * back `undefined` — read as *hidden* and as *the guard did not pass*. Both
-   * take the field out of validation, which on the server is a required answer
-   * quietly becoming optional.
-   *
-   * The runtime readings are fixed too, in `visibility.ts` and `validation.ts`.
-   * This is the answer that means nobody has to rely on them.
-   */
-  /**
-   * Everything on a node that is read at render time without a guard.
-   *
-   * `PropValue`, `ValidationRule`, `Condition` and `Operand` are closed unions,
-   * so every consumer switches over one exhaustively and TypeScript proves the
-   * switch total. That proof is about values the compiler made. A document is
-   * data — hand-editable JSON, a paste, a row out of a database — so the tag can
-   * be anything and the payload can be missing.
-   *
-   * The line this draws: refuse what is **malformed**, meaning a shape no
-   * version of this library ever wrote. Do not refuse what is merely unusual. A
-   * gate that rejects a document somebody is holding is worse than the render it
-   * was protecting, and the panel is where a broken document goes to be fixed.
-   */
   const visitShape = (node: Record<string, unknown>, key: string, path: string): void => {
     const where = (what: string): string => what + ' on ' + key
 
@@ -1295,18 +1001,7 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
         malformed(where(what) + ' must be an object.')
         return
       }
-      /*
-       * The same bound the evaluator uses, imported rather than restated. The
-       * outer `visit` was given `MAX_TREE_DEPTH` and this walker, nested inside
-       * the function documented as total, was not -- so a condition nested deep
-       * enough threw a `RangeError` out of the gate whose whole job is to be the
-       * thing that never throws on a document.
-       *
-       * `MAX_CONDITION_DEPTH`, not `MAX_TREE_DEPTH`: a condition this gate
-       * accepted at 500 is one `evaluate` reads as unreadable at 200, and a gate
-       * that passes what the renderer cannot answer is saying the opposite of
-       * what it exists to say.
-       */
+
       if (depth > MAX_CONDITION_DEPTH) {
         malformed(where(what) + ' is nested deeper than this library will walk.')
         return
@@ -1412,15 +1107,30 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
        * whole gate exists for.
        */
       const k = rule['key']
-      if (k === 'minLength' || k === 'maxLength' || k === 'min' || k === 'max') {
+      if (
+        k === 'minLength' ||
+        k === 'maxLength' ||
+        k === 'minItems' ||
+        k === 'maxItems' ||
+        k === 'min' ||
+        k === 'max'
+      ) {
         if (typeof rule['value'] !== 'number') malformed(where(named) + ' needs a number.')
       } else if (k === 'pattern') {
         text(rule['value'], named + "'s pattern")
+      } else if (k === 'matches' || k === 'after') {
+        text(rule['field'], named + "'s field")
+        if (rule['scope'] !== undefined && rule['scope'] !== 'form' && rule['scope'] !== 'row') {
+          malformed(where(named) + "'s scope must be form or row.")
+        }
       } else if (k === 'custom') {
         text(rule['expression'], named + "'s expression")
       }
 
-      if (rule['message'] !== undefined) text(rule['message'], named + "'s message")
+      if (rule['message'] !== undefined) {
+        if (typeof rule['message'] === 'string') text(rule['message'], named + "'s message")
+        else binding(rule['message'], named + "'s message")
+      }
       binding(rule['when'], named + "'s guard")
     }
   }
@@ -1457,6 +1167,9 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
           malformed(path + '.events holds an action reference with no name.')
           continue
         }
+        if (ref['params'] !== undefined && !isRecord(ref['params'])) {
+          malformed(path + '.events contains an action reference whose params are not an object.')
+        }
         if (!ACTION_REF_TYPES.has(ref['type'] as string)) {
           malformed(
             'Component ' +
@@ -1474,7 +1187,12 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
          * names something the host supplies, which core deliberately knows
          * nothing about.
          */
-        if (ref['type'] !== 'code') continue
+        if (ref['type'] === 'builtin') {
+          if (!BUILTIN_ACTIONS.has(name)) {
+            malformed('Component ' + key + ' references unknown built-in action ' + name + '.')
+          }
+          continue
+        }
         /*
          * `Object.hasOwn`, not a plain lookup. `actions['toString']` finds
          * `Object.prototype.toString`, so an event referencing `toString`
@@ -1550,13 +1268,6 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
 
   if (tags.some((tag) => tag === undefined)) malformed('every language needs a string code.')
 
-  /*
-   * The tags that are tags. A language that is not a record, or whose `code` is
-   * not a string, pushes `undefined` into this list -- and a document with no
-   * `defaultLanguage` at all then matched it, so `languages: [{}]` reported the
-   * language link as sound. The document is malformed for a different reason,
-   * but a caller filtering by `code` was told the wrong thing.
-   */
   const named = tags.filter((tag): tag is string => tag !== undefined)
 
   if (!named.includes(candidate['defaultLanguage'] as string)) {
@@ -1567,4 +1278,13 @@ export function validateDocument(doc: FormDocument): StructuralError[] {
   }
 
   return errors
+}
+
+/** Validate external document data without throwing on unreadable objects. */
+export function validateDocument(doc: unknown): StructuralError[] {
+  try {
+    return inspectDocument(doc)
+  } catch {
+    return [{ code: 'malformed', message: 'The form document could not be read safely.' }]
+  }
 }

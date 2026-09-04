@@ -557,18 +557,15 @@ describe('option fields read as own properties', () => {
    * inherited value and the control's submitted value stopped being the inverse
    * of what it rendered.
    */
-  it('ignores a value inherited from Object.prototype', () => {
-    const proto = Object.prototype as unknown as Record<string, unknown>
-    proto['value'] = 'polluted'
-    try {
-      const options: JsonValue[] = [{ label: 'A' }, { label: 'B' }]
-      const rendered = options.map((option, index) => optionEntry(option, index, options).value)
+  it('ignores a value inherited from an option prototype', () => {
+    const polluted = { value: 'polluted' }
+    const option = (label: string): JsonValue =>
+      Object.assign(Object.create(polluted) as Record<string, JsonValue>, { label })
+    const options = [option('A'), option('B')]
+    const rendered = options.map((entry, index) => optionEntry(entry, index, options).value)
 
-      expect(rendered).toEqual(['0', '1'])
-      expect(optionValue(options, '0')).toBe('0')
-    } finally {
-      delete proto['value']
-    }
+    expect(rendered).toEqual(['0', '1'])
+    expect(optionValue(options, '0')).toBe('0')
   })
 })
 

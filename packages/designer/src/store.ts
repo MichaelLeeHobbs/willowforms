@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ComponentDef,
   ComponentNode,
+  CodeAction,
   Device,
   FieldSchema,
   FormDocument,
@@ -52,21 +53,6 @@ interface History {
   label?: string
 }
 
-/**
- * Add a version to the history, coalescing a run of edits to the same thing.
- *
- * Without this, every keystroke in a text field was its own undo step: typing a
- * thirteen-character label spent thirteen of the hundred slots and pushed the
- * real edits out of reach, which made undo useless for anything but the last few
- * characters.
- *
- * A run breaks when the label changes, which happens on a different property, a
- * different component, a structural edit, or an undo. Deliberately not on a
- * timer: wall-clock coalescing makes the behaviour depend on how fast someone
- * types, and makes the tests depend on how fast the machine runs them. The cost
- * is that pausing mid-field and resuming stays one entry, which is a smaller
- * problem than the one it replaces.
- */
 function commit(history: History, next: FormDocument, label?: string): History {
   if (next === history.present) return history
 
@@ -125,21 +111,7 @@ export interface DesignerApi {
 
   select: (key: string | undefined) => void
   /** Add a palette entry under a parent, selecting the new node. */
-  /**
-   * Adds a component, and answers whether anything landed.
-   *
-   * It returned `void`, so every caller announced an insert unconditionally --
-   * including the refusals inside: a definition a kit got wrong, which
-   * `instantiate` answers `undefined` for, and an insert the tree itself
-   * refuses, which is `insertNode` handing back the root unchanged because the
-   * target cannot hold children. A screen-reader user was told a component was
-   * added when none was.
-   *
-   * Not "an insert that matched no parent". `containerFor` falls back to the
-   * root for a key it does not find, deliberately, so an unknown parent still
-   * lands somewhere -- and the comment claimed a refusal the code does not
-   * have.
-   */
+
   addComponent: (def: ComponentDef, parentKey?: string, index?: number) => boolean
   setProp: (key: string, name: string, value: PropValue | undefined) => void
   /**
@@ -178,6 +150,10 @@ export interface DesignerApi {
    * same as setting it to false: absent means always shown.
    */
   setRenderWhen: (key: string, value: PropValue | undefined) => void
+  /** Replace the selected component's event wiring. */
+  setNodeEvents: (key: string, events: ComponentNode['events']) => void
+  /** Replace the document's reusable code actions. */
+  setCodeActions: (actions: Record<string, CodeAction>) => void
   /**
    * Set a component's CSS for one device. Empty text removes that entry, and
    * removing the last one removes `css` entirely, so a component nobody styled
@@ -234,22 +210,6 @@ function containerFor(root: ComponentNode, key: string | undefined): string {
 }
 
 /**
- * The document with one node rewritten, or the document itself when the rewrite
- * changed nothing.
- *
- * `updateNode` compares by identity and every writer's updater returns a fresh
- * object — `{ ...node, props }` — so the root was always new and `commit`'s own
- * identity check never fired. Setting a property to what it already was
- * therefore took a slot in a capped undo stack, which means a real edit fell
- * off the far end of it.
- *
- * Compared as JSON, on one node. A `ComponentNode` is JSON by construction —
- * that is what makes a document storable — and a node is small, so this costs a
- * few microseconds on the edit path and nothing anywhere else. Comparing whole
- * documents would have been simpler and would have put the same cost on every
- * keystroke.
- */
-/**
  * How a visibility rule is *shaped*, for the undo label.
  *
  * The operator and how many clauses hang off it. Two edits that leave both alone
@@ -290,29 +250,26 @@ function writeNode(
   )
 }
 
-/**
- * The document with a new root, or the document itself when nothing moved.
- *
- * `commit` already refuses to record a document it has seen — by identity — and
- * every writer defeated that by building a fresh one around a root `updateNode`
- * had handed back unchanged. So setting a property to what it already was took
- * a slot in a capped stack, which means a real edit fell off the end of it.
- */
+function retainActionRefs(node: ComponentNode, actions: Record<string, CodeAction>): ComponentNode {
+  const children = node.children?.map((child) => retainActionRefs(child, actions))
+  const entries = Object.entries(node.events ?? {}).flatMap(([event, refs]) => {
+    const kept =
+      refs?.filter((ref) => ref.type === 'builtin' || Object.hasOwn(actions, ref.name)) ?? []
+    return kept.length > 0 ? [[event, kept] as const] : []
+  })
+  const events = Object.fromEntries(entries) as NonNullable<ComponentNode['events']>
+  const { children: _children, events: _events, ...base } = node
+  return {
+    ...base,
+    ...(children ? { children } : {}),
+    ...(entries.length > 0 ? { events } : {}),
+  }
+}
+
 function withRoot(doc: FormDocument, root: ComponentNode): FormDocument {
   return root === doc.root ? doc : { ...doc, root }
 }
 
-/**
- * Which kind of binding a property value is, for an undo label.
- *
- * A static value, an expression and a translation key are three different
- * gestures on one control, and `commit` folds consecutive edits that share a
- * label. Without this they shared one, so switching between them replaced the
- * entry holding what was typed rather than stacking on it.
- *
- * `'none'` for a cleared property, which is `ClearButton`'s gesture and has
- * to be distinguishable from typing for exactly the same reason.
- */
 const bindingKind = (value: PropValue | undefined): string => {
   if (value === undefined) return 'none'
   if (value !== null && typeof value === 'object' && 'kind' in value) {
@@ -327,20 +284,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const document = history.present
 
-  /*
-   * The selection always names a node that is in the document, or nothing.
-   *
-   * Every path that removes a node used to clear the selection itself, and each
-   * got it slightly wrong: `removeComponent` compared the removed key against
-   * the selection, so removing a *container* left the selection on a
-   * descendant; undo and redo restored the document and never touched the
-   * selection at all. That state — a selection naming a node that is not there
-   * — is the precondition for every other bug in this file.
-   *
-   * Derived rather than reconciled. An effect would leave a render in which the
-   * two disagree, and would be a `setState` in an effect besides; this cannot
-   * disagree at all, because there is nothing to keep in step.
-   */
   const selectedKey =
     chosenKey !== undefined && findNode(document.root, chosenKey) ? chosenKey : undefined
 
@@ -369,21 +312,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
    * saved document is worse than one that opens it and says what is wrong, and
    * the designer is where somebody goes to repair it.
    */
-  /*
-   * Once, for the document this hook was mounted with -- and the dependency
-   * was `[initial]`, which is not that.
-   *
-   * `initialDocument` is read once, in a `useState` initializer, and ignored
-   * after mount. The effect keyed on it re-ran on every identity change of a
-   * prop the hook does not otherwise look at -- and `README.md` documents the
-   * pattern `initialDocument={form} onChange={setForm}`, under which `form` is
-   * a new object per edit. So a host following the README got a full-document
-   * structural walk plus a repeated `console.warn` on every keystroke,
-   * describing a document `useDesigner` had already discarded.
-   *
-   * An empty dependency array says what the comment said. The value read inside
-   * is the one from the first render, which is the document this hook is about.
-   */
+
   const mountedWith = useRef(initial)
   useEffect(() => {
     const problems = validateDocument(mountedWith.current)
@@ -399,48 +328,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     latest.current = history.present
   }, [history.present])
 
-  /**
-   * Commit a document this callback already decided on.
-   *
-   * `addComponent` and `moveComponent` used to answer by assigning to a local
-   * from inside the `setHistory` updater. React requires an updater to be pure
-   * and is free to defer it or run it twice, so the boolean was read before the
-   * assignment on any path where React did not eagerly evaluate -- and it worked
-   * only because React's eager-state optimisation happens to run it. A value
-   * that is right because of an optimisation is a value that is wrong.
-   *
-   * So the decision is made out here, from `latest.current`, and the updater
-   * only writes. `latest.current` advances *now* rather than in the effect
-   * below, which closes the other half of the same problem: the ref was a render
-   * behind, so two edits in one tick both read the document from before either
-   * of them.
-   *
-   * There is no `h.present !== doc` guard any more, and that is the point rather
-   * than a simplification. It could refuse a commit while the caller had already
-   * returned `true` and moved the selection -- reintroducing the exact
-   * "announced as a success" failure the return value exists to prevent -- and
-   * it was reachable: any other writer in the same tick left `latest.current`
-   * behind `h.present`. It cannot be right to keep a guard whose firing is
-   * itself the bug.
-   *
-   * What replaces it is that *every* writer below advances the ref, so
-   * `latest.current` is always the document as of now and every decision is
-   * made against it. The check at the top of this function holds that in
-   * place: it throws rather than refusing, because a stale read means a writer
-   * skipped the ref, which is a bug in this file and not a race.
-   */
   const commitDecided = useCallback((doc: FormDocument, next: FormDocument, label?: string) => {
-    /*
-     * The caller decided against the document as of now, which is the property
-     * the guard used to check for at commit time and could only enforce by
-     * refusing. Checked here instead, where a violation is a bug in this file
-     * rather than a race: it means a writer changed the history without
-     * advancing the ref, which is the one way `latest.current` can fall behind.
-     *
-     * A throw rather than a refusal, because there is no correct thing to write
-     * in that state and silently doing nothing is what this whole area was
-     * getting wrong.
-     */
     if (doc !== latest.current) {
       throw new Error('a document was decided against a stale read of the store')
     }
@@ -490,47 +378,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
       const root = insertNode(doc.root, containerFor(doc.root, parentKey), node, index)
 
-      /*
-       * Nothing landed, so nothing is committed and the selection does not move.
-       * It used to wrap the result unconditionally, so an insert the tree
-       * refused still took an undo slot — and still selected a key that is not
-       * in the document, which is the precondition for the next mistake.
-       * `moveComponent` and `removeComponent` have always guarded this.
-       *
-       * Refused by `insertNode`, which hands back the root unchanged when the
-       * target cannot hold children. Not "matched no parent": `containerFor`
-       * falls back to the root for a key it does not find, so an unknown parent
-       * lands rather than refusing.
-       */
       if (root === doc.root) return false
 
-      /*
-       * Committed against the version it was decided on, not against whatever the
-       * updater is handed.
-       *
-       * `commit(h, { ...doc, root })` reads `h` for the history and `doc` for the
-       * content, so a second edit arriving between the read of `latest.current`
-       * and the updater running was silently overwritten -- the new component
-       * landed and the other edit did not, with no sign either way. React batches,
-       * and `latest.current` is a ref updated on render, so the two are not the
-       * same document as often as this shape assumes.
-       *
-       * Refused rather than merged: if the document has moved, the insert was
-       * decided against a tree that no longer exists and its index means something
-       * else. Doing nothing is recoverable; writing the wrong thing is not.
-       */
-      /*
-       * The selection moves only if the commit landed.
-       *
-       * `setSelectedKey` ran unconditionally on the next line, so when the
-       * document had moved between the read of `latest.current` and the updater,
-       * nothing was inserted and the selection still went to a key that is not in
-       * the document. `Designer.tsx` then announced "Text added to root." for an
-       * insert that did not happen.
-       *
-       * Decided against the same document the commit was decided against, so the
-       * two cannot disagree.
-       */
       commitDecided(doc, { ...doc, root })
       setSelectedKey(node.key)
       return true
@@ -549,28 +398,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             else props[name] = value
             return { ...node, props }
           }),
-        /*
-         * Typing into one property is one undo step, not one per character --
-         * and the *binding kind* is in the label, which it was not.
-         *
-         * `commit` replaces the present when the new label matches the last
-         * one, so a coalesced run of keystrokes and the gesture that follows it
-         * shared a slot: type "Email address" into Label, then switch the Label
-         * binding select to Expression, and the same label matched. The present
-         * became the empty expression and "Email address" was in neither `past`
-         * nor `future` -- destroyed in one step, with Ctrl+Z landing on the
-         * empty original and Ctrl+Y returning the empty expression. Reset does
-         * the same thing, from the same `onChange`.
-         *
-         * `Properties.tsx` passes one `onChange` to the text editors, to
-         * `ClearButton` and to `BindingMode`, so all three arrive here
-         * indistinguishable unless the value says which is which.
-         *
-         * This file has already fixed this defect twice, and both fixes are the
-         * same shape: `setRenderWhen` puts the kind in its label with a comment
-         * describing this failure verbatim, and `setFieldSchema` puts the type
-         * and rule keys in its own. This was the third site and it was left.
-         */
+
         'prop:' + key + ':' + name + ':' + bindingKind(value),
       )
     },
@@ -600,18 +428,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
          * coalesces. Adding or removing one changes it, which is what starts a
          * new entry.
          */
-        /*
-         * The data type and the auto-validate flag are part of the label too.
-         *
-         * Item 13 put the rule *keys* in it, so adding or removing a rule breaks
-         * the run. Changing the field's type -- string to number, which rewrites
-         * what every rule means -- and toggling "Validate while typing" still
-         * folded into whatever typing came before them, so one undo took a
-         * structural change and an unrelated edit together.
-         *
-         * A label names what makes an edit a continuation. Typing a rule's
-         * value is one; changing the shape of the field is not.
-         */
+
         'schema:' +
           key +
           ':' +
@@ -636,14 +453,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     (language: string, key: string, text: string) => {
       apply(
         (doc) => {
-          /*
-           * Both levels guarded. The index happened *before* the `?? {}` that
-           * was meant to defend it, so a pasted document with no `translations`
-           * threw — inside a state updater, which takes the designer and its
-           * whole undo history with it. A bundle that is not an object is the
-           * same shape one level down: spreading a string yields a record of
-           * its characters.
-           */
           const bundles =
             doc.translations && typeof doc.translations === 'object' ? doc.translations : {}
           const held = bundles[language]
@@ -718,59 +527,12 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         return { ok: false, reason: 'There is no component keyed ' + key + ' any more.' }
       }
 
-      /*
-       * The key, anything that names it *as a step*, and -- now -- anything that
-       * reads its answer.
-       *
-       * The first two were here. A `Step` ships with a condition comparing
-       * `context.step` against its own key, so renaming one rewrote `node.key`
-       * and left the condition naming the old one, and `repointBinding` fixes
-       * that on the renamed node itself.
-       *
-       * The third was not, and the comment above claimed it was. `dataKeyOf` is
-       * `node.dataKey ?? node.key` and `instantiate` never writes a `dataKey`,
-       * so a freshly dropped component's answer name *is* its key -- and this
-       * moved the answer while every `renderWhen` elsewhere in the document went
-       * on naming the old one. The ref reads an answer nothing writes, the
-       * condition is false, the component is permanently hidden, and because
-       * `renderWhen` gates validation, `validateForm` skips whatever is inside
-       * it on the server too. `repointBinding` cannot do this job: it rewrites
-       * literals in comparisons that read `context` and says in as many words
-       * that it leaves refs alone, because a *copy* shares its source's data key
-       * deliberately. A rename is the case where that is false.
-       *
-       * Only when the renamed node was the sole writer of the name. Two fields
-       * behind opposite guards writing one answer is a supported shape, and if
-       * another node still writes it every ref still resolves -- rewriting them
-       * would break a document that was correct.
-       *
-       * `docs/decisions.md` records why re-pointing rather than the three other
-       * defensible answers.
-       */
       const before = findNode(history.present.root, key) as ComponentNode
       const movedName = dataKeyOf(before)
       const alsoWrites = writersOf(history.present.root, movedName).filter(
         (each: string) => each !== key,
       )
 
-      /*
-       * Three conditions, and `movedName === key` was standing in for two of
-       * them badly.
-       *
-       * The answer only moves when the node has no `dataKey` of its own, since
-       * `dataKeyOf` is `node.dataKey ?? node.key` and an explicit one does not
-       * follow the key. `movedName === key` is true for a node whose `dataKey`
-       * is spelled out and happens to equal its key -- a shape a host's JSON
-       * produces and the designer's own key editor can leave behind -- and for
-       * that node the rename moves nothing, so re-pointing every ref would send
-       * them all at a name nothing writes. Exactly the defect this code exists
-       * to prevent, caused by the fix for it.
-       *
-       * And a node with no `schema` writes no answer at all, so there is
-       * nothing for a ref to have been reading. `writersOf` already tests
-       * `node.schema`, which is why `alsoWrites` is empty for one of these and
-       * the gate read that emptiness as "sole writer".
-       */
       const followsTheRename =
         alsoWrites.length === 0 && before.schema !== undefined && before.dataKey === undefined
 
@@ -905,33 +667,47 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             }
             return { ...node, renderWhen: value }
           }),
-        /*
-         * The kind is part of the label, and that is the whole fix.
-         *
-         * Consecutive edits sharing a label replace the entry on top rather than
-         * stacking on it, which is right for typing an expression and wrong for
-         * changing what kind of rule this is. Every write here shared one label,
-         * so choosing "Always" after authoring a condition replaced the version
-         * that held the condition -- destroying it in `past` and in `present` at
-         * once, so it was reachable by neither undo nor redo. The panel offered
-         * no other way back.
-         *
-         * A label has to name what makes an edit a continuation. Same kind is a
-         * continuation; a different kind is a new decision.
-         */
-        /*
-         * The shape of the condition too, not only its kind.
-         *
-         * Item 13 put the kind in the label, so switching to "Always" no longer
-         * destroys a condition. Within one kind the run still coalesced
-         * everything, so removing a clause from a group folded into the typing
-         * that preceded it -- and one undo took the clause and the text back
-         * together, which is the same defect one level down.
-         *
-         * The operator and the clause count are what change structurally; a
-         * literal being typed does not move either.
-         */
+
         'renderWhen:' + key + ':' + (value?.kind ?? 'none') + ':' + conditionShape(value),
+      )
+    },
+    [apply],
+  )
+
+  const setNodeEvents = useCallback(
+    (key: string, events: ComponentNode['events']) => {
+      apply(
+        (doc) =>
+          writeNode(doc, key, (node) => {
+            const populated = Object.fromEntries(
+              Object.entries(events ?? {}).filter(
+                ([, refs]) => Array.isArray(refs) && refs.length > 0,
+              ),
+            ) as NonNullable<ComponentNode['events']>
+            if (Object.keys(populated).length === 0) {
+              const { events: _dropped, ...rest } = node
+              return rest
+            }
+            return { ...node, events: populated }
+          }),
+        'events:' + key,
+      )
+    },
+    [apply],
+  )
+
+  const setCodeActions = useCallback(
+    (actions: Record<string, CodeAction>) => {
+      apply(
+        (doc) => {
+          const removed = Object.keys(doc.actions).some((name) => !Object.hasOwn(actions, name))
+          return {
+            ...doc,
+            actions,
+            root: removed ? retainActionRefs(doc.root, actions) : doc.root,
+          }
+        },
+        'document-actions:' + Object.keys(actions).sort().join(','),
       )
     },
     [apply],
@@ -1017,22 +793,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     [document, selectedKey],
   )
 
-  /*
-   * One object, held across renders.
-   *
-   * This returned a fresh object with fresh closures every time, so nothing
-   * downstream could memoise anything: every keystroke re-rendered the canvas
-   * and the tree in full and re-attached the shell's window keydown listener.
-   * Every member below is already stable — `useCallback` with empty or narrow
-   * dependencies — so the only thing that was changing was the wrapper.
-   */
-  /*
-   * These step the history rather than editing the document, so they cannot
-   * decide a next document out here -- what they move to depends on the history
-   * React holds. The ref is advanced from inside the updater, which is the one
-   * place that knows, and it is a write to a ref rather than a decision read
-   * back out: the value is not used to answer anything this tick.
-   */
   const undoNow = useCallback(
     () =>
       setHistory((h) => {
@@ -1069,6 +829,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       renameKey,
       setDataKey,
       setRenderWhen,
+      setNodeEvents,
+      setCodeActions,
       setNodeCss,
       moveComponent,
       duplicateComponent,
@@ -1091,6 +853,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       renameKey,
       setDataKey,
       setRenderWhen,
+      setNodeEvents,
+      setCodeActions,
       setNodeCss,
       moveComponent,
       duplicateComponent,

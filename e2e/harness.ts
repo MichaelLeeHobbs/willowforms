@@ -25,10 +25,10 @@ export interface Designer {
   select: (key: string) => Promise<void>
   /**
    * Open a tab in either pane. The left pane holds Components, Tree and
-   * Settings; the inspector holds Properties and Rules.
+   * Settings; the inspector holds Properties, Style, Rules, and Actions.
    */
   openTab: (
-    name: 'Components' | 'Tree' | 'Settings' | 'Properties' | 'Style' | 'Rules',
+    name: 'Components' | 'Tree' | 'Settings' | 'Properties' | 'Style' | 'Rules' | 'Actions',
   ) => Promise<void>
   undo: () => Promise<void>
 }

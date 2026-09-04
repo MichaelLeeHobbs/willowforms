@@ -88,7 +88,7 @@ heard of and would not stop a kit nobody thought of, and it fails `pnpm lint` ra
 
 **Accessibility is not a later milestone.** Every button is named, the tabs are a real tablist, the tree
 is fully keyboard-operable including moving components, contrast is computed from the stylesheets in CI,
-and axe runs over the designer in eleven states. See [../accessibility.md](../accessibility.md).
+and axe runs over the designer in twelve states. See [../accessibility.md](../accessibility.md).
 
 **Nothing degrades silently.** A missing sandbox makes rules pass rather than throw. A refused rename
 says which component holds the name. A malformed import lists every problem at once. A rule that cannot

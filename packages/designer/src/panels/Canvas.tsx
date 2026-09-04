@@ -13,6 +13,7 @@ import {
   contextValues,
   findParent,
   indexKit,
+  jsonToString,
   validateForm,
 } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
@@ -113,24 +114,6 @@ interface Snapshot {
 const isOwnChrome = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('.fs-selection') !== null
 
-/**
- * Does a pointer landing here have its focus cancelled by the canvas?
- *
- * Exported because the shell has to ask the same question and was asking a
- * different one. `onMouseDownCapture` below calls `preventDefault`, which is
- * what stops a click from focusing a text field on the canvas -- and the shell's
- * own handler exempted `input, textarea, select, button` from taking focus, on
- * the theory that anything which takes focus keeps it. Here, nothing does. So
- * clicking a field selected the component, left the shell unfocused, and Delete,
- * Ctrl+Z and Escape all silently did nothing.
- *
- * Two guards with opposite assumptions about the same click. This is the one
- * they now share.
- *
- * `:not(.is-preview)`, because the capture handlers are attached only while
- * editing. In preview a click really does focus the field, and the shell must
- * not steal it.
- */
 export const canvasSwallowsFocus = (target: EventTarget | null): boolean =>
   target instanceof Element &&
   target.closest('.fs-canvas__surface:not(.is-preview)') !== null &&
@@ -174,6 +157,19 @@ export function Canvas({
     () => (current === undefined ? undefined : { step: current }),
     [current],
   )
+  const messages = useMemo(() => {
+    const bundles: unknown = api.document.translations
+    if (!bundles || typeof bundles !== 'object' || Array.isArray(bundles)) return undefined
+    const bundle: unknown = (bundles as Record<string, unknown>)[
+      language ?? api.document.defaultLanguage
+    ]
+    if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return undefined
+    return Object.fromEntries(
+      Object.entries(bundle).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      ),
+    )
+  }, [api.document.defaultLanguage, api.document.translations, language])
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
   /** Fields the user has changed. A field validates while typing only after it is touched. */
@@ -182,15 +178,7 @@ export function Canvas({
     key: undefined,
     row: undefined,
   })
-  /**
-   * Which drawn copy was clicked, and which node that answer belongs to.
-   *
-   * The key travels with the row on purpose. This was a bare row string written
-   * only by the canvas click handler, so selecting a different component from
-   * the tree left the previous row behind and the frame stayed on it. Pairing
-   * them makes a selection by any other route invalidate the row without the
-   * tree having to know this state exists.
-   */
+
   const [clicked, setClicked] = useState<{ key: string | undefined; row: string | undefined }>({
     key: undefined,
     row: undefined,
@@ -207,14 +195,7 @@ export function Canvas({
    */
   const selected = api.selectedNode
   const selectedKey = api.selectedKey
-  /*
-   * Memoised, and it was the one tree walk in this component that was not.
-   *
-   * `Canvas` re-renders on every `pointermove` of every drag, because `useDrag`
-   * puts the pointer position in state -- so this walked the whole document per
-   * pointer event, on the path where the pointer is producing dozens a second.
-   * Every other walk here is already behind a `useMemo`.
-   */
+
   const parent = useMemo(
     () =>
       selectedKey && selectedKey !== api.document.root.key
@@ -261,31 +242,10 @@ export function Canvas({
    */
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
-  /*
-   * Memoised, and a shared empty object when there is nothing to report.
-   *
-   * A fresh `{}` every render is a new `errors` prop every render, so every
-   * memoised node in the form re-renders for a value that has not changed --
-   * `NO_ERRORS` is one object for the life of the module, which is what makes
-   * "no errors" cheap.
-   *
-   * And nothing at all while editing. The canvas swallows keystrokes so a click
-   * selects rather than types, so `data` stays empty and `touched` stays empty,
-   * and every error this produced was then filtered out and thrown away: a
-   * `validateForm` pass over the whole document, on every edit, for a result
-   * that could only be `NO_ERRORS`.
-   */
   const errors = useMemo(() => {
     if (!preview) return NO_ERRORS
 
-    /*
-     * The same context the renderer was given, or the two disagree about what
-     * is on screen — which is the bug `isVisible` exists to prevent, arriving
-     * through an argument list. Preview draws the current step, so validating
-     * without the context would treat that step as hidden and report nothing:
-     * Validate on an empty required field would come back clean.
-     */
-    const all = validateForm(api.document.root, data, context ? { context } : {})
+    const all = validateForm(api.document.root, data, { context, messages })
     if (validated) return all
 
     /*
@@ -319,23 +279,9 @@ export function Canvas({
       shown[address] = message
     }
     return shown ?? NO_ERRORS
-  }, [preview, validated, api.document.root, data, touched, context])
+  }, [preview, validated, api.document.root, data, touched, context, messages])
 
   const onChange = useCallback((address: string, value: JsonValue) => {
-    /*
-     * `applyChange`, not a flat write.
-     *
-     * The renderer reports a change at an *address* — `addresses[1].line1`
-     * inside a repeater, and outside one the bare data key, byte-identical. A
-     * flat `{...d, [address]: value}` therefore worked everywhere until a
-     * repeater existed, and then wrote a literal `"addresses[1].line1"` property
-     * that the renderer never reads back: every keystroke in a row vanished as
-     * it was typed.
-     *
-     * Core ships `applyChange` as the writer a host uses in `onChange`, and it
-     * had no caller anywhere in this repository — including in the one host
-     * this repository ships.
-     */
     setData((d) => applyChange(d, address, value))
     setTouched((t) => (t.has(address) ? t : new Set(t).add(address)))
   }, [])
@@ -399,40 +345,6 @@ export function Canvas({
        */
       if (event.button !== 0) return
 
-      /*
-       * Cancelled, like `onMouseDownCapture` beside it.
-       *
-       * `pointerdown` was the one interaction event this canvas did not
-       * intercept while editing: `onMouseDownCapture`, `onClickCapture` and
-       * `onKeyDownCapture` all cancel, and this one only armed a drag. That
-       * mattered for the reason `05-canvas.md` already records for mouse --
-       * cancelling `mousedown` alone was insufficient because MUI's Select
-       * opens from an inner `onMouseDown` -- and the identical argument holds
-       * for a kit whose controls open on `onPointerDown`, which is what
-       * Radix-based components do and what `ARCHITECTURE.md:35` names as the
-       * next kit.
-       *
-       * Before the drag is armed rather than after, so a press that opens a
-       * control is stopped whether or not it becomes a drag.
-       *
-       * `preventDefault` only, where `onMouseDownCapture` beside it also calls
-       * `stopPropagation` -- and the asymmetry is deliberate.
-       *
-       * `preventDefault` cancels the browser's *default action* for the press:
-       * focusing the control, starting a text selection, beginning a native
-       * drag. It does not stop a JavaScript handler, which is what
-       * `stopPropagation` is for and what `onMouseDownCapture` uses it for. The
-       * earlier comment here said `preventDefault` "is what stops a control
-       * opening", which conflates the two -- a control that opens from its own
-       * `onMouseDown` is unaffected by this line, and a kit that wants to
-       * cooperate reads `event.defaultPrevented`.
-       *
-       * `stopPropagation` is deliberately *not* added on this event, because
-       * the shell needs to see the press: with both, pressing a component and
-       * then Escape no longer cleared the selection, because the shortcut never
-       * saw the press that should have put focus in the shell. Measured -- the
-       * Escape test in this file's own suite is what said so.
-       */
       event.preventDefault()
 
       const key = keyFromEventTarget(event.target)
@@ -443,34 +355,9 @@ export function Canvas({
     [api.document.root.key, begin],
   )
 
-  /*
-   * A keystroke aimed at a kit component while arranging the form.
-   *
-   * "A click selects rather than types" was enforced for pointer and mouse and
-   * nothing else, so tabbing into the canvas and typing reached the kit's own
-   * `onChange` — which seeds the preview's data while the author believes they
-   * are arranging a layout, and then the preview shows answers nobody entered.
-   *
-   * Navigation keys are let through: Tab has to move, and arrow keys and Escape
-   * belong to the shell's own shortcuts.
-   */
   const onKeyDownCapture = useCallback((event: ReactKeyboardEvent) => {
     if (isOwnChrome(event.target)) return
-    /*
-     * The gestures that are navigation rather than typing.
-     *
-     * `event.ctrlKey || event.metaKey` let *every* modifier combination through,
-     * which is far more than the shortcuts this exemption exists for: Ctrl+V
-     * pasted into a field on the canvas, Ctrl+A selected its text, Ctrl+X cut
-     * it. While editing, a keystroke on the canvas is a selection gesture and
-     * nothing else -- that is what the capture handler is for -- and the
-     * exemption was quietly undoing it for the one class of keystroke that
-     * changes a value.
-     *
-     * The shell's own shortcuts are named instead. Undo, redo and duplicate are
-     * what a person expects to work over the canvas; paste into a field they
-     * cannot see the caret in is not.
-     */
+
     const shellShortcut =
       (event.ctrlKey || event.metaKey) && ['z', 'y', 'd'].includes(event.key.toLowerCase())
     const navigational =
@@ -532,28 +419,6 @@ export function Canvas({
     (clientX: number, clientY: number, draggedKey: string | undefined) => {
       if (preview) return undefined
 
-      /*
-       * There is deliberately no bounds check here, and the block that used to
-       * sit at this spot described one as though there were.
-       *
-       * It read "asking whether the point is on the surface at all is the
-       * question the zone is for", immediately below a docblock saying the
-       * opposite and explaining why the check was removed: the canvas scrolls,
-       * so a legitimate drop onto the last component of a long form is released
-       * below the visible box while sitting squarely inside the form, and
-       * clamping to the client box broke exactly that drop.
-       *
-       * Two comments on one function disagreeing about whether a guard exists
-       * is worse than either alone -- a reader stopping at the first is told the
-       * code does a thing it does not do, and the review that found this
-       * downgraded the missing check from HIGH to MEDIUM precisely because the
-       * trade-off is deliberate and documented. What was left was the dead
-       * paragraph, so that is what is gone.
-       *
-       * If a guard is ever added it clamps to the scrollable *content* box, not
-       * the client box, which is the distinction the removed version got wrong.
-       */
-
       // `-1`, a snapshot no drag can be holding: this one is measured for this
       // release and thrown away, and passing `0` claimed to be drag zero's.
       const snap = measureNow(-1)
@@ -562,43 +427,6 @@ export function Canvas({
       const [x, y] = toLocal(snap.origin, clientX, clientY)
       const resolved = resolveDrop(snap.candidates, x, y, draggedKey)
 
-      /*
-       * And the drag's snapshot goes with a drag that ends in a release.
-       *
-       * Not with every drag, which is what the first line here used to say and
-       * what the paragraph further down exists to correct. A reader who takes
-       * the opening sentence and stops -- which is what an opening sentence is
-       * for -- was told the opposite of the truth.
-       *
-       * It holds a measured rectangle for every drawn element in the form --
-       * one per row of every repeater -- and nothing released it, so the last
-       * drag of a session stayed in memory for the rest of it, describing a
-       * document that has since moved on. Released here rather than in an
-       * effect on `dragState`, because setting state from an effect is a
-       * cascade React's own rule refuses; this runs from the release handler.
-       *
-       * A release the tree claims first never reaches this line, so at most one
-       * snapshot survives a gesture -- and the next `takeSnapshot` replaces it.
-       *
-       * What it does not do is release the snapshot for a drag that ended
-       * *without* a release. Escape, `pointercancel`, `blur` and
-       * `visibilitychange` all abandon a drag and none of them reaches this
-       * line, so the snapshot outlives the gesture -- and the docblock above
-       * claiming it "goes with the drag" was false on those four paths.
-       *
-       * It is not cleared from an effect on `dragState`, which is the obvious
-       * repair and the wrong one: setting state from an effect is the cascade
-       * `react-hooks/set-state-in-effect` refuses, and the paragraph above says
-       * so already. What makes a leftover snapshot harmless is the reader
-       * rather than the writer -- `dropTarget` compares `snapshot.dragId`
-       * against the live drag's id and answers nothing when they differ, so a
-       * snapshot from an abandoned gesture can never be resolved against. One
-       * object is retained until the next drag replaces it, which is bounded
-       * and inert.
-       *
-       * The comment is what was wrong here, so the comment is what changed.
-       * `dragId` is the guard; state that is unreachable is not stale state.
-       */
       setSnapshot(undefined)
 
       return resolved ? { parentKey: resolved.parentKey, index: resolved.index } : undefined
@@ -610,24 +438,6 @@ export function Canvas({
 
   const editing = !preview
 
-  /*
-   * The form, as an element that only changes when its inputs do.
-   *
-   * The drag controller keeps the pointer position in React state, and it has
-   * to: the drop indicator follows the pointer. So this component re-renders on
-   * every `pointermove`, at pointer-event frequency, which is fine on its own.
-   *
-   * What was not fine is that nothing stood between here and the form. Every
-   * one of those renders walked the whole document — `isVisible` and
-   * `resolveProps` for every node, then every kit component — to produce output
-   * that cannot have changed, because a pointer position is not an input to any
-   * of it. On a large form that is the whole tree, per pointer event.
-   *
-   * Holding the element itself is the boundary: React compares children by
-   * identity and skips a subtree whose element it has already seen. It is also
-   * the honest list of what the form depends on, which a reader can check
-   * against the props below.
-   */
   const form = useMemo(
     () => (
       <FormRenderer
@@ -637,6 +447,14 @@ export function Canvas({
         errors={errors}
         revealHidden={editing}
         {...(context ? { context } : {})}
+        {...(preview && current !== undefined
+          ? {
+              navigation: {
+                path: 'step',
+                onNavigate: (value: JsonValue) => setStep(jsonToString(value)),
+              },
+            }
+          : {})}
         onChange={onChange}
         {...(language ? { language } : {})}
         // `Viewport` has no empty member, so the conditional this used to carry
@@ -644,7 +462,19 @@ export function Canvas({
         device={viewport}
       />
     ),
-    [api.document, rendererKit, data, errors, editing, context, onChange, language, viewport],
+    [
+      api.document,
+      rendererKit,
+      data,
+      errors,
+      editing,
+      context,
+      preview,
+      current,
+      onChange,
+      language,
+      viewport,
+    ],
   )
 
   return (
@@ -735,20 +565,7 @@ export function Canvas({
           data-fs-viewport={viewport}
           style={frameWidth === undefined ? undefined : { width: frameWidth }}
         >
-          {/*
-           * `revealHidden` while editing, never in preview.
-           *
-           * The canvas renders with empty data and swallows pointer events so a
-           * click selects rather than types, so nothing here can ever satisfy a
-           * condition. A component with `renderWhen` set was therefore absent
-           * from the DOM: invisible, unselectable on the canvas, and skipped by
-           * `measureTree`, so nothing could be dropped into it either. The tree
-           * was the only way to reach it.
-           *
-           * Arranging a form means arranging every component in it, including
-           * the ones a given user will not see. Showing what a user sees is
-           * what Preview is for, and Preview still hides them.
-           */}
+          {}
           {form}
         </div>
 

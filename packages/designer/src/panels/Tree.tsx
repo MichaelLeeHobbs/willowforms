@@ -21,16 +21,7 @@ export interface TreeProps {
   selectedKey: string | undefined
   onSelect: (key: string) => void
   onRemove: (key: string) => void
-  /**
-   * Answers whether the move happened.
-   *
-   * `void` here, so this panel announced every keyboard move unconditionally
-   * while the toolbar and the canvas were already gated on the same boolean.
-   * `moveNode` returns the identical root for a move the tree refuses -- a kit
-   * that mis-flags a container is the ordinary way in -- so a screen-reader
-   * user was told a component moved when it had not, which is worse than
-   * silence because it is the only feedback they get.
-   */
+
   onMove: (key: string, parentKey: string, index: number) => boolean
   /** Copy a component in beside itself. Returns the new key, or nothing if refused. */
   onDuplicate: (key: string) => string | undefined
@@ -88,18 +79,6 @@ export function Tree({
       const origin = originOf(list)
       const rows: TreeRow[] = []
 
-      /*
-       * One sweep, bucketed by key, rather than one `querySelector` per node.
-       *
-       * This issued a query over the whole list for every node in the document,
-       * so measuring was O(n*m) -- and it runs on the first pointer move of
-       * every drag. `geometry.ts` had the same shape and the same fix.
-       *
-       * A `Map` keyed on the attribute also removes the `CSS.escape` call
-       * entirely, which is worth saying because that call was untested: no
-       * fixture uses a key that needs escaping, and a host-supplied document is
-       * not gated.
-       */
       const byKey = new Map<string, HTMLElement>()
       for (const each of list.querySelectorAll<HTMLElement>('[data-fs-tree-row]')) {
         const key = each.getAttribute('data-fs-tree-row')
@@ -143,13 +122,7 @@ export function Tree({
   const onRowPointerDown = useCallback(
     (node: ComponentNode, event: ReactPointerEvent) => {
       if (node.key === root.key) return
-      /*
-       * The primary button only, which `Canvas.tsx` and `Palette.tsx` both check
-       * and both explain. This was the third `begin` call site and the one
-       * without the guard: a right-press and four pixels reparented the
-       * component under its own context menu -- the menu opens, the component
-       * has already moved, and nothing about the gesture said it would.
-       */
+
       if (event.button !== 0) return
       begin({ kind: 'move', key: node.key, label: node.key }, event)
     },
@@ -167,16 +140,6 @@ export function Tree({
     [onSelect],
   )
 
-  /**
-   * A focus move scheduled for after the tree has redrawn, cancellable.
-   *
-   * Three places move focus a frame late, because the row they want does not
-   * exist until the document they just changed has rendered. None of them kept
-   * the handle, so a frame scheduled just before the pane was switched away
-   * still ran -- pulling focus back into a tree the user had left, from a
-   * component that had unmounted. One handle, replaced each time, cancelled on
-   * the way out.
-   */
   const scheduled = useRef(0)
   const focusRowSoon = useCallback(
     (key: string) => {
@@ -201,18 +164,7 @@ export function Tree({
    * mouse. WAI-ARIA has no standard pattern for that, so this follows the
    * outliner convention people already know from editors and file trees.
    */
-  /*
-   * One walk per document, not one per render and one per keystroke.
-   *
-   * `flatten(root)` ran in the component body -- so on every render of the
-   * whole designer, including every render caused by a pointer move anywhere,
-   * allocating an array of every node per pointer event -- and again inside the
-   * key handler, including for keys the handler goes on to ignore. `indexKit`
-   * was built per keystroke beside it.
-   *
-   * Both answers depend only on the document and the kit, so both are memoised
-   * on exactly that.
-   */
+
   const rows = useMemo(() => flatten(root), [root])
   const defs = useMemo(() => indexKit(kit), [kit])
 
@@ -340,16 +292,6 @@ export function Tree({
     const x = dragState.x - snapshot.origin.x
     const y = dragState.y - snapshot.origin.y
 
-    /*
-     * Only claim the drop while the pointer is over the tree, or the canvas and
-     * the tree would both try to handle the same release.
-     *
-     * The widest row rather than the first, and no drop at all when there are no
-     * rows. `rows[0]?.rect.width ?? 0` silently rejected every drop whenever the
-     * first row was missing -- which is what a filtered or empty tree is -- and
-     * a zone that answers "not mine" to everything is indistinguishable from one
-     * that is broken.
-     */
     const width = Math.max(0, ...snapshot.rows.map((row) => row.rect.width))
     if (width === 0 || x < 0 || x > width) return undefined
 
@@ -495,16 +437,7 @@ function TreeItem({
           <button
             type="button"
             className="fs-tree__remove"
-            /*
-             * Out of the tab order, like the row it sits in. The tree is one tab
-             * stop with arrow keys inside it, which is what the roving tabindex
-             * on the rows is for — and every row's Remove button was a stop of
-             * its own, so a forty-component form added thirty-nine of them.
-             * Exactly the problem the roving tabindex was added to solve.
-             *
-             * Reachable without it: Delete on a focused row removes the
-             * component, which is the keyboard route the tree already has.
-             */
+
             tabIndex={-1}
             aria-label={'Remove ' + node.key}
             onPointerDown={(e) => e.stopPropagation()}

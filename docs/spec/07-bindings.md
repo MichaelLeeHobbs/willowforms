@@ -2,7 +2,6 @@
 
 **Status: partial.** Every mode is authored in the panel, and the weakest section here is expression
 authoring: a plain textarea with no completion, no syntax check and no way to try an expression out.
-Translation keys do not follow a rename either.
 
 Any property can be a literal value, an expression computed at render time, a key into a translation
 bundle, or -- where the schema opts in -- a structured condition. Which of them a property may be is
@@ -85,9 +84,9 @@ translations: Record<string, Record<string, string>> // 'en-US' -> 'email_label'
 Seeded as `componentKey_propName` — `email_label`, `submit_text` — by `translationKey()`. The author can
 change it, which is what makes two components able to share one string.
 
-**Known gap:** renaming a component does not rename its keys. The binding keeps working, because the key
-is independent of the component, but the convention quietly stops holding and a form full of
-`oldName_label` keys is confusing. Renaming should offer to follow.
+Translation keys are stable text identities. Renaming a component does not rewrite them or their bundles:
+the seeded `componentKey_propName` form is a convention for new bindings, not ownership. This preserves
+shared keys and avoids a structural rename changing translated copy that another component still uses.
 
 ### A missing translation renders its key
 
@@ -110,9 +109,10 @@ language it does not have renders every translation as a raw key.
 Removing a language leaves its bundle in the document. Dropping the text with it would make an accidental
 removal unrecoverable except through undo, and an orphaned bundle costs nothing.
 
-### What is not localised yet
+### Validation messages
 
-**Planned.** Validation messages are plain strings, so a fully translated form still fails in English.
+**Status: built.** Rule messages can use translation bindings and are authored with the same per-language
+editor. See [08-validation.md](08-validation.md#messages).
 They should be `PropValue`. See [08-validation.md](08-validation.md#messages).
 
 ## The active language

@@ -13,8 +13,8 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { languagesOf } from '../language.js'
-import { languageTag } from '@formsmith/core'
-import type { Language } from '@formsmith/core'
+import { keyProblem, languageTag } from '@formsmith/core'
+import type { CodeAction, JsonValue, Language } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
 
@@ -22,79 +22,111 @@ export interface FormSettingsProps {
   api: DesignerApi
 }
 
-/**
- * A language's name, whatever the document put there.
- *
- * `language.name.trim()` threw on a language with no `name` -- and a `Language`
- * arrives from a pasted document, so `{ code: 'en' }` is a shape somebody can
- * type. A throw during render in React 19 unmounts the tree, so a missing name
- * took the whole designer down and left the JSON dialog, the one place the
- * document could be repaired, unreachable.
- */
 function nameOf(language: { name?: unknown }): string {
   return typeof language.name === 'string' ? language.name.trim() : ''
+}
+
+function paramsText(value: unknown): string {
+  try {
+    return JSON.stringify(value ?? {}, null, 2) ?? '{}'
+  } catch {
+    return '{}'
+  }
+}
+
+function CodeActionEditor({
+  action,
+  onChange,
+  onRemove,
+}: {
+  action: CodeAction
+  onChange: (next: CodeAction) => void
+  onRemove: () => void
+}): ReactNode {
+  const [params, setParams] = useState(() => paramsText(action.params))
+  const [paramsError, setParamsError] = useState('')
+
+  const commitParams = (): void => {
+    try {
+      const value: unknown = JSON.parse(params)
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        setParamsError('Parameters must be a JSON object.')
+        return
+      }
+      onChange({ ...action, params: value as Record<string, JsonValue> })
+      setParamsError('')
+    } catch {
+      setParamsError('Parameters must be valid JSON.')
+    }
+  }
+
+  return (
+    <li className="fs-action-definition">
+      <div className="fs-action__head">
+        <code>{action.name}</code>
+        <button type="button" aria-label={`Remove ${action.name}`} onClick={onRemove}>
+          ×
+        </button>
+      </div>
+      <label>
+        Body
+        <textarea
+          className="fs-code__area"
+          rows={6}
+          value={action.body}
+          onChange={(event) => onChange({ ...action, body: event.target.value })}
+        />
+      </label>
+      <label>
+        Default parameters
+        <textarea
+          className="fs-code__area"
+          rows={4}
+          value={params}
+          aria-invalid={paramsError ? true : undefined}
+          onChange={(event) => {
+            setParams(event.target.value)
+            setParamsError('')
+          }}
+          onBlur={commitParams}
+        />
+      </label>
+      {paramsError && <p className="fs-languages__error">{paramsError}</p>}
+    </li>
+  )
 }
 
 export function FormSettings({ api }: FormSettingsProps): ReactNode {
   const { document: doc } = api
 
-  /*
-   * The list's shape is guarded, and the shape of each language already was.
-   *
-   * `nameOf` exists precisely because "a `Language` arrives from a pasted
-   * document", and its docblock states that a throw during render in React 19
-   * unmounts the whole designer -- so every language in this list was defended
-   * and the list itself was not. `doc.languages` was read as an array three
-   * times, and the Form tab is the tab the left pane can open, so
-   * `doc.languages.map` threw and took the designer with it, including the JSON
-   * dialog that would repair the document. `store.ts` only warns about a host's
-   * `initialDocument`, which is the path such a document arrives by.
-   */
-  /*
-   * Every write in this panel sends this list back, not `doc.languages`.
-   *
-   * Passing the raw array would write whatever the document held -- including
-   * the entries this panel refused to draw -- through an API typed
-   * `Language[]`, handing a malformed entry on as though something had read it.
-   *
-   * Sending the guarded list does drop those entries, and that is right for an
-   * edit: adding a language, removing one, choosing a default and ticking
-   * "Right to left" are all the author acting on what the panel showed them, so
-   * what the panel showed them is what gets written. It is not right for a
-   * read, which is why nothing here quietly repairs the document on mount.
-   *
-   * This note said the default-language radio was "the one place in this panel
-   * where dropping is right", which was never true of one place -- `add`,
-   * `remove` and the checkbox write the same list for the same reason.
-   */
   const languages = languagesOf(doc)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
+  const [actionName, setActionName] = useState('')
+  const [actionError, setActionError] = useState('')
+  const actions =
+    doc.actions && typeof doc.actions === 'object' && !Array.isArray(doc.actions) ? doc.actions : {}
+
+  const addAction = (): void => {
+    const nextName = actionName.trim()
+    const problem = keyProblem(nextName)
+    if (problem) {
+      setActionError(problem)
+      return
+    }
+    if (Object.hasOwn(actions, nextName)) {
+      setActionError(`${nextName} already exists.`)
+      return
+    }
+    api.setCodeActions({ ...actions, [nextName]: { name: nextName, body: '', params: {} } })
+    setActionName('')
+    setActionError('')
+  }
 
   const add = (): void => {
     const raw = code.trim()
-    /*
-     * A tag is a primary subtag and an optional region, and Language keeps the
-     * two in separate fields. Lowercasing the whole string into `code` made
-     * pt-BR the language "pt-br": `dialect` could never be set through the UI,
-     * and the tag the renderer looks translations up by was never the one the
-     * panel had written.
-     */
-    /*
-     * Checked against a grammar, not merely split.
-     *
-     * `raw.split('-')` took the first two subtags and dropped the rest, so
-     * `zh-Hans-CN` was stored as `zh-HANS`: every translation authored for it
-     * went into a bundle the renderer will never look up, because the tag it
-     * looks up is the one this panel wrote. And nothing checked the shape at
-     * all, so `en US` became a bundle key nothing can ever resolve.
-     *
-     * The subset this library supports, stated: a primary subtag and an
-     * optional region, which is what `Language` has fields for. A tag with a
-     * script subtag is refused with a reason rather than silently truncated —
-     * saying "not yet" is a smaller failure than storing text nobody will find.
-     */
+
     const parsed = /^([A-Za-z]{2,3})(?:-([A-Za-z]{2}|\d{3}))?$/.exec(raw)
     if (!parsed) {
       setError(
@@ -203,16 +235,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                   <input
                     type="checkbox"
                     checked={language.bidi === 'rtl'}
-                    /*
-                     * By position, like the Remove button beside it.
-                     *
-                     * Nothing stops a hand-edited document holding one tag
-                     * twice, and matching by tag then wrote both rows: ticking
-                     * "Right to left" on one flipped the other. The removal on
-                     * this same row was fixed and pinned by a test; the checkbox
-                     * next to it kept matching by tag, which is one side of a
-                     * symmetry fixed and the other left alone.
-                     */
+
                     onChange={(e) =>
                       api.setLanguages(
                         languages.map((l, i) =>
@@ -230,19 +253,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
                   aria-label={'Remove ' + (nameOf(language) || tag)}
                   // A document with no languages renders every translation as its
                   // raw key, so the last one cannot be removed.
-                  /*
-                   * `languages`, the guarded list, not `doc.languages`.
-                   *
-                   * This read the raw array for its length, so a document whose
-                   * `languages` is not one threw here -- during render, in the
-                   * panel that exists to survive exactly that, three lines after
-                   * the filter that was added for it.
-                   *
-                   * The rule is unchanged: a document with no languages renders
-                   * every translation as its raw key, so the last one cannot be
-                   * removed. It is now the last one this panel can *draw*, which
-                   * is the only one a person can act on anyway.
-                   */
+
                   disabled={languages.length === 1}
                   onClick={() => remove(at)}
                 >
@@ -270,15 +281,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
              */
             aria-invalid={error ? true : undefined}
             {...(error ? { 'aria-describedby': 'fs-language-error' } : {})}
-            /*
-             * Editing the code clears the refusal it earned.
-             *
-             * The error was cleared only by the next successful `add()`, so
-             * correcting `en US` to `en-US` left "not a language code" sitting
-             * under a field that no longer holds one -- and the box is
-             * `aria-invalid` and described by that message, so a screen reader
-             * went on reading a refusal of text that had been fixed.
-             */
+
             onChange={(e) => {
               setCode(e.target.value)
               setError('')
@@ -316,6 +319,57 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
           </p>
         )}
       </div>
+
+      <h3 className="fs-rules__heading">
+        Code actions <span className="fs-rules__count">{Object.keys(actions).length}</span>
+      </h3>
+      <p className="fs-rules__note">
+        Formsmith stores this source but never executes it directly. The host must provide a
+        sandboxed action evaluator.
+      </p>
+      {Object.keys(actions).length > 0 && (
+        <ul className="fs-actions__list">
+          {Object.keys(actions)
+            .sort()
+            .map((actionKey) => {
+              const action = actions[actionKey]!
+              return (
+                <CodeActionEditor
+                  key={`${actionKey}:${paramsText(action.params)}`}
+                  action={action}
+                  onChange={(next) => api.setCodeActions({ ...actions, [actionKey]: next })}
+                  onRemove={() => {
+                    const next = { ...actions }
+                    delete next[actionKey]
+                    api.setCodeActions(next)
+                  }}
+                />
+              )
+            })}
+        </ul>
+      )}
+      <div className="fs-rules__add">
+        <input
+          type="text"
+          aria-label="New code action name"
+          placeholder="actionName"
+          value={actionName}
+          aria-invalid={actionError ? true : undefined}
+          onChange={(event) => {
+            setActionName(event.target.value)
+            setActionError('')
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            addAction()
+          }}
+        />
+        <button type="button" onClick={addAction}>
+          Add action
+        </button>
+      </div>
+      {actionError && <p className="fs-languages__error">{actionError}</p>}
     </div>
   )
 }

@@ -3,9 +3,10 @@ import { defineConfig } from 'vite'
 
 import { formsmithAliases } from '../../aliases.js'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  resolve: { alias: formsmithAliases },
+  // Distribution smoke builds resolve workspace packages through package exports.
+  ...(mode === 'dist' ? {} : { resolve: { alias: formsmithAliases } }),
   /*
    * `strictPort`, so `pnpm dev` fails loudly on a busy port rather than
    * quietly starting on 5181 — where the end-to-end suite, which asks for 5180,
@@ -14,4 +15,4 @@ export default defineConfig({
    * half that applies when a person runs the dev server themselves.
    */
   server: { port: 5180, strictPort: true },
-})
+}))

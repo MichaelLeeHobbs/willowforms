@@ -294,6 +294,11 @@ describe.each(
     expect(on('--fsh-border', '--fsh-field')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fsh-border', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
   })
+
+  it('the scrollbar thumb is visible against kit surfaces', () => {
+    expect(on('--fsh-scrollbar-thumb', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
+    expect(on('--fsh-scrollbar-thumb', '--fsh-field')).toBeGreaterThanOrEqual(AA_LARGE)
+  })
 })
 
 /**

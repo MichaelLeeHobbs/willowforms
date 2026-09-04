@@ -2124,12 +2124,7 @@ describe('the Rules tab and a pattern nobody can run', () => {
     schema: { type: 'string', validations: [{ key: 'pattern', value: '' }] },
   })
 
-  it('says so under the field, where it can still be fixed', async () => {
-    /*
-     * The engine refuses a pattern with an unbounded repeat inside another, and
-     * refusing means the rule *fails* -- so an author who typed one saw an
-     * ordinary rule here and every answer rejected on the server.
-     */
+  it('accepts nested repeats because the pattern engine has linear-time semantics', async () => {
     const { user, select } = setup(withPattern())
     await select()
     await user.click(screen.getByRole('tab', { name: 'Rules' }))
@@ -2144,7 +2139,20 @@ describe('the Rules tab and a pattern nobody can run', () => {
     await user.clear(field)
     await user.type(field, '(a+)+$')
 
-    expect(screen.getByRole('alert').textContent).toMatch(/unbounded repeat/i)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('reports syntax the bounded pattern engine does not support', async () => {
+    const { user, select } = setup(withPattern())
+    await select()
+    await user.click(screen.getByRole('tab', { name: 'Rules' }))
+
+    const field = document.querySelector('input[id$="-value"]')
+    if (!(field instanceof HTMLInputElement)) throw new Error('no pattern field')
+    await user.clear(field)
+    await user.type(field, '(?=a)')
+
+    expect(screen.getByRole('alert').textContent).toMatch(/unsupported/i)
   })
 
   it('says nothing about a pattern the engine will run', async () => {

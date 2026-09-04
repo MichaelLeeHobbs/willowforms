@@ -29,14 +29,7 @@ export interface JsonSchemaProperty {
   title?: string
   minLength?: number
   maxLength?: number
-  /**
-   * The list keywords, for the same two rules on a field that holds one.
-   *
-   * `minLength` on an `array` is ignored by every validator, and `lengthOf` in
-   * `validation.ts` counts an array's items — so a multi-select with
-   * `minLength: 2` means two choices and used to export a constraint nothing
-   * read.
-   */
+
   minItems?: number
   maxItems?: number
   minimum?: number
@@ -76,32 +69,17 @@ const DRAFT = 'https://json-schema.org/draft/2020-12/schema'
 export function unexportableRules(document: FormDocument): { key: string; rule: string }[] {
   const lossy: { key: string; rule: string }[] = []
 
-  /*
-   * One walk. This was three, each visiting every node to answer a different
-   * question, and the three shared no state that forced the separation -- and
-   * the JSON dialog calls this unmemoized in its component body, so the cost
-   * was paid three times on every render of a document a person is reading.
-   *
-   * The order of the questions is preserved, because the order they are pushed
-   * in is the order the dialog lists them.
-   */
   const FORMAT_RULES = new Set(['email', 'url', 'uuid'])
   const claimed = new Set<string>()
 
   walk(document.root, (node) => {
     for (const rule of validationsOf(node)) {
       // Arbitrary JavaScript has no declarative equivalent at all.
-      if (rule.key === 'custom') {
+      if (rule.key === 'custom' || rule.key === 'matches' || rule.key === 'after') {
         lossy.push({ key: node.key, rule: rule.key })
         continue
       }
-      /*
-       * A rule that applies only sometimes, and no keyword expresses that. Two
-       * ways a rule gets there: its own guard, or a `renderWhen` on the node
-       * that holds it. The second was missing, so a required field behind a
-       * condition exported as unconditionally required and the dialog reported
-       * the export as lossless.
-       */
+
       if (rule.when || node.renderWhen !== undefined) {
         lossy.push({ key: node.key, rule: rule.key })
         continue
@@ -135,6 +113,10 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
       const numeric = exported === 'number'
 
       if ((rule.key === 'minLength' || rule.key === 'maxLength') && !lengthy) {
+        lossy.push({ key: node.key, rule: rule.key })
+        continue
+      }
+      if ((rule.key === 'minItems' || rule.key === 'maxItems') && exported !== 'array') {
         lossy.push({ key: node.key, rule: rule.key })
         continue
       }
@@ -205,32 +187,9 @@ function baseType(type: FieldSchema['type']): JsonSchemaProperty {
  */
 function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchemaProperty {
   const counting = property.type === 'array'
-  /*
-   * `minLength` on a number or a boolean is not a length at all.
-   *
-   * The choice was between the item keywords and the length keywords, decided by
-   * whether the type is `array` -- so a `minLength` rule on a `number` field
-   * exported `minLength`, which JSON Schema defines for strings only and every
-   * validator ignores. The form enforces the rule and the exported schema drops
-   * it, silently, which is the direction that matters: a server validating
-   * against the export accepts what the form refused.
-   *
-   * `unexportableRules` is where a rule that cannot be expressed is reported, so
-   * this returns the property unchanged and lets that reporting stand.
-   */
+
   const measurable = property.type === 'array' || property.type === 'string'
 
-  /*
-   * `minimum` and `maximum` are JSON Schema keywords for numbers only.
-   *
-   * `minLength`/`maxLength` were refused on a type that has no length and
-   * `min`/`max` were exported onto anything, so a `min` rule on a `string` or a
-   * `date` field emitted a keyword every validator ignores -- and
-   * `unexportableRules` reported the export as lossless. The same
-   * silent-permissive direction the guard above exists for, on the other axis:
-   * the form enforces the rule and the schema says nothing, while the note that
-   * exists to say so stays quiet.
-   */
   const comparable = property.type === 'number' || property.type === 'integer'
 
   switch (rule.key) {
@@ -244,6 +203,10 @@ function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchem
       return counting
         ? { ...property, maxItems: rule.value }
         : { ...property, maxLength: rule.value }
+    case 'minItems':
+      return property.type === 'array' ? { ...property, minItems: rule.value } : property
+    case 'maxItems':
+      return property.type === 'array' ? { ...property, maxItems: rule.value } : property
     case 'min':
       if (!comparable) return property
       return { ...property, minimum: rule.value }
@@ -261,6 +224,8 @@ function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchem
     // `required` is a keyword on the parent object, not the property, and
     // `custom` has no declarative equivalent at all.
     case 'required':
+    case 'matches':
+    case 'after':
     case 'custom':
     default:
       return property
@@ -269,13 +234,6 @@ function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchem
 
 /** A component's static `label`, if it has one, for the property title. */
 function titleOf(node: ComponentNode): string | undefined {
-  /*
-   * Guarded, because `props` can be anything. `validateDocument` reports a
-   * malformed `props` and reporting is not refusing: a host that exports a
-   * schema from a document it never gated, or gated and chose to keep, reached
-   * here and threw on `undefined['label']` -- in the JSON dialog, which is the
-   * one place somebody is looking at a broken document on purpose.
-   */
   const props: unknown = node.props
   if (!props || typeof props !== 'object' || Array.isArray(props)) return undefined
 
@@ -297,29 +255,6 @@ function titleOf(node: ComponentNode): string | undefined {
 }
 
 export function toJsonSchema(document: FormDocument): JsonSchema {
-  /*
-   * A root that is itself a repeater keeps its rows.
-   *
-   * `objectFor` skips the node it is given -- it exists to describe that node's
-   * *children* -- which is right for a screen and wrong for a repeater: the
-   * root's rows were flattened to the top level and the array disappeared, so
-   * the export named a row's fields as the document's own. That is the exact
-   * failure `objectFor`'s comment says is silent and was already fixed once,
-   * one level up from where it was fixed.
-   *
-   * The root is always a container and a repeater is a container, so this is
-   * reachable from any imported document.
-   */
-  /*
-   * A document with no root at all.
-   *
-   * `isRowScope(document.root)` reads `node.schema?.type`, and the optional
-   * chain protects `schema`, not `node` -- so this threw where every other
-   * entry point in the package is total on a rootless document. A host that
-   * did not gate its document reaches this through the JSON dialog's schema
-   * tab, which is the one place somebody is looking at a broken document on
-   * purpose.
-   */
   if (!document.root || typeof document.root !== 'object') {
     return { $schema: DRAFT, type: 'object', properties: {} }
   }
@@ -363,34 +298,12 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
  */
 function objectFor(
   root: ComponentNode,
-  /**
-   * How deep this walk already is, carried in from an enclosing `objectFor`.
-   *
-   * A nested repeater re-entered this function to build its row object, which
-   * started a fresh counter at zero -- so the bound below reset on every level
-   * of nesting and there was no effective ceiling at all on that path. The
-   * depth travels with the recursion now.
-   */
+
   from = 0,
 ): {
   properties: Record<string, JsonSchemaProperty>
   required: string[]
 } {
-  /*
-   * No prototype, the twin item 1 named and left here.
-   *
-   * `properties[name] = property` for a `dataKey` of `__proto__` runs the
-   * inherited setter and adds no own property, so the field vanishes from the
-   * exported schema -- and a server validating a payload against that export
-   * then has no constraint for it at all. Plain assignment rather than a
-   * coalesce, so this is quieter than `validateAcross` was and reaches the same
-   * place: `submittedData` and `validateForm` both build on a null prototype for
-   * exactly this reason, and the export did not.
-   *
-   * Spread into a plain object on the way out, like `submittedData` does: spread
-   * defines own properties rather than invoking the setter, so the schema a
-   * caller receives is an ordinary object that still holds the key.
-   */
   const properties: Record<string, JsonSchemaProperty> = Object.create(null) as Record<
     string,
     JsonSchemaProperty

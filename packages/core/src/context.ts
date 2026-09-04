@@ -29,22 +29,6 @@ import type {
   PropValue,
 } from './types.js'
 
-/*
- * On `MAX_CONDITION_DEPTH`, imported above.
- *
- * How deep a condition may nest before a walk in this file stops reading it:
- * the same bound `condition.ts` evaluates under, for the same reason. These
- * walks run over a document nobody has validated yet, and a hand-written
- * `{ and: [{ and: [ ... ] }] }` is a stack overflow in a function whose whole
- * job is to survive malformed input.
- *
- * `condition.ts` exports it precisely so nobody writes "a second one that
- * agrees today". `tree.ts` and `rows.ts` both import it; this file was the last
- * outlier. Not a `/**` block, because the constant is not declared here and a
- * doc comment with no declaration under it becomes documentation for whatever
- * comes next -- which is `fromCondition`.
- */
-
 /** Every context path a condition anywhere in this condition reads. */
 function fromCondition(condition: Condition | undefined, out: Set<string>, depth = 0): void {
   if (depth > MAX_CONDITION_DEPTH) return
@@ -164,17 +148,6 @@ export function evaluatorKeys(root: ComponentNode): string[] {
       props.some(needs) ||
       rules.some((rule) => needs(rule?.when) || rule?.key === 'custom')
 
-    /*
-     * A node with no usable key still needs an evaluator.
-     *
-     * The key was used to *name* the node in the answer and, when it was not a
-     * string, the fact that the node needs a sandbox was discarded with it --
-     * so a document with `"key": 42` and a computed `renderWhen` answered "no
-     * expressions here", the host waved it through with no evaluator, and every
-     * such node read as hidden. What this function is asked is whether a
-     * sandbox is needed, and the answer does not depend on the key being
-     * readable.
-     */
     if (expression) keys.add(typeof node.key === 'string' ? node.key : '(a node with no key)')
 
     for (const child of Array.isArray(node.children) ? node.children : [])
@@ -233,43 +206,7 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * An operator comparing a context path to a field contributes nothing, because
  * there is no name there to collect.
  */
-/**
- * How many distinct values `contextValues` will report for one path.
- *
- * `contextValues(root, 'step')` is how a host discovers a form's steps, and the
- * reference server runs one full validation pass per value it gets back. A
- * hundred thousand distinct literals is a few seconds to author in the JSON
- * editor and a hundred thousand passes to submit against. A thousand is far
- * past any real flow: a wizard with more than a thousand steps is not a wizard.
- *
- * `add` below de-duplicates with `same`, the structural comparison a condition
- * itself uses, so what is capped is a thousand genuinely *distinct* values --
- * not a thousand literals, however they are spelled. Reaching it from a hand-
- * authored form is not a thing that happens; reaching it from a generated or
- * pasted document is, and that is the case the cap is for.
- *
- * Exported, and it was not, which is what made the cap silent. The function
- * returns a bare array, so a caller that hit the ceiling could not tell a
- * complete answer from a truncated one -- and the consequence is on the submit
- * path: `validateAcross` runs one pass per scope the caller builds from this
- * list, so every step past the cap is never validated at all and the submit
- * succeeds with its required fields missing. `rows.ts` states the rule this
- * broke -- "a check that reports problems must never answer 'no problem' when
- * what happened was 'did not look'".
- *
- * A host detects truncation by comparing the result's length against this:
- *
- * ```ts
- * const steps = contextValues(document.root, 'step')
- * if (steps.length >= MAX_CONTEXT_VALUES) throw new Error('this form has more steps than can be checked')
- * ```
- *
- * That is deliberately weaker than the `truncated` flag `rowScopeProblems`
- * carries, and `docs/decisions.md` records why: changing this signature to
- * report it properly is a breaking change to a public export for a shape that
- * needs a thousand distinct literals on one path to reach. The export makes the
- * limit checkable without pretending the API is better than it is.
- */
+
 export const MAX_CONTEXT_VALUES = 1000
 
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {

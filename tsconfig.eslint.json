@@ -34,11 +34,13 @@
     "apps/*/src/**/*",
     "test/**/*",
     "e2e/**/*",
+    "e2e-dist/**/*",
+    "examples/**/*",
     "scripts/**/*",
     "aliases.ts",
     "apps/*/vite.config.ts",
     "eslint.config.js",
     "vitest.config.ts",
-    "playwright.config.ts"
+    "playwright*.config.ts"
   ]
 }

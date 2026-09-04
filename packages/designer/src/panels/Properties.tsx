@@ -54,30 +54,7 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
     <section className="fs-properties">
       <h2 className="fs-panel__heading">{def?.label ?? node.type}</h2>
 
-      {/*
-       * Not keyed on `node.key`, which is the value this field edits.
-       *
-       * A successful rename changes the key, so React unmounted the field and
-       * mounted a new one -- taking the focus with it, mid-edit, and discarding
-       * the error state that a *refused* rename had just set. The one gesture
-       * this control exists for was the one that threw it away.
-       *
-       * Nothing replaces the remount, and nothing needs to. A key changing
-       * underneath this field means the key it is showing is gone from the
-       * document, the store refuses to leave the selection on a node that is
-       * gone, and the panel unmounts with it -- so there is no state in which
-       * this field could go stale. That is two components agreeing, so it is
-       * pinned from the test side as well.
-       *
-       * Selecting a different component is what should replace this field, and
-       * the panel above does *not* remount on that -- `Inspector` renders this
-       * panel unkeyed and `Designer` renders `Inspector` unkeyed, and neither
-       * ever did. That sentence was the whole justification for this field
-       * having no key and no re-sync guard, and it was false, so the field
-       * showed and would commit the previously selected component's key.
-       * `KeyField` carries the guard its eight siblings carry now; the reason a
-       * guard rather than a key is the right answer is in its own docblock.
-       */}
+      {}
       <KeyField value={node.key} onRename={(next) => api.renameKey(node.key, next)} />
 
       {/*
@@ -161,19 +138,6 @@ function DataKeyField({
   const [committed, setCommitted] = useState(value)
   const [error, setError] = useState('')
 
-  /*
-   * Re-sync when the document changes underneath, without losing an edit in
-   * progress: only the version this field last saw is replaced.
-   *
-   * It had none, and its React key is the node's key, which does not change
-   * when only the data key does — so an undo restored the document while this
-   * box went on showing the text from before it, and the next blur wrote that
-   * text back. The undo silently reversed itself, and the submitted payload's
-   * key with it.
-   *
-   * The same shape as the raw CSS field, the JSON editor and the options box.
-   * This was the last editor here without it.
-   */
   if (value !== committed) {
     setCommitted(value)
     setDraft(value)
@@ -261,36 +225,6 @@ function KeyField({
   const [committed, setCommitted] = useState(value)
   const [error, setError] = useState('')
 
-  /*
-   * The re-sync guard every other editor in this panel carries, and the one
-   * this field did not.
-   *
-   * Without it this box showed, and would commit, the *previously* selected
-   * component's key. Nothing remounts it on a selection change: `Inspector`
-   * renders `<Properties>` unkeyed and `Designer` renders `<Inspector>`
-   * unkeyed, and `selectedKey` stays defined when moving between two live
-   * nodes, so `Properties` never takes its `!node` early return and this field
-   * never unmounts. Select `email`, click `phone`, and the Key row read `email`
-   * under a heading naming `phone` -- carrying any refusal alert left over from
-   * `email` with it. Then delete `email`, click into the box and press Enter,
-   * and `commit()` compared draft `'email'` against value `'phone'` and renamed
-   * `phone` to `email`: the name is free now, so the store agrees, and the
-   * component's `dataKey` fallback -- and therefore its submitted payload key --
-   * goes with it.
-   *
-   * A guard rather than a React key, which is the part worth reading. Keying
-   * this field on the node's key is what the docblock at its call site records
-   * as a defect: a successful rename changes the key, so the field would unmount
-   * mid-edit and take the focus and the refusal alert with it. Keying the whole
-   * panel on `api.selectedKey` has the identical problem, because the store
-   * keeps the selection on the node it just renamed. The guard distinguishes the
-   * two cases where a key cannot: a refused rename leaves `value` alone so it
-   * does not fire, a successful one moves `value` to something this field
-   * committed so it does not fire, and only a `value` this field never wrote --
-   * a selection change, an undo, an applied JSON import -- resets the draft.
-   *
-   * Same shape as `DataKeyField` above and `JsonEditor` below.
-   */
   if (value !== committed) {
     setCommitted(value)
     setDraft(value)
@@ -298,25 +232,11 @@ function KeyField({
   }
 
   const commit = (): void => {
-    /*
-     * Normalised first, then compared — the same order `DataKeyField` uses.
-     * Comparing the untrimmed draft and leaving the trimming to the store meant
-     * that typing " email " over `email` was a rename to the same key: the store
-     * did nothing, and the panel went on showing a key the document does not
-     * have.
-     */
     const trimmed = draft.trim()
     if (trimmed !== draft) setDraft(trimmed)
     if (trimmed === value) return
     const result = onRename(trimmed)
     if (result.ok) {
-      /*
-       * `committed` moves with the rename this field just performed, so the
-       * guard above reads the new `value` as one it wrote and leaves the draft
-       * and the focus alone. Without this line the guard would fire on the
-       * field's own successful rename and re-create the remount the call site's
-       * docblock says was removed.
-       */
       setCommitted(trimmed)
       setError('')
       return
@@ -428,24 +348,6 @@ function VisibilityRow({
           className="fs-binding__mode"
           value={mode}
           onChange={(e) => {
-            /*
-             * Every option named, and a chosen value this row does not know
-             * does nothing.
-             *
-             * The last branch was a fallthrough: anything that is not
-             * `always`/`never`/`computed` authored a condition, so `other` --
-             * which is a real option value, rendered whenever the document
-             * holds a rule this row cannot read -- would have replaced that
-             * rule with an empty condition. Unreachable today only because the
-             * option is rendered only when the select's value is already
-             * `other`, so choosing it is a no-op change event; a fifth option
-             * would have silently overwritten the document.
-             *
-             * `other` is deliberately inert rather than mapped to something:
-             * the row cannot read the rule it stands for, so it has nothing to
-             * put back, and the JSON dialog is where such a document is
-             * repaired.
-             */
             const chosen = e.target.value
             if (chosen === 'always') return onChange(undefined)
             if (chosen === 'never') return onChange({ kind: 'static', value: false })
@@ -545,16 +447,7 @@ export function PropRows({
           componentKey={node.key}
           dataKeys={dataKeys}
           {...(scopes.row ? { rowDataKeys: scopes.row } : {})}
-          /*
-           * The guarded list. `Binding` maps this prop to draw one row per
-           * language, so a `languages` that is not an array, or an entry with
-           * no `name`, threw from a prop row the moment a property was bound to
-           * a translation -- taking the inspector down with it, in a designer
-           * whose whole job at that moment is repairing the document.
-           *
-           * Three panels read this list and two of them guarded it. This was
-           * the third.
-           */
+
           languages={languagesOf(api.document)}
           defaultLanguage={api.document.defaultLanguage}
           translations={api.document.translations}
@@ -772,15 +665,7 @@ function PropRow({
         ) : schema.editor === 'select' ? (
           <select
             id={id}
-            /*
-             * Read and written through `jsonToString` and `optionValue`, which
-             * are inverses. `PropOption.value` is a `JsonValue`, and this
-             * treated it as a string in both directions — so a kit declaring
-             * `{ label: 'Two', value: 2 }` showed nothing selected and stored
-             * `"2"`. Neither shipped kit does that today, which is the only
-             * reason it was invisible: the panel is the part a third kit meets
-             * first.
-             */
+
             value={jsonToString(raw)}
             onChange={(e) =>
               e.target.value === ''
@@ -842,14 +727,6 @@ function ClearButton({ label, onClear }: { label: string; onClear: () => void })
   )
 }
 
-/**
- * A JSON property, committed on blur when it parses.
- *
- * Controlled rather than uncontrolled: reading the value once at mount meant the
- * textarea showed whatever was there before, so undo, an applied JSON import,
- * and switching between two components of the same type all left stale text on
- * screen that a blur would then write back.
- */
 function JsonEditor({
   id,
   value,
@@ -882,12 +759,7 @@ function JsonEditor({
         spellCheck={false}
         value={draft}
         aria-invalid={error ? true : undefined}
-        /*
-         * And named as the box's description, which it was not. `role="alert"`
-         * reads the message once as it appears; a screen-reader user who moves
-         * away and comes back had no way to hear it again, and no way to know
-         * the field is invalid beyond a flag with nothing attached to it.
-         */
+
         {...(error ? { 'aria-describedby': id + '-error' } : {})}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
@@ -915,15 +787,6 @@ function JsonEditor({
   )
 }
 
-/**
- * A colour, as a swatch beside a text field.
- *
- * The text is the value and the swatch is a convenience, never the other way
- * round. `<input type="color">` can only hold `#rrggbb`, and the useful things
- * to write here are `var(--brand)`, `transparent`, and `rgb(0 0 0 / 40%)`. A
- * swatch that owned the value would quietly rewrite every one of them into the
- * nearest hex the moment it was touched.
- */
 function ColorEditor({
   id,
   value,

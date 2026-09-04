@@ -221,6 +221,20 @@ describe('axe audit of the designer', () => {
     expect(await audit(container)).toEqual([])
   }, 20000)
 
+  it('has none on the Actions tab', async () => {
+    const user = userEvent.setup()
+    const container = renderDesigner()
+
+    await user.click(screen.getByRole('tab', { name: 'Tree' }))
+    const row = container.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
+    if (!row) throw new Error('no tree row')
+    await user.click(row)
+    await user.click(screen.getByRole('tab', { name: 'Actions' }))
+
+    showing('fs-action-onChange')
+    expect(await audit(container)).toEqual([])
+  }, 20000)
+
   it('has none on the Settings tab', async () => {
     const user = userEvent.setup()
     const container = renderDesigner()

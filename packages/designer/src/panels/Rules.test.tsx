@@ -140,7 +140,7 @@ describe('inspector tabs', () => {
     const tabs = within(tablist).getAllByRole('tab')
     // Form settings moved to the left pane: it belongs to the document, not to
     // whatever is selected.
-    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Style', 'Rules'])
+    expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Style', 'Actions', 'Rules'])
 
     const selected = tabs.find((t) => t.getAttribute('aria-selected') === 'true')
     expect(selected?.textContent).toBe('Properties')
@@ -175,7 +175,7 @@ describe('inspector tabs', () => {
     setup()
     const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
     const tabs = within(tablist).getAllByRole('tab')
-    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
+    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1'])
   })
 
   it('moves between tabs with the arrow keys', async () => {
@@ -187,6 +187,9 @@ describe('inspector tabs', () => {
     await user.keyboard('{ArrowRight}')
     expect(focused()).toBe('Style')
     expect(screen.getByRole('tab', { name: 'Style' }).getAttribute('aria-selected')).toBe('true')
+
+    await user.keyboard('{ArrowRight}')
+    expect(focused()).toBe('Actions')
 
     await user.keyboard('{ArrowRight}')
     expect(focused()).toBe('Rules')
@@ -382,14 +385,84 @@ describe('rules editor', () => {
     expect(screen.getByText(/evaluator/i)).toBeTruthy()
   })
 
+  it('authors a structured guard for a rule', async () => {
+    const { user, selectRow, openRules, latest } = setup([{ key: 'required' }])
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Apply when'), 'condition')
+
+    expect(rulesOf(latest(), 'email')).toEqual([
+      {
+        key: 'required',
+        when: {
+          kind: 'condition',
+          condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'email' } },
+        },
+      },
+    ])
+    expect(screen.getByLabelText('Comparison')).toBeTruthy()
+  })
+
+  it('authors and removes an expression guard', async () => {
+    const { user, selectRow, openRules, latest } = setup([{ key: 'required' }])
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Apply when'), 'computed')
+    await user.type(screen.getByLabelText('Guard expression'), 'data.optedIn')
+
+    expect(rulesOf(latest(), 'email')[0]?.when).toEqual({
+      kind: 'computed',
+      expression: 'data.optedIn',
+    })
+
+    await user.selectOptions(screen.getByLabelText('Apply when'), 'always')
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'required' }])
+  })
+
+  it('authors a cross-field comparison from document data keys', async () => {
+    const document = makeDocument()
+    document.root.children?.unshift({
+      key: 'password',
+      type: 'Field',
+      props: {},
+      schema: { type: 'string' },
+    })
+    const { user, selectRow, openRules, latest } = setup([], document)
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Add a rule'), 'matches')
+    await user.selectOptions(screen.getByLabelText('Compare with'), 'form:password')
+
+    expect(rulesOf(latest(), 'email')).toEqual([{ key: 'matches', field: 'password' }])
+  })
+
   it('drops the message key rather than storing an empty string', async () => {
     const { user, selectRow, openRules, latest } = setup([{ key: 'required', message: 'Needed' }])
 
     await selectRow('email')
     await openRules()
-    await user.clear(screen.getByLabelText('Message'))
+    await user.clear(screen.getByLabelText('Custom message'))
 
     expect(rulesOf(latest(), 'email')).toEqual([{ key: 'required' }])
+  })
+
+  it('authors a translated validation message', async () => {
+    const { user, selectRow, openRules, latest } = setup([{ key: 'required' }])
+
+    await selectRow('email')
+    await openRules()
+    await user.selectOptions(screen.getByLabelText('Message'), 'i18n')
+    await user.type(screen.getByLabelText('English'), 'Email is required')
+
+    expect(rulesOf(latest(), 'email')).toEqual([
+      { key: 'required', message: { kind: 'i18n', key: 'email_required_message' } },
+    ])
+    expect(latest().translations['en-US']).toEqual({
+      email_required_message: 'Email is required',
+    })
   })
 
   it('removes a rule', async () => {

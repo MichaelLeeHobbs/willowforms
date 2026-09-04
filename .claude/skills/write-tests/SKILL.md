@@ -253,10 +253,8 @@ just buys the same failure twice.
       names the behaviour. This is the only step that distinguishes a test from a comment.
 - [ ] **Run `pnpm e2e` too.** 78 tests in a real browser are the only ones that see layout, real event
       capture, and focus. jsdom will not tell you.
-- [ ] **Check the counts.** `pnpm test`'s total appears in `README.md`, `CLAUDE.md` and
-      `docs/ROADMAP.md`, and `test/count-reporter.ts` compares them against the run rather than
-      against each other -- no test can count the run it belongs to. The `pnpm e2e` total appears in
-      those three and in this file, and `test/docs.test.ts` compares all four against the spec files.
+- [ ] **Run the relevant suite directly.** Documentation does not quote exact test totals; runner
+      output is the authoritative count.
 - [ ] Grep your diff for the tells: an assertion that would hold with the feature removed, a
       `getBy*` with no scope, a fixture literal where a factory exists, a `getBoundingClientRect`
       in a `.test.ts`, a new "must" in the spec with no test behind it, a fixture whose two names

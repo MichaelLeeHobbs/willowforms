@@ -131,13 +131,7 @@ export const muiKit: Kit = {
       dataBound: true,
       dataType: 'boolean',
       defaultProps: { label: 'Checkbox label' },
-      /*
-       * `helperText` is declared here because the renderer already draws it. It
-       * was read and never offered, so the one place a checkbox most needs a
-       * sentence -- consent, terms, "you can change this later" -- had nowhere
-       * to put one, and `Switch`, which is the same control with a different
-       * shape, offered it.
-       */
+
       props: [label, helperText, disabled],
       events: ['onChange'],
     },
@@ -267,8 +261,8 @@ export const muiKit: Kit = {
        */
       dataBound: true,
       dataType: 'array',
-      defaultProps: { gap: 16 },
-      props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      defaultProps: { label: 'Items', gap: 16 },
+      props: [label, { name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
       events: [],
     },
     {
@@ -574,12 +568,6 @@ export const muiKit: Kit = {
       label: 'Progress',
       icon: 'progress',
       group: 'feedback',
-      /*
-       * No `value`, because the hint on it says to leave it empty for an
-       * indeterminate bar and the default filled it in: every freshly dropped
-       * Progress was a determinate bar sitting at 0%, which reads as a stuck
-       * upload rather than as work in progress.
-       */
       defaultProps: { variant: 'linear', label: 'Progress' },
       props: [
         label,

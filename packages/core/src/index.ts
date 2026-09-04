@@ -4,6 +4,7 @@ export type {
   ComponentNode,
   Condition,
   Device,
+  Effect,
   EventName,
   FieldSchema,
   FormContext,
@@ -18,6 +19,9 @@ export type {
   ValidationKey,
   ValidationRule,
 } from './types.js'
+
+export type { ActionEvaluator, ActionInvocation, ActionRunResult } from './actions.js'
+export { BUILTIN_ACTION_NAMES, runActions } from './actions.js'
 
 export type {
   ComponentDef,
@@ -76,14 +80,6 @@ export {
   missingContext,
 } from './context.js'
 
-/*
- * `MAX_KEY_LENGTH` beside the two it belongs with, and it was missing.
- *
- * `KEY_PATTERN` and `RESERVED_KEYS` were both public and the length bound was
- * not, so a server-side consumer checking a key against the published grammar
- * passed one this package then refuses as `invalid-key`. Two thirds of a rule
- * is not a rule.
- */
 export { KEY_PATTERN, MAX_KEY_LENGTH, RESERVED_KEYS, keyProblem } from './keys.js'
 
 export type { KeyScopes, RowContext, RowFrame, RowPath } from './rows.js'
@@ -136,6 +132,7 @@ export {
   autoValidateKeys,
   submittedData,
   DEFAULT_MESSAGES,
+  INVALID_TYPE,
   MAX_ROWS,
   NOT_A_LIST,
   TOO_DEEP,
@@ -151,3 +148,6 @@ export {
 } from './validation.js'
 
 export { createDocument, emptyRoot, instantiate, prop } from './factory.js'
+
+export type { DocumentLoadResult } from './document.js'
+export { CURRENT_DOCUMENT_VERSION, loadDocument } from './document.js'

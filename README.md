@@ -2,9 +2,12 @@
 
 An MIT-licensed visual form designer for React. The **designer**, not just the renderer.
 
-> Status: beta. The builder works end to end and is covered by 2525 tests, but nothing is published to
-> npm yet and no release has been cut. [docs/ROADMAP.md](docs/ROADMAP.md) is the honest status,
-> including what is still missing.
+> Status: beta. The core designer workflow is usable, but several specified runtime behaviours remain
+> incomplete. Nothing is published to npm and no release has been cut. See the
+> [roadmap](docs/ROADMAP.md) for the current priorities.
+
+Compatibility and release gates are documented in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) and
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## Why this exists
 
@@ -34,7 +37,7 @@ year for a drag-and-drop panel.
   and what would win it back: `docs/ideas.md`.)
 - **Properties.** Per-type panels built from kit metadata. Any property can be a literal value, a
   computed expression, or a translation key, with an editor for each.
-- **Validation.** Ten rule types carrying their parameters in the type system, edited in a Rules tab,
+- **Validation.** Fourteen rule types carrying their parameters in the type system, edited in a Rules tab,
   and the same engine runs in Node so a server enforces the form's own rules.
 - **Localization.** Languages, a default, per-language writing direction, and translations edited inline
   beside the property they belong to.
@@ -46,6 +49,10 @@ year for a drag-and-drop panel.
 
 The full specification is in [docs/spec](docs/spec/README.md), one file per contract, with a status on
 every section.
+
+The supported designer and HTML-kit theme tokens are listed in
+[docs/spec/11-theming.md](docs/spec/11-theming.md); both can be overridden without reaching into
+component internals.
 
 Undo and redo cover all of it.
 
@@ -67,12 +74,15 @@ Hono server so the demo can persist a document and prove server-side validation 
 ```bash
 pnpm install
 pnpm dev          # playground at http://localhost:5180
-pnpm test         # 2525 tests
-pnpm e2e          # 78 more, in a real browser
+pnpm test         # unit and integration tests
+pnpm e2e          # browser tests
 pnpm build        # tsc --build across all packages
 ```
 
 ## Using it
+
+The snippets below are maintained as typechecked consumer code in
+[examples/usage.tsx](examples/usage.tsx).
 
 ```tsx
 import { Designer } from '@formsmith/designer'
@@ -91,10 +101,16 @@ Runtime only, no designer:
 
 ```tsx
 import { FormRenderer } from '@formsmith/renderer'
-import { validateForm } from '@formsmith/core'
+import { applyChange, validateForm } from '@formsmith/core'
 
 const errors = validateForm(doc.root, data)
-;<FormRenderer document={doc} kit={muiRendererKit} data={data} errors={errors} onChange={set} />
+;<FormRenderer
+  document={doc}
+  kit={muiRendererKit}
+  data={data}
+  errors={errors}
+  onChange={(address, value) => set((current) => applyChange(current, address, value))}
+/>
 ```
 
 The same `validateForm` runs in Node, so the server enforces the form's own rules without a second
@@ -123,7 +139,7 @@ JavaScript. Core deliberately ships no evaluator, so the host injects one and ow
 none injected, those rules degrade to permissive rather than throwing.
 
 **Accessibility is not a later milestone.** Every button is named, the tabs are a real tablist, contrast
-is computed from the stylesheets in CI, and axe-core runs over the designer in eleven states -- two of
+is computed from the stylesheets in CI, and axe-core runs over the designer in twelve states -- two of
 them with the MUI kit drawing the form.
 
 The measurements that made this a stated goal are in [docs/prior-art](docs/prior-art/README.md), which is where
@@ -133,6 +149,10 @@ this repository. What is measured here is measured in CI, and [docs/accessibilit
 says what is not.
 
 ## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before making a change. Security reports and the project's trust
+boundaries are documented in [SECURITY.md](SECURITY.md) and
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 `pnpm lint` enforces more than style. The architectural invariants in [CLAUDE.md](CLAUDE.md) are
 `no-restricted-imports` rules, so importing React into core or a component library into the designer

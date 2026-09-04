@@ -1,7 +1,7 @@
 # Inspector
 
-**Status: partial.** Properties, Style and Rules are built, and so is every property editor and the
-section routing. Actions do not exist.
+**Status: built.** Properties, Style, Actions and Rules are built, along with every property editor and
+the section routing.
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
 never knows what a `TextField` is, only that something declared a `label` property with a `string`
@@ -9,12 +9,12 @@ editor.
 
 ## Tabs
 
-| Tab        | Status  | Edits                                          |
-| ---------- | ------- | ---------------------------------------------- |
-| Properties | Built   | The selected component's `props`               |
-| Style      | Built   | The selected component's `css`, per breakpoint |
-| Actions    | Planned | The selected component's `events`              |
-| Rules      | Built   | The selected component's `schema.validations`  |
+| Tab        | Status | Edits                                          |
+| ---------- | ------ | ---------------------------------------------- |
+| Properties | Built  | The selected component's `props`               |
+| Style      | Built  | The selected component's `css`, per breakpoint |
+| Actions    | Built  | The selected component's `events`              |
+| Rules      | Built  | The selected component's `schema.validations`  |
 
 A third tab used to hold form settings. It has moved to the left pane, because it belongs to the document
 rather than the selection. See [04-shell.md](04-shell.md#tabbed-left-pane).
@@ -205,17 +205,16 @@ see is written blind.
 
 ## Actions
 
-**Status: planned.** Nothing exists. See [09-actions.md](09-actions.md) for the model and the sandbox
-boundary; this section is only about authoring.
+**Status: built.** See [09-actions.md](09-actions.md) for the runtime contract and sandbox boundary.
 
 Two halves:
 
 - **Per component:** which of its declared `EventName`s fire which actions, in order.
-- **Per document:** the named `CodeAction`s themselves, each a body and parameters. These are shared, so
-  they need a home that is not the selected component — most likely the left pane's Settings tab.
+- **Per document:** the named `CodeAction`s themselves, each a body and default parameters, in the left
+  pane's Settings tab.
 
-The panel must be plain that an action needs a host-injected evaluator to run, in the same way the Rules
-tab is about `custom`. An action that silently never fires is worse than one that visibly cannot.
+Both surfaces state that code actions require a host-injected sandbox evaluator. Built-ins remain
+available without one.
 
 ## Rules
 
@@ -236,7 +235,8 @@ Two things the panel says out loud, because both are otherwise invisible:
 
 A component that holds no form data says so instead of showing an empty rule list.
 
-**Missing:** no UI for a rule's `when` guard.
+Each rule has an **Apply when** editor for always, never, structured conditions, or a host-evaluated
+expression. Structured conditions use the same closed editor as component visibility.
 
 ## Additional properties
 

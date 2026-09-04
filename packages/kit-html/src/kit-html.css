@@ -35,6 +35,7 @@
    * what a light-on-dark elevation needs.
    */
   --fsh-shadow: 0 1px 8px rgb(0 0 0 / 16%);
+  --fsh-scrollbar-thumb: #6b7280;
   --fsh-radius: 6px;
   --fsh-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
@@ -46,6 +47,8 @@
   font-size: 16px;
   color: var(--fsh-text);
   background: var(--fsh-surface);
+  scrollbar-width: thin;
+  scrollbar-color: var(--fsh-scrollbar-thumb) transparent;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,6 +74,7 @@
     --fsh-success: #5cba62;
     --fsh-warning: #e0a33c;
     --fsh-shadow: 0 2px 14px rgb(0 0 0 / 55%);
+    --fsh-scrollbar-thumb: #79828f;
   }
 }
 
@@ -86,6 +90,26 @@
   --fsh-success: #5cba62;
   --fsh-warning: #e0a33c;
   --fsh-shadow: 0 2px 14px rgb(0 0 0 / 55%);
+  --fsh-scrollbar-thumb: #79828f;
+}
+
+.fsh-screen::-webkit-scrollbar,
+.fsh-screen *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.fsh-screen::-webkit-scrollbar-track,
+.fsh-screen *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fsh-screen::-webkit-scrollbar-thumb,
+.fsh-screen *::-webkit-scrollbar-thumb {
+  background: var(--fsh-scrollbar-thumb);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
 
 /*
@@ -100,6 +124,28 @@
 .fsh-stack {
   display: flex;
   min-width: 0;
+}
+
+.fsh-repeater__row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--fsh-border);
+  border-radius: var(--fsh-radius);
+}
+
+.fsh-repeater__remove,
+.fsh-repeater__add {
+  align-self: flex-start;
+}
+
+.fsh-step__navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .fsh-heading {
@@ -472,23 +518,6 @@ fieldset.fsh-field {
   border-inline-start-color: var(--fsh-danger);
 }
 
-/*
- * The track needs a boundary, because its fill is the same colour as the page.
- *
- * `--fsh-field` and `--fsh-surface` are both `#ffffff` in the light palette, so
- * an empty progress bar was invisible: nothing on screen said the component was
- * there, and a bar at 10% read as a stray blue dash. WCAG 1.4.11 asks 3:1 of
- * anything that identifies a component.
- *
- * A ring rather than a darker fill, and that is the whole design question here.
- * Darkening the track to clear 3:1 against a white surface takes it to about
- * #949494, which drops the *fill* against the track to 2.4:1 -- and the boundary
- * between fill and track is what conveys the value. A 1px ring at
- * `--fsh-border` clears 4.8:1 against the surface and leaves the fill its full
- * contrast against a light track.
- *
- * `box-shadow` rather than `border`, so the 6px track stays 6px.
- */
 .fsh-progress {
   position: relative;
   block-size: 6px;
@@ -524,13 +553,6 @@ fieldset.fsh-field {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /*
-   * Still 40%, still not moving. This used to stretch the bar to full width at
-   * half opacity, which is what a *finished* bar looks like -- so a viewer who
-   * asked for less motion was told the upload had completed. A short bar that
-   * does not move says "running, length unknown", which is the truth and is what
-   * `aria-valuenow`'s absence says to a screen reader.
-   */
   .fsh-progress__fill--sweeping {
     animation: none;
     opacity: 0.7;

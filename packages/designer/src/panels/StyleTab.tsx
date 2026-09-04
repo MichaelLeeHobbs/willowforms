@@ -130,16 +130,6 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
           control={control}
           value={readDeclaration(text, control.name)}
           onCommit={(next) => {
-            /*
-             * Through the same refusal the raw box enforces.
-             *
-             * `RawCss` refuses a block `safeDeclarations` will not emit and says
-             * so, and these controls wrote straight past it -- so a brace typed
-             * into the Radius field was stored, the renderer then dropped the
-             * whole block, and the component lost every other declaration on
-             * that layer with nothing on screen explaining why. One sink, one
-             * rule.
-             */
             const written = setDeclaration(text, control.name, next)
             if (written && !safeDeclarations(written)) return false
             api.setNodeCss(node.key, device, written)
@@ -157,20 +147,6 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
   )
 }
 
-/**
- * One declaration, committed on blur rather than on every keystroke.
- *
- * The control used to be `value={readDeclaration(...)}` with an `onChange` that
- * wrote straight through, which reads as the obvious controlled input and is
- * the third instance of Trap 10 in this repository. `setDeclaration` parses and
- * normalises, and the parse trims — so the space in `8px auto` was removed as
- * it was typed, the next character landed against `8px`, and the field stored
- * `8pxauto`. Its own placeholder could not be entered into it.
- *
- * The same draft-and-resync shape as `RawCss` below, the JSON editor and the
- * key field. Committing on blur *and* on Enter, because a single-line field is
- * a place people press Enter.
- */
 function DeclarationField({
   control,
   value,
@@ -194,48 +170,16 @@ function DeclarationField({
   if (value !== committed) {
     setCommitted(value)
     setDraft(value)
-    /*
-     * And the refusal goes with the value it was about.
-     *
-     * `refused` survived this resync, so a field that had refused `6px}` stayed
-     * `aria-invalid` with its alert on screen after an undo, a redo or an edit
-     * through the raw box put a *valid* value back. The control then said the
-     * text in it was wrong when it was not -- and a message that outlives its
-     * cause is how somebody learns to ignore the messages.
-     */
+
     setRefused('')
   }
 
   const commit = (): void => {
     if (draft === committed) {
-      /*
-       * Nothing to write, but there may still be something to withdraw.
-       *
-       * The refusal is about the text in the box, and the text in the box is
-       * back to the value that was written -- so refuse `6px}`, delete the
-       * brace, blur, and this returned early with the alert still up and the
-       * field still `aria-invalid`, describing text nobody could see any more.
-       * The only way out was to type a *different* valid value, because that
-       * is the one path that reaches the write below.
-       */
       setRefused('')
       return
     }
 
-    /*
-     * The refusal is shown, and the typed text is kept.
-     *
-     * This set `committed` to `draft` and called `onCommit`, which returns
-     * early when `safeDeclarations` refuses the block -- so `api.setNodeCss`
-     * was never called, the `value` prop did not move, and the re-render
-     * overwrote `draft` with the stale value. Type `6px}` into Radius and press
-     * Enter: the field blanked back to its previous value, with no reason given
-     * and no chance to delete the stray character.
-     *
-     * The raw box beside it explains the identical refusal, which is what makes
-     * this one hard to defend: one sink, one rule, and only one of the two
-     * controls told the author anything.
-     */
     const ok = onCommit(draft)
     if (!ok) {
       setRefused(
@@ -335,17 +279,6 @@ function RawCss({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
-            /*
-             * Refused text stays in the box and out of the document.
-             *
-             * It used to be committed anyway, with the message beside it saying
-             * it would not be applied -- so the document carried declarations
-             * the renderer drops, which is the "worst of both" this row's own
-             * comment warns about, and a host reading `node.css` for itself
-             * would have got the unsanitised string. The draft is kept so the
-             * stray brace can be taken out rather than retyped, which is the
-             * same bargain `KeyField` makes with a name that is already used.
-             */
             if (refused) return
             setCommitted(draft)
             onCommit(draft)

@@ -213,39 +213,12 @@ function bundleFor(
   return bundle && typeof bundle === 'object' ? bundle : {}
 }
 
-/**
- * One key's text out of a bundle, read as an own property.
- *
- * The callers indexed the bundle with an author-typed key using a bare lookup,
- * so `Object.prototype` members were reachable: typing `toString` as the
- * translation key put a `Function` into a controlled `<input value={...}>`, and
- * renaming that key stored it. Core fixed this exact pattern for action
- * references with `Object.hasOwn`, and `json.ts`, `schema.ts` and `rows.ts` all
- * read option and data fields the same way.
- *
- * `toString` is a legal key: it passes `KEY_PATTERN`, and a translation key is
- * whatever an author types.
- */
 function textFor(bundle: Record<string, string>, key: string): string {
   if (!Object.hasOwn(bundle, key)) return ''
   const held = bundle[key]
   return typeof held === 'string' ? held : ''
 }
 
-/**
- * The translation key, committed on blur, carrying its text with it.
- *
- * It was a controlled input writing a new binding on every keystroke, so typing
- * a new name walked through every prefix of it. None of those prefixes has a
- * bundle entry, so both language boxes blanked as you typed — and the text
- * already written stayed under the old key, orphaned, with no way back to it
- * from the panel.
- *
- * The same draft-and-commit shape as every other editor here that parses or
- * renames. What is different is that the commit has to move the translations
- * too: a key is the name of something, and renaming it without the thing it
- * names is what made this destructive rather than merely awkward.
- */
 function TranslationKeyField({
   id,
   value,
@@ -330,16 +303,7 @@ export function TranslationEditor({
 }: TranslationEditorProps): ReactNode {
   return (
     <>
-      {/*
-       * A draft, committed on blur, and the rename carries the translations
-       * with it.
-       *
-       * It wrote a new binding on every keystroke, so typing a new name walked
-       * through every prefix of it — and none of those prefixes had a bundle
-       * entry, so both language boxes blanked as you typed and the text already
-       * written was orphaned under the old key, permanently. There is no way
-       * back to it from the panel.
-       */}
+      {}
       <TranslationKeyField
         id={id}
         value={value.key}

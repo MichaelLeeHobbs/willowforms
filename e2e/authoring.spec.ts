@@ -73,11 +73,9 @@ test('a rule authored in the panel fails a real submit with its own message', as
    * silently fills a different box -- and the assertion below would then be
    * about the default message rather than the authored one.
    */
-  await designer.page
-    .locator('.fs-rule')
-    .filter({ hasText: 'Minimum length' })
-    .getByLabel('Message')
-    .fill('Needs at least 12 characters.')
+  const rule = designer.page.locator('.fs-rule').filter({ hasText: 'Minimum length' })
+  await rule.getByLabel('Message').selectOption('custom')
+  await rule.getByLabel('Custom message').fill('Needs at least 12 characters.')
 
   await designer.page.getByRole('button', { name: 'Preview' }).click()
   await designer.node('email').locator('input').fill('a@b.co')

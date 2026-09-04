@@ -185,7 +185,7 @@ describe('the JSON dialog', () => {
     await replaceEditor(user, editor(), '[1, 2, 3]')
     await user.click(screen.getByRole('button', { name: 'Apply' }))
 
-    expect(within(screen.getByRole('alert')).getByText(/must be a JSON object/)).toBeTruthy()
+    expect(within(screen.getByRole('alert')).getByText(/must be an object/)).toBeTruthy()
     expect(latest().name).toBe('Contact request')
   })
 
@@ -199,7 +199,7 @@ describe('the JSON dialog', () => {
     const messages = within(screen.getByRole('alert'))
       .getAllByRole('listitem')
       .map((li) => li.textContent)
-    expect(messages).toHaveLength(4)
+    expect(messages).toHaveLength(6)
     expect(messages.join(' ')).toMatch(/version/)
     expect(messages.join(' ')).toMatch(/root/)
   })

@@ -9,19 +9,6 @@ export function prop(value: JsonValue): PropValue {
   return { kind: 'static', value }
 }
 
-/**
- * A document's starting tree.
- *
- * `Screen` is a component type, and core knowing one is a seam this project
- * otherwise refuses: `isRowScope` asks whether a node's schema is an array
- * rather than whether it is called `Repeater`, for exactly that reason.
- *
- * The difference is that a root is not a behaviour. Every kit in the contract
- * declares one component with `root: true`, and a new document has to hold
- * *some* node before a kit is in the picture at all -- `createDocument` takes no
- * kit, and a document outlives the kit it was authored against. So the name is a
- * default that the palette's root replaces, not a rule about how a kit works.
- */
 export function emptyRoot(): ComponentNode {
   return { key: 'root', type: 'Screen', props: {}, children: [] }
 }
@@ -54,26 +41,8 @@ export function createDocument(name: string, id: string): FormDocument {
  * props from the definition's defaults.
  */
 export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNode | undefined {
-  /*
-   * Built on a null prototype and then copied into a plain object, the way
-   * `submittedData` does it. A kit is third-party code by design, and a
-   * `defaultProps` key of `__proto__` on an object literal runs the setter
-   * rather than adding a property: the prop vanishes and the node inherits
-   * whatever it pointed at. This is the one place in core that was assigning
-   * an outside-supplied name straight onto a literal.
-   */
   const built = Object.create(null) as Record<string, PropValue>
 
-  /*
-   * And read as data, not trusted as a shape.
-   *
-   * The prototype-pollution half of "a kit is third-party code by design" was
-   * defended above and this half was not: `defaultProps` is required by the
-   * type, so `Object.entries(undefined)` throws for a kit compiled loosely or
-   * built at runtime from JSON -- and it throws inside the designer's drop
-   * handler, which reads as the builder crashing rather than as a bad kit.
-   * A component with no defaults is a component with no defaults.
-   */
   const defaults: unknown = def.defaultProps
   if (defaults && typeof defaults === 'object' && !Array.isArray(defaults)) {
     for (const [name, value] of Object.entries(defaults as Record<string, JsonValue>)) {
@@ -83,20 +52,6 @@ export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNo
 
   const props: Record<string, PropValue> = { ...built }
 
-  /*
-   * The third thing this function reads off a third-party definition, and the
-   * one it did not harden.
-   *
-   * `defaultProps` is shape-checked above and `defaultRenderWhen` is wrapped in
-   * a `try` below, both with comments about a kit "compiled loosely or built at
-   * runtime from JSON". `def.type` went straight to `generateKey`, whose first
-   * statement is `type.charAt(0).toLowerCase()` -- so a kit built from JSON
-   * with a missing `type` threw inside the designer's drop handler.
-   *
-   * A definition with no usable type cannot be instantiated into anything a
-   * renderer could draw, so this refuses rather than inventing a name: the drop
-   * does nothing, which is what a drop of an unusable component should do.
-   */
   if (typeof def.type !== 'string' || def.type.length === 0) return undefined
 
   const node: ComponentNode = {

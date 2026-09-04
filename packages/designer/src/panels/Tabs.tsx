@@ -1,18 +1,3 @@
-/**
- * A real tablist, in one place.
- *
- * `role="tablist"`, roving tabindex, arrow keys, Home and End, and panels that
- * name their tab. The whole pattern costs about fifteen lines and is commonly
- * shipped as a row of styled buttons instead, which leaves a screen reader
- * announcing unrelated controls.
- *
- * Extracted when the left pane needed the same thing the inspector already had.
- * Two copies would have been two places to get the roving tabindex wrong, and
- * the inspector's copy had already been wrong once: every tab carried
- * `aria-controls` while only the selected panel was rendered, so two of the
- * three named an id that was not in the document.
- */
-
 import { useCallback, useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 
@@ -93,24 +78,6 @@ export function Tabs<Id extends string>({
       if (!target) return
       onSelect(target.id)
 
-      /*
-       * Focus follows selection, the expected behaviour for tabs whose panels
-       * are cheap to render.
-       *
-       * By position in the strip rather than by re-querying an id: the id route
-       * depended on `CSS.escape` and on two optional chains, either of which
-       * would leave focus where it was with nothing to say so -- keyboard
-       * navigation that looks like it worked because the panel changed. The
-       * buttons are the strip's element children, in the order they are
-       * rendered, so `next` indexes them directly.
-       *
-       * Moved here rather than after the parent has honoured the request. The
-       * review is right that `onSelect` is a request and this assumes it was
-       * granted -- and the version that waited for `active` to change was
-       * measured in a browser and did not move focus at all, while passing in
-       * jsdom. A keyboard regression is worse than the hole; the finding stays
-       * open in `triage.md` with what was tried.
-       */
       const buttons = strip.current?.children
       const element = buttons?.[next]
       if (element instanceof HTMLButtonElement) element.focus()

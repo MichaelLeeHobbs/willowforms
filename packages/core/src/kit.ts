@@ -138,30 +138,6 @@ export interface Kit {
   components: ComponentDef[]
 }
 
-/**
- * Index a kit's components by type for O(1) lookup.
- *
- * The **first** declaration of a type wins, and `groupKit` below drops the rest,
- * so the two readings of a kit agree. A `Map` built from the list keeps the
- * last, while the palette listed both -- so a kit declaring `TextField` twice
- * drew two entries, one of which added a node whose renderer was the other
- * definition's. A kit is third-party code and can do this by accident when two
- * files are merged.
- */
-/**
- * A kit's component list, guarded the way `factory.ts` guards a definition.
- *
- * `for (const component of kit.components)` threw for a kit whose `components`
- * is absent or is an object, and both readers below run inside React: `groupKit`
- * in `Palette.tsx`'s `useMemo`, `indexKit` in the render bodies of
- * `Properties.tsx` and `StyleTab.tsx`. A throw during render in React 19
- * unmounts the whole designer rather than showing an empty palette.
- *
- * This is the same "a kit is third-party code by design" seam `instantiate`
- * hardened explicitly, with comments about a kit "compiled loosely or built at
- * runtime from JSON". These two readers are on the other side of it and were
- * not hardened.
- */
 function componentsOf(kit: Kit): ComponentDef[] {
   if (!kit || !Array.isArray(kit.components)) return []
   return kit.components.filter(
@@ -197,16 +173,6 @@ export function indexKit(kit: Kit): ReadonlyMap<string, ComponentDef> {
 export function groupKit(kit: Kit): Array<{ group: PaletteGroup; components: ComponentDef[] }> {
   const out: Array<{ group: PaletteGroup; components: ComponentDef[] }> = []
 
-  /*
-   * The palette draws what the renderer resolves, by construction.
-   *
-   * "First declaration wins" used to be written twice -- `!byType.has(...)`
-   * above and a `seen` Set here -- with a comment in each pointing at the
-   * other. That is two places to change if the rule ever does, and the failure
-   * if only one changes is the palette drawing one definition while the
-   * renderer resolves another, which is the bug the comment above this pair
-   * says already happened once.
-   */
   const resolved = indexKit(kit)
 
   for (const component of componentsOf(kit)) {

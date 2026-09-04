@@ -69,6 +69,59 @@ const field = (key: string, dataKey?: string): ComponentNode => ({
   schema: { type: 'string', validations: [] },
 })
 
+describe('action lifecycle events', () => {
+  it('dispatches onMount after the node is mounted', () => {
+    const doc = documentOf([])
+    doc.root.events = {
+      onMount: [{ type: 'builtin', name: 'announce', params: { message: 'Mounted' } }],
+    }
+    const onEffects = vi.fn()
+
+    render(
+      <FormRenderer
+        document={doc}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+        onEffects={onEffects}
+      />,
+    )
+
+    expect(onEffects.mock.calls).toEqual([
+      [
+        [{ kind: 'announce', message: 'Mounted' }],
+        { nodeKey: 'root', event: 'onMount', address: 'root' },
+      ],
+    ])
+  })
+
+  it('dispatches onUnmount with the latest configured handler', () => {
+    const doc = documentOf([])
+    doc.root.events = {
+      onUnmount: [{ type: 'builtin', name: 'announce', params: { message: 'Unmounted' } }],
+    }
+    const onEffects = vi.fn()
+    const view = render(
+      <FormRenderer
+        document={doc}
+        kit={kit}
+        data={{}}
+        onChange={() => undefined}
+        onEffects={onEffects}
+      />,
+    )
+
+    view.unmount()
+
+    expect(onEffects.mock.calls).toEqual([
+      [
+        [{ kind: 'announce', message: 'Unmounted' }],
+        { nodeKey: 'root', event: 'onUnmount', address: 'root' },
+      ],
+    ])
+  })
+})
+
 describe('data keys in the renderer', () => {
   it('reads a value under the data key', () => {
     render(
@@ -2025,6 +2078,60 @@ describe('the node boundary letting go', () => {
     )
 
     expect(container.querySelector('[data-fs-failed]')).not.toBeNull()
+  })
+
+  it('recovers when the renderer kit changes', () => {
+    expectConsoleError(/the first kit failed/)
+    const document = withLabel('fine')
+    const data = {}
+    const onChange = (): void => undefined
+    const brokenKit: RendererKit = {
+      id: 'same-id',
+      renderers: {
+        Screen: Screen_,
+        Field: () => {
+          throw new Error('the first kit failed')
+        },
+      },
+    }
+    const workingKit: RendererKit = {
+      id: 'same-id',
+      renderers: { Screen: Screen_, Field: Fussy },
+    }
+    const { container, rerender } = render(
+      <FormRenderer document={document} kit={brokenKit} data={data} onChange={onChange} />,
+    )
+    expect(container.querySelector('[data-fs-failed]')).not.toBeNull()
+
+    rerender(<FormRenderer document={document} kit={workingKit} data={data} onChange={onChange} />)
+
+    expect(container.querySelector('[data-fs-failed]')).toBeNull()
+    expect(container.querySelector('[data-fs-key="one"]')?.textContent).toBe('fine')
+  })
+
+  it('recovers when the field data changes', () => {
+    expectConsoleError(/the value failed/)
+    const ValueFussy = ({ nodeProps, value }: NodeRendererProps): ReactNode => {
+      if (value === 'boom') throw new Error('the value failed')
+      return <div {...nodeProps}>{typeof value === 'string' ? value : ''}</div>
+    }
+    const kit: RendererKit = {
+      id: 'value-sensitive',
+      renderers: { Screen: Screen_, Field: ValueFussy },
+    }
+    const document = withLabel('fine')
+    const onChange = (): void => undefined
+    const { container, rerender } = render(
+      <FormRenderer document={document} kit={kit} data={{ one: 'boom' }} onChange={onChange} />,
+    )
+    expect(container.querySelector('[data-fs-failed]')).not.toBeNull()
+
+    rerender(
+      <FormRenderer document={document} kit={kit} data={{ one: 'fine' }} onChange={onChange} />,
+    )
+
+    expect(container.querySelector('[data-fs-failed]')).toBeNull()
+    expect(container.querySelector('[data-fs-key="one"]')?.textContent).toBe('fine')
   })
 })
 

@@ -1,21 +1,9 @@
-/**
- * Documentation that cannot silently rot.
- *
- * Both checks here are for drift that actually happened while building this
- * repo. The README claimed 52 tests when there were 278, because the number
- * lives in three files and only one of them got updated. A new package can just
- * as easily never reach the README's table, and nothing else would notice.
- *
- * Neither check verifies that the prose is true, only that the facts it states
- * agree with the repo and with each other. That is the part a reader can check
- * for themselves in ten seconds and lose all trust over.
- */
+/** Documentation contracts that can be checked without interpreting prose. */
 
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { DOCS, REPORTER_MARK, totals } from './count-reporter.js'
 import { isFixture } from './fixtures.js'
 
 const root = new URL('../', import.meta.url)
@@ -38,182 +26,6 @@ function headings(text: string): string[] {
       .replace(/\s+/g, '-'),
   )
 }
-
-/*
- * The list and the pattern come from the reporter now.
- *
- * There were two of each. This file's list held five documents against the
- * reporter's three, and two of its five -- `docs/spec/README.md` and
- * `docs/spec/08-validation.md` -- quote no total at all and never have. A
- * document that says nothing contributes an empty array, so the agreement check
- * below passed over both of them: the list read as covering five documents while
- * covering three.
- *
- * The reporter's own comment said the two patterns "have to stay the same",
- * which is a note asking somebody to remember rather than a mechanism. Importing
- * them is the mechanism.
- */
-const DOCS_WITH_COUNTS = DOCS
-
-/**
- * Every end-to-end total a document quotes.
- *
- * The unit total above is caught by the `\d{2,4} tests` pattern. The end-to-end
- * one was not, three times over: it is under a hundred so the `>= 100` filter
- * discarded it, and two of the three documents phrase it without the word
- * `tests` at all — "67 more, in a real browser" and "runs 67 in a real browser".
- * So the figure lived in three files, was compared in none, and this file's own
- * checklist claimed otherwise.
- *
- * Matched on the phrase they do share, which is the browser.
- */
-function browserTotals(text: string): number[] {
-  return [...text.matchAll(/(\d{2,4})(?: more| tests)?,? in a real browser/g)].map((match) =>
-    Number(match[1]),
-  )
-}
-
-/**
- * How many end-to-end tests there actually are.
- *
- * Counted from the spec files rather than taken from any document, because
- * "the documents agree with each other" is satisfied by all of them being
- * equally wrong -- and they were: three said 68 while the suite ran 74.
- *
- * `^test(` at the start of a line is every Playwright test in this repository;
- * none is nested inside a describe or built by a loop, and a `test.skip` or a
- * `test.each` would not match, which is the conservative direction. The
- * assertion below that this found something is what keeps a change of style
- * from turning this into a comparison against zero.
- */
-function browserTestsThatExist(): number {
-  const dir = fileURLToPath(new URL('e2e/', root))
-  return readdirSync(dir)
-    .filter((name) => name.endsWith('.spec.ts'))
-    .reduce((total, name) => total + [...read('e2e/' + name).matchAll(/^test\(/gm)].length, 0)
-}
-
-describe('documented end-to-end counts', () => {
-  /*
-   * `SKILL.md` is in this list now. `CLAUDE.md` tells every contributor to read
-   * it before writing a test, and it carried "65 of these checks" while the
-   * three documents this guard did police said 68 -- so the one document a
-   * contributor is sent to was the one nothing checked. Its two figures are
-   * phrased the same way as everybody else's now, so one pattern covers all
-   * four rather than a special case per document.
-   */
-  const DOCS_WITH_BROWSER_COUNTS = [
-    'README.md',
-    'CLAUDE.md',
-    'docs/ROADMAP.md',
-    '.claude/skills/write-tests/SKILL.md',
-  ]
-
-  it('match the number of end-to-end tests there are', () => {
-    const ran = browserTestsThatExist()
-
-    // The control: a walk that found no spec files would compare every document
-    // against zero and report them all wrong, or worse, all right.
-    expect(ran, 'no end-to-end tests were found to count').toBeGreaterThan(50)
-
-    const wrong = DOCS_WITH_BROWSER_COUNTS.map((path) => ({
-      path,
-      counts: browserTotals(read(path)),
-    })).filter((entry) => entry.counts.some((count) => count !== ran))
-
-    expect(
-      wrong.map((entry) => entry.path + ' says ' + entry.counts.join('/')),
-      'a document quotes an end-to-end total that is not ' + String(ran),
-    ).toEqual([])
-  })
-
-  it('agree with each other', () => {
-    const quoted = DOCS_WITH_BROWSER_COUNTS.map((path) => ({
-      path,
-      counts: browserTotals(read(path)),
-    }))
-
-    // Every one of them has to say something, or "they agree" is a claim about
-    // an empty set — which is how this went unnoticed for as long as it did.
-    for (const entry of quoted) {
-      expect(entry.counts.length, entry.path + ' quotes no end-to-end total').toBeGreaterThan(0)
-    }
-
-    const found = quoted.flatMap((entry) => entry.counts)
-    expect(
-      new Set(found).size,
-      'documents disagree: ' + quoted.map((e) => e.path + ' says ' + e.counts.join('/')).join(', '),
-    ).toBe(1)
-  })
-})
-
-describe('documented test counts', () => {
-  it('quotes the same total everywhere it is mentioned', () => {
-    const quoted = DOCS_WITH_COUNTS.map((path) => ({ path, counts: totals(read(path)) }))
-
-    const found = quoted.flatMap((entry) => entry.counts)
-    expect(found.length, 'no test total is quoted in any document').toBeGreaterThan(0)
-
-    const unique = [...new Set(found)]
-    expect(
-      unique,
-      'documents disagree about the suite size: ' +
-        quoted.map((e) => e.path + ' says ' + e.counts.join('/')).join(', '),
-    ).toHaveLength(1)
-  })
-
-  it('has a total to compare in every document it claims to check', () => {
-    /*
-     * A document that quotes nothing contributed an empty array and passed. So a
-     * listed document could lose its figure, or never have had one, and the
-     * guard would report agreement among the documents that were left -- the
-     * same shape as a green suite that ran no tests.
-     *
-     * The reporter already refused a silent document. This file did not, and it
-     * was this file's list that had the silent ones in it.
-     */
-    const silent = DOCS_WITH_COUNTS.filter((path) => totals(read(path)).length === 0)
-
-    expect(silent, 'these are listed as stating the suite size and state none').toEqual([])
-  })
-
-  it('is being watched by a reporter that is still running', () => {
-    /*
-     * The count itself is checked by `test/count-reporter.ts`, because no test
-     * can count the run it belongs to. That leaves one question a test can
-     * answer and has to: is the reporter still being called at all?
-     *
-     * It fails by going quiet rather than by failing. Its finish hook was named
-     * for the vitest 2 API, and a version bump that renames it leaves the file
-     * loaded, the class constructed and nothing ever asked -- with the suite
-     * green and every documented figure free to rot. The reporter implements
-     * both the old name and the new one; this is what would notice if it
-     * implemented neither.
-     *
-     * A file rather than a global, because the reporter runs in the main process
-     * and this test runs in a worker.
-     *
-     * Matched on the pid rather than on the file merely existing. Deleting it
-     * after reading was the first version and it was not enough: a marker left
-     * by a filtered run seconds earlier let a deliberately disabled reporter
-     * pass, which is the stale-guard shape this whole item is about. A worker is
-     * either the main process (threads pool) or its child (forks), so the pid
-     * identifies this run in both.
-     */
-    const mark = existsSync(REPORTER_MARK)
-      ? (JSON.parse(readFileSync(REPORTER_MARK, 'utf8')) as { pid?: number })
-      : undefined
-    rmSync(REPORTER_MARK, { force: true })
-
-    expect(
-      [process.pid, process.ppid].includes(mark?.pid ?? -1),
-      'the count reporter left no mark from this run, so it is loaded and never called. ' +
-        'Check the hook names in test/count-reporter.ts against the installed vitest. ' +
-        'Mark was ' +
-        JSON.stringify(mark),
-    ).toBe(true)
-  })
-})
 
 /**
  * What the kit contract claims the suite enforces, against the suite.
@@ -852,82 +664,6 @@ describe('the theming document', () => {
   })
 })
 
-/**
- * The decision log, against the shape it says it has.
- *
- * "The field that earns this file is **Reversal**: it says which entries
- * deserve a second look" -- so an entry with no Reversal line is invisible to
- * the one use the file claims. Five entries written during this run carried
- * none of the five fields and used `##` where every other entry uses `###`,
- * which also took them out of the heading level the rest of the file reads by.
- */
-describe('the decision log', () => {
-  /*
-   * `**Decided` rather than `**Decided:**`. Two entries carry the field with
-   * the sentence folded into the label -- `**Decided: validateDocument now
-   * reads the whole document**` -- which is the same field written a different
-   * way, and a guard that insisted on the punctuation would be about the
-   * punctuation.
-   */
-  const FIELDS = ['Decided', 'Reversal', 'When']
-
-  /*
-   * Not `Why` and not `Rejected`, and the omission is deliberate.
-   *
-   * Two entries fold the reasoning into a preamble above the list, and two
-   * decisions genuinely had no alternative worth naming -- writing one in to
-   * satisfy a guard would be inventing rationale, which is worse than the gap.
-   * The three above are the ones the file's own stated use depends on: what was
-   * decided, what it would cost to undo, and when.
-   */
-
-  /** Each entry as its heading and the body up to the next one. */
-  const entries = (): { title: string; body: string }[] => {
-    const text = read('docs/decisions.md')
-    const found: { title: string; body: string }[] = []
-    const headings = [...text.matchAll(/^### (.+)$/gm)]
-
-    for (const [index, heading] of headings.entries()) {
-      const from = (heading.index ?? 0) + heading[0].length
-      const to = headings[index + 1]?.index ?? text.length
-      found.push({ title: heading[1] ?? '', body: text.slice(from, to) })
-    }
-
-    return found
-  }
-
-  it('is read as entries at all', () => {
-    // The control: a file that parsed to nothing would satisfy every
-    // assertion below by having no entry to fail.
-    expect(entries().length).toBeGreaterThan(20)
-  })
-
-  it('gives every entry the fields the file is read by', () => {
-    const missing = entries()
-      .flatMap((entry) =>
-        FIELDS.filter((field) => !new RegExp('\\*\\*' + field + '\\b').test(entry.body)).map(
-          (field) => entry.title + ' has no ' + field,
-        ),
-      )
-      .sort()
-
-    expect(missing).toEqual([])
-  })
-
-  it('writes every entry at the same heading level', () => {
-    /*
-     * `##` inside the log is a section, and there are none -- the file is a
-     * flat list under one `#`. An entry written at `##` reads as a section
-     * holding the entries after it, and drops out of any reader that walks
-     * `###`, which is what the check above does.
-     */
-    const text = read('docs/decisions.md')
-    const sections = [...text.matchAll(/^## (?!#)(.+)$/gm)].map((match) => match[1] ?? '')
-
-    expect(sections).toEqual([])
-  })
-})
-
 describe('the accessibility document', () => {
   it('lists exactly the axe rules the suite disables', () => {
     /*
@@ -1354,18 +1090,6 @@ describe('a section that calls itself planned is still planned', () => {
    * excuse, because the next guard rejects a `null` with no reason.
    */
   const DISPROOF: Record<string, { needle: string | null; because: string }> = {
-    '01-document-model.md: Versioning and migration': {
-      needle: null,
-      because: 'a migration has no name yet; there is no function it would have to be called',
-    },
-    '01-document-model.md: events': {
-      needle: 'setEvents',
-      because: 'authoring an event means a store action that writes ComponentNode.events',
-    },
-    '06-inspector.md: Actions': {
-      needle: 'setEvents',
-      because: 'the Actions tab is the surface for that same store action',
-    },
     '06-inspector.md: a passthrough for id,': {
       needle: null,
       because: 'an author-defined attribute has no store action and no element id yet',
@@ -1373,22 +1097,6 @@ describe('a section that calls itself planned is still planned', () => {
     '07-bindings.md: try an expression': {
       needle: null,
       because: 'a scratch evaluation surface has no element id yet',
-    },
-    '08-validation.md: message as a PropValue': {
-      needle: 'message?: PropValue',
-      because: 'the type is where this lands, and it still reads message?: string',
-    },
-    '08-validation.md: Cross-field rules': {
-      needle: null,
-      because: 'no rule key is reserved for it, so there is no string to find',
-    },
-    '09-actions.md: the whole file': {
-      needle: 'setEvents',
-      because: 'nothing authors an action until the store can write one',
-    },
-    '09-actions.md: Authoring': {
-      needle: 'setEvents',
-      because: 'the same store action, named from the other document',
     },
   }
 

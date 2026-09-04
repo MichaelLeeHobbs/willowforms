@@ -36,26 +36,11 @@ export interface DropCommit {
 export type DropResolver = (
   clientX: number,
   clientY: number,
-  /**
-   * The component being dragged, or undefined for a new one from the palette.
-   *
-   * Passed in rather than read from React state inside the zone. A zone's
-   * resolver is registered from an effect, so the state it closes over can be a
-   * render behind, and a resolver that thought nothing was being dragged failed
-   * to exclude the dragged node from its own sibling list and placed a downward
-   * reorder one position too far.
-   */
+
   draggedKey: string | undefined,
 ) => DropCommit | undefined
 
 export interface DragState {
-  /**
-   * Increments once per drag. Drop zones measure lazily on the first pointer
-   * move they see, and compare this against the id their snapshot was taken
-   * under; a mismatch means the snapshot belongs to a previous drag and the
-   * layout must be read again. It replaces an effect that would otherwise have
-   * to clear stale measurements when a drag ends.
-   */
   id: number
   source: DragSource
   /** Client coordinates, for the label that follows the pointer. */
@@ -68,15 +53,7 @@ export interface DragController {
   state: DragState | undefined
   /** Call from `onPointerDown`. Does not start a drag on its own. */
   begin: (source: DragSource, event: ReactPointerEvent) => void
-  /**
-   * A drop zone registers how to turn a release position into an insertion
-   * point, and gets back a function that unregisters it.
-   *
-   * Asking the zones at release time, rather than having them publish a target
-   * as it changes, removes a race that was losing drops. Publishing meant an
-   * effect, and an effect runs after the render that computed the target; a
-   * release arriving in between saw no target at all and silently did nothing.
-   */
+
   registerZone: (name: string, resolve: DropResolver) => () => void
   /**
    * True once per completed drag, for a click handler to skip its own work.
@@ -124,30 +101,9 @@ export function useDrag(
   const nextId = useRef(0)
   const moved = useRef(false)
   const swallowClick = useRef(false)
-  /*
-   * Whether the drag now ending was abandoned rather than dropped.
-   *
-   * Escape raised the swallow flag and then `cancel()` cleared the state the
-   * flag was about — so the `pointerup` that inevitably followed found nothing
-   * dragging, lowered the flag again, and the click selected whatever was under
-   * the pointer. Exactly the behaviour the comment beside Escape says it
-   * prevents.
-   */
+
   const abandoned = useRef(false)
-  /*
-   * Held in a ref so the window listeners below never need reattaching, and
-   * written in an effect rather than during render.
-   *
-   * Writing it during render is the shape React's own documentation warns
-   * about: a render that is thrown away still mutates the ref, so under
-   * concurrent rendering the ref can end up holding a handler from a render
-   * that never committed. Nothing here read it during render — the listeners
-   * are installed from an effect and fire long afterwards — so this is the same
-   * behaviour, expressed somewhere it is also correct.
-   *
-   * The test below it pins what the ref is for: a release calls the handler the
-   * hook was last given, not the one the listeners were attached with.
-   */
+
   const commit = useRef(onCommit)
   useEffect(() => {
     commit.current = onCommit
@@ -247,21 +203,6 @@ export function useDrag(
       let landed: DropCommit | undefined
       if (dragged) {
         for (const resolve of zones.current.values()) {
-          /*
-           * A zone that throws must not strand the gesture.
-           *
-           * `cancel()` is at the bottom of this handler, so a resolver throwing
-           * skipped it: the drag state stayed set, the label stayed glued to the
-           * cursor, and every later `pointerup` re-entered the same resolver and
-           * threw again. The controller was permanently dragging, and the only
-           * way out was a reload.
-           *
-           * A zone is code this file does not own -- `Canvas` and `Tree` both
-           * register one, and a third-party surface could -- so "it will not
-           * throw" is not a property this can rely on. The other zones still get
-           * asked, which is the same answer `resolveDrop` gives for a zone that
-           * declines: not mine.
-           */
           try {
             landed = resolve(x, y, draggedKey)
           } catch {
@@ -272,18 +213,6 @@ export function useDrag(
       }
 
       if (dragged && press && landed) {
-        /*
-         * And a commit that throws must not strand the gesture either. The
-         * document is the host's to change and this cannot know what that
-         * costs.
-         *
-         * Re-thrown on a later task rather than swallowed. This handler is a
-         * bare `window` listener, so React's error boundaries never see what
-         * throws here -- the comment that used to sit in this `catch` said they
-         * did, and swallowing it therefore hid a host's error completely.
-         * Throwing on a timeout reaches `window.onerror` and whatever telemetry
-         * the host has there, while `cancel()` below still runs on this task.
-         */
         try {
           commit.current(press.source, landed)
         } catch (error) {
@@ -302,24 +231,6 @@ export function useDrag(
       cancel()
     }
 
-    /*
-     * Giving up on a gesture while the pointer is still on the page.
-     *
-     * Escape, and the browser taking the pointer away with `pointercancel` --
-     * a touch that became a scroll, a pen off the digitiser, a system dialog.
-     * Both end the drag with the page still under the cursor, so both must stop
-     * the release being read as a click on whatever is underneath.
-     *
-     * `pointercancel` used to be wired straight to `cancel`, which clears the
-     * drag and raises neither flag, and the test that covered it asserted only
-     * that the state cleared. So a cancelled drag's trailing click selected
-     * whatever was under the pointer -- the exact behaviour the Escape handling
-     * exists to prevent, in the one path where no `pointerup` arrives afterwards
-     * to raise the flag late.
-     *
-     * Losing the window is different and keeps its own handler: the click that
-     * follows a blur comes minutes later and belongs to nobody.
-     */
     const abandon = (): void => {
       if (!pending.current) return
       swallowClick.current = moved.current
@@ -332,18 +243,6 @@ export function useDrag(
       abandon()
     }
 
-    /*
-     * Only the pointer that started this drag may cancel it.
-     *
-     * `pointercancel` was wired straight to `abandon`, with no `pointerId`
-     * check, while `pointermove` and `pointerup` both have one -- so a second
-     * finger becoming a scroll cancelled the first finger's drag. The same
-     * cross-gesture defect those two were fixed for, through the one event type
-     * that was left out.
-     *
-     * Escape keeps calling `abandon` directly, because a key press belongs to no
-     * pointer.
-     */
     const onCancel = (event: PointerEvent): void => {
       const press = pending.current
       if (press && pointerOf(event) !== press.pointerId) return
@@ -365,42 +264,9 @@ export function useDrag(
       cancel()
     }
 
-    /*
-     * The flag lowers itself once the click it was raised for has been and gone.
-     *
-     * It used to be lowered only by a `consumeClick()` caller, and there are
-     * exactly two of those — the canvas and the tree. A palette drag starts on a
-     * button in the left pane and ends on the canvas, so the `click` the browser
-     * dispatches goes to their nearest common ancestor, above both readers.
-     * Nobody lowered it, it stayed up, and it ate the next unrelated click:
-     * after every drop from the palette, the first click on a component
-     * silently failed to select it.
-     *
-     * On `window` and in the bubble phase, so it runs after every element
-     * handler that might want to read it — lowering it in the capture phase
-     * would take the flag away before the canvas got to ask.
-     *
-     * `pointerdown` as well, for the click whose propagation something stopped
-     * and which therefore never reached the window. A new press is a new
-     * interaction whatever happened to the last one.
-     */
     const lowerSwallow = (): void => {
       swallowClick.current = false
-      /*
-       * And the abandonment, for the same reason and one the other flag already
-       * had written down: a new press is a new interaction whatever happened to
-       * the last one.
-       *
-       * `abandoned` was lowered only by `pointerup`, and the window-blur path
-       * that raises it is precisely the path where no `pointerup` arrives -- the
-       * button came up somewhere the page never saw. So it stayed raised, and
-       * the next release anywhere computed `swallowClick = dragged || abandoned`
-       * and ate a click nobody connected to a drag abandoned minutes earlier.
-       *
-       * The Escape path still works, and that is what makes lowering it here
-       * safe: Escape abandons while the button is still down, so its `pointerup`
-       * arrives before any new `pointerdown` or `click` can run this.
-       */
+
       abandoned.current = false
     }
 
