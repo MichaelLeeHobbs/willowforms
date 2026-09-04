@@ -63,6 +63,6 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@mui/material": "^7.3.11"
+    "@mui/material": "^9.4.0"
   }
 }
