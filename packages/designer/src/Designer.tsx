@@ -51,6 +51,15 @@ export interface DesignerProps {
    * from that.
    */
   onSave?: (document: FormDocument) => void
+  /**
+   * Controlled colour mode for the designer chrome.
+   *
+   * A renderer kit owns its own theme, so a host that wants the canvas to
+   * follow this choice can mirror it into that theme from `onThemeChange`.
+   */
+  theme?: DesignerTheme
+  /** Reports a colour-mode choice made in the toolbar. */
+  onThemeChange?: (theme: DesignerTheme) => void
 }
 
 /**
@@ -61,7 +70,7 @@ export interface DesignerProps {
  * host managing its own theme can force either. See
  * [11-theming.md](../../../docs/spec/11-theming.md).
  */
-type Theme = 'system' | 'light' | 'dark'
+export type DesignerTheme = 'system' | 'light' | 'dark'
 
 export function Designer({
   initialDocument,
@@ -69,6 +78,8 @@ export function Designer({
   rendererKit,
   onChange,
   onSave,
+  theme: controlledTheme,
+  onThemeChange,
 }: DesignerProps): ReactNode {
   /*
    * `initialDocument` is read once, at mount, and the name says so: the designer
@@ -80,18 +91,6 @@ export function Designer({
    */
   const api = useDesigner(initialDocument)
 
-  /*
-   * The host is told when the *document* changes, and only then.
-   *
-   * `onChange` was in the dependency list, so a host passing an inline arrow —
-   * which is what a host writes — re-emitted on every one of its own renders.
-   * If the host then stores what it is given, that is a render loop, and if it
-   * bails on identical values it is merely wasted work it cannot see.
-   *
-   * Held in a ref for the same reason `drag.ts` holds its own callback, with
-   * the same note there about writing it in an effect rather than during
-   * render.
-   */
   const emit = useRef(onChange)
   useEffect(() => {
     emit.current = onChange
@@ -122,20 +121,6 @@ export function Designer({
 
   const commitDrop = useCallback(
     (source: DragSource, target: DropCommit) => {
-      /*
-       * Announced only if it happened.
-       *
-       * Both of these reported unconditionally, and both have refusal paths:
-       * `addComponent` declines a definition a kit got wrong, and an insert the
-       * tree refuses because the target cannot hold children; `moveNode`
-       * returns the identical root for an illegal move. So a screen-reader user
-       * was told a component moved into a container that will not hold it,
-       * which is worse than silence -- it is the only feedback they get, and it
-       * was wrong.
-       *
-       * Not "an insert that matched no parent": `containerFor` falls back to
-       * the root for an unknown key, so that insert lands.
-       */
       if (source.kind === 'new') {
         if (api.addComponent(source.def, target.parentKey, target.index)) {
           announce(source.def.label + ' added to ' + target.parentKey + '.')
@@ -179,7 +164,15 @@ export function Designer({
    * them last looked at it on a phone.
    */
   const [viewport, setViewport] = useState<Viewport>('desktop')
-  const [theme, setTheme] = useState<Theme>('system')
+  const [uncontrolledTheme, setUncontrolledTheme] = useState<DesignerTheme>('system')
+  const theme = controlledTheme ?? uncontrolledTheme
+  const chooseTheme = useCallback(
+    (next: DesignerTheme) => {
+      if (controlledTheme === undefined) setUncontrolledTheme(next)
+      onThemeChange?.(next)
+    },
+    [controlledTheme, onThemeChange],
+  )
 
   /*
    * Which breakpoint the Style tab edits. It follows the viewport, because
@@ -288,7 +281,7 @@ export function Designer({
           setStyleDevice(next)
         }}
         theme={theme}
-        onTheme={setTheme}
+        onTheme={chooseTheme}
         language={activeLanguage}
         onLanguage={setLanguage}
         {...(onSave ? { onSave: () => onSave(api.document) } : {})}
@@ -463,8 +456,8 @@ function Toolbar({
   onSave?: () => void
   viewport: Viewport
   onViewport: (next: Viewport) => void
-  theme: Theme
-  onTheme: (next: Theme) => void
+  theme: DesignerTheme
+  onTheme: (next: DesignerTheme) => void
   language: string | undefined
   onLanguage: (next: string | undefined) => void
 }): ReactNode {
@@ -587,14 +580,7 @@ function useKeyboardShortcuts(
   api: DesignerApi,
   shell: RefObject<HTMLDivElement | null>,
   announce: (message: string) => void,
-  /**
-   * Whether a drag is in progress right now.
-   *
-   * Passed in rather than read here, because the drag module owns the answer
-   * and a second one in this file is the shape this run keeps finding. Escape
-   * is the only shortcut that needs it: the spec says it clears the selection
-   * *or* abandons a drag, and both handlers were running.
-   */
+
   isDragging: boolean,
 ): void {
   const { undo, redo, removeComponent, select, selectedKey } = api
@@ -619,21 +605,7 @@ function useKeyboardShortcuts(
        * document, the window, a text node from a synthetic event -- and the
        * cast bought nothing the optional chains below did not already do.
        */
-      /*
-       * `Element`, not `HTMLElement`, and the difference is what closed three
-       * guards at once.
-       *
-       * `closest` and `tagName` live on `Element`; only `isContentEditable` is
-       * `HTMLElement`-only. Narrowing to `HTMLElement` made `target` null for
-       * anything else -- and `Icon` renders SVG, whose elements are
-       * `SVGElement` -- so with focus on one, `target?.closest('dialog[open]')`
-       * was undefined and the modal guard did not fire, and
-       * `backspaceIsSafe`'s `!== null` read undefined as *safe* and deleted the
-       * selected component.
-       *
-       * The three guards failed open together, and the destructive one failed
-       * open in the direction that destroys work.
-       */
+
       const target = event.target instanceof Element ? event.target : null
       const editable = event.target instanceof HTMLElement ? event.target : null
       const tag = target?.tagName
@@ -641,28 +613,8 @@ function useKeyboardShortcuts(
         tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || editable?.isContentEditable
       if (typing) return
 
-      /*
-       * An event from inside an open dialog belongs to that dialog.
-       *
-       * `showModal()` makes the background inert to *pointers* and says nothing
-       * about keys, so these shortcuts stayed armed over a modal: Backspace on
-       * the JSON dialog's Apply button deleted the component selected behind it
-       * while the textarea in front of you still showed the JSON from before.
-       * The `typing` guard above does not help — a button is not a text field.
-       *
-       * It is also what lets Escape close the dialog. This handler called
-       * `preventDefault()` on Escape whenever anything was selected, which
-       * cancels the native close request, so the dialog took two presses.
-       */
       if (target?.closest('dialog[open]')) return
 
-      /*
-       * A keystroke this handler cannot attribute to an element is not one it
-       * should act on. Every guard above reads the target, so with none there is
-       * nothing to say the key was not aimed at a dialog, a text field or
-       * something else with a claim on it -- and the branches below are
-       * destructive.
-       */
       if (!target) return
 
       const mod = event.ctrlKey || event.metaKey
@@ -678,35 +630,7 @@ function useKeyboardShortcuts(
         redo()
         return
       }
-      /*
-       * `Backspace` only when nothing else has a claim on it.
-       *
-       * Delete is unambiguous. Backspace is not: on a button it is the browser's
-       * back gesture in some settings, and on any control it is what somebody
-       * presses expecting to correct a typo. This fired whenever focus was on
-       * *any* chrome button -- so tabbing to Undo and pressing Backspace deleted
-       * the selected component, which is a destructive edit from a key nobody
-       * aimed at the canvas.
-       *
-       * The shell itself and the tree rows are the two places where Backspace
-       * can only mean "remove what is selected", because neither takes text and
-       * both are about the selection. Anywhere else it is left alone; Delete
-       * still works from everywhere.
-       *
-       * Asked of the element rather than compared with the ref, because a ref is
-       * stable and listing one as a dependency is what
-       * `react-hooks/preserve-manual-memoization` refuses. `fs-shell` is the
-       * class the container carries and nothing else does.
-       */
-      /*
-       * `Boolean`, not `!== null`.
-       *
-       * `target?.closest(...)` is `undefined` when there is no target to ask,
-       * and `undefined !== null` is `true` -- so a keystroke this handler could
-       * not attribute to anything was read as *safe* and removed the selected
-       * component. The clause on the line above guards the same case correctly
-       * with `=== true`, which is what made this one easy to miss.
-       */
+
       const backspaceIsSafe =
         target?.classList.contains('fs-shell') === true ||
         Boolean(target?.closest('[data-fs-tree-row]'))
@@ -722,20 +646,6 @@ function useKeyboardShortcuts(
         return
       }
       if (event.key === 'Escape' && selectedKey) {
-        /*
-         * "Escape clears the selection, *or* abandons a drag if one is in
-         * progress" -- `04-shell.md:159`, and it did both.
-         *
-         * `drag.ts` registers its own `keydown` on `window` and this one is on
-         * `.fs-shell`, which is below `window` in the bubble path, so both ran:
-         * the drag was abandoned *and* the selection was cleared, in one press.
-         * A drag is the more recent gesture and the one the key is aimed at, so
-         * it wins and this does nothing.
-         *
-         * Read from `drag.state` rather than duplicated: the drag module owns
-         * whether a drag is in progress, and a second answer here is the shape
-         * this run keeps finding.
-         */
         if (dragging.current) return
 
         event.preventDefault()

@@ -1,9 +1,7 @@
 # Component catalogue
 
-**Status: partial.** 27 of the 27 below are built, in both kits, and every palette group this catalogue
-uses has components in it. The catalogue is done; the two designs at the bottom of this file are not.
-Repeated scope has no add or remove buttons and no `minItems`/`maxItems` rules, and steps have no Next or
-Back. Both sections say so under their own **Still to build**.
+**Status: built.** 27 of the 27 below are built in both kits, including editable repeated scope and
+controlled, branch-aware step navigation.
 
 This file opened **Built** over those two lists. `README.md` calls that the direction that has been wrong
 most often, and it was wrong here on the file that is also the roadmap -- so a reader planning against it
@@ -96,7 +94,7 @@ uses it.
 | `Grid`     | Built  | yes       | `columns`, `gap`, `minColumnWidth`                 |
 | `Box`      | Built  | yes       | `padding`, `background`, `radius`                  |
 | `Card`     | Built  | yes       | `title`, `subtitle`, `variant`                     |
-| `Repeater` | Built  | yes       | `gap`; its value is the list of rows               |
+| `Repeater` | Built  | yes       | `label`, `gap`; its value is the list of rows      |
 
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
 twelve-column system: a form author thinks "two side by side", not "six of twelve".
@@ -285,19 +283,22 @@ context it is decidable from the tree alone.
 adds one sees no change. `applyChange` is the writer, and it ships in core so no host implements array
 descent and `__proto__` is not handled two different ways in two places.
 
-Rows are keyed by index, which remounts the rows below a deletion. That is the price of refusing a
-generated row id, which would put a non-answer inside `data` — the thing
-[12-api.md](12-api.md#state-that-is-not-an-answer) already refused by name.
+Rows are keyed by index. After a deletion React reuses each following component instance for the row
+that moved into its index, so browser-owned transient state such as a file selection or IME composition
+can follow the index rather than the answer. A stable generated id would instead put a non-answer inside
+`data`, which [12-api.md](12-api.md#state-that-is-not-an-answer) refuses by design.
 
-### Still to build
+### Editing rows
 
-Add and remove buttons, which is an action rather than a component; nested repeaters, which the coordinate
-already supports and nothing yet exercises; and `minItems`/`maxItems` as rules of their own, though
-`minLength` on the list now counts its rows correctly.
+Both kits provide Add and Remove controls and report the complete list through the repeater's ordinary
+`onChange` address. `minItems` and `maxItems` rules disable controls at authored bounds and validate the
+same bounds in core. As with every non-required rule, `minItems` passes on an empty list unless the field
+also carries `required`. Nested repeaters use composed row addresses and are covered in core and renderer
+tests.
 
 ## Steps
 
-**Status: partial.** The core of it is built. This section used to say a Step component was absent
+**Status: built.** The core of it is built. This section used to say a Step component was absent
 because it needed a design, and named two open questions: where the current step lives given the renderer
 holds no state, and what a step means to `validateForm`. Both are answered, and the answer is smaller
 than the question: there is no Step type in core, because a step is a container with a condition on it.
@@ -399,15 +400,19 @@ nothing for rows to inherit. Repeated scope is next but one: the key grammar com
 a path grammar on top of a key grammar that does not exist is how the mistake those libraries made would
 get made here. See `docs/decisions.md`.
 
-### Still to build
+### Controlled navigation
 
-No Next or Back buttons: advancing a step is navigation, and navigation belongs to the host's router.
+Advancing a step is navigation, so the host still owns the current value in `context` and receives each
+destination through `FormRenderer.navigation.onNavigate`. When that controlled prop is supplied, both
+kits draw Back and Next controls. The renderer discovers step nodes from their own context conditions,
+evaluates each candidate against current data to skip inactive branches, and reports a one-based position
+without claiming a total that can change as answers change.
 
 The `Step` palette entry is built. Both kits ship one, and it is the first use of `defaultRenderWhen` on
 `ComponentDef` — a visibility rule a freshly dropped instance starts with, generated from the node's own
 key, so two steps cannot silently share a condition and show at once. A starting value rather than a
 constraint: the Rules tab edits it afterwards like any other `renderWhen`, deletion included.
 
-The canvas half is built. It supplies `context.step` and offers a switcher naming the steps the document
-declares, so preview shows one step at a time while editing shows all of them.
+The canvas supplies `context.step` and offers both its authoring switcher and the runtime controls, so
+preview shows one reachable step at a time while editing shows all of them.
 See [05-canvas.md](05-canvas.md#the-step-switcher).

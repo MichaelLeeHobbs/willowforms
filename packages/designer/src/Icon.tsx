@@ -220,14 +220,6 @@ export interface IconProps {
  * so naming it would make a screen reader read the label twice.
  */
 export function Icon({ name, size = 16 }: IconProps): ReactNode {
-  /*
-   * A name outside the vocabulary draws nothing at all, rather than an empty
-   * 16px square. The type says this cannot happen and a kit is third-party
-   * code, so it can: an unknown name used to reserve the space an icon would
-   * take and leave a hole beside the label, which looks like a glyph that
-   * failed to load. Drawing nothing lets the label stand on its own, which is
-   * what a kit shipping without icons already gets.
-   */
   const glyph = GLYPHS[name]
   if (!glyph) return null
 

@@ -17,12 +17,14 @@
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps, ReactElement } from 'react'
-import { prop } from '@formsmith/core'
+import { useState } from 'react'
+import { applyChange, prop } from '@formsmith/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IconName } from '@formsmith/core'
 import type {
   ComponentDef,
   ComponentNode,
+  FormData,
   FormDocument,
   JsonValue,
   Kit,
@@ -118,6 +120,113 @@ function documentOf(root: ComponentNode): FormDocument {
     translations: {},
     settings: {},
   }
+}
+
+function EditableRepeater({ renderers }: { renderers: RendererKit }): ReactElement {
+  const [data, setData] = useState<FormData>({ guests: [{}] })
+  const repeater: ComponentNode = {
+    key: 'guests',
+    dataKey: 'guests',
+    type: 'Repeater',
+    props: { label: prop('Guest'), gap: prop(8) },
+    schema: {
+      type: 'array',
+      validations: [
+        { key: 'minItems', value: 1 },
+        { key: 'maxItems', value: 2 },
+      ],
+    },
+    children: [
+      {
+        key: 'guest-name',
+        dataKey: 'name',
+        type: 'TextField',
+        props: { label: prop('Name') },
+        schema: { type: 'string' },
+      },
+    ],
+  }
+
+  return (
+    <FormUnderTest
+      document={documentOf(repeater)}
+      kit={renderers}
+      data={data}
+      onChange={(address, value) => setData((current) => applyChange(current, address, value))}
+    />
+  )
+}
+
+function BranchingSteps({ renderers }: { renderers: RendererKit }): ReactElement {
+  const [step, setStep] = useState('step_one')
+  const stepWhen = (key: string): NonNullable<ComponentNode['renderWhen']> => ({
+    kind: 'condition',
+    condition: {
+      op: 'eq',
+      left: { kind: 'context', path: 'step' },
+      right: { kind: 'literal', value: key },
+    },
+  })
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'step_one',
+        type: 'Step',
+        props: { gap: prop(8) },
+        renderWhen: stepWhen('step_one'),
+        children: [{ key: 'first_copy', type: 'Text', props: { text: prop('First step') } }],
+      },
+      {
+        key: 'step_two',
+        type: 'Step',
+        props: { gap: prop(8) },
+        renderWhen: {
+          kind: 'condition',
+          condition: {
+            op: 'and',
+            conditions: [
+              {
+                op: 'eq',
+                left: { kind: 'context', path: 'step' },
+                right: { kind: 'literal', value: 'step_two' },
+              },
+              {
+                op: 'eq',
+                left: { kind: 'ref', dataKey: 'country' },
+                right: { kind: 'literal', value: 'GB' },
+              },
+            ],
+          },
+        },
+        children: [{ key: 'second_copy', type: 'Text', props: { text: prop('Second step') } }],
+      },
+      {
+        key: 'step_three',
+        type: 'Step',
+        props: { gap: prop(8) },
+        renderWhen: stepWhen('step_three'),
+        children: [{ key: 'third_copy', type: 'Text', props: { text: prop('Third step') } }],
+      },
+    ],
+  }
+
+  return (
+    <FormUnderTest
+      document={documentOf(root)}
+      kit={renderers}
+      data={{ country: 'US' }}
+      context={{ step }}
+      navigation={{
+        onNavigate: (value) => {
+          if (typeof value === 'string') setStep(value)
+        },
+      }}
+      onChange={() => undefined}
+    />
+  )
 }
 
 /*
@@ -2107,6 +2216,161 @@ describe('the seam a document is addressed through', () => {
       expect(bare, type + ' spreads nodeProps onto an unclassed wrapper').toBe(false)
     },
   )
+})
+
+describe.each(KITS)('$name editable repeaters', ({ kit, renderers }) => {
+  it('adds and removes rows without crossing authored bounds', () => {
+    if (!requires(kit, 'Repeater') || !requires(kit, 'TextField')) return
+
+    render(<EditableRepeater renderers={renderers} />)
+
+    const add = screen.getByRole('button', { name: 'Add Guest' })
+    const firstRemove = screen.getByRole('button', { name: 'Remove Guest item 1' })
+    expect(screen.getAllByRole('textbox', { name: 'Name' })).toHaveLength(1)
+    expect(firstRemove.hasAttribute('disabled')).toBe(true)
+    expect(add.hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(add)
+
+    expect(screen.getAllByRole('textbox', { name: 'Name' })).toHaveLength(2)
+    expect(add.hasAttribute('disabled')).toBe(true)
+    expect(firstRemove.hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Guest item 2' }))
+
+    expect(screen.getAllByRole('textbox', { name: 'Name' })).toHaveLength(1)
+    expect(firstRemove.hasAttribute('disabled')).toBe(true)
+    expect(add.hasAttribute('disabled')).toBe(false)
+  })
+})
+
+describe.each(KITS)('$name controlled step navigation', ({ kit, renderers }) => {
+  it('moves through reachable branches and reports position without a false total', () => {
+    if (!requires(kit, 'Step') || !requires(kit, 'Text')) return
+
+    render(<BranchingSteps renderers={renderers} />)
+
+    const back = screen.getByRole('button', { name: 'Back' })
+    const next = screen.getByRole('button', { name: 'Next' })
+    expect(screen.getByText('First step')).toBeTruthy()
+    expect(screen.getByText('Step 1')).toBeTruthy()
+    expect(back.hasAttribute('disabled')).toBe(true)
+    expect(next.hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(next)
+
+    expect(screen.queryByText('First step')).toBeNull()
+    expect(screen.queryByText('Second step')).toBeNull()
+    expect(screen.getByText('Third step')).toBeTruthy()
+    expect(screen.getByText('Step 2')).toBeTruthy()
+    const lastBack = screen.getByRole('button', { name: 'Back' })
+    const lastNext = screen.getByRole('button', { name: 'Next' })
+    expect(lastBack.hasAttribute('disabled')).toBe(false)
+    expect(lastNext.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.click(lastBack)
+    expect(screen.getByText('First step')).toBeTruthy()
+  })
+})
+
+describe.each(KITS)('$name action events', ({ kit, renderers }) => {
+  it('dispatches a button click as a validated effect batch', () => {
+    if (!requires(kit, 'Button')) return
+    const onEffects = vi.fn()
+    const button: ComponentNode = {
+      key: 'submit',
+      type: 'Button',
+      props: { text: prop('Submit') },
+      events: {
+        onClick: [{ type: 'builtin', name: 'announce', params: { message: 'Submitting' } }],
+      },
+    }
+
+    render(
+      <FormUnderTest
+        document={documentOf(button)}
+        kit={renderers}
+        data={{}}
+        onChange={() => undefined}
+        onEffects={onEffects}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+    expect(onEffects).toHaveBeenCalledTimes(1)
+    expect(onEffects.mock.calls[0]).toEqual([
+      [{ kind: 'announce', message: 'Submitting' }],
+      { nodeKey: 'submit', event: 'onClick', address: 'submit' },
+    ])
+  })
+
+  it('raises a field event once alongside its ordinary data change', () => {
+    if (!requires(kit, 'TextField')) return
+    const onChange = vi.fn()
+    const onEffects = vi.fn()
+    const field: ComponentNode = {
+      key: 'name',
+      type: 'TextField',
+      props: { label: prop('Name') },
+      schema: { type: 'string' },
+      events: {
+        onChange: [{ type: 'builtin', name: 'announce', params: { message: 'Changed' } }],
+      },
+    }
+
+    render(
+      <FormUnderTest
+        document={documentOf(field)}
+        kit={renderers}
+        data={{}}
+        onChange={onChange}
+        onEffects={onEffects}
+      />,
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+      target: { value: 'Ada' },
+    })
+
+    expect(onChange).toHaveBeenCalledWith('name', 'Ada')
+    expect(onEffects).toHaveBeenCalledOnce()
+  })
+
+  it('runs code actions only through the supplied action evaluator', () => {
+    if (!requires(kit, 'Button')) return
+    const evaluateAction = vi.fn((): JsonValue => [{ kind: 'announce', message: 'Prepared' }])
+    const onEffects = vi.fn()
+    const button: ComponentNode = {
+      key: 'prepare',
+      type: 'Button',
+      props: { text: prop('Prepare') },
+      events: { onClick: [{ type: 'code', name: 'prepare' }] },
+    }
+    const document = documentOf(button)
+    document.actions['prepare'] = {
+      name: 'prepare',
+      body: 'return effects',
+      params: { target: 'status' },
+    }
+
+    render(
+      <FormUnderTest
+        document={document}
+        kit={renderers}
+        data={{}}
+        onChange={() => undefined}
+        evaluateAction={evaluateAction}
+        onEffects={onEffects}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare' }))
+
+    expect(evaluateAction).toHaveBeenCalledOnce()
+    expect(onEffects).toHaveBeenCalledWith([{ kind: 'announce', message: 'Prepared' }], {
+      nodeKey: 'prepare',
+      event: 'onClick',
+      address: 'prepare',
+    })
+  })
 })
 
 describe('a breadcrumb landmark in the form language', () => {

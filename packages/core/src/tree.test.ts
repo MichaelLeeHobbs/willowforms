@@ -270,6 +270,20 @@ describe('moveNode', () => {
 })
 
 describe('validateDocument', () => {
+  it('reports an unreadable object instead of throwing', () => {
+    const unreadable = new Proxy(
+      {},
+      {
+        get: () => {
+          throw new Error('unreadable')
+        },
+      },
+    )
+
+    expect(validateDocument(unreadable)).toEqual([
+      { code: 'malformed', message: 'The form document could not be read safely.' },
+    ])
+  })
   it('accepts a well-formed document', () => {
     const doc = createDocument('Test', 'id-1')
     doc.root = fixture()
@@ -351,7 +365,7 @@ describe('validateDocument against malformed input', () => {
   const judge = (mutate: (doc: Record<string, unknown>) => void): StructuralError[] => {
     const doc = wellFormed() as unknown as Record<string, unknown>
     mutate(doc)
-    return validateDocument(doc as unknown as FormDocument)
+    return validateDocument(doc)
   }
 
   /*
@@ -457,8 +471,8 @@ describe('validateDocument against malformed input', () => {
 
   it('survives values that are not objects at all', () => {
     for (const value of [null, undefined, 42, 'text', [], true]) {
-      expect(() => validateDocument(value as unknown as FormDocument)).not.toThrow()
-      expect(validateDocument(value as unknown as FormDocument).length).toBeGreaterThan(0)
+      expect(() => validateDocument(value)).not.toThrow()
+      expect(validateDocument(value).length).toBeGreaterThan(0)
     }
   })
 
@@ -1339,14 +1353,13 @@ describe('validateDocument over the whole document', () => {
       expect(codes(docWith({ name: '' }))).toEqual([])
     })
 
-    it('rejects settings that are not an object, or hold a type that is not a name', () => {
+    it('rejects settings that are not an object or are not defined by version 1', () => {
       expect(codes(docWith({ settings: 'nope' }))).toContain('malformed')
-      expect(codes(docWith({ settings: { errorType: 7 } }))).toContain('malformed')
+      expect(codes(docWith({ settings: { errorType: 'Alert' } }))).toContain('malformed')
     })
 
-    it('accepts settings it has no opinion about', () => {
+    it('accepts the reserved empty settings object', () => {
       expect(codes(docWith({ settings: {} }))).toEqual([])
-      expect(codes(docWith({ settings: { errorType: 'Alert' } }))).toEqual([])
     })
 
     it('rejects a language entry missing the parts the renderer reads', () => {
@@ -1550,10 +1563,16 @@ describe('validateDocument over the whole document', () => {
       ).toContain('malformed')
     })
 
-    it('accepts a builtin reference, which names no action on the document', () => {
+    it('accepts a known builtin reference', () => {
+      expect(
+        codes(nodeWith({ events: { onChange: [{ name: 'announce', type: 'builtin' }] } })),
+      ).toEqual([])
+    })
+
+    it('rejects an unknown builtin reference', () => {
       expect(
         codes(nodeWith({ events: { onChange: [{ name: 'submit', type: 'builtin' }] } })),
-      ).toEqual([])
+      ).toContain('malformed')
     })
   })
 })

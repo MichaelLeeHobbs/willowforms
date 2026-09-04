@@ -15,6 +15,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, posix, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -60,25 +61,22 @@ if (missing.length > 0) {
   process.exit(1)
 }
 
-/*
- * And every entry point actually loads.
- *
- * Nothing in CI ever *imported* a `dist`. `pnpm test` resolves `@formsmith/*` to
- * `src` through `aliases.ts` and `pnpm e2e` runs the Vite dev server, which does
- * the same -- so the whole pipeline could be green while the published artefact
- * was unimportable. A file existing is not the same as a module loading: a wrong
- * `exports` condition, a dependency that only resolves under a bundler, a
- * directory import Node refuses. All three are things a build produces happily.
- *
- * This is the first thing in the repository that reads what a consumer installs.
- */
+// Resolve package names through their public export maps, as a consumer does.
 const broken = []
+const consumerRequire = createRequire(new URL('../apps/playground/package.json', import.meta.url))
 for (const name of packages) {
-  const entry = at('packages/' + name + '/dist/index.js')
+  const manifest = JSON.parse(readFileSync(at('packages/' + name + '/package.json'), 'utf8'))
+  const packageName = manifest.name
   try {
+    const entry = consumerRequire.resolve(packageName)
     await import(pathToFileURL(entry).href)
+    for (const subpath of Object.keys(manifest.exports ?? {})) {
+      if (subpath === '.' || subpath === './package.json') continue
+      const resolved = consumerRequire.resolve(packageName + subpath.slice(1))
+      if (!existsSync(resolved)) throw new Error(subpath + ' resolves to a missing file')
+    }
   } catch (error) {
-    broken.push(name + ': ' + (error instanceof Error ? error.message : String(error)))
+    broken.push(packageName + ': ' + (error instanceof Error ? error.message : String(error)))
   }
 }
 
@@ -102,15 +100,17 @@ if (broken.length > 0) {
  * guessing what it means.
  */
 const unreachable = []
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-
 for (const name of packages) {
   const dir = at('packages/' + name)
-  const output = execFileSync(npm, ['pack', '--dry-run', '--json'], {
+  const command = process.platform === 'win32' ? (process.env['ComSpec'] ?? 'cmd.exe') : 'npm'
+  const args =
+    process.platform === 'win32'
+      ? ['/d', '/s', '/c', 'npm', 'pack', '--dry-run', '--json']
+      : ['pack', '--dry-run', '--json']
+  const output = execFileSync(command, args, {
     cwd: dir,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
-    shell: process.platform === 'win32',
   })
   const published = new Set(
     JSON.parse(output.slice(output.indexOf('[')))[0].files.map((file) =>

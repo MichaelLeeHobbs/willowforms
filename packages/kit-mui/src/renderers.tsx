@@ -30,7 +30,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useId, useState } from 'react'
+import { Children, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { ComponentNode, JsonValue } from '@formsmith/core'
@@ -42,7 +42,12 @@ import {
   safeHref,
   safeStyleValue,
 } from '@formsmith/core'
-import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
+import type {
+  NodeEventHandlers,
+  NodeRenderer,
+  NodeRendererProps,
+  RendererKit,
+} from '@formsmith/renderer'
 
 type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
@@ -85,41 +90,17 @@ const bool = (v: unknown): boolean => v === true
 const num = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? v : fallback
 
-/**
- * Lengths as CSS strings, not as theme multiples.
- *
- * `sx` reads a bare number as a multiple of a theme value — `padding` through
- * `theme.spacing`, `borderRadius` through `theme.shape.borderRadius` — so the
- * kit used to divide by the scale to get back to the pixels the document
- * authored. That round-trips only under the defaults it was written against,
- * and MUI's whole point is that a host replaces them: under `spacing: 3` an
- * authored 8px drew at 3px. One of the two divisions was against the wrong
- * default and was wrong even under the defaults, dividing `radius` by 8 where
- * MUI multiplies by 4, so an authored 24 drew at 12.
- *
- * A string is passed through untouched, so the document's number is the number
- * on the page in every theme. `Grid` already carries a note about the same
- * failure — "made the same document lay out differently in the two kits" — and
- * this was the same failure two functions below it, undetected because no test
- * rendered one document through both kits and compared what came out.
- */
 const px = (value: number): string => String(value) + 'px'
 
-/**
- * The gap a layout component takes when the document does not say.
- *
- * CSS pixels, like every other length in both kits, and this one was not.
- * MUI's `gap` prop is a multiple of `theme.spacing`, which defaults to 8, so an
- * authored `gap: 2` was 16px here and 2px in `@formsmith/kit-html` -- eight
- * times apart for the same document, which is the one thing the kit contract
- * exists to prevent. MUI's own `Grid` in this file already used pixels, so the
- * kit disagreed with itself as well.
- *
- * 16 rather than 2, so the *default* renders exactly as it did: `gap: 2` through
- * MUI's spacing scale was 16px, and 16px is what `kit-html` has always used.
- * What changes is the meaning of an authored number, which is stated in
- * `docs/spec/02-kit-contract.md`.
- */
+const changed = (
+  onChange: (value: JsonValue) => void,
+  events: NodeEventHandlers | undefined,
+  value: JsonValue,
+): void => {
+  onChange(value)
+  events?.onChange?.(value)
+}
+
 const GAP = 16
 
 /**
@@ -152,21 +133,6 @@ const message = (error: string | undefined, helper: string): string => error ?? 
 const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
   error ? { role: 'alert' } : {}
 
-/**
- * The same, for a helper line carrying whichever message is showing.
- *
- * Not "a notice rather than an error": its argument is `error ?? tooLarge(...)`,
- * so an error reaches it too, and announcing whichever one is on screen is the
- * point. `alertWhenError` above is the narrower sibling, for a line that can
- * only ever hold an error.
- *
- * `FileUploadNode` produced its "too large" message only when `error` was
- * undefined and asked for `role="alert"` only when `error` was set -- two
- * conditions that cannot both hold, so the string it built was never announced
- * and the comment at the call site saying "And somebody is told" was wrong. A
- * refusal nobody can see is indistinguishable from a broken picker, which is
- * the whole reason that message exists.
- */
 const alertWhenSaying = (notice: string | undefined): { role?: 'alert' } =>
   notice ? { role: 'alert' } : {}
 
@@ -174,14 +140,16 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // Children need spacing of their own: MUI's outlined label sits on the border
   // and collides with the next field when siblings are flush against each other.
   return (
-    /*
-     * `px()`, like every other length in this file. This was the one that
-     * skipped it, and MUI's sizing transform reads a value at or below 1 as a
-     * *percentage* -- which `ImageNode`'s own comment already documents as the
-     * reason `width` converts. So `maxWidth: 1` was 100% here and 1px on
-     * `kit-html`: one document, two layouts.
-     */
-    <Box {...nodeProps} sx={{ maxWidth: px(num(props['maxWidth'], 640)), mx: 'auto', p: 2 }}>
+    <Box
+      {...nodeProps}
+      sx={{
+        maxWidth: px(num(props['maxWidth'], 640)),
+        mx: 'auto',
+        p: 2,
+        color: 'text.primary',
+        bgcolor: 'background.default',
+      }}
+    >
       <Stack gap={px(num(props['gap'], GAP))}>{children}</Stack>
     </Box>
   )
@@ -197,20 +165,26 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
 }
 
 /*
- * A step draws as a plain column. Everything that makes it a step is the
- * condition on it, which core evaluates, so there is nothing here for a kit to
- * decide beyond how a group of fields stacks up.
- *
- * (That paragraph is `StepNode`'s, further down. It sat directly above
- * `RepeaterNode`, so a reader taking a comment as documentation of the function
- * beneath it was told the wrong thing about the more complicated of the two.)
- */
-/*
  * A repeater draws the rows it was handed and nothing else. The renderer has
  * already expanded them, so a kit never counts rows, never sees an index, and
  * never learns what an address is.
  */
-function RepeaterNode({ node, props, nodeProps, children, error }: NodeRendererProps): ReactNode {
+function itemLimit(node: ComponentNode, key: 'minItems' | 'maxItems', fallback: number): number {
+  const rule = node.schema?.validations?.find((candidate) => candidate.key === key)
+  return rule && 'value' in rule && typeof rule.value === 'number' && Number.isFinite(rule.value)
+    ? Math.max(0, Math.floor(rule.value))
+    : fallback
+}
+
+function RepeaterNode({
+  node,
+  props,
+  nodeProps,
+  value,
+  onChange,
+  children,
+  error,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
   /*
@@ -222,7 +196,11 @@ function RepeaterNode({ node, props, nodeProps, children, error }: NodeRendererP
    * A `label` property on both kits would be better and is a contract change;
    * it is written up in the run's `found.md` rather than smuggled in here.
    */
-  const name = node.dataKey ?? node.key
+  const name = str(props['label'], node.dataKey ?? node.key)
+  const rows = Array.isArray(value) ? value : []
+  const renderedRows = Children.toArray(children)
+  const minimum = itemLimit(node, 'minItems', 0)
+  const maximum = itemLimit(node, 'maxItems', Number.POSITIVE_INFINITY)
   return (
     <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
       {/*
@@ -243,8 +221,31 @@ function RepeaterNode({ node, props, nodeProps, children, error }: NodeRendererP
         gap={px(num(props['gap'], GAP))}
         aria-describedby={messageId}
       >
-        {children}
+        {renderedRows.map((row, index) => (
+          <Stack key={index} gap={1} alignItems="flex-start">
+            {row}
+            {index < rows.length && (
+              <Button
+                type="button"
+                size="small"
+                disabled={rows.length <= minimum}
+                aria-label={`Remove ${name} item ${String(index + 1)}`}
+                onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+              >
+                Remove
+              </Button>
+            )}
+          </Stack>
+        ))}
       </Stack>
+      <Button
+        type="button"
+        size="small"
+        disabled={rows.length >= maximum}
+        onClick={() => onChange([...rows, {}])}
+      >
+        Add {name}
+      </Button>
       <FormHelperText id={messageId} error={Boolean(error)} {...alertWhenError(error)}>
         {message(error, '')}
       </FormHelperText>
@@ -252,24 +253,34 @@ function RepeaterNode({ node, props, nodeProps, children, error }: NodeRendererP
   )
 }
 
-function StepNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+function StepNode({ props, nodeProps, children, navigation }: NodeRendererProps): ReactNode {
   return (
     <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
       {children}
+      {navigation && (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+          <Button type="button" size="small" disabled={!navigation.back} onClick={navigation.back}>
+            Back
+          </Button>
+          <Typography component="span" variant="body2" aria-live="polite">
+            Step {navigation.position}
+          </Typography>
+          <Button
+            type="button"
+            size="small"
+            variant="outlined"
+            disabled={!navigation.next}
+            onClick={navigation.next}
+          >
+            Next
+          </Button>
+        </Stack>
+      )}
     </Stack>
   )
 }
 
 function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
-  /*
-   * Narrowed, like every other enumerated prop in this file.
-   *
-   * The cast was the only thing between a document's string and MUI's
-   * `variantMapping[variant] || 'span'`, so `level: 'body2'` rendered a `<p>`
-   * and `level: 'x'` a `<span>` with a made-up class -- a heading that has
-   * silently stopped being a heading, which no automated check would see
-   * because the element is still there.
-   */
   const LEVELS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const
   /*
    * `h2` when the document names no rank, which is what the HTML kit answers.
@@ -295,6 +306,7 @@ function TextFieldNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   // MUI derives the helper text's id, and the input's aria-describedby, from
   // this one. Without it there is no description at all.
@@ -315,7 +327,9 @@ function TextFieldNode({
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
       slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
-      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => events?.onBlur?.()}
+      onFocus={() => events?.onFocus?.()}
+      onChange={(e) => changed(onChange, events, e.target.value)}
     />
   )
 }
@@ -327,6 +341,7 @@ function NumberFieldNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
@@ -341,7 +356,10 @@ function NumberFieldNode({
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
       slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
-      onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+      onBlur={() => events?.onBlur?.()}
+      onChange={(e) =>
+        changed(onChange, events, e.target.value === '' ? null : Number(e.target.value))
+      }
     />
   )
 }
@@ -353,6 +371,7 @@ function CheckboxNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   // Every other field in this kit shows its error. This one used to drop it on
   // the floor, so a required checkbox failed a submit while saying nothing. The
@@ -365,20 +384,7 @@ function CheckboxNode({
         control={
           <Checkbox
             checked={bool(value)}
-            /*
-             * `slotProps.input`, not `inputProps`.
-             *
-             * `inputProps` is deprecated in MUI 7 and on `Switch` it is simply
-             * dropped, so every one of these attributes vanished -- measured, by
-             * installing `@mui/material@7` and running the contract suite:
-             * `aria-invalid`, `aria-required` and `aria-describedby` all gone
-             * from the Switch, while the Checkbox happened to survive. This
-             * package's peer range claims `^6 || ^7`, so that was a shipped
-             * accessibility regression on half the range nobody had run.
-             *
-             * `slotProps` works on both, which is what makes it the fix rather
-             * than a version bump.
-             */
+
             slotProps={{
               input: {
                 'aria-describedby': messageId,
@@ -392,7 +398,7 @@ function CheckboxNode({
                 ...(isRequired(node) ? { 'aria-required': true } : {}),
               },
             }}
-            onChange={(e) => onChange(e.target.checked)}
+            onChange={(e) => changed(onChange, events, e.target.checked)}
           />
         }
       />
@@ -410,6 +416,7 @@ function SelectNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const raw = props['options']
   const options = Array.isArray(raw) ? raw : []
@@ -422,49 +429,19 @@ function SelectNode({
       fullWidth
       label={str(props['label'])}
       disabled={bool(props['disabled'])}
-      /*
-       * `jsonToString`, not `str`. `str` answers `''` for a number, so a stored
-       * answer of `2` rendered as nothing selected: the user picks an option,
-       * the data holds it, the control shows blank, and the choice can never be
-       * made to stick. `optionValue` in core exists so a numeric option value
-       * survives the round trip, and this was the one end that dropped it —
-       * `RadioGroupNode` in this same file already had it right.
-       */
+
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      /*
-       * The required marking goes on the element a screen reader announces.
-       *
-       * A MUI `select` renders three nested boxes: an `InputBase` root, a
-       * `div[role="combobox"]` inside it, and a hidden native `input` beside
-       * that. `htmlInput` lands on the hidden one, which is `aria-hidden`, so
-       * `aria-required` there reached nobody -- and the contract test passed
-       * because it looked for the attribute anywhere inside the component.
-       *
-       * `slotProps.select` was the first attempt at fixing that and it is not
-       * enough: it lands on the `InputBase` root, which carries no role, so the
-       * attribute still was not on the thing being announced. `aria-invalid`
-       * arrives on the combobox by itself, which is why only half of this was
-       * visible. `SelectDisplayProps` is MUI's own way through to the element
-       * with the role, and the contract test now looks at ARIA widget roles
-       * rather than native elements, so it can see the difference.
-       */
+
       slotProps={{
         formHelperText: alertWhenError(error),
         htmlInput: requiredProps(node),
         select: { SelectDisplayProps: requiredProps(node) },
       }}
-      onChange={(e) => onChange(optionValue(options, e.target.value))}
+      onChange={(e) => changed(onChange, events, optionValue(options, e.target.value))}
     >
-      {/*
-       * The empty choice, which this kit did not draw at all.
-       *
-       * Without it a MUI select could be answered and never unanswered: there
-       * was no option to pick that means "none", so clearing a non-required
-       * field was impossible once anybody had touched it. The HTML kit had one
-       * and hardcoded its English; both now read the authored `placeholder`.
-       */}
+      {}
       <MenuItem value="">{str(props['placeholder'], 'Choose…')}</MenuItem>
       {options.map((option, i) => {
         /*
@@ -483,11 +460,16 @@ function SelectNode({
   )
 }
 
-function ButtonNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+function ButtonNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const variant = str(props['variant'], 'contained')
   const safe = variant === 'outlined' || variant === 'text' ? variant : 'contained'
   return (
-    <Button {...nodeProps} variant={safe} disabled={bool(props['disabled'])}>
+    <Button
+      {...nodeProps}
+      variant={safe}
+      disabled={bool(props['disabled'])}
+      onClick={() => events?.onClick?.()}
+    >
       {str(props['text'], 'Button')}
     </Button>
   )
@@ -551,14 +533,7 @@ function CardNode({ props, nodeProps, children }: NodeRendererProps): ReactNode 
         <CardHeader
           {...(title ? { title } : {})}
           {...(subtitle ? { subheader: subtitle } : {})}
-          /*
-           * `slotProps.title`, not `titleTypographyProps`. The latter is
-           * deprecated across the upper half of the declared peer range and
-           * still honoured by the installed 7.3.11, so this is drift rather
-           * than a defect today -- and it is the same hazard the `Checkbox`
-           * comment in this file records for `inputProps`, where a silent drop
-           * cost the `Switch` every ARIA attribute it had.
-           */
+
           slotProps={{ title: { variant: 'h6', component: 'h3' } }}
         />
       )}
@@ -570,17 +545,7 @@ function CardNode({ props, nodeProps, children }: NodeRendererProps): ReactNode 
 function TextNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const raw = props['variant']
   const variant = raw === 'small' ? 'body2' : raw === 'caption' ? 'caption' : 'body1'
-  /*
-   * MUI's `align` predates logical properties and takes left/right, so the
-   * document's start/end are mapped here rather than passed through. The HTML
-   * kit uses `text-align: start` directly and is correct in RTL for free; this
-   * one is correct in LTR, which is what MUI's own API allows.
-   *
-   * `start` maps to left rather than to `inherit`. Inheriting means a Text
-   * inside a centred container comes out centred while its own property says
-   * start, so the one alignment an author never set explicitly was the one that
-   * could not be relied on.
-   */
+
   const rawAlign = props['align']
   const align = rawAlign === 'center' ? 'center' : rawAlign === 'end' ? 'right' : 'left'
   return (
@@ -653,6 +618,7 @@ function TextAreaNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
@@ -672,7 +638,8 @@ function TextAreaNode({
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
       slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
-      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => events?.onBlur?.()}
+      onChange={(e) => changed(onChange, events, e.target.value)}
     />
   )
 }
@@ -684,15 +651,7 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
       {...nodeProps}
       role="group"
       direction={vertical ? 'column' : 'row'}
-      /*
-       * `px()`, like every other length. This was `gap={1}`, a bare number,
-       * which MUI resolves through `theme.spacing` -- so the 8px the default
-       * theme drew became 4px under `spacing: 4` and 16px under `spacing: 16`,
-       * from a document that said nothing. `renderers.test.tsx` states the rule
-       * as "a length the document authored is not the host theme's to rescale"
-       * and tested it on `Box.padding` and `Box.radius` only; this was the
-       * length it missed.
-       */
+
       gap={px(8)}
       sx={{ alignItems: vertical ? 'stretch' : 'center' }}
     >
@@ -708,6 +667,7 @@ function SwitchNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const messageId = useId()
   return (
@@ -726,7 +686,7 @@ function SwitchNode({
                 ...(isRequired(node) ? { 'aria-required': true } : {}),
               },
             }}
-            onChange={(e) => onChange(e.target.checked)}
+            onChange={(e) => changed(onChange, events, e.target.checked)}
           />
         }
       />
@@ -744,6 +704,7 @@ function RadioGroupNode({
   value,
   error,
   onChange,
+  events,
   children,
 }: NodeRendererProps): ReactNode {
   const messageId = useId()
@@ -766,7 +727,7 @@ function RadioGroupNode({
         aria-describedby={messageId}
         {...(error ? { 'aria-invalid': true } : {})}
         {...requiredProps(node)}
-        onChange={(e) => onChange(optionValue(options, e.target.value))}
+        onChange={(e) => changed(onChange, events, optionValue(options, e.target.value))}
       >
         {options.map((option, i) => {
           const { value: v, label } = optionEntry(option, i, options)
@@ -792,23 +753,6 @@ function RadioGroupNode({
 }
 
 function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
-  /*
-   * Wired to the group's value, which it always was.
-   *
-   * The comment here used to say the opposite -- "deliberately not wired ...
-   * making this self-controlling would give one question two sources of truth"
-   * -- and it was false. MUI's `Radio` reads `useRadioGroup()` from context
-   * whatever is wrapped around it, so this has never been an uncontrolled slot,
-   * and the contract's "A RadioItem child can be selected in its group" rule
-   * requires that it is not. A wrong comment is plausibly why the guard below
-   * was never written.
-   *
-   * `RadioItem` ships with `value: ''` and an unanswered group's value is `''`
-   * too, so `'' === ''` rendered a freshly dropped item pre-checked -- and every
-   * other one, all at once, since they all matched. An empty value is a control
-   * that cannot answer anything. `kit-html` fixed exactly this and its comment
-   * says so; this is the same guard on the other kit.
-   */
   const group = useRadioGroup()
   const value = str(props['value'])
 
@@ -855,6 +799,7 @@ function DatePickerNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   /*
@@ -883,7 +828,8 @@ function DatePickerNode({
           ...(str(props['max']) ? { max: str(props['max']) } : {}),
         },
       }}
-      onChange={(e) => onChange(e.target.value || null)}
+      onBlur={() => events?.onBlur?.()}
+      onChange={(e) => changed(onChange, events, e.target.value || null)}
     />
   )
 }
@@ -902,6 +848,7 @@ function FileUploadNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   /** How many files the last choice dropped for being over `maxSize`. */
   const [dropped, setDropped] = useState(0)
@@ -911,18 +858,7 @@ function FileUploadNode({
    */
   const notice = error ?? (dropped > 0 ? tooLarge(dropped) : undefined)
   const id = useId()
-  /*
-   * The names the document holds, drawn beside the input.
-   *
-   * A file input is uncontrolled by design and cannot be given a value, so a
-   * restored draft showed "No file chosen" while the payload was about to
-   * submit a filename. Nothing on screen said what the form was going to send.
-   *
-   * It is also the only thing that follows the row a value belongs to: rows are
-   * keyed by index, so the browser's own idea of which file this input holds
-   * stays with the index rather than with the data. See the note on row keys in
-   * the renderer.
-   */
+
   const filesHeld = (Array.isArray(value) ? value : [value])
     .filter((name): name is string => typeof name === 'string' && name !== '')
     .join(', ')
@@ -949,15 +885,7 @@ function FileUploadNode({
        */
       helperText={message(
         notice,
-        /*
-         * The authored helper text, not a hard-coded English sentence.
-         *
-         * This kit's own `Select` comment calls a hard-coded English string a
-         * defect worth fixing, and then this line put "Holding contrat.pdf"
-         * under a file input on a form localised to French, with no prop able
-         * to change it. The file names alone say what is held, and the helper
-         * text stays what the author wrote.
-         */
+
         filesHeld || str(props['helperText']),
       )}
       slotProps={{
@@ -980,13 +908,7 @@ function FileUploadNode({
          */
         const input = e.target
         if (!(input instanceof HTMLInputElement)) return
-        /*
-         * `maxSize` is honoured here rather than left to a host that may never
-         * look: it was a number in a panel whose own hint admitted it did
-         * nothing. Oversized files are left out and the rest are kept, so one
-         * file being too large does not silently drop the others. Kilobytes,
-         * which is what the label says.
-         */
+
         const limit = num(props['maxSize'], 0) * 1024
         const chosen = Array.from(input.files ?? [])
         const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
@@ -997,7 +919,11 @@ function FileUploadNode({
          * see is indistinguishable from a broken picker.
          */
         setDropped(chosen.length - kept.length)
-        onChange(multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null))
+        changed(
+          onChange,
+          events,
+          multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null),
+        )
       }}
     />
   )
@@ -1023,13 +949,7 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const circular = props['variant'] === 'circular'
-  /*
-   * `Number.isFinite`, not `typeof === 'number'`. `NaN` is a number, and a
-   * document can hold one -- `JsonValue` admits it, and a computed prop can
-   * produce one -- so it reached MUI as a determinate value and the bar rendered
-   * with `aria-valuenow="NaN"`. The `num()` helper in this file exists for
-   * exactly this and was the only narrowing here that did not use it.
-   */
+
   const raw = props['value']
   const determinate = typeof raw === 'number' && Number.isFinite(raw)
   const value = determinate ? Math.min(100, Math.max(0, raw)) : 0
@@ -1048,7 +968,7 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
-function LinkNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+function LinkNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const href = safeHref(props['href'])
   const blank = props['target'] === 'blank'
   /*
@@ -1067,6 +987,7 @@ function LinkNode({ props, nodeProps }: NodeRendererProps): ReactNode {
       {...nodeProps}
       href={href}
       {...(blank ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      onClick={() => events?.onClick?.()}
     >
       {str(props['text'], 'Link')}
     </Link>
@@ -1079,17 +1000,6 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const last = items.length - 1
 
   return (
-    /*
-     * The landmark's name, from the document.
-     *
-     * This was the English word `"Breadcrumb"` whatever the form's language, on
-     * a component whose every other string is translatable. `kit-html` already
-     * read a `label` prop here -- and neither kit *declared* one, so the panel
-     * rendered no editor for it and there was no i18n binding mode either: the
-     * fix its comment described was unreachable from the designer. Both kits
-     * declare it now, so the prop the renderers read is a prop an author can
-     * write and translate.
-     */
     <Breadcrumbs {...nodeProps} aria-label={str(props['label'], 'Breadcrumb')}>
       {items.map((item, i) => {
         /*

@@ -1,34 +1,15 @@
-/**
- * The validation rules editor.
- *
- * The rule engine and the rule types have been in core since the start; what was
- * missing was any way to author a rule without editing the document by hand.
- *
- * Two behaviours from the model are surfaced here rather than left implicit,
- * because both surprise people who have used other builders:
- *
- * - Only `required` fails on an empty value. A field carrying just a `url` rule
- *   stays valid while blank. The panel says so, next to the rule.
- * - A `custom` rule runs author-supplied JavaScript through an evaluator the
- *   host injects. With no evaluator it passes rather than throws, and the panel
- *   says so, because a rule that silently never fires is worse than one that
- *   visibly cannot run.
- *
- * A rule's `when` guard is in the model and has no UI here at all -- the spec
- * records it as the outstanding part of this panel -- so a guarded rule can only
- * be authored in the JSON dialog. Until it has one, nothing on this tab can warn
- * about a guard, and this comment used to say it did.
- */
-
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FieldSchema, ValidationKey, ValidationRule } from '@formsmith/core'
-import { DEFAULT_MESSAGES, patternProblem } from '@formsmith/core'
+import { DEFAULT_MESSAGES, keyScopesFor, patternProblem } from '@formsmith/core'
 
+import { languagesOf } from '../language.js'
 import type { DesignerApi } from '../store.js'
+import { TranslationEditor, translationKey } from './Binding.js'
+import { ConditionEditor, emptyCondition } from './ConditionEditor.js'
 
 /** What each rule needs from the author beyond a message. */
-type Parameter = 'none' | 'number' | 'text' | 'expression'
+type Parameter = 'none' | 'number' | 'text' | 'expression' | 'field'
 
 interface RuleDef {
   key: ValidationKey
@@ -42,8 +23,12 @@ const RULES: RuleDef[] = [
   { key: 'required', label: 'Required', parameter: 'none' },
   { key: 'minLength', label: 'Minimum length', parameter: 'number' },
   { key: 'maxLength', label: 'Maximum length', parameter: 'number' },
+  { key: 'minItems', label: 'Minimum items', parameter: 'number' },
+  { key: 'maxItems', label: 'Maximum items', parameter: 'number' },
   { key: 'min', label: 'Minimum', parameter: 'number' },
   { key: 'max', label: 'Maximum', parameter: 'number' },
+  { key: 'matches', label: 'Matches field', parameter: 'field' },
+  { key: 'after', label: 'After field', parameter: 'field' },
   { key: 'pattern', label: 'Pattern', parameter: 'text', hint: 'Regular expression' },
   { key: 'email', label: 'Email', parameter: 'none' },
   { key: 'url', label: 'URL', parameter: 'none' },
@@ -73,11 +58,16 @@ function makeRule(key: ValidationKey): ValidationRule {
   switch (key) {
     case 'minLength':
     case 'maxLength':
+    case 'minItems':
+    case 'maxItems':
     case 'min':
     case 'max':
       return { key, value: 0 }
     case 'pattern':
       return { key, value: '' }
+    case 'matches':
+    case 'after':
+      return { key, field: '' }
     case 'custom':
       return { key, expression: '' }
     default:
@@ -98,24 +88,6 @@ export interface RulesProps {
  */
 const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
 
-/**
- * Whether this panel can draw a row for a stored rule without falling over.
- *
- * A known key *and*, where the row reads the value, a value of the right shape.
- * The check here was "a non-null object with a string `key`", which admits
- * `{ key: 'pattern', value: null }` -- and the pattern row calls
- * `patternProblem(rule.value)`, which reads `.length` and throws on `null`.
- * That takes the Rules tab down, which is the failure this filter exists to
- * prevent, through the half of the shape it was not looking at.
- *
- * An unknown key is dropped too. `validateForm` already refuses one with
- * `UNREADABLE_RULE`, so a row for it would offer to edit a rule the server will
- * not run -- and the row is built from `rule.key`, so there is nothing to draw.
- *
- * Dropped from the panel, never from the document: `write` only ever sends what
- * the author edited, so a rule this cannot draw is left exactly as it is rather
- * than quietly deleted by opening a tab.
- */
 function usable(rule: unknown): rule is ValidationRule {
   if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return false
 
@@ -156,19 +128,7 @@ export function Rules({ api }: RulesProps): ReactNode {
    * on the canvas and took the whole designer down the moment this tab opened.
    * The panel is where somebody goes to repair such a document.
    */
-  /*
-   * And every entry has to be a rule, not only the list an array.
-   *
-   * `Array.isArray` alone was blessed as sufficient and is not: an array whose
-   * entries are junk passes it and crashes one line later at
-   * `new Set(rules.map((r) => r.key))` on `validations: [null]`.
-   *
-   * `validateDocument` does reject that entry -- but `store.ts` only *warns*
-   * for a host-supplied `initialDocument`, which is precisely the path the
-   * docblock above says is ungated. A host restoring
-   * `{"schema":{"type":"string","validations":[null]}}` took the designer down
-   * on opening this tab, and this is the panel somebody opens to repair it.
-   */
+
   const rules = (Array.isArray(schema.validations) ? schema.validations : []).filter(usable)
   const write = (next: Partial<FieldSchema>): void =>
     api.setFieldSchema(node.key, { ...schema, ...next })
@@ -183,6 +143,7 @@ export function Rules({ api }: RulesProps): ReactNode {
    * the control gives no sign that it does anything but name a type.
    */
   const repeats = schema.type === 'array' && Array.isArray(node.children)
+  const scopes = keyScopesFor(api.document.root, node.key)
 
   const used = new Set(rules.map((r) => r.key))
   // Every rule but `custom` is idempotent, so offering a second one is noise.
@@ -240,6 +201,13 @@ export function Rules({ api }: RulesProps): ReactNode {
                 write({ validations: rules.map((r, i) => (i === index ? next : r)) })
               }
               onRemove={() => write({ validations: rules.filter((_, i) => i !== index) })}
+              dataKeys={scopes.form}
+              rowDataKeys={scopes.row}
+              nodeKey={node.key}
+              languages={languagesOf(api.document)}
+              defaultLanguage={api.document.defaultLanguage}
+              translations={api.document.translations}
+              onTranslate={api.setTranslation}
             />
           ))}
         </ul>
@@ -262,6 +230,17 @@ export function Rules({ api }: RulesProps): ReactNode {
           onChange={(e) => {
             const key = e.target.value as ValidationKey
             if (!key) return
+            if (key === 'matches' || key === 'after') {
+              const rowField = scopes.row?.[0]
+              const formField = scopes.form[0] ?? ''
+              write({
+                validations: [
+                  ...rules,
+                  rowField ? { key, field: rowField, scope: 'row' } : { key, field: formField },
+                ],
+              })
+              return
+            }
             write({ validations: [...rules, makeRule(key)] })
           }}
         >
@@ -277,11 +256,19 @@ export function Rules({ api }: RulesProps): ReactNode {
   )
 }
 
-type NumericRule = Extract<ValidationRule, { key: 'minLength' | 'maxLength' | 'min' | 'max' }>
+type NumericRule = Extract<
+  ValidationRule,
+  { key: 'minLength' | 'maxLength' | 'minItems' | 'maxItems' | 'min' | 'max' }
+>
 
 function isNumeric(rule: ValidationRule): rule is NumericRule {
   return (
-    rule.key === 'minLength' || rule.key === 'maxLength' || rule.key === 'min' || rule.key === 'max'
+    rule.key === 'minLength' ||
+    rule.key === 'maxLength' ||
+    rule.key === 'minItems' ||
+    rule.key === 'maxItems' ||
+    rule.key === 'min' ||
+    rule.key === 'max'
   )
 }
 
@@ -290,6 +277,13 @@ interface RuleRowProps {
   index: number
   onChange: (rule: ValidationRule) => void
   onRemove: () => void
+  dataKeys: string[]
+  rowDataKeys?: string[] | undefined
+  nodeKey: string
+  languages: ReturnType<typeof languagesOf>
+  defaultLanguage: string
+  translations: Record<string, Record<string, string>>
+  onTranslate: (language: string, key: string, text: string) => void
 }
 
 /**
@@ -332,14 +326,7 @@ function NumberField({
       setDraft(text)
       return
     }
-    /*
-     * The box shows what was stored, not what was typed.
-     *
-     * `commit` normalised the value and updated `committed` without touching
-     * `draft`, so typing `007` left the box reading `007` over a document
-     * holding `7` -- and the re-sync above only fires when the *document*
-     * changes, which it did not.
-     */
+
     setCommitted(String(next))
     setDraft(String(next))
     onCommit(next)
@@ -363,7 +350,19 @@ function NumberField({
   )
 }
 
-function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
+function RuleRow({
+  rule,
+  index,
+  onChange,
+  onRemove,
+  dataKeys,
+  rowDataKeys,
+  nodeKey,
+  languages,
+  defaultLanguage,
+  translations,
+  onTranslate,
+}: RuleRowProps): ReactNode {
   const def = BY_KEY.get(rule.key)
   const id = 'fs-rule-' + String(index)
   const label = def?.label ?? rule.key
@@ -401,12 +400,7 @@ function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
 
       {rule.key === 'pattern' && (
         <div className="fs-prop-row">
-          {/*
-           * `def?.hint ?? 'Value'` -- the descriptor comes from a table this
-           * panel owns and a document can hold a rule key it does not know, in
-           * which case every other part of this row falls back to something
-           * readable and the label used to fall back to `undefined`.
-           */}
+          {}
           <label htmlFor={id + '-value'}>{def?.hint ?? 'Value'}</label>
           <input
             id={id + '-value'}
@@ -418,16 +412,7 @@ function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
             }
             onChange={(e) => onChange({ ...rule, value: e.target.value })}
           />
-          {/*
-           * The pattern is compiled here, where an author can see the answer.
-           *
-           * The engine refuses two shapes at validation time -- a pattern that
-           * does not compile, and one with an unbounded quantifier inside
-           * another -- and refusing means the rule *fails*. So a pattern this
-           * panel accepted silently made every answer invalid, on the server,
-           * with the panel showing a perfectly ordinary rule. `matchesPattern`
-           * decides; this says the same thing where it can still be fixed.
-           */}
+          {}
           {rule.key === 'pattern' && patternProblem(rule.value) ? (
             <p id={id + '-value-error'} className="fs-prop-row__error" role="alert">
               {patternProblem(rule.value)}
@@ -449,25 +434,57 @@ function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
         </div>
       )}
 
-      <div className="fs-prop-row">
-        <label htmlFor={id + '-message'}>Message</label>
-        <input
-          id={id + '-message'}
-          type="text"
-          placeholder={DEFAULT_MESSAGES[rule.key]}
-          value={rule.message ?? ''}
-          onChange={(e) => {
-            const message = e.target.value
-            if (message) onChange({ ...rule, message })
-            else {
-              // exactOptionalPropertyTypes: clearing a message drops the key
-              // rather than setting it to undefined.
-              const { message: _cleared, ...rest } = rule
-              onChange(rest)
-            }
-          }}
-        />
-      </div>
+      {(rule.key === 'matches' || rule.key === 'after') && (
+        <div className="fs-prop-row">
+          <label htmlFor={id + '-field'}>Compare with</label>
+          <select
+            id={id + '-field'}
+            value={(rule.scope ?? 'form') + ':' + rule.field}
+            onChange={(event) => {
+              const separator = event.target.value.indexOf(':')
+              const scope = event.target.value.slice(0, separator) as 'form' | 'row'
+              const field = event.target.value.slice(separator + 1)
+              if (scope === 'row') {
+                onChange({ ...rule, field, scope })
+              } else {
+                const { scope: _scope, ...rest } = rule
+                onChange({ ...rest, field })
+              }
+            }}
+          >
+            <option value="form:">Choose a field…</option>
+            {dataKeys.map((key) => (
+              <option key={'form:' + key} value={'form:' + key}>
+                Form: {key}
+              </option>
+            ))}
+            {rowDataKeys?.map((key) => (
+              <option key={'row:' + key} value={'row:' + key}>
+                This row: {key}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <RuleMessage
+        id={id + '-message'}
+        rule={rule}
+        nodeKey={nodeKey}
+        languages={languages}
+        defaultLanguage={defaultLanguage}
+        translations={translations}
+        onTranslate={onTranslate}
+        onChange={onChange}
+      />
+
+      <RuleGuard
+        id={id + '-when'}
+        rule={rule}
+        dataKeys={dataKeys}
+        rowDataKeys={rowDataKeys}
+        onChange={onChange}
+      />
 
       {rule.key === 'custom' && (
         <p className="fs-rule__note">
@@ -476,5 +493,180 @@ function RuleRow({ rule, index, onChange, onRemove }: RuleRowProps): ReactNode {
         </p>
       )}
     </li>
+  )
+}
+
+function RuleMessage({
+  id,
+  rule,
+  nodeKey,
+  languages,
+  defaultLanguage,
+  translations,
+  onTranslate,
+  onChange,
+}: Pick<
+  RuleRowProps,
+  'nodeKey' | 'languages' | 'defaultLanguage' | 'translations' | 'onTranslate' | 'onChange'
+> & {
+  id: string
+  rule: ValidationRule
+}): ReactNode {
+  const message = rule.message
+  const mode =
+    message === undefined
+      ? 'default'
+      : typeof message === 'string' || message.kind === 'static'
+        ? 'custom'
+        : message.kind === 'i18n'
+          ? 'i18n'
+          : 'other'
+
+  const setMessage = (next: ValidationRule['message']): void => {
+    if (next !== undefined) {
+      onChange({ ...rule, message: next })
+      return
+    }
+    const { message: _removed, ...rest } = rule
+    onChange(rest)
+  }
+
+  const custom =
+    typeof message === 'string'
+      ? message
+      : message?.kind === 'static' && typeof message.value === 'string'
+        ? message.value
+        : ''
+
+  return (
+    <div className="fs-prop-row">
+      <label htmlFor={id + '-mode'}>Message</label>
+      <select
+        id={id + '-mode'}
+        value={mode}
+        onChange={(event) => {
+          if (event.target.value === 'default') setMessage(undefined)
+          if (event.target.value === 'custom') {
+            setMessage({ kind: 'static', value: DEFAULT_MESSAGES[rule.key] })
+          }
+          if (event.target.value === 'i18n') {
+            setMessage({ kind: 'i18n', key: translationKey(nodeKey, rule.key + '_message') })
+          }
+        }}
+      >
+        <option value="default">Default</option>
+        <option value="custom">Custom text</option>
+        <option value="i18n">Translation</option>
+        {mode === 'other' && <option value="other">Unrecognised message</option>}
+      </select>
+
+      {mode === 'custom' && (
+        <input
+          id={id}
+          aria-label="Custom message"
+          type="text"
+          placeholder={DEFAULT_MESSAGES[rule.key]}
+          value={custom}
+          onChange={(event) => {
+            if (event.target.value) setMessage({ kind: 'static', value: event.target.value })
+            else setMessage(undefined)
+          }}
+        />
+      )}
+
+      {message && typeof message !== 'string' && message.kind === 'i18n' && (
+        <TranslationEditor
+          id={id}
+          value={message}
+          languages={languages}
+          defaultLanguage={defaultLanguage}
+          translations={translations}
+          onChange={setMessage}
+          onTranslate={onTranslate}
+        />
+      )}
+    </div>
+  )
+}
+
+function RuleGuard({
+  id,
+  rule,
+  dataKeys,
+  rowDataKeys,
+  onChange,
+}: {
+  id: string
+  rule: ValidationRule
+  dataKeys: string[]
+  rowDataKeys?: string[] | undefined
+  onChange: (rule: ValidationRule) => void
+}): ReactNode {
+  const when = rule.when
+  const mode =
+    when === undefined
+      ? 'always'
+      : when.kind === 'static' && when.value === false
+        ? 'never'
+        : when.kind === 'condition' || when.kind === 'computed'
+          ? when.kind
+          : 'other'
+
+  const setWhen = (next: ValidationRule['when']): void => {
+    if (next !== undefined) {
+      onChange({ ...rule, when: next })
+      return
+    }
+    const { when: _removed, ...rest } = rule
+    onChange(rest)
+  }
+
+  return (
+    <div className="fs-prop-row">
+      <label htmlFor={id}>Apply when</label>
+      <select
+        id={id}
+        value={mode}
+        onChange={(event) => {
+          const next = event.target.value
+          if (next === 'always') return setWhen(undefined)
+          if (next === 'never') return setWhen({ kind: 'static', value: false })
+          if (next === 'computed') return setWhen({ kind: 'computed', expression: '' })
+          if (next !== 'condition') return
+
+          const rowKey = rowDataKeys?.[0]
+          const formKey = dataKeys[0]
+          if (rowKey) setWhen({ kind: 'condition', condition: emptyCondition(rowKey, 'row') })
+          else if (formKey) setWhen({ kind: 'condition', condition: emptyCondition(formKey) })
+        }}
+      >
+        <option value="always">Always</option>
+        <option value="never">Never</option>
+        <option value="condition" disabled={(rowDataKeys?.length ?? 0) + dataKeys.length === 0}>
+          A condition
+        </option>
+        <option value="computed">An expression</option>
+        {mode === 'other' && <option value="other">Unrecognised guard</option>}
+      </select>
+
+      {when?.kind === 'condition' && (
+        <ConditionEditor
+          id={id + '-condition'}
+          value={when.condition}
+          dataKeys={dataKeys}
+          rowDataKeys={rowDataKeys}
+          onChange={(condition) => setWhen({ kind: 'condition', condition })}
+        />
+      )}
+
+      {when?.kind === 'computed' && (
+        <textarea
+          aria-label="Guard expression"
+          rows={2}
+          value={when.expression}
+          onChange={(event) => setWhen({ kind: 'computed', expression: event.target.value })}
+        />
+      )}
+    </div>
   )
 }

@@ -76,7 +76,7 @@ test('every missing field is named at once, not one at a time', async ({ designe
   expect(text).toContain('id')
   expect(text).toContain('name')
   expect(text).toContain('root')
-  await expect(problems).toHaveCount(4)
+  await expect(problems).toHaveCount(6)
 })
 
 test('a duplicate key is caught even though the JSON is well formed', async ({ designer }) => {

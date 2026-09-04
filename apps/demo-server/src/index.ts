@@ -452,13 +452,7 @@ async function textOf(c: {
   return new TextDecoder().decode(joined)
 }
 
-/**
- * Whether a parsed body nests deeper than `limit`, measured without recursing.
- *
- * A recursive depth check on a body chosen by an attacker is the bug it exists
- * to find, wearing the fix's clothes. This walks an explicit stack, and stops
- * the moment the answer is yes rather than measuring how much worse it gets.
- */
+/** Whether an external body exceeds the nesting limit, measured iteratively. */
 function deeperThan(value: unknown, limit: number): boolean {
   const stack: { value: unknown; depth: number }[] = [{ value, depth: 0 }]
 
@@ -552,12 +546,7 @@ app.put('/api/forms/:id', async (c) => {
   }
 
   await withStore((store) => {
-    /*
-     * A null-prototype record, so an attacker-chosen key is a key. `store['__proto__'] = doc`
-     * answered `{ok: true}` and stored nothing at all. Core's own `submittedData`
-     * documents this exact hazard and builds on a null prototype; the reference
-     * server was doing the thing core warns against.
-     */
+    // External document ids are stored as data keys, never as prototype operations.
     const next: Store = Object.assign(Object.create(null) as Store, store)
     next[c.req.param('id')] = doc
     return { next, result: undefined }
@@ -649,9 +638,10 @@ app.post('/api/forms/:id/submit', async (c) => {
   const steps = contextValues(doc.root, 'step').filter(
     (step): step is string => typeof step === 'string',
   )
+  const messages = doc.translations[doc.defaultLanguage]
   const scopes = steps.length
-    ? steps.map((step) => ({ context: { ...context, step } }))
-    : [{ context }]
+    ? steps.map((step) => ({ context: { ...context, step }, messages }))
+    : [{ context, messages }]
 
   /*
    * Checked against the contexts this will actually evaluate in, not against

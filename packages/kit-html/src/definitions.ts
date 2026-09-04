@@ -1,20 +1,3 @@
-/**
- * Palette metadata for the HTML kit.
- *
- * A kit's metadata half has no React import, which is what lets the designer
- * build a palette and a properties panel without loading any component library.
- * Data with one deliberate exception: `defaultRenderWhen` is a function, because
- * a `Step`'s condition names its own key and the key is not known until the node
- * is made -- so a `Kit` does not round-trip through JSON, and nothing relies on
- * it doing so. This kit exists to prove that claim: it was added as a new
- * package, with no change to core, the renderer, or the designer.
- *
- * The component types match `@formsmith/kit-mui` on purpose, so a document
- * authored against one kit renders against the other. Nothing in the contract
- * requires that; it is a courtesy this repo keeps because it makes swapping kits
- * a one-line change in the host rather than a migration.
- */
-
 import type { Kit, PropSchema } from '@formsmith/core'
 
 const label: PropSchema = {
@@ -134,13 +117,7 @@ export const htmlKit: Kit = {
       dataBound: true,
       dataType: 'boolean',
       defaultProps: { label: 'Checkbox label' },
-      /*
-       * `helperText` is declared here because the renderer already draws it. It
-       * was read and never offered, so the one place a checkbox most needs a
-       * sentence -- consent, terms, "you can change this later" -- had nowhere
-       * to put one, and `Switch`, which is the same control with a different
-       * shape, offered it.
-       */
+
       props: [label, helperText, disabled],
       events: ['onChange'],
     },
@@ -266,8 +243,8 @@ export const htmlKit: Kit = {
        */
       dataBound: true,
       dataType: 'array',
-      defaultProps: { gap: 16 },
-      props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      defaultProps: { label: 'Items', gap: 16 },
+      props: [label, { name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
       events: [],
     },
     {
@@ -573,12 +550,6 @@ export const htmlKit: Kit = {
       label: 'Progress',
       icon: 'progress',
       group: 'feedback',
-      /*
-       * No `value`, because the hint on it says to leave it empty for an
-       * indeterminate bar and the default filled it in: every freshly dropped
-       * Progress was a determinate bar sitting at 0%, which reads as a stuck
-       * upload rather than as work in progress.
-       */
       defaultProps: { variant: 'linear', label: 'Progress' },
       props: [
         label,

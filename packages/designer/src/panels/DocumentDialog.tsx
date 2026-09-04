@@ -26,7 +26,7 @@ const MAX_IMPORT = 10 * 1024 * 1024
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormDocument } from '@formsmith/core'
-import { toJsonSchema, unexportableRules, validateDocument } from '@formsmith/core'
+import { loadDocument, toJsonSchema, unexportableRules } from '@formsmith/core'
 
 import { Tabs } from './Tabs.js'
 
@@ -98,34 +98,14 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
       return
     }
 
-    /*
-     * Inside the `try` as well.
-     *
-     * The `catch` covered `JSON.parse` and stopped there, while
-     * `documentProblems` -- and `validateDocument` through it -- ran outside
-     * it. Both are total today, and this is the one panel whose whole purpose
-     * is to be handed a document nobody has checked: a throw from the gate is
-     * the dialog disappearing rather than reporting, which is the outcome the
-     * gate exists to prevent.
-     */
-    let problems: string[]
-    try {
-      problems = documentProblems(parsed)
-    } catch (error) {
-      setErrors([
-        'That document could not be checked: ' +
-          (error instanceof Error ? error.message : 'unknown error'),
-      ])
-      return
-    }
-
-    if (problems.length > 0) {
-      setErrors(problems)
+    const loaded = loadDocument(parsed)
+    if (!loaded.ok) {
+      setErrors(loaded.errors.map((error) => error.message))
       return
     }
 
     setErrors([])
-    onReplace(parsed as FormDocument)
+    onReplace(loaded.document)
     onClose()
   }, [draft, onClose, onReplace])
 
@@ -191,19 +171,7 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
 
   return (
     <>
-      {/*
-       * `Tabs`, not a second implementation of it.
-       *
-       * This was a hand-rolled tablist with a roving `tabIndex`, no arrow-key
-       * handler, no `aria-controls` and no tabpanel — and a roving tabindex puts
-       * exactly one tab in the tab order, so the JSON Schema view could not be
-       * reached from the keyboard at all. `Tabs.tsx`'s own comment says two
-       * copies was the mistake it existed to avoid; this was the second copy.
-       *
-       * The close button goes in `aside` because it cannot go in the strip: the
-       * strip is the `tablist` and may hold nothing but tabs. Wanting it on that
-       * row is what the second implementation was for.
-       */}
+      {}
       <Tabs
         label="JSON view"
         tabs={VIEWS}
@@ -343,21 +311,6 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   )
 }
 
-/**
- * A filename stem from the form's name.
- *
- * Takes `unknown`, because it is called on an unvalidated document during the
- * render of the dialog body. `validateDocument` requires `name` to be text and
- * `store.ts:333-341` only *warns* for a host-supplied `initialDocument`, so a
- * document whose `name` is a number reached `name.trim()` and threw -- taking
- * the designer down on the one panel this file's own docblock calls the place
- * for "getting JSON out and putting edited JSON back in". It is the repair
- * surface for exactly the documents that arrive that way.
- *
- * The `'form'` fallback already existed for an empty slug and now covers a name
- * that is not a string at all, which is the same answer: a file has to be
- * called something.
- */
 function slugify(name: unknown): string {
   if (typeof name !== 'string') return 'form'
   const slug = name
@@ -366,33 +319,4 @@ function slugify(name: unknown): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
   return slug || 'form'
-}
-
-/**
- * Refuse anything that would crash the renderer.
- *
- * `validateDocument` in core catches duplicate keys, empty keys, and unknown
- * references, but it takes a `FormDocument` and pasted JSON is not one yet. The
- * shape checks here are what make the cast that follows them honest.
- */
-function documentProblems(value: unknown): string[] {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return ['A form document must be a JSON object.']
-  }
-
-  const candidate = value as Partial<FormDocument>
-  const problems: string[] = []
-
-  if (candidate.version !== '1') problems.push('version must be "1".')
-  if (typeof candidate.id !== 'string') problems.push('id must be a string.')
-  if (typeof candidate.name !== 'string') problems.push('name must be a string.')
-  if (typeof candidate.root !== 'object' || candidate.root === null) {
-    problems.push('root must be a component node.')
-  } else if (typeof candidate.root.key !== 'string' || typeof candidate.root.type !== 'string') {
-    problems.push('root needs a string key and a string type.')
-  }
-
-  // Only worth the deeper walk once the shape holds up.
-  if (problems.length > 0) return problems
-  return validateDocument(candidate as FormDocument).map((error) => error.message)
 }

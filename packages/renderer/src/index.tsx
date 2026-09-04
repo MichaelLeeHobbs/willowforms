@@ -7,25 +7,41 @@
  * draws the result. That comes in as a RendererKit.
  */
 
-import { Component, createContext, useCallback, useContext, useId, useMemo } from 'react'
+import {
+  Component,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+} from 'react'
 import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import {
   MAX_ROWS,
   NO_ROWS,
   addressOf,
+  contextValues,
   dataKeyOf,
   encodeRow,
   evaluateCondition,
   isRowScope,
   isVisible,
+  keyProblem,
   pushRow,
   rowContext,
+  readPath,
+  runActions,
   rowsOf,
   styleSheetFor,
+  same,
   unreadableTag,
   valueOf,
+  walk,
 } from '@formsmith/core'
 import type {
+  ActionEvaluator,
   ComponentNode,
   EvalOptions,
   RowContext,
@@ -36,6 +52,8 @@ import type {
   FormDocument,
   FormErrors,
   Device,
+  Effect,
+  EventName,
   JsonValue,
   PropValue,
 } from '@formsmith/core'
@@ -57,7 +75,20 @@ export interface NodeRendererProps {
   /** Validation message for this node, if any. */
   error: string | undefined
   onChange: (value: JsonValue) => void
+  /** Event callbacks connected to this node's configured actions. */
+  events?: NodeEventHandlers | undefined
+  /** Controlled step navigation for a node identified as a step by its condition. */
+  navigation?: NodeNavigation | undefined
   children?: ReactNode
+}
+
+export type NodeEventHandlers = Partial<Record<EventName, (value?: JsonValue) => void>>
+
+export interface NodeNavigation {
+  /** One-based position among the steps reachable with the current answers. */
+  position: number
+  back?: (() => void) | undefined
+  next?: (() => void) | undefined
 }
 
 export interface NodeAttributes {
@@ -113,6 +144,8 @@ interface RenderContext {
    * too, and a condition reads it without an evaluator at all.
    */
   options: EvalOptions
+  navigation: ReadonlyMap<string, NodeNavigation>
+  dispatch: (node: ComponentNode, event: EventName, address: string, value?: JsonValue) => void
   onChange: (address: string, value: JsonValue) => void
   /** Told when a node's render threw, so a host can put it in its own telemetry. */
   onError: ((error: Error, key: string) => void) | undefined
@@ -128,6 +161,7 @@ const Ctx = createContext<RenderContext | null>(null)
  */
 const NO_ERRORS: FormErrors = Object.freeze({})
 const NO_TRANSLATIONS: Record<string, string> = Object.freeze({})
+const NO_NAVIGATION: ReadonlyMap<string, NodeNavigation> = new Map()
 
 /*
  * One frozen empty object, for every node whose props read no answers.
@@ -158,24 +192,10 @@ function readsData(node: ComponentNode): boolean {
   })
 }
 
-/**
- * A node's own content, as a string, for deciding whether it has been edited.
- *
- * `children` is left out: each child sits inside a boundary of its own, so a
- * child's repair is that boundary's question and not this one's. Everything
- * else the renderer reads -- `key`, `type`, `props`, `schema`, `css`, `dataKey`
- * -- is in, because any of them can be what broke a kit renderer.
- *
- * `JSON.stringify` on a document is safe: it is JSON already, so there are no
- * cycles to trip over. A key holding something unserialisable would throw here
- * rather than in a kit, so the whole thing is guarded -- a signature that
- * cannot be computed is one that never matches, which leaves the fallback up
- * rather than looping.
- */
+/** Stable content used to retry a failed renderer after the document changes. */
 function signatureOf(node: ComponentNode): string {
   try {
-    const { children: _children, ...own } = node
-    return JSON.stringify(own) ?? ''
+    return JSON.stringify(node) ?? ''
   } catch {
     return ''
   }
@@ -194,13 +214,6 @@ export function resolveProp(
   data: FormData,
   options: EvalOptions = {},
 ): JsonValue {
-  /*
-   * A shape check before the switch, which the docblock's "total over an
-   * untrusted document" already promised. `props` comes straight from JSON, so
-   * a prop holding a string or `null` reached `value.kind` and threw during
-   * render -- and a throw during render is what the boundary exists for, which
-   * is a heavy answer to a prop that is simply not a binding.
-   */
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
 
   switch (value.kind) {
@@ -229,37 +242,8 @@ export function resolveProp(
     case 'computed':
       // No sandbox means no evaluation. Render the field rather than crash the form.
       if (!options.evaluate) return null
-      /*
-       * And a throw gets the same answer, for the same reason.
-       *
-       * This was the last render-time evaluator call site in the project without
-       * a `try`. `visibility.ts` wraps it and says why; `validation.ts`'s two
-       * sites were wrapped in item 8. An expression is authored in a document
-       * and the evaluator belongs to the host, so a throw here is neither side's
-       * to own -- and it took the form down through a path the boundary did not
-       * cover either.
-       *
-       * `null`, not the boundary's fallback. A single bad prop expression is not
-       * a reason to replace a working component with an error box, and this line
-       * already promised exactly this answer for a host that supplied no
-       * evaluator at all.
-       */
+
       try {
-        /*
-         * Scoped to the row, which this was the last call site not to do.
-         *
-         * `visibility.ts:53` and `validation.ts:734` both spread `options.row`
-         * over `data` before evaluating, and the `condition` branch twelve
-         * lines up passes `options.row` straight through. This one read
-         * top-level `data` only, so a computed prop inside a repeater resolved
-         * the *same* value in every row: a computed label reading `price * qty`
-         * showed row one's answer on all of them, and nothing looked wrong
-         * enough to report.
-         *
-         * The row is spread last for the reason `validation.ts` states: a key
-         * the row holds shadows the form's, and an expression can still reach a
-         * form-level answer no field in the row writes.
-         */
         const scoped = options.row ? { ...data, ...options.row.values } : data
         return options.evaluate(value.expression, scoped, options.context)
       } catch {
@@ -333,41 +317,11 @@ function MissingType({ node, nodeProps, error }: NodeRendererProps): ReactNode {
  */
 const RowCtx = createContext<RowContext | undefined>(undefined)
 
-/**
- * One node's blast radius.
- *
- * A kit is third-party code and a host's evaluator is arbitrary JavaScript, so
- * a render here can throw for reasons this package does not control. React 19
- * unmounts the whole tree when nothing catches that, which means one bad
- * component blanks whatever page the form was embedded in — and there was no
- * boundary anywhere in this repository.
- *
- * Per node rather than around the form, and the difference is not academic. A
- * form-level boundary saves the host's page and still throws away every answer
- * already typed into the fields that were fine. On the canvas it is worse: the
- * component that broke becomes unselectable, and selecting it is the one thing
- * an author needs in order to delete it.
- *
- * So the fallback carries `data-fs-key` and `data-fs-type` itself. The canvas
- * hit-tests with `closest('[data-fs-key]')` and there is nothing else in the DOM
- * that identifies a node; without them a broken component is unreachable from
- * both the canvas and the tree.
- *
- * A class, because that is the only way to catch a render error in React. It is
- * the only one in this repository and it is not a style anybody should copy.
- */
 interface NodeBoundaryProps {
   node: ComponentNode
+  runtime: RenderContext
   scope: string
-  /**
-   * The row the failed node was drawn in, when it was drawn in one.
-   *
-   * The fallback carried `data-fs-key`, `data-fs-type` and `data-fs-scope` so a
-   * broken component stays selectable, and omitted this one -- so inside a
-   * repeater the designer could find *a* copy of the node and not the one that
-   * broke. It is the fourth symptom of one missing field, and the other three
-   * are in the drag pipeline.
-   */
+
   row: string | undefined
   /**
    * Whether the node it wraps is one `renderWhen` hides, drawn anyway.
@@ -381,46 +335,24 @@ interface NodeBoundaryProps {
   children: ReactNode
 }
 
-type BoundaryState = { failed: boolean; signature: string | null }
+type BoundaryState = {
+  failed: boolean
+  signature: string | null
+  runtime: RenderContext | null
+}
 
 class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
   // `null` is "no failure to compare against yet", not a signature. The
   // signature is only read while failed, so computing one here would be work
   // for nothing -- and `getDerivedStateFromError` has no props to compute it
   // from, which is why the first failed render records it instead.
-  override state: BoundaryState = { failed: false, signature: null }
+  override state: BoundaryState = { failed: false, signature: null, runtime: null }
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true }
   }
 
-  /**
-   * A different node here is a fresh chance to render.
-   *
-   * `failed` was never cleared, so a component that threw once stayed an error
-   * box for the life of the mount. On the canvas that is the ordinary case
-   * rather than a rare one: an author writes a property value that breaks a
-   * renderer, fixes it, and the box stays -- with nothing to click that would
-   * bring the component back, because the box is what replaced it.
-   *
-   * Keyed on the node's content rather than on every render, because retrying
-   * on each render is an infinite loop when the cause has not gone away.
-   *
-   * Key and type alone were not enough, and the case they missed is the one the
-   * paragraph above is written about: an author writes a prop value that breaks
-   * a renderer and fixes it, and neither the key nor the type ever changed, so
-   * the box stayed. The retry fired for a *different component* and not for a
-   * repaired one.
-   *
-   * A signature over the node's own fields, so an edit anywhere in it is a new
-   * question. Not reference identity: a host is free to rebuild its document
-   * object on every render, and identity would then retry on every render --
-   * the infinite loop this is guarding against. `children` is excluded because
-   * each child has a boundary of its own.
-   *
-   * Computed only while failed, which is the whole reason this is affordable.
-   * A healthy node returns on the first line and stringifies nothing.
-   */
+  /** Retry after either document content or runtime inputs change. */
   static getDerivedStateFromProps(
     props: NodeBoundaryProps,
     state: BoundaryState,
@@ -430,9 +362,11 @@ class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
     const signature = signatureOf(props.node)
     // The render right after the throw. Record what failed; do not read the
     // fallback as a repair.
-    if (state.signature === null) return { failed: true, signature }
-    if (signature === state.signature) return null
-    return { failed: false, signature: null }
+    if (state.signature === null) {
+      return { failed: true, signature, runtime: props.runtime }
+    }
+    if (signature === state.signature && props.runtime === state.runtime) return null
+    return { failed: false, signature: null, runtime: null }
   }
 
   override componentDidCatch(error: Error, _info: ErrorInfo): void {
@@ -491,18 +425,6 @@ function errorAt(errors: FormErrors, address: string): string | undefined {
   return Object.hasOwn(errors, address) ? errors[address] : undefined
 }
 
-/**
- * One row's scope, as a context value that only changes when the row does.
- *
- * The provider used to build its value inline, so every row got a new object
- * identity on every render of the repeater — which defeats the four `useMemo`s
- * in every descendant, because each of them lists `row` in its dependencies.
- * A fifty-row repeater therefore re-ran `isVisible` and `resolveProps` for every
- * node beneath it on every keystroke.
- *
- * A component rather than a `useMemo` at the call site, because the call site is
- * inside a `.map` and a hook cannot go there.
- */
 function Row({
   path,
   name,
@@ -524,19 +446,6 @@ function Row({
   return <RowCtx.Provider value={context}>{children}</RowCtx.Provider>
 }
 
-/**
- * One node, inside its boundary.
- *
- * The boundary used to wrap `<Component>` and nothing else, so everything below
- * this line -- the kit lookup, `isVisible`, `resolveProps`, the row mapping --
- * ran outside it. A kit is third-party code, which is the premise the boundary's
- * own comment argues from, and `kit.renderers[node.type]` is a property read on
- * an object this package did not write.
- *
- * Split in two so the boundary is a parent rather than a wrapper around the last
- * expression. `RenderNode` now reads the context and returns the boundary;
- * everything else is here, where a throw is caught.
- */
 /**
  * A node's children, whatever the document put there.
  *
@@ -563,9 +472,41 @@ function childrenOf(node: ComponentNode): ComponentNode[] {
   )
 }
 
+const EVENT_NAMES: EventName[] = [
+  'onChange',
+  'onClick',
+  'onBlur',
+  'onFocus',
+  'onMount',
+  'onUnmount',
+]
+
+function NodeLifecycle({
+  nodeKey,
+  events,
+  children,
+}: {
+  nodeKey: string
+  events: NodeEventHandlers
+  children: ReactNode
+}): ReactNode {
+  const latest = useRef(events)
+
+  useEffect(() => {
+    latest.current = events
+  }, [events])
+
+  useEffect(() => {
+    latest.current.onMount?.()
+    return () => latest.current.onUnmount?.()
+  }, [nodeKey])
+
+  return children
+}
+
 function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
   const ctx = useRenderContext()
-  const { scope, revealHidden, kit, data, errors, translations, options, onChange } = ctx
+  const { scope, revealHidden, kit, data, errors, translations, options, onChange, dispatch } = ctx
   const row = useContext(RowCtx)
 
   // Everything a rule reads has to know which row it is in, or the renderer and
@@ -618,6 +559,14 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
     (value: JsonValue) => onChange(address, value),
     [onChange, address],
   )
+  const events = useMemo<NodeEventHandlers>(() => {
+    const handlers: NodeEventHandlers = {}
+    for (const event of EVENT_NAMES) {
+      if (!Array.isArray(node.events?.[event]) || node.events[event]?.length === 0) continue
+      handlers[event] = (value) => dispatch(node, event, address, value)
+    }
+    return handlers
+  }, [node, address, dispatch])
 
   const nodeProps = useMemo<NodeAttributes>(
     () => ({
@@ -634,40 +583,8 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 
   const Component = kit.renderers[node.type] ?? kit.fallback ?? MissingType
 
-  /*
-   * A repeater draws its children once per row, each under that row's scope.
-   * The rows come out of the data, so the count is never something a caller
-   * claims.
-   *
-   * Keyed by index, and here is what that actually costs. This comment used to
-   * say index keys "remount rows below a deletion", which is the opposite of
-   * what React does: it *reuses* the component instance at each index and
-   * unmounts only the last one. So after deleting row 0, the instance that drew
-   * row 0 now draws row 1.
-   *
-   * Everything a kit derives from `value` follows the data and is fine. Anything
-   * the browser owns does not: the file a `type="file"` input is holding, an IME
-   * composition in progress, a text selection, the scroll position of a long
-   * control. Those stay with the index and now belong to the wrong row.
-   *
-   * There is no better key available, and that is a consequence of a decision
-   * rather than an oversight. A key would have to be stable for the row's
-   * lifetime, and the two candidates both fail: a generated row id would be a
-   * non-answer living inside `data` and in the payload, which `12-api.md`
-   * refuses by name, and the row object's own identity changes every time that
-   * row is edited, which would remount it on every keystroke.
-   *
-   * Recorded in `docs/build-out/triage.md` with what closing it would take.
-   */
-  /*
-   * An authoring surface draws one row for an empty repeater.
-   *
-   * The canvas renders with empty data, so a repeater has no rows there and its
-   * children never render: the authored subtree would be invisible and nothing
-   * could be dropped into it. That is the same hole `revealHidden` was added to
-   * close for a conditional component, so it is the same flag. A person filling
-   * in the form still sees no rows until there are some.
-   */
+  /* Rows are keyed by address index because submitted data has no stable row id. */
+
   /*
    * Computed only for a repeater, which is what asks for it. Every node in the
    * document used to read its own value out of the data and build a row list
@@ -718,18 +635,22 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
     : childrenOf(node).map((child) => <RenderNode key={child.key} node={child} />)
 
   return (
-    <Component
-      node={node}
-      props={props}
-      nodeProps={nodeProps}
-      // Value by data key, error by node key. Two components may share a data
-      // key; they can still fail for different reasons.
-      value={valueOf(row?.values ?? data, dataKey)}
-      error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
-      onChange={handleChange}
-    >
-      {children}
-    </Component>
+    <NodeLifecycle nodeKey={node.key} events={events}>
+      <Component
+        node={node}
+        props={props}
+        nodeProps={nodeProps}
+        // Value by data key, error by node key. Two components may share a data
+        // key; they can still fail for different reasons.
+        value={valueOf(row?.values ?? data, dataKey)}
+        error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
+        onChange={handleChange}
+        events={events}
+        navigation={ctx.navigation.get(node.key)}
+      >
+        {children}
+      </Component>
+    </NodeLifecycle>
   )
 }
 
@@ -749,7 +670,8 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
  * it did not cover.
  */
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
-  const { scope, onError, data, options, revealHidden } = useRenderContext()
+  const runtime = useRenderContext()
+  const { scope, onError, data, options, revealHidden } = runtime
   // The same coordinate the body puts on `nodeProps`, so a fallback is findable
   // in the row that broke rather than in whichever row drew first.
   const row = useContext(RowCtx)
@@ -757,6 +679,7 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   return (
     <NodeBoundary
       node={node}
+      runtime={runtime}
       scope={scope}
       row={row ? encodeRow(row.path) : undefined}
       /*
@@ -786,6 +709,84 @@ const EMPTY_ROWS: FormData[] = []
  */
 const AUTHORED_ROW: FormData[] = [{}]
 
+export interface FormNavigation {
+  /** Context path whose literal comparisons define the flow. Defaults to `step`. */
+  path?: string
+  /** Called with the destination value; the host remains the owner of navigation state. */
+  onNavigate: (value: JsonValue) => void
+}
+
+export interface ActionDispatch {
+  nodeKey: string
+  event: EventName
+  address: string
+}
+
+function contextWith(
+  current: FormContext | undefined,
+  path: string,
+  value: JsonValue,
+): FormContext | undefined {
+  const parts = path.split('.')
+  if (parts.length === 0 || parts.some((part) => keyProblem(part))) return undefined
+
+  const write = (source: JsonValue | undefined, at: number): JsonValue => {
+    const part = parts[at]
+    if (!part) return value
+    const record =
+      source && typeof source === 'object' && !Array.isArray(source)
+        ? source
+        : ({} as Record<string, JsonValue>)
+    const next = at === parts.length - 1 ? value : write(record[part], at + 1)
+    return { ...record, [part]: next }
+  }
+
+  return write(current, 0) as FormContext
+}
+
+function navigationFor(
+  root: ComponentNode,
+  data: FormData,
+  context: FormContext | undefined,
+  path: string,
+  onNavigate: (value: JsonValue) => void,
+): ReadonlyMap<string, NodeNavigation> {
+  const entries: { key: string; value: JsonValue }[] = []
+
+  walk(root, (node) => {
+    if (!node.renderWhen) return
+    const shell: ComponentNode = {
+      key: node.key,
+      type: node.type,
+      props: {},
+      renderWhen: node.renderWhen,
+    }
+    for (const value of contextValues(shell, path)) {
+      const candidate = contextWith(context, path, value)
+      if (!candidate || !isVisible(node, data, { context: candidate })) continue
+      if (!entries.some((entry) => entry.key === node.key && same(entry.value, value))) {
+        entries.push({ key: node.key, value })
+      }
+    }
+  })
+
+  const current = readPath(context, path)
+  const active = entries.findIndex((entry) => same(entry.value, current))
+  if (active < 0) return NO_NAVIGATION
+
+  const result = new Map<string, NodeNavigation>()
+  entries.forEach((entry, index) => {
+    const previous = entries[index - 1]
+    const following = entries[index + 1]
+    result.set(entry.key, {
+      position: index + 1,
+      ...(previous ? { back: () => onNavigate(previous.value) } : {}),
+      ...(following ? { next: () => onNavigate(following.value) } : {}),
+    })
+  })
+  return result
+}
+
 export interface FormRendererProps {
   document: FormDocument
   kit: RendererKit
@@ -793,20 +794,7 @@ export interface FormRendererProps {
   errors?: FormErrors
   /** Language tag to draw translations from. Defaults to the document default. */
   language?: string
-  /**
-   * Draw components their `renderWhen` would hide, marked with `data-fs-hidden`.
-   *
-   * For an authoring surface, and wrong anywhere a person is filling in a form.
-   * The designer's canvas renders with empty data and swallows pointer events so
-   * a click can select rather than type, so a conditional component was absent
-   * from the DOM: it could not be seen, positioned, or dropped into, and the
-   * only way to reach it was the tree. Arranging a form means arranging every
-   * component in it, including the ones a given user will not see. Showing what
-   * a user sees is what Preview is for.
-   *
-   * Validation is untouched. `validateForm` calls the same `isVisible`, so this
-   * changes what is drawn and never what is checked.
-   */
+
   revealHidden?: boolean
   /** Sandbox for computed bindings. Omit to render computed props as null. */
   evaluate?: Evaluator
@@ -829,6 +817,14 @@ export interface FormRendererProps {
    * discovering that per submit.
    */
   context?: FormContext
+  /** Optional controlled navigation for condition-defined steps. */
+  navigation?: FormNavigation
+  /** Sandbox boundary for code actions. Built-in actions do not require it. */
+  evaluateAction?: ActionEvaluator
+  /** Receives one fully validated effect batch. The host decides how to apply it. */
+  onEffects?: (effects: Effect[], dispatch: ActionDispatch) => void
+  /** Reports an action reference, evaluator, or effect failure. */
+  onActionError?: (message: string, dispatch: ActionDispatch) => void
   /**
    * A node's render threw, and its component was replaced with a notice.
    *
@@ -869,23 +865,14 @@ export function FormRenderer({
   evaluate,
   device,
   context,
+  navigation,
+  evaluateAction,
+  onEffects,
+  onActionError,
   onError,
   nonce,
   onChange,
 }: FormRendererProps): ReactNode {
-  /*
-   * Total against a document that never passed the gate.
-   *
-   * `validateDocument` reports a malformed `translations`, and a host is
-   * supposed to call it — but the designer renders a document the instant it is
-   * pasted, and a host is free not to. An unguarded index here throws during
-   * render, and a throw during render in React 19 unmounts the whole tree
-   * rather than the one node, so the page a form was embedded in goes blank.
-   *
-   * A bundle that is not an object holds no translation for anything, so it
-   * reads as none: `resolveProp` then falls back to the key, which is what an
-   * untranslated string already does.
-   */
   const translations = useMemo(() => {
     const bundles: unknown = document.translations
     if (!bundles || typeof bundles !== 'object' || Array.isArray(bundles)) return NO_TRANSLATIONS
@@ -893,15 +880,7 @@ export function FormRenderer({
       language ?? document.defaultLanguage
     ]
     if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return NO_TRANSLATIONS
-    /*
-     * The strings in it, not the object as it stands.
-     *
-     * This asserted a type after checking only that the bundle was a non-array
-     * object, so `translations: { en: { greeting: { a: 1 } } }` reached a kit
-     * as a label -- and both in-repo kits swallow a non-string to `''` through
-     * `str()`, so the label silently disappeared instead of falling back to the
-     * key. A translation that is not text is a translation nobody wrote.
-     */
+
     const strings: Record<string, string> = {}
     for (const [key, value] of Object.entries(bundle)) {
       if (typeof value === 'string') strings[key] = value
@@ -914,10 +893,75 @@ export function FormRenderer({
   const scope = useId()
 
   const options = useMemo<EvalOptions>(() => ({ evaluate, context }), [evaluate, context])
+  const nodeNavigation = useMemo(
+    () =>
+      navigation
+        ? navigationFor(
+            document.root,
+            data,
+            context,
+            navigation.path ?? 'step',
+            navigation.onNavigate,
+          )
+        : NO_NAVIGATION,
+    [document.root, data, context, navigation],
+  )
+  const dispatch = useCallback(
+    (node: ComponentNode, event: EventName, address: string, value?: JsonValue): void => {
+      const refs = node.events?.[event]
+      if (!Array.isArray(refs) || refs.length === 0) return
+      const stored: unknown = document.actions
+      const actions =
+        stored && typeof stored === 'object' && !Array.isArray(stored)
+          ? (stored as FormDocument['actions'])
+          : {}
+      const invocation = {
+        event,
+        nodeKey: node.key,
+        address,
+        ...(value === undefined ? {} : { value }),
+      }
+      const result = runActions(refs, actions, data, invocation, {
+        context,
+        evaluate: evaluateAction,
+      })
+      const meta: ActionDispatch = { nodeKey: node.key, event, address }
+      if (!result.ok) {
+        onActionError?.(result.error, meta)
+        return
+      }
+      if (result.effects.length > 0) onEffects?.(result.effects, meta)
+    },
+    [document.actions, data, context, evaluateAction, onEffects, onActionError],
+  )
 
   const ctx = useMemo<RenderContext>(
-    () => ({ scope, revealHidden, kit, data, errors, translations, options, onChange, onError }),
-    [scope, revealHidden, kit, data, errors, translations, options, onChange, onError],
+    () => ({
+      scope,
+      revealHidden,
+      kit,
+      data,
+      errors,
+      translations,
+      options,
+      navigation: nodeNavigation,
+      dispatch,
+      onChange,
+      onError,
+    }),
+    [
+      scope,
+      revealHidden,
+      kit,
+      data,
+      errors,
+      translations,
+      options,
+      nodeNavigation,
+      dispatch,
+      onChange,
+      onError,
+    ],
   )
 
   /*
@@ -926,21 +970,7 @@ export function FormRenderer({
    * Every rule is scoped to a `data-fs-key`, which every renderer already
    * spreads, so this reaches exactly the elements the document names.
    */
-  /*
-   * The one document field that was not guarded, and the only one whose failure
-   * escapes every boundary.
-   *
-   * `translations` gets a full shape check above, with a comment saying a host
-   * "is free not to" call `validateDocument`. `document.root` went straight
-   * into `<RenderNode node={document.root} />`, and `NodeBoundary` reads
-   * `props.node.key` while constructing itself -- so a missing root threw
-   * outside the very boundary meant to contain it, and React 19 unmounts the
-   * host's whole tree on an uncaught render error. A form that fails to load
-   * takes the page around it down with it.
-   *
-   * A message rather than `null`, because a host embedding a form and seeing
-   * nothing has no way to tell "no root" from "the form rendered empty".
-   */
+
   const root: unknown = document.root
   const rooted =
     Boolean(root) && typeof root === 'object' && typeof (root as { key?: unknown }).key === 'string'

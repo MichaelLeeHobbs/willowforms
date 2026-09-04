@@ -41,8 +41,9 @@ inspector to see the tree are different intentions.
 **The grip sits outside the pane it controls.** Inside, it would be a one-way door: collapsing the pane
 would take the control that reopens it with it. The chevron points the way the pane will move.
 
-A collapsed pane is `hidden`, so it leaves the accessibility tree and the tab order rather than becoming
-a zero-width region a keyboard can still land in. `test/a11y.test.tsx` audits that state.
+A collapsed pane is `hidden` and explicitly `display: none`, so it leaves both layout and the
+accessibility tree rather than becoming a region a keyboard can still land in. `test/a11y.test.tsx` and
+the browser layout suite audit that state.
 
 ### Tabbed left pane
 

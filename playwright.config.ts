@@ -19,6 +19,8 @@ const baseURL = 'http://localhost:' + String(PORT)
 
 export default defineConfig({
   testDir: './e2e',
+  // The first navigation includes Vite's cold compilation on a clean runner.
+  timeout: 60_000,
   // Everything here shares one dev server, and several tests drag components
   // around the same document, so they run in order rather than in parallel.
   fullyParallel: false,

@@ -63,20 +63,6 @@ export function forbiddenKeys(candidates: Candidate[], key: string | undefined):
   return closure(candidates, key)
 }
 
-/**
- * A key and everything under it, from a flat list of `{key, parentKey}`.
- *
- * Shared by the canvas and the tree, which had the same loop written twice --
- * and the copies had drifted in their comments rather than their behaviour,
- * which is the drift that is hardest to notice.
- *
- * Repeated until nothing new is added, not a single pass. The comment on the
- * canvas copy claimed one pass was enough because candidates arrive
- * parent-before-child; the loop it sat above did not rely on that, and a
- * measurement that is not in document order -- a repeater's rows, a kit that
- * renders children before their container -- would have made a single pass
- * wrong. The loop is right and the comment was not.
- */
 function closure(
   nodes: readonly { key: string; parentKey?: string | undefined }[],
   key: string | undefined,
@@ -99,21 +85,7 @@ function closure(
 }
 
 /** The innermost container under the point that the drag is allowed to enter. */
-/**
- * One repeater row's worth of children, chosen by where the pointer is.
- *
- * A repeater draws its subtree once per row, so `measureTree` emits one
- * candidate per drawn element and the children of a repeater arrive here as
- * every row's children interleaved -- each with the same key and the same
- * `index`, differing only in `row` and in the rectangle. Scanning that list for
- * a midpoint compares the pointer against whichever row sorted first, so a drop
- * into row 1 was placed by row 0's geometry.
- *
- * Grouped by row and then picked by containment, falling back to the nearest
- * group by vertical distance so a pointer in the gap between two rows still gets
- * an answer. Outside a repeater every child shares one row value, the map has a
- * single entry, and this returns its argument.
- */
+
 function inOneRow(children: Candidate[], x: number, y: number): Candidate[] {
   const rows = new Map<string, Candidate[]>()
   for (const child of children) {
@@ -283,24 +255,6 @@ export function resolveDrop(
     }
   }
 
-  /*
-   * A wrapping container is resolved in reading order, not on one axis.
-   *
-   * `inferAxis` collapses a layout to `'row' | 'column'` by summing the deltas
-   * between adjacent children, and the slot loop then compares the pointer
-   * against midpoints on that one axis. Both shipped kits render `Grid` as
-   * `gridTemplateColumns: repeat(auto-fit, minmax(...))` -- a genuinely 2-D
-   * wrapping layout, `container: true`, with a palette entry in each. A default
-   * `Grid` holding four children lays them out 2x2, `inferAxis` answers `'row'`,
-   * and a drop into the bottom-right cell resolved to slot 1 -- between the two
-   * children of the *top* row -- with the drop bar drawn a row away from the
-   * pointer. Slots 2 and 3 were unreachable by any pointer position.
-   *
-   * A layout is wrapping when its children occupy more than one visual band and
-   * at least one band holds more than one child. That is exactly the case
-   * neither axis describes: several bands each holding one child is a column,
-   * one band holding several is a row, and both of those keep the original path.
-   */
   const bands = visualRows(children)
   const wrapping = bands.length > 1 && bands.some((band) => band.length > 1)
 
@@ -339,15 +293,7 @@ export function resolveDrop(
     }
 
     const bandSlot = before ? band.indexOf(before) : band.length
-    /*
-     * A stand-in parent whose rectangle is the band's own box.
-     *
-     * `spanOf` returns the parent's rectangle whenever the children share its
-     * repeater row -- which ordinary children always do, both being `undefined`
-     * -- so handing it the band changes nothing by itself. The band's extent
-     * has to arrive as the parent's, which is what this does: the bar then has
-     * the row's height and sits in the row, and `barFor` is left alone.
-     */
+
     indicator = barFor({ ...parent, rect: boxOf(band) ?? parent.rect }, band, bandSlot, 'row')
   } else {
     const position = axis === 'row' ? x : y
@@ -375,13 +321,6 @@ export function resolveDrop(
   }
 }
 
-/**
- * Translate a slot in the filtered list back to an index in the real children.
- *
- * `moveNode` removes the node before inserting it, so an index measured in a
- * list that already excludes the dragged node is exactly what it wants. For any
- * other drag the dragged node was never in this parent, and the two agree.
- */
 function documentIndex(
   candidates: Candidate[],
   parentKey: string,
@@ -389,47 +328,11 @@ function documentIndex(
   slot: number,
   draggedKey: string | undefined,
 ): number {
-  /*
-   * A palette drop is an insertion, like a move from another parent, so it takes
-   * the same translation. It used to return the raw slot: in a container holding
-   * a node that drew nothing -- a component the kit does not implement, or one
-   * whose renderer returned null -- the drawn list is shorter than the real one,
-   * so dropping from the palette and dragging in from elsewhere put a component
-   * in two different places for the same gesture.
-   */
   if (!draggedKey) return indexInParent(filtered, slot)
 
   const dragged = candidates.find((c) => c.key === draggedKey && c.parentKey === parentKey)
   if (!dragged) return indexInParent(filtered, slot)
 
-  /*
-   * A same-parent move is translated too, and then adjusted for the removal.
-   *
-   * This returned the raw `slot` on the theory that "for a sibling the index is
-   * measured in the list that already excludes it". That is true of the *drawn*
-   * list and false of the document, and the two agree only when every sibling
-   * drew an element -- `measureTree` skips a node with no `[data-fs-key]`
-   * element and its whole subtree, which `ARCHITECTURE.md` names as a supported
-   * kit outcome.
-   *
-   * Computed by hand against this file's own `withHidden()` fixture, which is
-   * the shape that separates them, and then confirmed by running `removeNode`
-   * and `insertNode` for every candidate index. Children `[a, ?, ?, d, e]` where
-   * two drew nothing; drop `a` between `d` and `e`:
-   *
-   *   1 -> h1, a, h2, d, e
-   *   2 -> h1, h2, a, d, e
-   *   3 -> h1, h2, d, a, e   <- where the pointer was
-   *   4 -> h1, h2, d, e, a
-   *
-   * The old code answered 2 and the test pinned 1. Both put the component
-   * somewhere the author did not aim, silently, and `dnd.test.ts` was the guard
-   * for exactly this fixture.
-   *
-   * `- 1` because `moveNode` is `insertNode(removeNode(...))`: when the dragged
-   * node sat before the target position, removing it has already shifted
-   * everything after it down by one.
-   */
   const target = indexInParent(filtered, slot)
   return dragged.index < target ? target - 1 : target
 }
@@ -442,21 +345,7 @@ function indexInParent(filtered: Candidate[], slot: number): number {
 }
 
 /** The insertion bar: a thin rect on the boundary between two children. */
-/**
- * The span the bar takes across the axis it is not on.
- *
- * The parent's own rectangle, normally, and the comment below says why: the bar
- * marks a position in the parent rather than in a child.
- *
- * Except inside a repeater, where the parent's rectangle covers every drawn row
- * at once. A bar for a drop into row 1 was therefore drawn from the top of row 0
- * to the bottom of the last row -- the right index with an indicator a hundred
- * pixels from the pointer, which is the visible half of this defect and the half
- * an author would report.
- *
- * The children name a row their parent does not exactly when they are a
- * repeater's row contents, so that comparison is the test.
- */
+
 function spanOf(parent: Candidate, children: Candidate[]): Rect {
   const first = children[0]
   if (!first || first.row === parent.row) return parent.rect
@@ -505,13 +394,6 @@ function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Ax
   const span = spanOf(parent, children)
 
   if (axis === 'row') {
-    /*
-     * The parent's own span. A child's rectangle is inside its parent's, so the
-     * `min` and the `max` this used to compute could only ever answer the
-     * parent -- arithmetic that reads as though it handles an overflowing child
-     * and does not. If a child ever does overflow, the bar should still be the
-     * parent's height: it marks a position in the parent, not in the child.
-     */
     const top = span.top
     const height = span.height
     // Midway between the neighbours, so the bar sits in the gap rather than on

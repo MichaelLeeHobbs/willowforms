@@ -25,22 +25,6 @@ import type { FormDocument, Language } from '@formsmith/core'
 export function isLanguage(language: unknown): language is Language {
   if (!language || typeof language !== 'object' || Array.isArray(language)) return false
 
-  /*
-   * Every field the type declares, not just the one that made it stop throwing.
-   *
-   * A predicate written `language is Language` is a promise to the compiler, and
-   * checking `code` alone made it a false one: `{ code: 'en' }` was handed on as
-   * a `Language`, the toolbar rendered `entry.name` as nothing, and
-   * `api.setLanguages` -- typed `Language[]` -- accepted it back. The compiler
-   * then has no reason to question `.name` or `.bidi` anywhere downstream,
-   * which is worse than no predicate at all.
-   *
-   * `bidi` is a two-value union in the type, so a third string is not one.
-   * `dialect` is optional, so absent is fine and a non-string is not: a
-   * `{"code":"en","dialect":5}` builds the tag `en-5`, which `findLanguage`
-   * matches against nothing -- the exact defect `languageTag`'s own docblock
-   * records having fixed once in core.
-   */
   const shape = language as { code?: unknown; dialect?: unknown; name?: unknown; bidi?: unknown }
 
   if (typeof shape.code !== 'string' || shape.code === '') return false

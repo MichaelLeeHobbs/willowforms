@@ -1,9 +1,7 @@
 # Validation
 
-**Status: partial.** The rule engine, the catalogue and the Rules tab are built and are what most
-readers came for. Two sections below are not: a `when` guard can only be authored through the JSON
-editor, and cross-field rules are a design with no code. The status here is the weakest section, which
-is the rule this index follows -- see [README.md](README.md).
+**Status: built.** The rule engine, type enforcement, localized messages, cross-field comparisons, and
+the complete Rules tab are implemented and share one runtime between browser and server.
 
 Validation lives in `@formsmith/core`, which imports no React and runs in Node. That is not a
 convenience: it means a form's rules are authored once and enforced in both places, rather than
@@ -47,28 +45,40 @@ Every rule carries its parameters in the type. A rule set of `{ key, message? }`
 
 ```ts
 type ValidationRule =
-  | { key: 'required'; message?: string; when?: PropValue }
-  | { key: 'minLength'; value: number; message?: string; when?: PropValue }
-  | { key: 'maxLength'; value: number; message?: string; when?: PropValue }
-  | { key: 'min'; value: number; message?: string; when?: PropValue }
-  | { key: 'max'; value: number; message?: string; when?: PropValue }
-  | { key: 'pattern'; value: string; message?: string; when?: PropValue }
-  | { key: 'email'; message?: string; when?: PropValue }
-  | { key: 'url'; message?: string; when?: PropValue }
-  | { key: 'uuid'; message?: string; when?: PropValue }
-  | { key: 'custom'; expression: string; message?: string; when?: PropValue }
+  | { key: 'required'; message?: string | PropValue; when?: PropValue }
+  | { key: 'minLength'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'maxLength'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'minItems'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'maxItems'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'min'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'max'; value: number; message?: string | PropValue; when?: PropValue }
+  | {
+      key: 'matches' | 'after'
+      field: string
+      scope?: 'form' | 'row'
+      message?: string | PropValue
+      when?: PropValue
+    }
+  | { key: 'pattern'; value: string; message?: string | PropValue; when?: PropValue }
+  | { key: 'email'; message?: string | PropValue; when?: PropValue }
+  | { key: 'url'; message?: string | PropValue; when?: PropValue }
+  | { key: 'uuid'; message?: string | PropValue; when?: PropValue }
+  | { key: 'custom'; expression: string; message?: string | PropValue; when?: PropValue }
 ```
 
-| Rule                      | Parameter          | Applies to | Fails when                                  |
-| ------------------------- | ------------------ | ---------- | ------------------------------------------- |
-| `required`                | —                  | anything   | the value is empty                          |
-| `minLength` / `maxLength` | `number`           | text, list | the string or the list is shorter or longer |
-| `min` / `max`             | `number`           | numbers    | the number is outside the range             |
-| `pattern`                 | regular expression | text       | the expression does not match               |
-| `email`                   | —                  | text       | it is not an email address                  |
-| `url`                     | —                  | text       | it is not an http, https, mailto or tel URL |
-| `uuid`                    | —                  | text       | it is not a UUID                            |
-| `custom`                  | expression         | anything   | the expression returns falsy                |
+| Rule                      | Parameter          | Applies to   | Fails when                                  |
+| ------------------------- | ------------------ | ------------ | ------------------------------------------- |
+| `required`                | —                  | anything     | the value is empty                          |
+| `minLength` / `maxLength` | `number`           | text, list   | the string or the list is shorter or longer |
+| `minItems` / `maxItems`   | `number`           | lists        | the list has fewer or more items            |
+| `min` / `max`             | `number`           | numbers      | the number is outside the range             |
+| `matches`                 | field and scope    | anything     | the value differs from the referenced value |
+| `after`                   | field and scope    | text, number | the value is not later or greater           |
+| `pattern`                 | regular expression | text         | the expression does not match               |
+| `email`                   | —                  | text         | it is not an email address                  |
+| `url`                     | —                  | text         | it is not an http, https, mailto or tel URL |
+| `uuid`                    | —                  | text         | it is not a UUID                            |
+| `custom`                  | expression         | anything     | the expression returns falsy                |
 
 **Empty** means `undefined`, `null`, a string that is blank once trimmed, an empty array, or an object
 with no keys. A `0` is a value, not an absence.
@@ -81,9 +91,14 @@ a required consent: `{"consent": {}}` was a truthy value with nothing in it, and
 the platform's own `<input type="checkbox" required>` means. Every other rule keeps treating `false` as a
 supplied value, because requiredness is one rule's job.
 
-This rule was written here before it was true anywhere else. The code treated `false` as a supplied
-answer, so a consent checkbox passed while unticked, and an existing test asserted that behaviour as
-correct. Neither the type checker nor the suite had an opinion, because nothing had ever asked.
+### Field schemas enforce value types
+
+**Status: built.**
+
+A non-empty answer must match its field schema: strings, dates and files are strings; numbers are finite
+JSON numbers; booleans are booleans; arrays are arrays; and objects are non-null, non-array objects.
+Empty values remain valid unless a `required` rule rejects them, preserving the rule that optional
+fields may be blank. Type validation runs before authored rules and uses `INVALID_TYPE` when it fails.
 
 ### Every failure degrades rather than throws
 
@@ -104,44 +119,14 @@ correct. Neither the type checker nor the suite had an opinion, because nothing 
 
 Three of these degrade towards failing rather than passing, and they are the ones an author will meet:
 
-- A **value longer than 4096 characters never matches a `pattern`.** Matching is linear in the input for a
-  well-behaved expression and is not for a hostile one, so the input is bounded before the engine is
-  asked. A long answer therefore fails its format rule rather than hanging the page.
-- A **pattern with a nested unbounded quantifier matches nothing at all.** `(a+)+` and `(\w+)+@example\.com`
-  are the shape whose backtracking is exponential, so they are refused rather than run -- which means every
-  value fails that rule, including the ones the author was testing with. The rule editor says so; a host
-  calling `applyRule` directly sees only the failure. A plain group around the inner repeat does not
-  evade it -- `(?:(a+))+` and `((a+))+` are refused too -- and neither does a bounded outer quantifier:
-  `(a+){10}` is ten million ways to split thirty characters.
-- A **repeated group with the same alternative twice is refused**, under its own message. `(a|a)*` is
-  exponential and a duplicated branch is never useful, so refusing it costs an author nothing.
-
-### What the pattern guard does not cover, and what a deployer does about it
-
-The guard is structural. It reads the pattern's shape and never runs it, so it catches the nesting
-family and the duplicate branch above, and it does **not** catch an alternation whose branches genuinely
-overlap without either being a repeat: `(a|ab)*` is exponential and is accepted. No cheap syntactic rule
-separates it from `(ab|cd)+`, and a first-character heuristic would refuse `(ab|ac)+`, which is safe --
-refusing a pattern an author legitimately wrote is a worse failure than missing one.
-
-`(a+|b)*` is **not** in that residual, which this paragraph got wrong: the inner `+` makes the group hold
-an unbounded quantifier and the outer `*` repeats it, so the nesting rule already refuses it. Every
-group-prefix spelling is covered too -- `(?:a|a)*`, `(?<name>a|a)*` and a lookahead prefix are read the
-same way as the bare form.
-
-This matters because **form authors and deployers are different people**. An author writing a pattern is
-not thinking about the server's event loop, and the 4096-character input cap bounds every polynomial
-pattern without bounding an exponential one. A host running author-supplied patterns against
-attacker-supplied values on a shared Node event loop should assume the guard is a filter and not a
-proof, and do at least one of:
-
-- run submission validation off the request thread, so a wedged match costs one worker rather than the
-  process;
-- put a wall-clock timeout around the submit route, so a hung match is a 503 rather than a dead server;
-- gate which authors may write a `pattern` rule at all, if the author population is not the trusted one.
-
-`patternProblem` is exported for the first of those: a host can refuse a document at import time on the
-same judgement the rule editor shows.
+- A **value longer than 4096 characters never matches a `pattern`**, and a pattern longer than 1024
+  characters is refused.
+- **Patterns use the RE2 language and a linear-time engine.** Nested repetition and overlapping
+  alternatives are safe to evaluate. Backreferences, lookarounds, and unsupported or malformed syntax
+  are refused and shown by `patternProblem` in the Rules tab.
+- Pattern matching remains unanchored and the accepted subset exports directly to JSON Schema. A host
+  that evaluates exported schemas must choose a validator with appropriate resource limits; Formsmith
+  controls only its own validation engine.
 
 - A **rule key the engine does not recognise fails with `UNREADABLE_RULE`.** This is the one place a rule
   reports rather than passes on an empty value, and deliberately: an unknown key is a document from a
@@ -149,17 +134,16 @@ same judgement the rule editor shows.
 
 ## Messages
 
-Each rule has a built-in default in `DEFAULT_MESSAGES`. An author can override it per rule; clearing the
-override removes the key rather than storing an empty string, so the default comes back rather than the
-field failing with no text.
-
-Messages are plain strings today. **Planned:** they should be `PropValue`, so a message can be a
-translation key. A localised form with English-only error messages is half localised.
+**Status: built.** Each rule has a default in `DEFAULT_MESSAGES`. An override may be a legacy plain
+string or a `PropValue`. The Rules tab authors custom static text or a translation key and edits every
+language beside the rule. Validation receives the active language bundle through `EvalOptions.messages`;
+a missing translation shows its key, while an empty or unreadable custom message falls back to the rule
+default. Computed messages run only through the host evaluator and otherwise use the default.
 
 ## Guards
 
-**Status: partial.** `when` is in the model and honoured by the engine; there is no UI, so a guarded rule
-can only be authored through the JSON editor.
+**Status: built.** `when` is in the model, honoured by the engine, and authored in the Rules tab as
+always, never, a structured condition, or an expression.
 
 A guard makes a rule conditional: `required` with `when` applies only when the guard is truthy.
 
@@ -175,21 +159,14 @@ Guarded rules are the reason `toJsonSchema` reports lossiness — see
 
 ## Cross-field rules
 
-**Status: planned.**
+**Status: built.**
 
-Every rule today sees one value. "Confirm password matches password" and "end date is after start date"
-are the two everyone needs, and neither is expressible except through `custom`, which needs a sandbox.
-
-`applyRule` already receives the whole `FormData`, so the engine can support this without a signature
-change. What is missing is a declarative rule that does not require the host to have injected an
-evaluator, since needing a sandbox for "these two fields must match" is a poor trade.
-
-Sketch, not yet decided:
-
-```ts
-| { key: 'matches'; field: string; message?: string; when?: PropValue }
-| { key: 'after';   field: string; message?: string; when?: PropValue }
-```
+`matches` compares JSON values structurally, so it covers confirmation fields as well as list or object
+answers. `after` compares numbers numerically and strings lexicographically; ISO dates therefore compare
+in chronological order. In a repeater, `scope: 'row'` names a sibling answer in the enclosing row while
+absent or `form` names a top-level answer. The document validator reports scope mismatches, and the Rules
+tab only offers data keys from the applicable scopes. Both rules are reported as lossy by JSON Schema
+export because their relationship cannot be represented by a property-local keyword.
 
 ## The API
 

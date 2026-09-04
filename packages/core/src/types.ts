@@ -49,17 +49,6 @@ export type Condition =
   | { op: 'and' | 'or'; conditions: Condition[] }
   | { op: 'not'; condition: Condition }
 
-/**
- * One side of a comparison: a fixed value, a field's answer, or the host's context.
- *
- * The three kinds are not interchangeable, and the difference is where the value
- * comes from. `literal` is in the document. `ref` reads `FormData`, which the
- * host owns and submits. `context` reads {@link FormContext}, which the host
- * supplies and the form never writes.
- *
- * There is deliberately no fourth kind for a component's own passing state. See
- * {@link FormContext}.
- */
 export type Operand =
   | { kind: 'literal'; value: JsonValue }
   | {
@@ -85,20 +74,22 @@ export interface ActionRef {
   /** Name of a {@link CodeAction} on the document, or a built-in. */
   name: string
   type: 'code' | 'builtin'
+  params?: Record<string, JsonValue>
 }
+
+export type Effect =
+  | { kind: 'setValue'; address: string; value: JsonValue }
+  | { kind: 'clearValue'; address: string }
+  | { kind: 'focus'; nodeKey: string }
+  | { kind: 'announce'; message: string }
+  | { kind: 'setContext'; path: string; value: JsonValue }
+  | { kind: 'validate'; scope?: string }
+  | { kind: 'emit'; event: string; payload?: JsonValue }
+  | { kind: 'halt'; reason?: string }
 
 export interface CodeAction {
   name: string
-  /**
-   * JavaScript source, stored and never run.
-   *
-   * Actions are a design with no code: nothing in this repository executes
-   * this string, and `09-actions.md` is Planned. It said "Executed in a
-   * sandbox", which invites a host to conclude core owns that boundary and to
-   * wire `new Function(action.body)` themselves -- which is the crossing
-   * invariant 6 exists to prevent. When it is built, the host will inject the
-   * evaluator and own the sandbox, the way `evaluate` already works.
-   */
+  /** JavaScript source passed only to a host-injected sandbox evaluator. */
   body: string
   params: Record<string, JsonValue>
 }
@@ -115,22 +106,7 @@ export interface Language {
 /** The data-shape contract for a component that participates in form data. */
 export interface FieldSchema {
   type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object' | 'file'
-  /**
-   * The rules, which a document may leave out entirely.
-   *
-   * Optional because `validateDocument` accepts a schema without it -- a field
-   * with no rules is an ordinary field, and demanding `validations: []` would
-   * refuse hand-written documents for nothing. The type said it was always
-   * there, so three readers were written as though it were:
-   * `duplicateNode` spread it, and `validateField` and `toJsonSchema` iterated
-   * it, all three throwing a `TypeError` on a document the gate calls valid.
-   *
-   * Ten other readers guarded with `Array.isArray`, which is what made the class
-   * look handled. Saying so in the type is what turns "remember to guard" into
-   * something the compiler asks about. Read it with `validationsOf`, which also
-   * answers for a `validations` that is not an array at all -- a document is
-   * data, so it can be a string.
-   */
+
   validations?: ValidationRule[]
   /** Validate on change rather than only on submit. */
   autoValidate?: boolean
@@ -146,16 +122,25 @@ export interface FieldSchema {
  * material belongs; this is a public type in an MIT package.
  */
 export type ValidationRule =
-  | { key: 'required'; message?: string; when?: PropValue }
-  | { key: 'minLength'; value: number; message?: string; when?: PropValue }
-  | { key: 'maxLength'; value: number; message?: string; when?: PropValue }
-  | { key: 'min'; value: number; message?: string; when?: PropValue }
-  | { key: 'max'; value: number; message?: string; when?: PropValue }
-  | { key: 'pattern'; value: string; message?: string; when?: PropValue }
-  | { key: 'email'; message?: string; when?: PropValue }
-  | { key: 'url'; message?: string; when?: PropValue }
-  | { key: 'uuid'; message?: string; when?: PropValue }
-  | { key: 'custom'; expression: string; message?: string; when?: PropValue }
+  | { key: 'required'; message?: string | PropValue; when?: PropValue }
+  | { key: 'minLength'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'maxLength'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'minItems'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'maxItems'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'min'; value: number; message?: string | PropValue; when?: PropValue }
+  | { key: 'max'; value: number; message?: string | PropValue; when?: PropValue }
+  | {
+      key: 'matches' | 'after'
+      field: string
+      scope?: 'form' | 'row'
+      message?: string | PropValue
+      when?: PropValue
+    }
+  | { key: 'pattern'; value: string; message?: string | PropValue; when?: PropValue }
+  | { key: 'email'; message?: string | PropValue; when?: PropValue }
+  | { key: 'url'; message?: string | PropValue; when?: PropValue }
+  | { key: 'uuid'; message?: string | PropValue; when?: PropValue }
+  | { key: 'custom'; expression: string; message?: string | PropValue; when?: PropValue }
 
 export type ValidationKey = ValidationRule['key']
 
@@ -190,11 +175,8 @@ export interface ComponentNode {
   renderWhen?: PropValue
 }
 
-export interface FormSettings {
-  /** Component type used to wrap fields in an error state. */
-  errorType?: string
-  tooltipType?: string
-}
+/** Reserved for versioned document-wide settings. Version 1 defines none. */
+export type FormSettings = Record<string, never>
 
 export interface FormDocument {
   version: '1'
@@ -245,29 +227,7 @@ export type FormData = Record<string, JsonValue>
  * kit's business, and no condition can read them. See
  * [12-api.md](../../../docs/spec/12-api.md#state-that-is-not-an-answer).
  */
-/*
- * `Readonly`, which documents the split and does not enforce it.
- *
- * `FormData` and `FormContext` were the identical type, so nothing stopped
- * `validateForm(root, context, { context: data })` -- the two swapped, the form
- * validated against the host's own facts, and the answers treated as context.
- *
- * This comment used to claim `Readonly` made that a type error. It does not.
- * TypeScript does not factor `readonly` into object assignability, so
- * `{ readonly [x: string]: JsonValue }` is assignable to
- * `{ [x: string]: JsonValue }` and the swap above still compiles clean. The
- * mistake the comment said was now caught was never caught.
- *
- * That is worse than saying nothing, and it is why the wording is corrected
- * rather than the type changed: a wrong claim of enforcement stops the next
- * person adding the brand that would actually work. A nominal brand is what
- * would work -- and it is not free, because it makes every host cast an object
- * literal at the call site, which is a real cost to weigh rather than a
- * decision to make in passing.
- *
- * What `Readonly` does buy is a mutation error inside this package if anything
- * here ever writes to a context, which is a smaller and true guarantee.
- */
+
 export type FormContext = Readonly<Record<string, JsonValue>>
 /** Runtime validation errors, keyed by component key. */
 export type FormErrors = Record<string, string>

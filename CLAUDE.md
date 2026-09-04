@@ -1,105 +1,71 @@
-# formsmith — MIT visual form designer for React
+# Formsmith — MIT visual form designer for React
 
-An open-source drag-and-drop form designer. The whole point is that the **designer** is MIT, not just the
-renderer, because every competitor paywalls exactly that piece.
-
-> Working agreement and personal defaults live in the global `~/.claude/CLAUDE.md`. This file is repo
-> facts only.
-
-> **Mid build-out.** Frozen queue, run status and the `/goal` line: `docs/build-out/queue.md`. Run
-> contract: `docs/build-out/RUN.md`. Decisions: `docs/decisions.md`. If no goal is active, tell me to
-> paste the line at the top of the queue file.
+Formsmith is an open-source drag-and-drop form designer. The designer and renderer are both MIT.
 
 ## Read first
 
-- `docs/spec/README.md` — the specification, one file per contract, each section carrying a status.
-  It is also the roadmap. Read the relevant contract before changing behaviour it describes.
-- `docs/ARCHITECTURE.md` — the kit seam, the document model, why the tree is the source of truth. Read
-  before changing anything in `core`.
-- `docs/ROADMAP.md` — a pointer at the spec, which carries the status. Check there before assuming a
-  feature exists.
-- `docs/prior-art/README.md` — what the competitor study found, the gaps it set as targets, and the
-  ground rules for using any of it.
-- `docs/accessibility.md` — what is checked, how, and what is still missing. Several of those checks
-  fail the build, so read it before changing a colour token or a keyboard handler.
+- `docs/spec/README.md` is the product contract and roadmap. Read the relevant contract before changing behaviour.
+- `docs/ARCHITECTURE.md` defines package boundaries and the document model.
+- `docs/accessibility.md` defines accessibility requirements and verification.
+- `SECURITY.md` and `docs/THREAT_MODEL.md` define security reporting and trust boundaries.
+- `docs/decisions.md` records the small set of current architectural decisions.
 
 ## Layout
 
 ```
-packages/core       document model, tree ops, validation. No React, runs in Node.
-packages/renderer   runtime renderer. Ships without the designer.
-packages/designer   the builder. No UI-library dependency; chrome is plain CSS.
-packages/kit-mui    Material UI kit. Reference implementation of the kit contract.
-packages/kit-html   Dependency-free HTML kit. Proves a kit is a package, not a rewrite.
-apps/playground     Vite demo, port 5180
-apps/demo-server    Hono, port 5181. A demo, not a product.
+packages/core       document model, tree operations, validation; no React
+packages/renderer   runtime renderer
+packages/designer   visual builder; no UI-library dependency
+packages/kit-mui    Material UI reference kit
+packages/kit-html   dependency-free HTML kit
+apps/playground     Vite demonstration app, port 5180
+apps/demo-server    demonstration server, port 5181
 ```
 
 ## Invariants
 
-Breaking any of these is a design regression, not a refactor. The first three are enforced rather than
-merely documented: 1 and 2 by `no-restricted-imports` blocks in `eslint.config.js`, 3 by
-`packages/designer/src/designer.css.test.ts`, which parses the stylesheet and fails on the shape of the
-mistake. Each error explains why the rule exists. Read that before silencing one.
+1. `@formsmith/core` imports no React or component library.
+2. `@formsmith/designer` imports no component library.
+3. Designer CSS styles only designer markup and never reaches into kit components.
+4. Tree operations are immutable and preserve structural sharing.
+5. Only the `required` rule fails on an empty value.
+6. Core provides no default evaluator for author-controlled code.
+7. The specification is not weakened to fit an implementation. Ambiguity is resolved in the specification first.
+8. Imported documents cross one validation and normalization boundary before normal runtime use.
 
-1. **`@formsmith/core` imports no React and no component library.** Server-side validation depends on it.
-2. **`@formsmith/designer` imports no component library.** It consumes `ComponentDef` metadata only. If
-   you find yourself importing MUI into the designer, the abstraction has leaked.
-3. **Designer CSS styles the designer's own markup and nothing else.** Every selector must name an
-   `fs-` class, and a selector that descends from a scope containing the form (`.fs-shell`,
-   `.fs-canvas` and anything under them that is not chrome) must end on one — so `.fs-shell` itself is
-   fine and carries the theme tokens, while `.fs-shell input` or `.fs-canvas__frame input` reaches into
-   the kit's components on the canvas and breaks them. That has already happened once, to MUI's notched
-   outline. Two exceptions are allowlisted in the test, each pinned to the properties it may set.
-4. **Tree operations are immutable.** Undo holds references to prior documents.
-5. **Only `required` fails on an empty value.** Every other rule passes when the value is empty.
-6. **No `eval` default for computed values.** The host injects an evaluator and owns the sandbox.
+The first three invariants have automated lint or CSS guards. Security controls and trust assumptions are
+documented in `docs/THREAT_MODEL.md`.
 
 ## Commands
 
 ```bash
-pnpm dev           # playground on :5180
-pnpm test          # vitest, 2525 tests
-pnpm lint          # eslint, including the invariant guardrails
-pnpm format:check  # prettier
-pnpm typecheck     # build configs, then tsconfig.eslint.json for tests and configs
-pnpm build         # tsc --build, then copies designer.css
-pnpm e2e           # playwright, 78 tests in a real browser
+pnpm dev
+pnpm test
+pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm build
+pnpm e2e
+node scripts/check-dist.mjs
 ```
 
-CI runs every one of these, then `node scripts/check-dist.mjs`, which reads the packages off
-the directory and asserts each emitted `dist/index.js` and `dist/index.d.ts`, and that every stylesheet
-`copy-assets.mjs` names arrived. The end-to-end suite runs last, after the build, against the playground on port 5180
-with `--strictPort`, so a busy port fails loudly rather than serving from somewhere else. CI's order is
-format, lint, typecheck, test, build, end-to-end -- the cheapest gates first, so a formatting slip does
-not wait behind a browser download -- and the list above is alphabetical-by-habit rather than an order;
-saying "in that order" here was wrong about a workflow anybody can read. Anything
-positional belongs there: jsdom has no layout engine, so drop geometry, selection frames, and focus
-order cannot be checked anywhere else. `pnpm typecheck` is two passes on purpose: the per-package configs exclude tests so
-they stay out of `dist`, which left every test file unchecked until `tsconfig.eslint.json` picked them
-up. It found a type error in the first test file it ever saw. Each of the five packages excludes both
-`*.test.ts` and `*.test.tsx`; core excluded only the first until a packaging pass caught it, so the
-first `.test.tsx` anybody wrote there would have been compiled into `dist` and published.
-`test/packaging.test.ts` reads the five manifests off the directory rather than a list, which is what
-stops that being a thing somebody has to remember.
+CI runs formatting, linting, typechecking, unit and integration tests, package builds, browser tests, and
+published-artifact checks. Positional browser behaviour belongs in Playwright because jsdom has no layout
+engine. `pnpm typecheck` checks package output separately from tests and repository configuration.
 
-`aliases.ts` at the root maps `@formsmith/*` to `src` for vitest and the playground, so in-repo edits
-need no rebuild. Published packages resolve through `dist`. The five bare package entries are anchored
-regexes on purpose -- the two stylesheet subpaths are plain strings, because an exact specifier needs no
-anchoring -- and the reason is that a
-plain string alias also rewrites `@formsmith/designer/styles.css` and breaks the build.
+`aliases.ts` maps workspace package imports to source during development. Published packages resolve
+through package exports and are verified independently.
 
 ## Conventions
 
-- Node 22.6+ to develop -- the demo server runs on `--experimental-strip-types`, which is where that
-  arrived -- and Node 20+ to consume a published package, which is what the five manifests declare.
-  pnpm 10, React 19, TypeScript strict with `exactOptionalPropertyTypes` and
-  `noUncheckedIndexedAccess`. Both are on deliberately; do not relax them to make a type fit.
-- Tests live beside the source as `*.test.ts`, or `*.test.tsx` for component tests. Node is the default
-  vitest environment, deliberately, so core keeps proving it runs without a DOM; a component test opts
-  into jsdom with an `@vitest-environment jsdom` docblock. jsdom has no layout engine, so anything
-  measuring geometry has to be checked in a real browser instead.
-  **Read [.claude/skills/write-tests/SKILL.md](.claude/skills/write-tests/SKILL.md) before writing one.**
-  It is the list of ways a test here has passed while proving nothing, each one taken from a real
-  incident in this repository.
-- This is a public MIT repo. No proprietary references, no employer material.
+- Develop on Node 22 and pnpm 10. Published package engine requirements live in each package manifest.
+- TypeScript uses `strict`, `exactOptionalPropertyTypes`, and `noUncheckedIndexedAccess`.
+- Unit tests live beside source. Cross-package contract tests live in `test/`; browser tests live in
+  `e2e/`.
+- Read `.claude/skills/write-tests/SKILL.md` before writing or changing tests.
+- Prefer focused changes with one product outcome. Update implementation, specification status, tests, and
+  public examples together.
+- Comments explain a current contract, invariant, or non-obvious constraint. Review history, prior
+  failures, and security payloads belong in Git history, tests, or the threat model.
+- This is a public MIT repository. Do not include proprietary material, credentials, or private customer
+  data.

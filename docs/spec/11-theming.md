@@ -1,8 +1,9 @@
 # Theming
 
-**Status: partial.** Both stylesheets are token-driven and both themes clear WCAG AA in CI, and the
-toolbar can force either. The designer's tokens are not documented for consumers outside this file, and
-the kit stylesheet does not style a scrollbar.
+**Status: built.** Both stylesheets are token-driven, both themes clear WCAG AA in CI, the toolbar can
+force either, and the public token vocabulary is documented here and linked from the project README.
+The playground keeps its host-owned MUI palette aligned with the toolbar choice in both editing and
+preview modes.
 
 Two independent theme systems, deliberately. The designer's chrome and the form on the canvas are
 different things owned by different people, and a host that restyles its builder has not thereby restyled
@@ -18,6 +19,16 @@ every form it produces.
 A kit brings its own theming or inherits its component library's. `@formsmith/kit-mui` has no tokens of
 its own because MUI's `ThemeProvider` already owns that; `@formsmith/kit-html` has a full set because
 nothing else does.
+
+That ownership boundary does not make the toolbar a dead end. `Designer` accepts a controlled `theme`
+and reports toolbar choices through `onThemeChange`; an embedding host uses that event to update its kit
+theme. The playground does this for MUI. Keeping the bridge in the host lets a branded MUI theme retain
+its own palette instead of the designer replacing it with a generic one.
+
+The kit root owns an opaque surface and its matching text colour. The designer canvas is intentionally
+theme-independent, so relying on its background can place a dark-system kit's light controls over light
+designer chrome. The HTML Screen uses its surface token; the MUI Screen uses `background.default` and
+`text.primary`. Browser coverage holds that boundary in both editing and preview modes.
 
 ## Designer tokens
 
@@ -61,7 +72,7 @@ On `.fsh-screen`:
 
 `--fsh-text`, `--fsh-muted`, `--fsh-surface`, `--fsh-field`, `--fsh-border`, `--fsh-accent`,
 `--fsh-accent-text`, `--fsh-danger`, `--fsh-success`, `--fsh-warning`, `--fsh-shadow`, `--fsh-radius`,
-`--fsh-font`.
+`--fsh-font`, `--fsh-scrollbar-thumb`.
 
 Both lists are checked against the stylesheets by `test/docs.test.ts`. A token a host cannot find here is
 a token they cannot override, which is the whole mechanism this section describes -- and three of the kit's
@@ -70,7 +81,7 @@ however thoroughly a host restyled the rest.
 
 ## Light and dark
 
-**Status: partial.** Light is the base. Dark is a token swap under both `prefers-color-scheme` and an
+**Status: built.** Light is the base. Dark is a token swap under both `prefers-color-scheme` and an
 explicit attribute, so a host managing its own theme can force either:
 
 ```css
@@ -82,9 +93,9 @@ explicit attribute, so a host managing its own theme can force either:
 }
 ```
 
-The toolbar sets that attribute. **System is the absence of it**, not a third palette: the stylesheet
-already answers `prefers-color-scheme`, so writing an explicit value would override the media query with
-nothing. See [04-shell.md](04-shell.md#toolbar).
+The toolbar sets that designer attribute and reports the same choice to the host. **System is the absence
+of it**, not a third palette: the stylesheet already answers `prefers-color-scheme`, so writing an
+explicit value would override the media query with nothing. See [04-shell.md](04-shell.md#toolbar).
 
 ## Contrast is enforced, not intended
 
@@ -106,7 +117,8 @@ dark palette and never once against the light one.
 
 ## Scrollbars
 
-**Status: built** for the designer. The kit's stylesheet still does not style one.
+**Status: built.** Both the designer and HTML kit use thin scrollbars with transparent tracks and
+token-controlled thumbs.
 
 Thin scrollbars on both panes, the inspector's tab panel, the canvas, and the preview data block, with a
 transparent track so the thumb sits directly on the surface below it. `scrollbar-width` and
@@ -150,8 +162,8 @@ The `icon` property editor named in [06-inspector.md](06-inspector.md#property-e
 the vocabulary as a select with the glyph drawn beside it, so a kit property whose value is an icon name
 is authored rather than typed.
 
-**Missing:** `Icon` is not exported from `@formsmith/designer`. It waits for a host that needs to draw
-one of these glyphs itself rather than name it.
+`Icon` and `IconProps` are exported from `@formsmith/designer` for hosts that need to draw the shared
+vocabulary outside the built-in palette.
 
 ## What is not themeable
 

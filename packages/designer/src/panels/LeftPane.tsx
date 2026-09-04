@@ -1,14 +1,3 @@
-/**
- * The left pane: components, structure, and the document's own settings.
- *
- * These were stacked in one scrolling column, so a form with thirty components
- * pushed the palette out of reach: the thing you reach for most often was the
- * thing furthest from the top. Tabs give each one the full height of the pane.
- *
- * Settings arrives here from the inspector, because it belongs to the document
- * rather than to whatever happens to be selected.
- */
-
 import { useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { ComponentDef, Kit } from '@formsmith/core'
@@ -48,15 +37,6 @@ export function LeftPane({
 }: LeftPaneProps): ReactNode {
   const [active, setActive] = useState<TabId>('components')
 
-  /*
-   * The palette's search lives here, not in the palette.
-   *
-   * Only the active tab's panel is mounted, so switching to the Tree and back
-   * threw away whatever had been typed into the search box -- which is exactly
-   * what somebody does when they search for a component, look at the tree to
-   * decide where to put it, and come back. State that has to outlive a panel
-   * belongs to the thing that outlives it.
-   */
   const [query, setQuery] = useState('')
 
   /*

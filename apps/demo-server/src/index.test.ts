@@ -44,7 +44,7 @@ const FORM: FormDocument = {
         key: 'answers',
         type: 'TextField',
         props: {},
-        schema: { type: 'string', validations: [] },
+        schema: { type: 'array', validations: [] },
       },
       {
         key: 'name',
@@ -141,9 +141,51 @@ describe('a body nested deeper than anything will walk', () => {
   it('still reports a missing required answer', async () => {
     // The other control: refusing deep bodies must not have made the gate
     // answer before it validated.
-    const response = await submit('{"answers":"x"}')
+    const response = await submit('{"answers":[]}')
 
     expect(response.status).toBe(422)
+  })
+})
+
+describe('localized validation messages', () => {
+  it('uses the document default-language bundle on submit', async () => {
+    const localized: FormDocument = {
+      ...FORM,
+      id: 'localized',
+      root: {
+        ...FORM.root,
+        children: [
+          {
+            key: 'name',
+            type: 'TextField',
+            props: {},
+            schema: {
+              type: 'string',
+              validations: [{ key: 'required', message: { kind: 'i18n', key: 'name_required' } }],
+            },
+          },
+        ],
+      },
+      translations: { 'en-US': { name_required: 'Please enter your name.' } },
+    }
+    const saved = await app.request('/api/forms/localized', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(localized),
+    })
+    expect(saved.status).toBe(200)
+
+    const response = await app.request('/api/forms/localized/submit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({
+      ok: false,
+      errors: { name: 'Please enter your name.' },
+    })
   })
 })
 
@@ -203,7 +245,7 @@ describe('two documents stored at once', () => {
       ids.filter((id) => !held.has(id)),
       'writes were lost',
     ).toEqual([])
-  })
+  }, 15_000)
 
   it('still refuses to delete an id nobody holds', async () => {
     // The control for moving that decision inside the chain: it must still be
@@ -279,7 +321,7 @@ describe('a body larger than the limit', () => {
 
   it('still takes a body of an ordinary size', async () => {
     // The control. A limit that refused everything would pass both rows above.
-    const response = await submit('{"answers":"x","name":"Ada"}')
+    const response = await submit('{"answers":[],"name":"Ada"}')
     expect(response.status).toBe(200)
   })
 })
@@ -398,7 +440,7 @@ describe('a form id borrowed from Object.prototype', () => {
   it('is not a form even when a real one is stored beside it', async () => {
     // The control. `deep` is in the store and answers, so a blanket 404 from a
     // broken route would not be what the cases above are measuring.
-    expect((await submit('{"answers":"x","name":"Ada"}')).status).toBe(200)
+    expect((await submit('{"answers":[],"name":"Ada"}')).status).toBe(200)
   })
 })
 

@@ -21,14 +21,7 @@ export interface PaletteProps {
   onAdd: (def: ComponentDef) => void
   /** Press and move. The drag controller decides which of the two happened. */
   onDragStart: (def: ComponentDef, event: ReactPointerEvent) => void
-  /**
-   * Whether the click now arriving is really the tail of a drag.
-   *
-   * The controller decides which of the two a release was and raises a flag;
-   * the canvas and the tree both ask. This did not, so a drag begun on a
-   * palette entry and abandoned back over it added a component anyway — which
-   * is exactly what dragging out and changing your mind looks like.
-   */
+
   consumeClick: () => boolean
   /**
    * The search text, held by the pane rather than here.
@@ -120,12 +113,6 @@ export function Palette({
                     onAdd(def)
                   }}
                   onPointerDown={(event) => {
-                    /*
-                     * The primary button only. Any button armed a drag, so a
-                     * right-click on a palette entry started one -- the label
-                     * followed the pointer while the context menu was open, and
-                     * the release that dismissed the menu dropped a component.
-                     */
                     if (event.button !== 0) return
                     onDragStart(def, event)
                   }}

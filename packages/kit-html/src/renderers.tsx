@@ -17,7 +17,7 @@
  * these produces an inaccessible form no amount of designer polish can fix.
  */
 
-import { createContext, createElement, useContext, useId, useState } from 'react'
+import { Children, createContext, createElement, useContext, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ComponentNode } from '@formsmith/core'
 import {
@@ -29,18 +29,15 @@ import {
   safeStyleValue,
 } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
-import type { NodeRenderer, NodeRendererProps, RendererKit } from '@formsmith/renderer'
+import type {
+  NodeEventHandlers,
+  NodeRenderer,
+  NodeRendererProps,
+  RendererKit,
+} from '@formsmith/renderer'
 
 type Level = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
-/**
- * A string, or the fallback.
- *
- * `v || fallback`, not `typeof v === 'string' ? v : fallback`. An emptied field
- * *is* a string, so every "safe default" here was bypassed by clearing one —
- * which is the most natural way to try to remove a label. A button with no
- * text, a link with no text, an `aria-label` of `''` on a progress bar.
- */
 const str = (v: unknown, fallback = ''): string => {
   /*
    * A non-string that is still text renders as its text, not as the fallback.
@@ -60,15 +57,6 @@ const str = (v: unknown, fallback = ''): string => {
   return text === '' ? fallback : text
 }
 
-/**
- * One of a known set, or the first of them.
- *
- * Every one of these values comes from a document, which is data. Interpolated
- * into a class name, an unnarrowed one adds classes of its own: on a host using
- * a utility CSS framework, `variant: "body fixed inset-0 z-50"` is an element
- * covering the viewport over the real form. React escapes the attribute, so it
- * is not script execution — it is UI redress, which is worse to debug.
- */
 const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
   allowed.includes(v as T) ? (v as T) : fallback
 
@@ -98,6 +86,15 @@ const bool = (v: unknown): boolean => v === true
 const num = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? v : fallback
 
+const changed = (
+  onChange: (value: JsonValue) => void,
+  events: NodeEventHandlers | undefined,
+  value: JsonValue,
+): void => {
+  onChange(value)
+  events?.onChange?.(value)
+}
+
 function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   return (
     <div
@@ -124,23 +121,33 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
 }
 
 /*
- * (This paragraph is `Step`'s, further down. It sat directly above `Repeater`,
- * so a reader taking a comment as documentation of the function beneath it was
- * told the wrong thing about the more complicated of the two. The same drift
- * was in `kit-mui`, copied along with the rest of the file.)
- *
- * A step draws as a plain column. Everything that makes it a step is the
- * condition on it, which core evaluates, so there is nothing here for a kit to
- * decide beyond how a group of fields stacks up.
- */
-/*
  * A repeater draws the rows it was handed and nothing else. The renderer has
  * already expanded them, so a kit never counts rows, never sees an index, and
  * never learns what an address is.
  */
-function Repeater({ props, nodeProps, children, error }: NodeRendererProps): ReactNode {
+function itemLimit(node: ComponentNode, key: 'minItems' | 'maxItems', fallback: number): number {
+  const rule = node.schema?.validations?.find((candidate) => candidate.key === key)
+  return rule && 'value' in rule && typeof rule.value === 'number' && Number.isFinite(rule.value)
+    ? Math.max(0, Math.floor(rule.value))
+    : fallback
+}
+
+function Repeater({
+  node,
+  props,
+  nodeProps,
+  value,
+  onChange,
+  children,
+  error,
+}: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
+  const rows = Array.isArray(value) ? value : []
+  const renderedRows = Children.toArray(children)
+  const minimum = itemLimit(node, 'minItems', 0)
+  const maximum = itemLimit(node, 'maxItems', Number.POSITIVE_INFINITY)
+  const label = str(props['label'], node.dataKey ?? node.key)
   return (
     <div {...nodeProps}>
       {/*
@@ -163,10 +170,34 @@ function Repeater({ props, nodeProps, children, error }: NodeRendererProps): Rea
         role="group"
         className="fsh-stack"
         style={{ flexDirection: 'column', gap: num(props['gap'], 16) }}
+        aria-label={label}
         aria-describedby={messageId}
       >
-        {children}
+        {renderedRows.map((row, index) => (
+          <div className="fsh-repeater__row" key={index}>
+            {row}
+            {index < rows.length && (
+              <button
+                type="button"
+                className="fsh-button fsh-button--plain fsh-repeater__remove"
+                disabled={rows.length <= minimum}
+                aria-label={`Remove ${label} item ${String(index + 1)}`}
+                onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
       </div>
+      <button
+        type="button"
+        className="fsh-button fsh-button--outline fsh-repeater__add"
+        disabled={rows.length >= maximum}
+        onClick={() => onChange([...rows, {}])}
+      >
+        Add {label}
+      </button>
       <p
         id={messageId}
         className={'fsh-field__message' + (error ? ' is-error' : '')}
@@ -178,7 +209,7 @@ function Repeater({ props, nodeProps, children, error }: NodeRendererProps): Rea
   )
 }
 
-function Step({ props, nodeProps, children }: NodeRendererProps): ReactNode {
+function Step({ props, nodeProps, children, navigation }: NodeRendererProps): ReactNode {
   return (
     <div
       {...nodeProps}
@@ -186,6 +217,27 @@ function Step({ props, nodeProps, children }: NodeRendererProps): ReactNode {
       style={{ flexDirection: 'column', gap: num(props['gap'], 16) }}
     >
       {children}
+      {navigation && (
+        <div className="fsh-step__navigation">
+          <button
+            type="button"
+            className="fsh-button fsh-button--plain"
+            disabled={!navigation.back}
+            onClick={navigation.back}
+          >
+            Back
+          </button>
+          <span aria-live="polite">Step {navigation.position}</span>
+          <button
+            type="button"
+            className="fsh-button fsh-button--outline"
+            disabled={!navigation.next}
+            onClick={navigation.next}
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -244,21 +296,7 @@ function Field({
   children: ReactNode
 }): ReactNode {
   const messageId = id + '-message'
-  /*
-   * `nodeProps` here, on `.fsh-field`, and not on a wrapper around it.
-   *
-   * Seven of the nine field renderers spread it onto an unclassed `<div>` with
-   * `.fsh-field` one level in, while `SwitchNode` and `RadioGroupNode` put it on
-   * `.fsh-field` itself -- so the kit had two DOM shapes at the seam that every
-   * external thing keys off: the designer's selection, `data-fs-key` styling
-   * from the Style tab, and end-to-end selectors. `kit-html.css`'s
-   * `min-width: 0` on `.fsh-field` was inert for the seven, because the flex
-   * item was the wrapper and not the element carrying the rule.
-   *
-   * Converged on the shape the other two already had, which is also the one the
-   * MUI kit produces: the component the document names is the component the
-   * kit's own class describes.
-   */
+
   return (
     <div {...nodeProps} className={'fsh-field' + (error ? ' is-invalid' : '')}>
       <label className="fsh-field__label" htmlFor={id}>
@@ -283,6 +321,7 @@ function TextFieldNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   const shared = {
@@ -294,6 +333,8 @@ function TextFieldNode({
     'aria-invalid': error ? true : undefined,
     'aria-describedby': id + '-message',
     ...requiredProps(node),
+    onBlur: () => events?.onBlur?.(),
+    onFocus: () => events?.onFocus?.(),
   }
 
   return (
@@ -305,9 +346,17 @@ function TextFieldNode({
       nodeProps={nodeProps}
     >
       {bool(props['multiline']) ? (
-        <textarea {...shared} rows={4} onChange={(e) => onChange(e.target.value)} />
+        <textarea
+          {...shared}
+          rows={4}
+          onChange={(e) => changed(onChange, events, e.target.value)}
+        />
       ) : (
-        <input {...shared} type="text" onChange={(e) => onChange(e.target.value)} />
+        <input
+          {...shared}
+          type="text"
+          onChange={(e) => changed(onChange, events, e.target.value)}
+        />
       )}
     </Field>
   )
@@ -320,6 +369,7 @@ function NumberFieldNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
@@ -339,7 +389,10 @@ function NumberFieldNode({
         aria-invalid={error ? true : undefined}
         {...requiredProps(node)}
         aria-describedby={id + '-message'}
-        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        onBlur={() => events?.onBlur?.()}
+        onChange={(e) =>
+          changed(onChange, events, e.target.value === '' ? null : Number(e.target.value))
+        }
       />
     </Field>
   )
@@ -352,6 +405,7 @@ function CheckboxNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
@@ -366,7 +420,7 @@ function CheckboxNode({
         aria-invalid={error ? true : undefined}
         {...requiredProps(node)}
         aria-describedby={messageId}
-        onChange={(e) => onChange(e.target.checked)}
+        onChange={(e) => changed(onChange, events, e.target.checked)}
       />
       <label className="fsh-field__label" htmlFor={id}>
         {str(props['label'])}
@@ -395,6 +449,7 @@ function SelectNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   const raw = props['options']
@@ -416,7 +471,7 @@ function SelectNode({
         aria-invalid={error ? true : undefined}
         {...requiredProps(node)}
         aria-describedby={id + '-message'}
-        onChange={(e) => onChange(optionValue(options, e.target.value))}
+        onChange={(e) => changed(onChange, events, optionValue(options, e.target.value))}
       >
         <option value="">{str(props['placeholder'], 'Choose…')}</option>
         {options.map((option, i) => {
@@ -438,7 +493,7 @@ function SelectNode({
   )
 }
 
-function ButtonNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+function ButtonNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const variant = str(props['variant'], 'solid')
   const safe = variant === 'outline' || variant === 'plain' ? variant : 'solid'
   return (
@@ -447,6 +502,7 @@ function ButtonNode({ props, nodeProps }: NodeRendererProps): ReactNode {
       type="button"
       className={'fsh-button fsh-button--' + safe}
       disabled={bool(props['disabled'])}
+      onClick={() => events?.onClick?.()}
     >
       {str(props['text'], 'Button')}
     </button>
@@ -569,6 +625,7 @@ function TextAreaNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
@@ -589,7 +646,8 @@ function TextAreaNode({
         aria-invalid={error ? true : undefined}
         {...requiredProps(node)}
         aria-describedby={id + '-message'}
-        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => events?.onBlur?.()}
+        onChange={(e) => changed(onChange, events, e.target.value)}
       />
     </Field>
   )
@@ -620,6 +678,7 @@ function SwitchNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
@@ -641,7 +700,7 @@ function SwitchNode({
           aria-invalid={error ? true : undefined}
           {...requiredProps(node)}
           aria-describedby={messageId}
-          onChange={(e) => onChange(e.target.checked)}
+          onChange={(e) => changed(onChange, events, e.target.checked)}
         />
         <span className="fsh-switch__track" aria-hidden="true" />
         <span>{str(props['label'])}</span>
@@ -657,16 +716,6 @@ function SwitchNode({
   )
 }
 
-/**
- * What a RadioItem needs from the group above it.
- *
- * A RadioItem used to render a radio wired to nothing, so clicking one did
- * nothing at all while looking exactly like an option. The group owns
- * selection, which is right; it just has to hand the item enough to take part.
- *
- * Kit-local, and deliberately so: this is two components in one package
- * agreeing with each other, not a new obligation on the kit contract.
- */
 interface RadioContext {
   name: string
   selected: string
@@ -692,6 +741,7 @@ function RadioGroupNode({
   value,
   error,
   onChange,
+  events,
   children,
 }: NodeRendererProps): ReactNode {
   const id = useId()
@@ -699,17 +749,6 @@ function RadioGroupNode({
   const raw = props['options']
   const options = Array.isArray(raw) ? raw : []
 
-  /*
-   * A fieldset with a legend, not a div with a label: a group of radios has one
-   * question and many answers, and `aria-labelledby` on a div is the workaround
-   * for markup that cannot say that.
-   *
-   * `role="radiogroup"` is stated rather than assumed. This comment claimed it
-   * was implicit and it is not -- a `<fieldset>` maps to `group`, which does not
-   * support `aria-invalid` or `aria-required`, so both were being set on an
-   * element that has no such state and neither reached a screen reader. The role
-   * is what makes the two attributes mean something.
-   */
   return (
     <fieldset
       {...nodeProps}
@@ -722,7 +761,12 @@ function RadioGroupNode({
     >
       <legend className="fsh-field__label">{str(props['label'])}</legend>
       <RadioGroupContext.Provider
-        value={{ name: id, selected: jsonToString(value), options, onSelect: onChange }}
+        value={{
+          name: id,
+          selected: jsonToString(value),
+          options,
+          onSelect: (next) => changed(onChange, events, next),
+        }}
       >
         <div
           className={
@@ -747,7 +791,7 @@ function RadioGroupNode({
                    * group, because an unanswered group's value is `''` too.
                    */
                   checked={v !== '' && jsonToString(value) === v}
-                  onChange={() => onChange(optionValue(options, v))}
+                  onChange={() => changed(onChange, events, optionValue(options, v))}
                 />
                 <span>{label}</span>
               </label>
@@ -818,6 +862,7 @@ function DatePickerNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   return (
@@ -839,7 +884,8 @@ function DatePickerNode({
         aria-invalid={error ? true : undefined}
         {...requiredProps(node)}
         aria-describedby={id + '-message'}
-        onChange={(e) => onChange(e.target.value || null)}
+        onBlur={() => events?.onBlur?.()}
+        onChange={(e) => changed(onChange, events, e.target.value || null)}
       />
     </Field>
   )
@@ -852,24 +898,14 @@ function FileUploadNode({
   value,
   error,
   onChange,
+  events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
   /** How many files the last choice dropped for being over `maxSize`. */
   const [dropped, setDropped] = useState(0)
   /** How many refusals there have been, so a repeated one is a new string. */
   const [attempt, setAttempt] = useState(0)
-  /*
-   * The names the document holds, drawn beside the input.
-   *
-   * A file input is uncontrolled by design and cannot be given a value, so a
-   * restored draft showed "No file chosen" while the payload was about to
-   * submit a filename. Nothing on screen said what the form was going to send.
-   *
-   * It is also the only thing that follows the row a value belongs to: rows are
-   * keyed by index, so the browser's own idea of which file this input holds
-   * stays with the index rather than with the data. See the note on row keys in
-   * the renderer.
-   */
+
   const filesHeld = (Array.isArray(value) ? value : [value])
     .filter((name): name is string => typeof name === 'string' && name !== '')
     .join(', ')
@@ -877,13 +913,7 @@ function FileUploadNode({
   const multiple = bool(props['multiple'])
   const heldId = id + '-held'
   const refusedId = id + '-refused'
-  /*
-   * The value is the selected file's name, and nothing more. A file input is
-   * uncontrolled by design, and turning bytes into form data is an upload
-   * protocol this project does not own: the host reads the input when it
-   * submits. Reporting the name keeps validation and the schema honest about
-   * whether a file was chosen.
-   */
+
   return (
     <Field
       id={id}
@@ -901,47 +931,18 @@ function FileUploadNode({
         disabled={bool(props['disabled'])}
         aria-invalid={error ? true : undefined}
         {...requiredProps(node)}
-        /*
-         * Every line on screen about this input, not just the helper one.
-         *
-         * "Holding contract.pdf" is the only statement of what this field will
-         * actually submit -- a file input is uncontrolled, so the browser's own
-         * display says "No file chosen" while the payload carries a name -- and
-         * it was described by nothing, so a screen reader user moving to the
-         * input was told the label and the helper text and never what was held.
-         * The refusal notice was likewise unreferenced. The MUI kit folds both
-         * strings into `helperText`, which is the element it wires
-         * `aria-describedby` to, so this was a divergence the other kit had
-         * right.
-         */
+
         aria-describedby={
           [id + '-message', filesHeld ? heldId : '', dropped > 0 ? refusedId : '']
             .filter(Boolean)
             .join(' ') || undefined
         }
-        /*
-         * `maxSize` is honoured here rather than left to a host that may never
-         * look. It was a number in a panel with a hint admitting it did
-         * nothing, which is a control that lies about being one.
-         *
-         * A refusal, not a truncation: the oversized files are left out and
-         * the ones that fit are kept, so choosing five files and one of them
-         * being too large does not silently drop the other four. The size is
-         * in kilobytes, which is what the label says.
-         */
+
         onChange={(e) => {
           const limit = num(props['maxSize'], 0) * 1024
           const chosen = Array.from(e.target.files ?? [])
           const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
-          /*
-           * Somebody is told when a file is dropped.
-           *
-           * `maxSize` filtered the reported names and said nothing, so
-           * choosing a file over the limit looked exactly like choosing none:
-           * the picker closed, the list did not change, and no message
-           * appeared. A refusal nobody can see is indistinguishable from a
-           * bug in the picker.
-           */
+
           const refused = chosen.length - kept.length
           setDropped(refused)
           /*
@@ -962,7 +963,11 @@ function FileUploadNode({
            * live region: an unchanged announcement is never read.
            */
           if (refused > 0) setAttempt((n) => n + 1)
-          onChange(multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null))
+          changed(
+            onChange,
+            events,
+            multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null),
+          )
         }}
       />
       {filesHeld ? (
@@ -1033,14 +1038,6 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
       className={'fsh-progress' + (circular ? ' fsh-progress--circular' : '')}
     >
       <span
-        /*
-         * The class says which mode this is; the stylesheet used to ask whether
-         * a `style` attribute was present. React does not remove the attribute
-         * when the object becomes `undefined` — it empties it — so a bar that
-         * went from determinate to indeterminate kept `style=""`, stopped
-         * matching `:not([style])`, and rendered permanently full. "Finished"
-         * instead of a sweep.
-         */
         className={'fsh-progress__fill' + (determinate ? '' : ' fsh-progress__fill--sweeping')}
         style={determinate ? { inlineSize: value + '%' } : undefined}
       />
@@ -1048,7 +1045,7 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   )
 }
 
-function LinkNode({ props, nodeProps }: NodeRendererProps): ReactNode {
+function LinkNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const href = safeHref(props['href'])
   const blank = props['target'] === 'blank'
   /*
@@ -1070,6 +1067,7 @@ function LinkNode({ props, nodeProps }: NodeRendererProps): ReactNode {
       // noopener is what stops the opened page reaching back through
       // window.opener; noreferrer is the courtesy that goes with it.
       {...(blank ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      onClick={() => events?.onClick?.()}
     >
       {str(props['text'], 'Link')}
     </a>

@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ComponentNode, Condition, FormData, JsonValue, ValidationRule } from './types.js'
+import type {
+  ComponentNode,
+  Condition,
+  FieldSchema,
+  FormData,
+  JsonValue,
+  ValidationRule,
+} from './types.js'
 import { contextValues } from './context.js'
 import { MAX_TREE_DEPTH } from './tree.js'
 import type { EvalOptions, Evaluator } from './validation.js'
 import {
   DEFAULT_MESSAGES,
+  INVALID_TYPE,
   MAX_ROWS,
   TOO_DEEP,
   TOO_MANY_ROWS,
@@ -60,11 +68,8 @@ describe('every non-required rule passes on an empty value', () => {
    * declaring only a `url` rule reported "Required" when left blank.
    * Requiredness is one rule's job, and only one.
    *
-   * Invariant 5, and it was enforced for six of the nine rules and for one shape
-   * of empty. `maxLength`, `max` and `custom` were not listed, and only `''` was
-   * tried -- while `required`'s own test says empty means `undefined`, `null`,
-   * `''`, whitespace and `[]`. An invariant checked on two thirds of its
-   * subjects is a rule with three exceptions nobody wrote down.
+   * This table is derived against `DEFAULT_MESSAGES` below, so a newly added
+   * rule cannot silently sit outside the invariant.
    *
    * What each half earns is worth being exact about. Removing the empty guard
    * for `maxLength`, `max` or `custom` fails none of these rows, because those
@@ -83,8 +88,12 @@ describe('every non-required rule passes on an empty value', () => {
     { key: 'uuid' },
     { key: 'minLength', value: 5 },
     { key: 'maxLength', value: 5 },
+    { key: 'minItems', value: 2 },
+    { key: 'maxItems', value: 2 },
     { key: 'min', value: 10 },
     { key: 'max', value: 10 },
+    { key: 'matches', field: 'expected' },
+    { key: 'after', field: 'start' },
     { key: 'pattern', value: '^x+$' },
     { key: 'custom', expression: 'false' },
   ]
@@ -135,8 +144,16 @@ describe('every non-required rule passes on an empty value', () => {
     expect(check({ key: 'uuid' }, 'nope')).toBeDefined()
     expect(check({ key: 'minLength', value: 5 }, 'ab')).toBeDefined()
     expect(check({ key: 'maxLength', value: 5 }, 'abcdef')).toBeDefined()
+    expect(check({ key: 'minItems', value: 2 }, ['one'])).toBeDefined()
+    expect(check({ key: 'maxItems', value: 2 }, ['one', 'two', 'three'])).toBeDefined()
     expect(check({ key: 'min', value: 10 }, 9)).toBeDefined()
     expect(check({ key: 'max', value: 10 }, 11)).toBeDefined()
+    expect(
+      applyRule({ key: 'matches', field: 'expected' }, 'wrong', { expected: 'right' }),
+    ).toBeDefined()
+    expect(
+      applyRule({ key: 'after', field: 'start' }, '2026-01-01', { start: '2026-02-01' }),
+    ).toBeDefined()
     expect(check({ key: 'pattern', value: '^x+$' }, 'y')).toBeDefined()
     expect(
       applyRule({ key: 'custom', expression: 'false' }, 'x', NO_DATA, { evaluate: () => false }),
@@ -204,6 +221,62 @@ describe('range rules', () => {
     expect(check({ key: 'min', value: 10 }, 9)).toBe(DEFAULT_MESSAGES.min)
     expect(check({ key: 'max', value: 10 }, 10)).toBeUndefined()
     expect(check({ key: 'max', value: 10 }, 11)).toBe(DEFAULT_MESSAGES.max)
+  })
+
+  it('applies list bounds inclusively', () => {
+    expect(check({ key: 'minItems', value: 2 }, ['one', 'two'])).toBeUndefined()
+    expect(check({ key: 'minItems', value: 2 }, ['one'])).toBe(DEFAULT_MESSAGES.minItems)
+    expect(check({ key: 'maxItems', value: 2 }, ['one', 'two'])).toBeUndefined()
+    expect(check({ key: 'maxItems', value: 2 }, ['one', 'two', 'three'])).toBe(
+      DEFAULT_MESSAGES.maxItems,
+    )
+  })
+
+  it('rejects a list rule applied to a non-list value', () => {
+    expect(check({ key: 'minItems', value: 1 }, 'one')).toBe(DEFAULT_MESSAGES.minItems)
+    expect(check({ key: 'maxItems', value: 1 }, { one: true })).toBe(DEFAULT_MESSAGES.maxItems)
+  })
+})
+
+describe('cross-field rules', () => {
+  it('matches primitive and structured values', () => {
+    expect(
+      applyRule({ key: 'matches', field: 'password' }, 'secret', { password: 'secret' }),
+    ).toBeUndefined()
+    expect(
+      applyRule({ key: 'matches', field: 'password' }, 'different', { password: 'secret' }),
+    ).toBe(DEFAULT_MESSAGES.matches)
+    expect(
+      applyRule(
+        { key: 'matches', field: 'expected' },
+        { nested: [1, true] },
+        {
+          expected: { nested: [1, true] },
+        },
+      ),
+    ).toBeUndefined()
+  })
+
+  it('compares numbers and ISO-style strings in order', () => {
+    expect(applyRule({ key: 'after', field: 'start' }, 11, { start: 10 })).toBeUndefined()
+    expect(applyRule({ key: 'after', field: 'start' }, 10, { start: 10 })).toBe(
+      DEFAULT_MESSAGES.after,
+    )
+    expect(
+      applyRule({ key: 'after', field: 'start' }, '2026-03-01', { start: '2026-02-28' }),
+    ).toBeUndefined()
+  })
+
+  it('can compare against the current repeater row', () => {
+    const row = { path: [], values: { password: 'row-secret' } }
+    expect(
+      applyRule(
+        { key: 'matches', field: 'password', scope: 'row' },
+        'row-secret',
+        { password: 'form-secret' },
+        { row },
+      ),
+    ).toBeUndefined()
   })
 })
 
@@ -355,6 +428,37 @@ describe('validateField', () => {
     expect(validateField(field, {})).toBe(DEFAULT_MESSAGES.required)
     expect(validateField(field, { email: 'bad' })).toBe(DEFAULT_MESSAGES.email)
     expect(validateField(field, { email: 'a@b.co' })).toBeUndefined()
+  })
+
+  it.each<[FieldSchema['type'], JsonValue, JsonValue]>([
+    ['string', 'text', 1],
+    ['number', 42, true],
+    ['boolean', false, 1],
+    ['date', '2026-09-04', 20260904],
+    ['array', ['one'], { one: true }],
+    ['object', { one: true }, ['one']],
+    ['file', 'base64-data', { bytes: [] }],
+  ])('enforces the declared %s value type', (type, valid, invalid) => {
+    const node: ComponentNode = {
+      key: 'answer',
+      type: 'Field',
+      props: {},
+      schema: { type, validations: [] },
+    }
+
+    expect(validateField(node, { answer: valid })).toBeUndefined()
+    expect(validateField(node, { answer: invalid })).toBe(INVALID_TYPE)
+  })
+
+  it.each([undefined, null, '', '   '])('leaves empty values to required (%s)', (value) => {
+    const node: ComponentNode = {
+      key: 'answer',
+      type: 'NumberField',
+      props: {},
+      schema: { type: 'number', validations: [] },
+    }
+
+    expect(validateField(node, value === undefined ? {} : { answer: value })).toBeUndefined()
   })
 })
 
@@ -1125,9 +1229,11 @@ describe('a required answer that was not required', () => {
   })
 
   it('is satisfied by an object that holds something', () => {
-    // The control. Reading every object as empty would be its own bug: an
-    // object-typed field with an answer in it is answered.
-    expect(validateForm(root([field('consent')]), { consent: { agreed: true } })).toEqual({})
+    const objectField: ComponentNode = {
+      ...field('consent'),
+      schema: { type: 'object', validations: [{ key: 'required' }] },
+    }
+    expect(validateForm(root([objectField]), { consent: { agreed: true } })).toEqual({})
   })
 
   it('reports a field whose key is __proto__', () => {
@@ -1153,120 +1259,29 @@ describe('a required answer that was not required', () => {
   })
 })
 
-/**
- * A pattern is authored in a document and run on the server against text an
- * attacker chose.
- *
- * `new RegExp(pattern).test(value)` with no cap on either side. The classic
- * shape is an unbounded quantifier wrapped in another one — `^(a+)+$` against
- * forty non-matching characters pins a thread, and a form runs one of these per
- * field per row of every repeater.
- *
- * Nothing here can make a backtracking engine linear, so the answer is narrower
- * and it is stated rather than implied: the shapes that go exponential are
- * refused when the rule is applied, and the text a pattern is run against is
- * bounded. `docs/build-out/triage.md` records what that still leaves.
- */
 describe('a pattern rule', () => {
   const pattern = (value: string, against: string): string | undefined =>
     check({ key: 'pattern', value }, against)
 
-  it('still does what a pattern is for', () => {
+  it('matches with the bounded engine', () => {
     expect(pattern('^[A-Z]{2}\\d{4}$', 'AB1234')).toBeUndefined()
     expect(pattern('^[A-Z]{2}\\d{4}$', 'nope')).toBe(DEFAULT_MESSAGES.pattern)
+    expect(pattern('^(ab|ac)+$', 'abac')).toBeUndefined()
   })
 
-  it.each([
-    ['a quantified group that is itself quantified', '^(a+)+$'],
-    ['the same shape with a star', '^(a*)*$'],
-    ['a nested group', '^((a+)*)+$'],
-    /*
-     * One plain group was all it took. An unquantified `)` popped the group and
-     * discarded its finding, so the enclosing group never learned it held an
-     * unbounded quantifier -- and both of these are one-token rewrites of the
-     * three rows above. Traced before the fix: `(?:(a+))+` returned false.
-     */
-    ['an unbounded quantifier wrapped in a plain group', '^(?:(a+))+$'],
-    ['the same, in a capturing group', '^((a+))+$'],
-    ['two plain groups deep', '^(?:(?:(a+)))+$'],
-    /*
-     * The alternation shape this file used to record as uncaught. A duplicated
-     * alternative is never useful -- `(a|a)` matches what `(a)` matches -- so
-     * refusing it costs an author nothing.
-     */
-    ['a repeated group with a duplicated alternative', '^(a|a)*$'],
-    ['the same with three branches', '^(x|a|a)+$'],
-    /*
-     * The non-capturing form, which is what an author actually writes -- and
-     * which the first version of this guard let through: the group body was
-     * sliced from the character after `(`, so `?:a` was compared against `a`
-     * and found different. Raised in review on PR #40.
-     */
-    ['the non-capturing form of the same', '^(?:a|a)*$'],
-    ['a named group with a duplicated alternative', '^(?<pick>a|a)*$'],
-    ['a lookahead prefix does not hide it either', '^(?=a|a)+$'],
-  ])('refuses %s rather than running it', (_what, source) => {
-    /*
-     * Refused means the rule fails, not that it passes. A pattern the engine
-     * cannot be trusted with has not been satisfied, and a silent pass is how a
-     * constraint stops applying on the server.
-     */
-    expect(pattern(source, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX')).toBe(DEFAULT_MESSAGES.pattern)
-  })
-
-  it('does not catch every blowup, and says so', () => {
-    /*
-     * The limit, asserted on a pattern that is actually outside the guard.
-     *
-     * This test's whole job is to notice when the guard grows, and it asserted
-     * `^(ab|cd)+$` -- a benign alternation that was never in scope. So the
-     * limit it claimed to pin was pinned by nothing: adding detection that
-     * refused `(a|a)*`, which its own comment named as the uncaught shape, left
-     * this green. That detection has since been added, which is exactly the
-     * change this test was supposed to report and did not.
-     *
-     * `(a|ab)*` is the honest residual: overlapping branches of different
-     * lengths, exponential, and genuinely not separable from a safe pattern by
-     * any cheap syntactic rule. If a later change starts refusing it, this goes
-     * red and somebody has to decide whether the false positives came with it.
-     */
+  it('evaluates formerly catastrophic patterns without backtracking', () => {
+    expect(pattern('^(a+)+$', 'a'.repeat(1_000) + 'X')).toBe(DEFAULT_MESSAGES.pattern)
     expect(pattern('^(a|ab)*$', 'ab')).toBeUndefined()
   })
 
-  it('still allows an alternation whose branches differ', () => {
-    /*
-     * The control for the duplicate-branch rule, and the reason it is narrow.
-     * `(ab|cd)+` is safe and common, and `(ab|ac)+` shares a first character
-     * and is also safe -- a prefix-overlap heuristic would have refused the
-     * second, which is a worse failure than missing it.
-     */
-    expect(pattern('^(ab|cd)+$', 'abcd')).toBeUndefined()
-    expect(pattern('^(ab|ac)+$', 'abac')).toBeUndefined()
-    // The non-capturing form of a *legitimate* alternation, so the prefix skip
-    // above cannot be a blanket refusal of `(?:`.
-    expect(pattern('^(?:ab|cd)+$', 'abcd')).toBeUndefined()
-    expect(pattern(String.raw`^(\d{3}|\d{4})-x$`, '123-x')).toBeUndefined()
-  })
-
-  it('allows a bounded inner quantifier, which is what real patterns look like', () => {
-    // `(\d{3}-)+` is a phone number, not an attack: the inner repetition has a
-    // fixed length, so there is nothing for the engine to try two ways.
-    expect(pattern('^(\\d{3}-)+\\d{4}$', '123-456-7890')).toBeUndefined()
-    expect(pattern('^(\\d{3}-)+\\d{4}$', 'nope')).toBe(DEFAULT_MESSAGES.pattern)
-  })
-
-  it('does not run a pattern against unbounded text', () => {
-    // An answer to a form field is not a megabyte. Bounding the input does not
-    // make an exponential pattern safe, but it does cap every polynomial one.
-    const long = 'a'.repeat(20_000)
-    expect(pattern('^a*$', long)).toBe(DEFAULT_MESSAGES.pattern)
-    expect(pattern('^a*$', 'a'.repeat(100))).toBeUndefined()
-  })
-
-  it('still refuses a pattern that is not a pattern', () => {
-    // The existing behaviour, kept: an unfinished pattern matches nothing,
-    // which is the same answer it gives once the author closes the bracket.
+  it('refuses unsupported or malformed syntax', () => {
+    expect(pattern('^(?=a)', 'a')).toBe(DEFAULT_MESSAGES.pattern)
     expect(pattern('^(a', 'a')).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it('does not evaluate unbounded input', () => {
+    expect(pattern('^a*$', 'a'.repeat(20_000))).toBe(DEFAULT_MESSAGES.pattern)
+    expect(pattern('^a*$', 'a'.repeat(100))).toBeUndefined()
   })
 })
 
@@ -1313,6 +1328,41 @@ describe('branches this file used to leave unexecuted', () => {
     it('still prefers a message the author wrote', () => {
       // The control. Ignoring `message` entirely would pass both tests above.
       expect(check({ key: 'required', message: 'We need this.' }, '')).toBe('We need this.')
+    })
+
+    it('resolves static and translated message bindings', () => {
+      expect(
+        applyRule(
+          { key: 'required', message: { kind: 'static', value: 'Required here.' } },
+          '',
+          {},
+        ),
+      ).toBe('Required here.')
+      expect(
+        applyRule(
+          { key: 'required', message: { kind: 'i18n', key: 'required_message' } },
+          '',
+          {},
+          { messages: { required_message: 'Ce champ est obligatoire.' } },
+        ),
+      ).toBe('Ce champ est obligatoire.')
+    })
+
+    it('shows a missing translation key instead of hiding the failure', () => {
+      expect(
+        applyRule({ key: 'required', message: { kind: 'i18n', key: 'required_message' } }, '', {}),
+      ).toBe('required_message')
+    })
+
+    it('resolves a computed message only through the injected evaluator', () => {
+      const rule: ValidationRule = {
+        key: 'required',
+        message: { kind: 'computed', expression: 'messageFor(value)' },
+      }
+      expect(applyRule(rule, '', {})).toBe(DEFAULT_MESSAGES.required)
+      expect(applyRule(rule, '', {}, { evaluate: () => 'A generated message.' })).toBe(
+        'A generated message.',
+      )
     })
   })
 
@@ -1472,7 +1522,7 @@ describe('bounds and schemes', () => {
  * true of `a{10}` and false of `(a+){10}`, and the code was written to the
  * sentence rather than to the distinction inside it.
  */
-describe('a pattern whose outer quantifier is bounded and whose inner is not', () => {
+describe('bounded matching of nested quantifiers', () => {
   /*
    * Each row supplies a value the pattern *matches*, which is what separates
    * "refused" from "ran and did not match". Both answer with the same message,
@@ -1488,8 +1538,8 @@ describe('a pattern whose outer quantifier is bounded and whose inner is not', (
     ['(a*){8}b', 'b', 'with a star inside'],
     ['(a+){2,5}b', 'aab', 'and with a range outside'],
     ['((a+)*){3}b', 'ab', 'and nested two deep'],
-  ])('refuses %s — %s', (pattern, matching) => {
-    expect(refused(pattern, matching)).toBe(true)
+  ])('runs %s — %s safely', (pattern, matching) => {
+    expect(refused(pattern, matching)).toBe(false)
   })
 
   it.each([
@@ -1695,64 +1745,37 @@ describe('rules that a document can malform or misplace', () => {
   })
 })
 
-/**
- * The reason a pattern will not be run, said once.
- *
- * A refused pattern makes the rule *fail*, so an author who typed one saw a
- * perfectly ordinary rule in the panel and every answer rejected on the server.
- * `patternProblem` is what the Rules tab shows while it can still be fixed, and
- * it is the same function `matchesPattern` decides with -- two sentences about
- * one rule is how the two come to disagree.
- */
 describe('patternProblem', () => {
-  /*
-   * The sentence, not only that there is one.
-   *
-   * These asserted `toBeDefined()`, so which of the messages an author is shown
-   * was unpinned -- and that string is what the Rules tab puts in front of them
-   * while the rule can still be fixed. The three now say different things and
-   * the difference is the point: telling somebody to "bound the inner one" when
-   * their pattern has no inner repeat is a refusal with no way out of it.
-   */
-  it.each([
-    ['(a+)+$', 'an unbounded repeat inside another', /unbounded repeat inside another one/],
-    [
-      '(a+){10}b',
-      'and a bounded one wrapping an unbounded one',
-      /unbounded repeat inside another one/,
-    ],
-    ['(a|a)*', 'a repeated group with the same choice twice', /same choice twice/],
-    ['(', 'a pattern that does not compile', /not a valid regular expression/],
-    ['[a-', 'an unterminated class', /not a valid regular expression/],
-  ])('reports %s — %s', (pattern, _what, says) => {
-    expect(patternProblem(pattern)).toMatch(says)
-  })
-
-  it.each(['^\\d{5}$', '(\\d{3}-){4}x', '(\\d{1,3}\\.){3}\\d{1,3}', '', '^[A-Z]{2}$'])(
-    'says nothing about %s',
+  it.each(['(', '[a-', '^(?=a)', String.raw`(a)\1`])(
+    'reports unsupported pattern %s',
     (pattern) => {
-      // The controls, including the empty one: it compiles, it matches
-      // everything, and it is what a half-typed rule looks like. Reporting it
-      // would put an error under the field before the first character.
-      expect(patternProblem(pattern)).toBeUndefined()
+      expect(patternProblem(pattern)).toMatch(/invalid or uses syntax unsupported/)
     },
   )
 
-  it('agrees with the rule, which is the point of it being one function', () => {
-    /*
-     * Every pattern this reports has to be one the engine refuses, and refusing
-     * means the rule fails. If these two ever answered differently, the panel
-     * would be describing a rule the server does not run.
-     */
-    for (const pattern of ['(a+)+$', '(a+){10}b', '(']) {
+  it('reports a pattern that exceeds the source limit', () => {
+    expect(patternProblem('a'.repeat(1_025))).toMatch(/cannot be longer/)
+  })
+
+  it.each([
+    '^\\d{5}$',
+    '(\\d{3}-){4}x',
+    '(\\d{1,3}\\.){3}\\d{1,3}',
+    '',
+    '^[A-Z]{2}$',
+    '(a+)+$',
+    '(a|ab)*',
+  ])('accepts bounded-engine pattern %s', (pattern) => {
+    expect(patternProblem(pattern)).toBeUndefined()
+  })
+
+  it('agrees with rule evaluation', () => {
+    for (const pattern of ['(', '^(?=a)', String.raw`(a)\1`]) {
       expect(patternProblem(pattern)).toBeDefined()
-      expect(check({ key: 'pattern', value: pattern }, 'aaaaaaaaaab')).toBe(
-        DEFAULT_MESSAGES.pattern,
-      )
+      expect(check({ key: 'pattern', value: pattern }, 'a')).toBe(DEFAULT_MESSAGES.pattern)
     }
   })
 })
-
 /**
  * The cap on how much work a request body can ask for.
  *
@@ -2127,11 +2150,13 @@ describe('a rule with no value to check against', () => {
   const SATISFYING: Record<string, JsonValue> = {
     minLength: 'abcd',
     maxLength: 'abcd',
+    minItems: ['one', 'two'],
+    maxItems: ['one', 'two'],
     min: 7,
     max: 7,
   }
 
-  const MEASURING = ['minLength', 'maxLength', 'min', 'max'] as const
+  const MEASURING = ['minLength', 'maxLength', 'minItems', 'maxItems', 'min', 'max'] as const
 
   it.each(MEASURING.flatMap((key) => VALUELESS.map((bound) => [key, bound[0], bound[1]] as const)))(
     '%s with a bound that is %s does not pass',
@@ -2150,6 +2175,8 @@ describe('a rule with no value to check against', () => {
      */
     expect(applyRule({ key: 'minLength', value: 3 }, SATISFYING['minLength'], {})).toBeUndefined()
     expect(applyRule({ key: 'maxLength', value: 9 }, SATISFYING['maxLength'], {})).toBeUndefined()
+    expect(applyRule({ key: 'minItems', value: 1 }, SATISFYING['minItems'], {})).toBeUndefined()
+    expect(applyRule({ key: 'maxItems', value: 3 }, SATISFYING['maxItems'], {})).toBeUndefined()
     expect(applyRule({ key: 'min', value: 3 }, SATISFYING['min'], {})).toBeUndefined()
     expect(applyRule({ key: 'max', value: 9 }, SATISFYING['max'], {})).toBeUndefined()
   })

@@ -12,15 +12,7 @@
   --fs-bg-panel: #ffffff;
   --fs-bg-well: #eef0f3;
   --fs-border: #d7dbe0;
-  /*
-   * The boundary of a control, which is not the same job as a divider.
-   *
-   * `--fs-border` separates panels, and a divider is decoration: WCAG 1.4.11
-   * asks nothing of it. A text field's outline is what tells somebody there is a
-   * text field there -- the field's background is a shade off the panel it sits
-   * on, so at 1.39:1 the border was carrying the whole message and failing to.
-   * This clears 3:1 on all three surfaces in both themes, which is the rule.
-   */
+
   --fs-control-border: #7c838d;
   --fs-text: #1c1f23;
   --fs-text-muted: #5b6470;
@@ -29,27 +21,9 @@
   --fs-accent: #b5179e;
   --fs-danger: #b3261e;
   --fs-radius: 6px;
-  /*
-   * The scheme the user agent paints its own controls in.
-   *
-   * The dark palette below is complete and this was missing, so every
-   * UA-rendered control inside a dark builder came out light: the property
-   * panel's checkboxes, `<select>` popups, number spinners, the colour input's
-   * native well. The four hand-written `::-webkit-scrollbar` rules further down
-   * exist for a problem this solves natively -- they predate it and stay,
-   * because they also set the thumb colour, which `color-scheme` does not.
-   */
+
   color-scheme: light;
-  /*
-   * Half the corner radius, for chrome drawn over the form.
-   *
-   * Six radii were written as literals and so ignored `--fs-radius`, which
-   * `11-theming.md` documents as the host-overridable corner and this file's
-   * header calls the whole restyling mechanism: a host squaring the builder off
-   * with `--fs-radius: 0` still got rounded selection frames, rounded selection
-   * toolbar buttons and a rounded badge. Derived rather than declared as `3px`
-   * so it cannot drift back out of step.
-   */
+
   --fs-radius-sm: calc(var(--fs-radius) / 2);
   --fs-panel-width: 288px;
   --fs-scrollbar-thumb: #7c838d;
@@ -96,15 +70,6 @@
 }
 
 .fs-shell[data-fs-theme='dark'] {
-  /*
-   * The same `color-scheme` the media-query block sets.
-   *
-   * It was in that block only, so a host that forces dark through the attribute
-   * on a machine set to light got the dark palette painted around light UA
-   * widgets: a white scrollbar down a dark panel, a light date picker, a light
-   * spinner on a number field. `color-scheme` is what tells the browser which
-   * one to draw, and no token can say it.
-   */
   color-scheme: dark;
   --fs-bg-app: #1b1d21;
   --fs-bg-panel: #24272c;
@@ -196,6 +161,10 @@
   background: var(--fs-bg-panel);
 }
 
+.fs-panel[hidden] {
+  display: none;
+}
+
 .fs-panel--left {
   border-inline-end: 1px solid var(--fs-border);
 }
@@ -225,31 +194,7 @@
  * notched outline so every label sat on top of its border. The canvas surface
  * must inherit nothing from here.
  */
-/*
- * `:where()` on the scope, so these lose to any later single-class rule.
- *
- * `.fs-panel button` is specificity (0,1,1) -- one class and one type -- and it
- * therefore beat every `(0,1,0)` rule that styles the same elements, whatever
- * the source order. So whole blocks that read as deliberate never applied:
- * `.fs-tabs__tab` (rendered as a `<button>` inside both `.fs-panel` asides),
- * `.fs-color__swatch`, whose own comment says "below about 28px a colour well
- * is a coloured line" and which never got its 28px, `.fs-code__area`,
- * `.fs-binding__expression`, `.fs-tree__remove`, `.fs-rule__remove`,
- * `.fs-prop-row__clear` and `.fs-toolbar__toggle`.
- *
- * Logical and physical properties cascade together, so `inline-size` did not
- * escape `width` either.
- *
- * The consequence with a name: `11-theming.md` documents `--fs-font-mono` for
- * "The JSON editor, the raw CSS box, the code editor". Only `.fs-dialog__editor`
- * is outside `.fs-panel` and actually got it -- the raw CSS box and the
- * expression editor rendered in the proportional UI font, with the token they
- * name unreachable. `test/docs.test.ts` checks that tokens are declared, not
- * that the rule using them wins.
- *
- * `:where()` contributes zero specificity, so these become (0,0,1): a base for
- * elements nothing else claims, which is what they were written to be.
- */
+
 :where(.fs-toolbar, .fs-panel, .fs-canvas__bar) button {
   font: inherit;
   color: inherit;
@@ -338,13 +283,6 @@
   border-radius: var(--fs-radius);
   cursor: pointer;
 
-  /*
-   * The drop feedback's two declarations, folded in from the second block this
-   * selector used to have five hundred lines down. Two blocks for one selector
-   * is the hazard the comment above this section says was eliminated, and it
-   * had come back: `position` and `touch-action` are what the `::before` rules
-   * near the drop feedback need, and they belong with the row that has them.
-   */
   position: relative;
   touch-action: none;
 }
@@ -421,29 +359,6 @@
   color: var(--fs-text-muted);
 }
 
-/*
- * `touch-action: none` here as well as on the palette and the tree rows.
- *
- * The surface is `overflow: auto`, so on touch the browser claimed a
- * press-and-drag as a pan, fired `pointercancel`, and canvas-to-canvas moves
- * simply did not exist — against the spec's "pointer events throughout, so it
- * works on touch". The palette and the tree already said this; the one surface
- * that scrolls did not.
- *
- * `pan-y` rather than `none`, so the canvas can still be scrolled vertically
- * with a finger. A horizontal drag is the gesture the designer wants.
- *
- * `pinch-zoom` alongside it, because this property is not inherited but it does
- * govern the whole subtree, and the subtree is the kit's rendered form. `pan-y`
- * alone turned off pinch for any touch starting over the form, so a low-vision
- * author on a tablet could not magnify the thing being authored -- WCAG 1.4.4,
- * against a repo that targets AA. Zoom is not a drag gesture and was never
- * competing with one; it was collateral.
- *
- * Invariant 3 in substance rather than in selector shape, which is why
- * `designer.css.test.ts` could not see it: the guard parses selectors, and this
- * reaches the kit's components without naming them.
- */
 .fs-canvas__surface {
   touch-action: pan-y pinch-zoom;
   position: relative;
@@ -483,17 +398,6 @@
   border-block-end: 1px solid var(--fs-border);
 }
 
-/*
- * A strip with something beside it, on the same row.
- *
- * Only the JSON dialog uses it, for its close button. The button cannot go
- * inside the strip — that is the `tablist` and may hold nothing but tabs — and
- * wanting it on that row is what led the dialog to grow a second, keyboardless
- * tab implementation of its own.
- *
- * The strip grows so its underline still runs the full width, which is what it
- * did when it was the only thing on the row.
- */
 .fs-tabs__row {
   display: flex;
   align-items: center;
@@ -834,6 +738,51 @@
   margin-block-start: 12px;
 }
 
+.fs-actions__event + .fs-actions__event {
+  margin-block-start: 18px;
+}
+
+.fs-actions__list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.fs-action,
+.fs-action-definition {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+}
+
+.fs-action label,
+.fs-action-definition label {
+  display: grid;
+  gap: 4px;
+  color: var(--fs-text-muted);
+  font-size: 12px;
+}
+
+.fs-action__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fs-action__head span {
+  display: flex;
+  gap: 4px;
+}
+
+.fs-action__head button {
+  padding: 2px 6px;
+}
+
 /*
  * Drop indicators and the label that follows a drag.
  *
@@ -857,13 +806,7 @@
 .fs-drop--bar {
   background: var(--fs-accent);
   border-radius: 2px;
-  /*
-   * A halo in the form's own background, not the canvas's. The bar is drawn
-   * between two components, which sit on whatever the kit paints -- usually
-   * white -- and the ring was the app background, the one colour the bar is
-   * never drawn against. `Canvas` is a neutral pair that reads as a separation
-   * on either.
-   */
+
   box-shadow:
     0 0 0 1px rgb(255 255 255 / 65%),
     0 0 0 2px rgb(0 0 0 / 20%);
@@ -874,15 +817,6 @@
   border-radius: var(--fs-radius);
 }
 
-/*
- * Above the kit's output, for the reason `.fs-drop` gives.
- *
- * This said 20, two rules after the block explaining that 2 and 3 were not
- * enough because MUI's `AppBar` defaults to 1100. Nothing between this element
- * and the viewport creates a stacking context, so the label competed directly
- * with whatever the form paints and lost to the same `AppBar` -- leaving a drag
- * over a bar with no label saying what is being dragged.
- */
 .fs-drag-label {
   position: fixed;
   z-index: 5000;
@@ -936,59 +870,15 @@
  * frame drawn around a desktop canvas would be a picture of a monitor, which
  * tells the author nothing they cannot already see.
  */
-/*
- * The frame is where the designer's own typography stops.
- *
- * `.fs-shell` sets `font-family`, `font-size` and `color`, and all three are
- * *inherited* — so they flowed through the surface and this frame into whatever
- * the kit rendered, and nothing put them back. Invariant 3 breached by
- * inheritance rather than by a descendant selector, which is why the test that
- * parses selectors could not see it: in dark mode an author styled and approved
- * text that ships as the browser's default black at the browser's default size.
- *
- * Reset rather than a value, because the form should look the way it will look
- * on the host's page and this cannot know what that is. Which keyword does that
- * is settled inside the rule below, where it was got wrong once.
- */
+
 .fs-canvas__frame {
   margin-inline: auto;
-  /*
-   * `initial`, not `revert`, and the difference is the whole point.
-   *
-   * `revert` rolls a property back to the user-agent origin, and for an
-   * inherited property with no UA rule that computes to `inherit` -- so these
-   * three did nothing at all. Measured in a browser rather than argued:
-   * `getComputedStyle` on the frame returned exactly the shell's values,
-   * `system-ui … | 14px | rgb(28, 31, 35)`, while the host page's body was
-   * `Roboto … | 16px`. The canvas was drawing the form in the designer's own
-   * typeface, so an author judged wrapping and spacing against a font the form
-   * will never use.
-   *
-   * `initial` stops the inheritance, which is what this rule exists to do. It
-   * cannot make the form look like the host's page -- nothing here knows what
-   * that is -- and it is not trying to: it is refusing to make it look like the
-   * builder.
-   */
+
   font-family: initial;
   font-size: initial;
   color: initial;
 }
 
-/*
- * A device frame is a width, plus something to see it by.
- *
- * No `overflow: hidden` and no background of its own, which is what it used to
- * carry. Both changed the form rather than the viewport, and only at tablet and
- * mobile, so the canvas answered a different question depending on which button
- * was pressed: `overflow: hidden` clipped a focus ring drawn with a positive
- * offset and turned every `position: sticky` inside the form into a plain one,
- * and the panel background painted the designer's own colour behind a kit that
- * has a background of its own -- a dark builder around a light form, unreadable
- * at two widths out of three.
- *
- * The border and the shadow stay: they say where the device edge is, and they
- * are drawn outside the content rather than over it.
- */
 .fs-canvas__frame[data-fs-viewport='tablet'],
 .fs-canvas__frame[data-fs-viewport='mobile'] {
   border: 1px solid var(--fs-border);
@@ -1271,37 +1161,9 @@
   min-width: 0;
 }
 
-/*
- * A checkbox stretched to the cell is a very wide checkbox.
- *
- * `align-self` alone did not do it. It won its own property and declared no
- * width, so the base rule's `width: 100%` stood uncontested and every boolean
- * property editor drew a checkbox as wide as the column -- the comment was
- * describing an intent the rule never carried out. `align-self` still matters
- * for the cross axis; the width is the half that was missing.
- */
 .fs-prop-row__control input[type='checkbox'] {
   align-self: start;
   width: auto;
-}
-
-.fs-prop-row__control--inline {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
-/*
- * The picker keeps its natural width; the checkbox beside it needs almost none.
- * Letting it shrink is what clipped it to nothing in the first place, and a row
- * is the one place it can happen again.
- */
-.fs-prop-row__control--inline .fs-binding__modes {
-  flex: 0 0 auto;
-}
-
-.fs-prop-row__control--inline input[type='checkbox'] {
-  align-self: center;
 }
 
 .fs-prop-row label {
@@ -1443,13 +1305,6 @@
   gap: 4px;
 }
 
-/*
- * Stacked, like everything else in this pane. Side by side, the source picker
- * and the field select shared 121px and got about 59 each, which is not enough
- * for either. The labels between them are visually hidden and absolutely
- * positioned, so they are out of flow and `:first-child` was quietly matching a
- * label rather than the control it looked like it named.
- */
 .fs-condition__operand {
   display: flex;
   flex-direction: column;

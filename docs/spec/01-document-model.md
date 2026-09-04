@@ -1,9 +1,7 @@
 # Document model
 
-**Status: partial.** The tree, property values, and validation rules are built and tested. The format has
-no version migration path, and three fields the types declare are checked by `validateDocument` and then
-acted on by nothing: `ComponentNode.events` (see [09-actions.md](09-actions.md)) and both members of
-`FormSettings`.
+**Status: built.** The tree, property values, validation rules, actions, and document-loading boundary
+are built and tested.
 
 That list was six. `FieldSchema.autoValidate` came off it when the canvas preview began reading it,
 `ComponentDef.icon` when the palette began drawing it, `ComponentNode.css` when the Style tab began
@@ -27,7 +25,7 @@ interface FormDocument {
   languages: Language[]
   defaultLanguage: string // a BCP 47 tag, matching languageTag(l) for some l
   translations: Record<string, Record<string, string>> // tag -> key -> text
-  settings: FormSettings
+  settings: Record<string, never> // reserved; version 1 defines no settings
 }
 ```
 
@@ -47,11 +45,15 @@ look fixed. One helper decides now, and nothing compares these strings by hand.
 
 ### Versioning and migration
 
-**Status: planned.** Decided; not yet written.
+**Status: built.**
 
-`version` is the literal `'1'`, and `validateDocument` refuses a document that says anything else. What
-is missing is not a reader -- it is a migration path, so any change to the shape of a stored document
-would refuse every document a host has already saved rather than upgrading it.
+`loadDocument(unknown)` is the boundary for stored and imported values. It applies ordered migrations,
+fills version-compatible defaults without mutating its input, validates the complete resulting structure,
+and returns a discriminated success or error result. Version `'1'` is currently the only published shape,
+so the migration registry is empty until version `'2'` is introduced.
+
+The loader accepts JSON values only and bounds its traversal, so functions, cyclic graphs, non-finite
+numbers, and documents beyond the traversal budget are rejected before normalization is trusted.
 
 **Core owns migrations.** `loadDocument(unknown)` takes arbitrary JSON and returns either a document at
 the current version or the list of reasons it cannot be one. Every host would otherwise reimplement the
@@ -163,9 +165,8 @@ exfiltration channel rather than a broken rule.
 
 ### events
 
-**Status: planned.** Declared, with a six-member `EventName` union and `ActionRef` pointing at a
-`CodeAction` on the document. Nothing authors them and nothing fires them. See
-[09-actions.md](09-actions.md).
+**Status: built.** The six-member `EventName` union, ordered `ActionRef` lists, authoring surfaces, core
+runner, and renderer dispatch are implemented. See [09-actions.md](09-actions.md).
 
 ### renderWhen
 

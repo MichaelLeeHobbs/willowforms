@@ -46,15 +46,6 @@ const literal = (value: JsonValue): Operand => ({ kind: 'literal', value })
 /** Every operator, in the order the picker lists them. */
 const ORDER: Condition['op'][] = [...COMPARISONS, ...UNARY, ...MEMBERSHIP, ...GROUPS, 'not']
 
-/**
- * A list, whatever the document actually holds.
- *
- * `evaluateCondition` was made total against a hand-edited document and this
- * editor was not, so `options: "not-a-list"` rendered fine in the form and
- * crashed the designer the moment the panel tried to map over it. The panel is
- * where someone goes to fix a broken document, so it is the last place that can
- * afford to fall over on one.
- */
 function asList<T>(value: T[] | undefined): T[] {
   return Array.isArray(value) ? value : []
 }
@@ -75,16 +66,6 @@ function asOperand(value: Operand | undefined): Operand {
   return literal('')
 }
 
-/**
- * A condition of the requested shape, keeping whatever the old one can spare.
- *
- * Changing a group — `and`, `or`, `not` — to a scalar operator has nothing to
- * carry: a list of conditions is not an operand. It used to discard the group
- * outright, and because the store coalesces by label, one undo went back to
- * before the whole condition was authored rather than restoring the group. The
- * first condition inside is carried instead, which is the nearest thing to what
- * the author was looking at, and leaves the rest recoverable in one step.
- */
 function morph(current: Condition, op: Condition['op']): Condition {
   const carried =
     'conditions' in current
@@ -125,26 +106,9 @@ function morph(current: Condition, op: Condition['op']): Condition {
     return { op: 'not', condition: 'condition' in current ? current.condition : current }
   }
 
-  /*
-   * An operator this editor does not know is refused, not turned into a `not`.
-   *
-   * The four families above are the whole vocabulary, and the tail used to
-   * accept anything else and rewrite it as a negation -- so a document holding
-   * an operator from a newer version, or a typo, was silently *changed* by
-   * opening the panel that was supposed to show it. Returning the condition as
-   * it stands leaves the document alone; the row above draws what it can.
-   */
   return current
 }
 
-/**
- * A condition this editor can draw, whatever the document holds.
- *
- * The guards so far covered the lists and the operands and not the conditions
- * inside them, so `conditions: [null]` still threw on the first `'left' in
- * value`. An unreadable one is drawn as a fresh comparison, which the author
- * can then set to whatever they meant; nothing is written until they touch it.
- */
 function asCondition(value: Condition | undefined): Condition {
   if (!value || typeof value !== 'object') return { op: 'truthy', value: literal('') }
   /*
@@ -210,21 +174,6 @@ function decodeRef(encoded: string): Operand {
     : { kind: 'ref', dataKey }
 }
 
-/**
- * One side of a comparison: a field, a fixed value, or something the host knows.
- *
- * The field list comes from the document rather than being typed, so a
- * condition cannot reference a key that does not exist. A hand-edited document
- * still can, and the select shows that key rather than silently selecting the
- * first one, because quietly changing which field a rule tests is worse than
- * showing something unfamiliar.
- *
- * Context is typed instead, and cannot be anything else: what the host supplies
- * is not in the document, so there is no list to offer. That asymmetry is worth
- * the friction it causes, because the alternative is a document that carries a
- * schema for something it does not own. `missingContext` is where a wrong path
- * gets caught, at the host's boot rather than in the panel.
- */
 function OperandField({
   id,
   label,
@@ -355,17 +304,6 @@ function switchKind(
   return literal(current.kind === 'literal' ? current.value : '')
 }
 
-/**
- * A fixed value, committed on blur rather than parsed on every keystroke.
- *
- * The fourth instance of Trap 10 in this repository. The input was controlled
- * from `jsonToString(coerce(text))`, so what was being typed was parsed and
- * handed back before it was finished: typing `1.5` gave `1`, then `1.` parsed
- * back to `1`, and the `5` landed against it as `15`. A decimal could not be
- * entered at all.
- *
- * Same shape as the options box below and the raw CSS field on the Style tab.
- */
 function LiteralField({
   id,
   value,
@@ -431,23 +369,7 @@ function LiteralField({
  * a postcode or a phone number, is the cost, and it is why the comparison
  * operators are the only place this matters.
  */
-/**
- * What this box shows for a stored value: the inverse of `coerce`.
- *
- * `jsonToString` was used here, and it answers the empty string for an object,
- * a list and `null` -- deliberately, because those carry no text and it is used
- * where text is wanted. In this box a blank line is dropped on commit, so a
- * document holding an object option showed a blank line and lost the option the
- * first time anybody touched the control. `coerce` right below already parses
- * `{`, `[` and `"` as JSON and its comment says an object "is what the box shows
- * a document that already holds one". It was not.
- *
- * The quoting clause is the same defect one step quieter. A stored string `"18"`
- * spelled as `18` comes back from `coerce` as the number, so editing an
- * unrelated line silently changed a neighbour's type. Anything that does not
- * survive the round trip is quoted, which is the escape hatch `coerce` already
- * documents.
- */
+
 function spell(value: JsonValue): string {
   if (value === null || typeof value === 'object') return JSON.stringify(value)
   const plain = jsonToString(value)
@@ -480,34 +402,11 @@ function coerce(text: string): JsonValue {
   if (text === 'true') return true
   if (text === 'false') return false
 
-  /*
-   * A number only when the number is spelled the way JavaScript spells it.
-   *
-   * `Number()` accepts far more than that, so `01234` became `1234` and could
-   * never match the string a postcode field holds; `+441234567890` became a
-   * number; `1.50` became `1.5`. The comment below already named postcodes and
-   * phone numbers as the cost, which was the moment to notice that "looks
-   * numeric" is not the test — "would be written this way if it were a number"
-   * is.
-   *
-   * The round trip is that test, and it is exact: `18` prints back as `18` and
-   * is a number; `01234` prints back as `1234`, which is not what was typed, so
-   * it stays text.
-   */
   const asNumber = Number(text)
   if (!Number.isNaN(asNumber) && String(asNumber) === text) return asNumber
   return text
 }
 
-/**
- * The list of values a membership test compares against.
- *
- * Holds its own draft and commits on blur, which it has to: the stored value is
- * a parsed list, so re-deriving the text on every keystroke normalised away the
- * newline the moment it was typed and `18` then Enter then `21` arrived as
- * `1821`. The same shape as the key field and the JSON editor, and the same
- * reason.
- */
 function OptionsField({
   id,
   options,
@@ -521,37 +420,12 @@ function OptionsField({
   const [draft, setDraft] = useState(text)
   const [committed, setCommitted] = useState(text)
 
-  /*
-   * Re-sync when the document changes underneath, without losing an edit in
-   * progress: only the version this editor last saw is replaced. Undo, redo, a
-   * document swapped in from the JSON dialog, and a sibling row being removed
-   * all reach here; without this the box keeps showing the old text and writes
-   * it back on the next blur.
-   *
-   * Setting state during render is deliberate and is React's own advice for
-   * adjusting state when a prop changes — React discards the render and retries
-   * immediately, so nothing stale is ever committed. An effect would paint the
-   * old text for a frame first, which is the bug this is here to prevent. The
-   * JSON editor in Properties.tsx has done it this way since before conditions
-   * existed.
-   */
   if (text !== committed) {
     setCommitted(text)
     setDraft(text)
   }
 
   const commit = (): void => {
-    /*
-     * Nothing happens unless the text actually changed. Committing on every
-     * blur meant tabbing *past* this control counted as editing it: the parse
-     * below is lossy on purpose, so a stored `"007"` came back as the number
-     * `7` and a stored `" x "` came back as `"x"`, with nobody typing anything
-     * and an undo entry left behind for the edit that was never made.
-     *
-     * Compared against the text this box was last given rather than against the
-     * parsed list, because that is the comparison the draft is already keeping
-     * and it needs no equality over JSON.
-     */
     if (draft === committed) return
 
     /*
@@ -725,24 +599,7 @@ export function ConditionEditor({
               </button>
             </div>
           ))}
-          {/*
-            Disabled when there is no key to read, rather than minting a clause
-            that reads nothing.
-
-            `emptyCondition(dataKeys[0] ?? '')` produced
-            `{ kind: 'ref', dataKey: '' }` -- the exact shape `switchKind` was
-            changed to stop producing, and one core's gate does not catch:
-            `tree.ts` validates a `ref` with `text(value['dataKey'])`, which
-            accepts the empty string. So in a document whose data-key list has
-            emptied, the new clause read nothing, the group was false forever,
-            the component was permanently hidden, and `validateForm` skipped
-            every rule beneath it -- while `validateDocument` reported the
-            document clean.
-
-            The same argument the Show-when select already makes one file over,
-            where "A condition" is disabled when there is nothing to test: an
-            option that can only produce an unsatisfiable rule is not an option.
-          */}
+          {}
           <button
             type="button"
             disabled={rowDataKeys?.[0] === undefined && dataKeys[0] === undefined}
