@@ -56,6 +56,7 @@ Adjacent documents that are not contracts:
 
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — why the seams are where they are
 - [../accessibility.md](../accessibility.md) — what is checked, how, and what is missing
+- [../SPEC_SCOPE_REVIEW.md](../SPEC_SCOPE_REVIEW.md) — mission-based scope findings and proposals awaiting a product decision
 - [../prior-art/README.md](../prior-art/README.md) — what the competitor study found and the rules for using it
 
 A file's status is the weakest of its sections, not an average, and it has to match what the file itself

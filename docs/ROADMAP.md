@@ -26,3 +26,5 @@ documentation agree.
 ## Scope decisions
 
 The [product principles](spec/README.md#product-principles) govern additions. Richer expression tooling and direct canvas keyboard selection are removed from product scope. Generic HTML attribute passthrough is replaced by specific accessibility requirements expressed through ordinary properties; existing expressions and keyboard authoring remain supported.
+
+The [specification scope review](SPEC_SCOPE_REVIEW.md) proposes further reductions and usability priorities. Those proposals are not additional roadmap commitments until approved.
