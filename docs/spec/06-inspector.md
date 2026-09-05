@@ -34,6 +34,8 @@ roving tabindex subtly wrong.
 
 ## Properties
 
+Renaming a component key also updates structured references when its answer name follows that key and no other component in the same scope still writes the old answer. Visibility, property conditions, rule guards, and cross-field validation stay aligned; form references and each repeater's row references remain separate. An explicit `dataKey` remains stable. Expressions and action parameters are author-written source or arbitrary JSON and must be reviewed manually after a rename.
+
 **Status: built.**
 
 One row per `PropSchema` the component's `ComponentDef` declares, in declaration order. Above them, the

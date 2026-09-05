@@ -38,6 +38,7 @@ import {
   writersOf,
   repointDataKey,
   flatten,
+  isRowScope,
 } from '@formsmith/core'
 
 export const MAX_HISTORY = 100
@@ -270,6 +271,47 @@ function withRoot(doc: FormDocument, root: ComponentNode): FormDocument {
   return root === doc.root ? doc : { ...doc, root }
 }
 
+function rowOwner(root: ComponentNode, key: string): string | undefined {
+  let parent = findParent(root, key)
+  while (parent) {
+    if (isRowScope(parent)) return parent.key
+    parent = findParent(root, parent.key)
+  }
+  return undefined
+}
+
+function repointNodeData(
+  node: ComponentNode,
+  from: string,
+  to: string,
+  scope: 'form' | 'row',
+): ComponentNode {
+  const binding = (value: PropValue): PropValue => repointDataKey(value, from, to, scope)
+  return {
+    ...node,
+    props: Object.fromEntries(
+      Object.entries(node.props).map(([name, value]) => [name, binding(value)]),
+    ),
+    ...(node.renderWhen ? { renderWhen: binding(node.renderWhen) } : {}),
+    ...(Array.isArray(node.schema?.validations)
+      ? {
+          schema: {
+            ...node.schema,
+            validations: node.schema.validations.map((rule) => ({
+              ...rule,
+              ...((rule.key === 'matches' || rule.key === 'after') &&
+              rule.field === from &&
+              (rule.scope ?? 'form') === scope
+                ? { field: to }
+                : {}),
+              ...(rule.when ? { when: binding(rule.when) } : {}),
+            })),
+          },
+        }
+      : {}),
+  }
+}
+
 const bindingKind = (value: PropValue | undefined): string => {
   if (value === undefined) return 'none'
   if (value !== null && typeof value === 'object' && 'kind' in value) {
@@ -496,6 +538,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const renameKey = useCallback(
     (key: string, nextKey: string): RenameResult => {
+      const doc = latest.current
       const trimmed = nextKey.trim()
       if (trimmed === key) return { ok: true }
 
@@ -513,7 +556,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
        * the selection regardless: the panel silently began editing whichever
        * component already owned the name.
        */
-      if (findNode(history.present.root, trimmed)) {
+      if (findNode(doc.root, trimmed)) {
         return { ok: false, reason: trimmed + ' is already used by another component.' }
       }
 
@@ -523,14 +566,15 @@ export function useDesigner(initial: FormDocument): DesignerApi {
        * edit that did not happen — reachable whenever the selection names a node
        * an undo has removed, which is an ordinary state rather than a rare one.
        */
-      if (!findNode(history.present.root, key)) {
+      const before = findNode(doc.root, key)
+      if (!before) {
         return { ok: false, reason: 'There is no component keyed ' + key + ' any more.' }
       }
 
-      const before = findNode(history.present.root, key) as ComponentNode
       const movedName = dataKeyOf(before)
-      const alsoWrites = writersOf(history.present.root, movedName).filter(
-        (each: string) => each !== key,
+      const owner = rowOwner(doc.root, key)
+      const alsoWrites = writersOf(doc.root, movedName).filter(
+        (each) => each !== key && rowOwner(doc.root, each) === owner,
       )
 
       const followsTheRename =
@@ -545,20 +589,13 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
         if (!followsTheRename) return withRoot(doc, renamed)
 
-        /*
-         * Every node's own `renderWhen`, including the renamed one's -- a
-         * component may read its own answer through a sibling's guard, and a
-         * self-reference is no less dangling than any other.
-         */
+        // Form references can occur in any row; row references belong to one repeater.
         let repointed = renamed
         for (const node of flatten(renamed)) {
-          if (!node.node.renderWhen) continue
-          const next = repointDataKey(node.node.renderWhen, movedName, trimmed)
-          if (next === node.node.renderWhen) continue
-          repointed = updateNode(repointed, node.node.key, (each) => ({
-            ...each,
-            renderWhen: next,
-          }))
+          if (owner !== undefined && rowOwner(renamed, node.node.key) !== owner) continue
+          repointed = writeNode({ ...doc, root: repointed }, node.node.key, (each) =>
+            repointNodeData(each, movedName, trimmed, owner === undefined ? 'form' : 'row'),
+          ).root
         }
 
         return withRoot(doc, repointed)
@@ -566,7 +603,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       setSelectedKey((current) => (current === key ? trimmed : current))
       return { ok: true }
     },
-    [apply, history.present.root],
+    [apply],
   )
 
   const moveComponent = useCallback(
