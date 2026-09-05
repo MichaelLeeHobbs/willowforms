@@ -10,7 +10,7 @@
  * removal unrecoverable except through undo, and the bundle costs nothing.
  */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { languagesOf } from '../language.js'
 import { keyProblem, languageTag } from '@formsmith/core'
@@ -97,6 +97,7 @@ function CodeActionEditor({
 }
 
 export function FormSettings({ api }: FormSettingsProps): ReactNode {
+  const idBase = useId()
   const { document: doc } = api
 
   const languages = languagesOf(doc)
@@ -177,9 +178,9 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
   return (
     <div className="fs-form-settings">
       <div className="fs-prop-row">
-        <label htmlFor="fs-form-name">Form name</label>
+        <label htmlFor={idBase + '-fs-form-name'}>Form name</label>
         <input
-          id="fs-form-name"
+          id={idBase + '-fs-form-name'}
           type="text"
           value={doc.name}
           onChange={(e) => api.renameDocument(e.target.value)}
@@ -267,9 +268,9 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
 
       <div className="fs-languages__add">
         <div className="fs-prop-row">
-          <label htmlFor="fs-language-code">Code</label>
+          <label htmlFor={idBase + '-fs-language-code'}>Code</label>
           <input
-            id="fs-language-code"
+            id={idBase + '-fs-language-code'}
             type="text"
             placeholder="fr"
             value={code}
@@ -280,7 +281,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
              * why the code was refused, or to know that it was.
              */
             aria-invalid={error ? true : undefined}
-            {...(error ? { 'aria-describedby': 'fs-language-error' } : {})}
+            {...(error ? { 'aria-describedby': idBase + '-fs-language-error' } : {})}
 
             onChange={(e) => {
               setCode(e.target.value)
@@ -301,9 +302,9 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
           />
         </div>
         <div className="fs-prop-row">
-          <label htmlFor="fs-language-name">Name</label>
+          <label htmlFor={idBase + '-fs-language-name'}>Name</label>
           <input
-            id="fs-language-name"
+            id={idBase + '-fs-language-name'}
             type="text"
             placeholder="French"
             value={name}
@@ -314,7 +315,7 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
           Add language
         </button>
         {error && (
-          <p id="fs-language-error" className="fs-languages__error" role="alert">
+          <p id={idBase + '-fs-language-error'} className="fs-languages__error" role="alert">
             {error}
           </p>
         )}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
   ComponentNode,
@@ -140,6 +140,7 @@ function DataKeyField({
   overridden: boolean
   onCommit: (next: string) => RenameResult
 }): ReactNode {
+  const idBase = useId()
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
   const [error, setError] = useState('')
@@ -176,14 +177,16 @@ function DataKeyField({
 
   return (
     <div className="fs-prop-row">
-      <label htmlFor="fs-prop-datakey">Data key</label>
+      <label htmlFor={idBase + '-fs-prop-datakey'}>Data key</label>
       <input
-        id="fs-prop-datakey"
+        id={idBase + '-fs-prop-datakey'}
         type="text"
         value={draft}
         placeholder={nodeKey}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? 'fs-prop-datakey-error' : 'fs-prop-datakey-hint'}
+        aria-describedby={
+          error ? idBase + '-fs-prop-datakey-error' : idBase + '-fs-prop-datakey-hint'
+        }
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
@@ -198,11 +201,11 @@ function DataKeyField({
         }}
       />
       {error && (
-        <p id="fs-prop-datakey-error" className="fs-prop-row__error" role="alert">
+        <p id={idBase + '-fs-prop-datakey-error'} className="fs-prop-row__error" role="alert">
           {error}
         </p>
       )}
-      <p id="fs-prop-datakey-hint" className="fs-prop-row__hint">
+      <p id={idBase + '-fs-prop-datakey-hint'} className="fs-prop-row__hint">
         {overridden
           ? 'Submitted as ' + value + ' rather than ' + nodeKey + '.'
           : 'The name this answer takes in submitted data. Defaults to the key.'}
@@ -227,6 +230,7 @@ function KeyField({
   value: string
   onRename: (next: string) => RenameResult
 }): ReactNode {
+  const idBase = useId()
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
   const [error, setError] = useState('')
@@ -253,13 +257,13 @@ function KeyField({
 
   return (
     <div className="fs-prop-row">
-      <label htmlFor="fs-prop-key">Key</label>
+      <label htmlFor={idBase + '-fs-prop-key'}>Key</label>
       <input
-        id="fs-prop-key"
+        id={idBase + '-fs-prop-key'}
         type="text"
         value={draft}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? 'fs-prop-key-error' : undefined}
+        aria-describedby={error ? idBase + '-fs-prop-key-error' : undefined}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
@@ -274,7 +278,7 @@ function KeyField({
         }}
       />
       {error && (
-        <p id="fs-prop-key-error" className="fs-prop-row__error" role="alert">
+        <p id={idBase + '-fs-prop-key-error'} className="fs-prop-row__error" role="alert">
           {error}
         </p>
       )}
@@ -305,6 +309,7 @@ function VisibilityRow({
   rowDataKeys?: string[] | undefined
   onChange: (next: PropValue | undefined) => void
 }): ReactNode {
+  const idBase = useId()
   /*
    * Inside a row, a fresh condition starts on the row. Seeded on the form it
    * would name a key the top level does not hold, so it would be false from the
@@ -347,10 +352,10 @@ function VisibilityRow({
 
   return (
     <div className={'fs-prop-row' + (value ? ' is-set is-binding' : '')}>
-      <label htmlFor="fs-prop-renderwhen-mode">Show when</label>
+      <label htmlFor={idBase + '-fs-prop-renderwhen-mode'}>Show when</label>
       <div className="fs-prop-row__control">
         <select
-          id="fs-prop-renderwhen-mode"
+          id={idBase + '-fs-prop-renderwhen-mode'}
           className="fs-binding__mode"
           value={mode}
           onChange={(e) => {
@@ -387,7 +392,7 @@ function VisibilityRow({
 
         {value?.kind === 'condition' && (
           <ConditionEditor
-            id="fs-prop-renderwhen"
+            id={idBase + '-fs-prop-renderwhen'}
             value={value.condition}
             dataKeys={dataKeys}
             rowDataKeys={rowDataKeys}
@@ -397,7 +402,7 @@ function VisibilityRow({
 
         {value?.kind === 'computed' && (
           <ComputedEditor
-            id="fs-prop-renderwhen"
+            id={idBase + '-fs-prop-renderwhen'}
             label="Show when"
             value={value}
             onChange={onChange}
@@ -527,7 +532,8 @@ function PropRow({
   onChange,
   onTranslate,
 }: PropRowProps): ReactNode {
-  const id = 'fs-prop-' + schema.name
+  const idBase = useId()
+  const id = idBase + '-fs-prop-' + schema.name
   const isSet = value !== undefined
   const set = (v: JsonValue): void => onChange({ kind: 'static', value: v })
 

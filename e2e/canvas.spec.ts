@@ -17,7 +17,9 @@ test('clicking a component on the canvas selects it and shows its properties', a
   const frame = designer.page.locator('.fs-selection--active')
   await expect(frame).toBeVisible()
   await expect(designer.page.locator('.fs-selection__label')).toHaveText('TextField')
-  await expect(designer.page.locator('#fs-prop-key')).toHaveValue('email')
+  await expect(designer.page.getByRole('textbox', { name: 'Key', exact: true })).toHaveValue(
+    'email',
+  )
 })
 
 test('the selection frame sits on the component it selected', async ({ designer }) => {

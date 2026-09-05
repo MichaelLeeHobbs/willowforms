@@ -1810,7 +1810,7 @@ describe('the select editor and a value that is not a string', () => {
    * tests. The id is what names this one control.
    */
   const weightSelect = (): HTMLSelectElement => {
-    const element = document.getElementById('fs-prop-weight')
+    const element = document.querySelector('[id$="fs-prop-weight"]')
     if (!(element instanceof HTMLSelectElement)) throw new Error('no Weight select')
     return element
   }

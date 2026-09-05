@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { ComponentDef, Kit, PaletteGroup } from '@formsmith/core'
 import { groupKit } from '@formsmith/core'
@@ -41,6 +41,7 @@ export function Palette({
   onDragStart,
   consumeClick,
 }: PaletteProps): ReactNode {
+  const idBase = useId()
   const groups = useMemo(() => groupKit(kit), [kit])
 
   const filtered = useMemo(() => {
@@ -66,11 +67,11 @@ export function Palette({
         heading here repeated the word directly under itself.
       */}
       <div className="fs-palette__search">
-        <label className="fs-visually-hidden" htmlFor="fs-palette-search">
+        <label className="fs-visually-hidden" htmlFor={idBase + '-fs-palette-search'}>
           Search components
         </label>
         <input
-          id="fs-palette-search"
+          id={idBase + '-fs-palette-search'}
           type="search"
           placeholder="Search components"
           value={query}

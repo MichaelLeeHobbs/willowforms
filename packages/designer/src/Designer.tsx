@@ -7,7 +7,7 @@
  * component library in play is whichever kit renders the canvas.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useId, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { findLanguage, languageTag } from '@formsmith/core'
 import { languagesOf } from './language.js'
@@ -81,6 +81,7 @@ export function Designer({
   theme: controlledTheme,
   onThemeChange,
 }: DesignerProps): ReactNode {
+  const idBase = useId()
   /*
    * `initialDocument` is read once, at mount, and the name says so: the designer
    * owns the document after that, because a builder whose content can be
@@ -289,13 +290,13 @@ export function Designer({
       <div className="fs-body">
         <PaneHandle
           side="left"
-          controls={LEFT_PANE_ID}
+          controls={idBase + '-left'}
           collapsed={collapsed.left}
           onToggle={() => toggle('left')}
         />
 
         <aside
-          id={LEFT_PANE_ID}
+          id={idBase + '-left'}
           className="fs-panel fs-panel--left"
           aria-label="Components and structure"
           hidden={collapsed.left}
@@ -324,7 +325,7 @@ export function Designer({
         </main>
 
         <aside
-          id={RIGHT_PANE_ID}
+          id={idBase + '-right'}
           className="fs-panel fs-panel--right"
           aria-label="Component properties"
           hidden={collapsed.right}
@@ -345,7 +346,7 @@ export function Designer({
 
         <PaneHandle
           side="right"
-          controls={RIGHT_PANE_ID}
+          controls={idBase + '-right'}
           collapsed={collapsed.right}
           onToggle={() => toggle('right')}
         />
@@ -374,14 +375,6 @@ export function Designer({
     </div>
   )
 }
-
-/*
- * Fixed ids rather than useId, because only one Designer is ever on a page: it
- * is a whole-screen application, and two would fight over the window-level
- * keyboard shortcuts long before they collided over an id.
- */
-const LEFT_PANE_ID = 'fs-pane-left'
-const RIGHT_PANE_ID = 'fs-pane-right'
 
 /**
  * The grip that collapses a pane.
@@ -461,6 +454,7 @@ function Toolbar({
   language: string | undefined
   onLanguage: (next: string | undefined) => void
 }): ReactNode {
+  const idBase = useId()
   const languages = languagesOf(api.document)
   return (
     <header className="fs-toolbar">
@@ -494,11 +488,11 @@ function Toolbar({
          */}
         {languages.length > 1 && (
           <div className="fs-toolbar__field">
-            <label className="fs-visually-hidden" htmlFor="fs-toolbar-language">
+            <label className="fs-visually-hidden" htmlFor={idBase + '-fs-toolbar-language'}>
               Canvas language
             </label>
             <select
-              id="fs-toolbar-language"
+              id={idBase + '-fs-toolbar-language'}
               value={language ?? ''}
               onChange={(e) => onLanguage(e.target.value || undefined)}
             >
@@ -523,11 +517,11 @@ function Toolbar({
         )}
 
         <div className="fs-toolbar__field">
-          <label className="fs-visually-hidden" htmlFor="fs-toolbar-theme">
+          <label className="fs-visually-hidden" htmlFor={idBase + '-fs-toolbar-theme'}>
             Designer theme
           </label>
           <select
-            id="fs-toolbar-theme"
+            id={idBase + '-fs-toolbar-theme'}
             value={theme}
             onChange={(e) => {
               /*

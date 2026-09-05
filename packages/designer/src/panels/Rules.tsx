@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FieldSchema, ValidationKey, ValidationRule } from '@formsmith/core'
 import { DEFAULT_MESSAGES, keyScopesFor, patternProblem } from '@formsmith/core'
@@ -102,6 +102,7 @@ function usable(rule: unknown): rule is ValidationRule {
 }
 
 export function Rules({ api }: RulesProps): ReactNode {
+  const idBase = useId()
   const node = api.selectedNode
 
   if (!node) {
@@ -152,12 +153,12 @@ export function Rules({ api }: RulesProps): ReactNode {
   return (
     <div className="fs-rules">
       <div className="fs-prop-row">
-        <label htmlFor="fs-field-type">Data type</label>
+        <label htmlFor={idBase + '-fs-field-type'}>Data type</label>
         <select
-          id="fs-field-type"
+          id={idBase + '-fs-field-type'}
           value={schema.type}
           onChange={(e) => write({ type: e.target.value as FieldSchema['type'] })}
-          aria-describedby={repeats ? 'fs-field-type-note' : undefined}
+          aria-describedby={repeats ? idBase + '-fs-field-type-note' : undefined}
         >
           {FIELD_TYPES.map((type) => (
             <option key={type} value={type}>
@@ -166,7 +167,7 @@ export function Rules({ api }: RulesProps): ReactNode {
           ))}
         </select>
         {repeats && (
-          <p id="fs-field-type-note" className="fs-prop-row__hint">
+          <p id={idBase + '-fs-field-type-note'} className="fs-prop-row__hint">
             This component repeats its contents once per row because it holds a list. Changing the
             type away from <code>array</code> stops that, and any condition inside that reads
             &ldquo;this row&rdquo; will read nothing.
@@ -175,9 +176,9 @@ export function Rules({ api }: RulesProps): ReactNode {
       </div>
 
       <div className="fs-prop-row">
-        <label htmlFor="fs-auto-validate">Validate while typing</label>
+        <label htmlFor={idBase + '-fs-auto-validate'}>Validate while typing</label>
         <input
-          id="fs-auto-validate"
+          id={idBase + '-fs-auto-validate'}
           type="checkbox"
           checked={schema.autoValidate === true}
           onChange={(e) => write({ autoValidate: e.target.checked })}
@@ -221,11 +222,11 @@ export function Rules({ api }: RulesProps): ReactNode {
       )}
 
       <div className="fs-rules__add">
-        <label className="fs-visually-hidden" htmlFor="fs-add-rule">
+        <label className="fs-visually-hidden" htmlFor={idBase + '-fs-add-rule'}>
           Add a rule
         </label>
         <select
-          id="fs-add-rule"
+          id={idBase + '-fs-add-rule'}
           value=""
           onChange={(e) => {
             const key = e.target.value as ValidationKey
@@ -363,8 +364,9 @@ function RuleRow({
   translations,
   onTranslate,
 }: RuleRowProps): ReactNode {
+  const idBase = useId()
   const def = BY_KEY.get(rule.key)
-  const id = 'fs-rule-' + String(index)
+  const id = idBase + '-fs-rule-' + String(index)
   const label = def?.label ?? rule.key
 
   return (

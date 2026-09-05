@@ -181,7 +181,7 @@ beforeAll(() => {
  * Each anchor is an element only that panel draws.
  */
 function showing(id: string): HTMLElement {
-  const element = document.getElementById(id)
+  const element = document.querySelector<HTMLElement>(`[id$="${id}"]`)
   if (!element) throw new Error('the panel never rendered: no #' + id)
 
   const panel = element.closest('[role="tabpanel"], dialog')
@@ -231,7 +231,7 @@ describe('axe audit of the designer', () => {
     await user.click(row)
     await user.click(screen.getByRole('tab', { name: 'Actions' }))
 
-    showing('fs-action-onChange')
+    expect(screen.getByRole('combobox', { name: 'Action for onChange' })).toBeTruthy()
     expect(await audit(container)).toEqual([])
   }, 20000)
 

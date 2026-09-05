@@ -62,7 +62,9 @@ test('selection still lands on the right component at mobile width', async ({ de
   await designer.node('email').click()
 
   await expect(designer.page.locator('.fs-selection--active')).toBeVisible()
-  await expect(designer.page.locator('#fs-prop-key')).toHaveValue('email')
+  await expect(designer.page.getByRole('textbox', { name: 'Key', exact: true })).toHaveValue(
+    'email',
+  )
 })
 
 test('the selection frame is drawn over the component, not beside it', async ({ designer }) => {
