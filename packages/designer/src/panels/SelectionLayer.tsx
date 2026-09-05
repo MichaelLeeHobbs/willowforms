@@ -93,6 +93,7 @@ export function SelectionLayer({
   actions,
 }: SelectionLayerProps): ReactNode {
   const [selected, setSelected] = useState<Rect | undefined>(undefined)
+  const [selectedHidden, setSelectedHidden] = useState(false)
   const [hover, setHover] = useState<Rect | undefined>(undefined)
 
   const what = useRef({ selectedKey, selectedRow, hoverKey, hoverRow })
@@ -107,6 +108,9 @@ export function SelectionLayer({
       hoverRow: hoveredRow,
     } = what.current
     const nextSelected = measure(surface, key, row)
+    setSelectedHidden(
+      Boolean(key && nodeElement(surface, key, row)?.closest('[data-fs-hidden="true"]')),
+    )
     /*
      * One frame is enough when the pointer is over the selection already, and
      * "already" now means the same drawn copy rather than the same node: inside
@@ -190,7 +194,10 @@ export function SelectionLayer({
       {hover && <div className="fs-selection fs-selection--hover" style={frameStyle(hover)} />}
       {selected && (
         <div className="fs-selection fs-selection--active" style={frameStyle(selected)}>
-          <span className="fs-selection__label">{selectedType ?? 'Component'}</span>
+          <span className="fs-selection__label">
+            {selectedType ?? 'Component'}
+            {selectedHidden ? ' · Hidden in preview' : ''}
+          </span>
 
           {/*
            * The frame is pointer-events: none so it cannot swallow a click meant

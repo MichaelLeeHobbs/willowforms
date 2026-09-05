@@ -26,6 +26,27 @@ test('the full-screen demo keeps scrolling inside the designer', async ({ design
   }
 })
 
+test('keeps the desktop shell within a laptop viewport with a long form name', async ({
+  designer,
+}) => {
+  await designer.page.setViewportSize({ width: 1024, height: 768 })
+  await designer.openTab('Settings')
+  await designer.page
+    .getByRole('textbox', { name: 'Form name' })
+    .fill('A very long beta form title '.repeat(8))
+  const dimensions = await designer.page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight,
+    canvas: document.querySelector('.fs-canvas__surface')?.getBoundingClientRect().width ?? 0,
+  }))
+  expect(dimensions.scrollWidth).toBe(dimensions.width)
+  expect(dimensions.scrollHeight).toBe(dimensions.height)
+  expect(dimensions.canvas).toBeGreaterThan(350)
+  await expect(designer.page.getByRole('button', { name: 'Mobile', exact: true })).toBeInViewport()
+})
+
 test('light mode applies to the MUI form while editing and previewing', async ({ designer }) => {
   await designer.page.getByLabel('Designer theme').selectOption('light')
 
@@ -42,8 +63,8 @@ test('light mode applies to the MUI form while editing and previewing', async ({
 })
 
 test('pane handles remove the panes from layout and restore them', async ({ designer }) => {
-  const left = designer.page.locator('#fs-pane-left')
-  const right = designer.page.locator('#fs-pane-right')
+  const left = designer.page.locator('.fs-panel--left')
+  const right = designer.page.locator('.fs-panel--right')
 
   await designer.page.getByRole('button', { name: 'Hide Components and structure' }).click()
   await designer.page.getByRole('button', { name: 'Hide Component properties' }).click()

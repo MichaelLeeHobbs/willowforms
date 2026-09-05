@@ -614,6 +614,7 @@ function useKeyboardShortcuts(
       if (typing) return
 
       if (target?.closest('dialog[open]')) return
+      if (target?.closest('.fs-canvas__surface.is-preview')) return
 
       if (!target) return
 

@@ -1,8 +1,6 @@
 # Canvas
 
-**Status: partial.** Selection, hover, drag and drop, the selection toolbar and the keyboard path are
-built. What is missing is an empty state and any way to select on the canvas without a pointer, both
-listed under [Gaps](#gaps).
+**Status: partial.** Selection, hover, drag and drop, an empty-state guide, hidden-selection feedback, and the selection toolbar are built. The structure tree provides keyboard selection and rearrangement; direct keyboard selection on the canvas remains deferred from the initial beta. See [Gaps](#gaps).
 
 The canvas renders the real runtime renderer, not a design-time approximation. What is on screen is
 literally what ships, which is the only way a WYSIWYG builder stays honest as a kit evolves.
@@ -203,11 +201,7 @@ showing what a user sees is what Preview is for.
 Validation is untouched. `validateForm` calls the same `isVisible`, so this changed what is drawn and
 never what is checked.
 
-**Open: what the marker should look like.** The attribute is in the DOM; nothing draws with it yet.
-Invariant 3's test forbids the obvious answer — its bar is that a sanctioned reach into a kit component
-gives back something the designer took, never an appearance decision on the kit's behalf, and dimming a
-revealed node is exactly that. An overlay in `SelectionLayer` is the shape that fits, since selection and
-hover frames already work that way.
+The selected component's overlay says **Hidden in preview** when its own visibility or an ancestor's visibility hides it. The marker belongs to the designer overlay and does not alter kit styling. Unselected hidden components remain visible while editing.
 
 ### The step switcher
 
@@ -224,12 +218,10 @@ component regardless, which is what keeps that from being a hole.
 
 ## Gaps
 
-**Empty state.** A document whose root has no children renders an empty canvas with no explanation. It
-should say what to do.
+**Empty state — built.** A document whose root has no children shows a guide to adding components and using the keyboard-accessible tree. The guide is absent in preview.
 
 **Keyboard access to the canvas.** Components can only be selected there with a pointer; the tree is the
 keyboard path to the same thing. A roving tabindex over rendered nodes would fight the kit's own
 focusable controls, so this needs a design rather than an implementation.
 
-**Mid-drag scrolling.** Zones measure at release, so a canvas scrolled during a drag resolves correctly,
-but the indicator drawn during the drag comes from an earlier measurement and drifts.
+**Mid-drag scrolling — built.** Scrolling or resizing refreshes the measured drop candidates and their origin, even when the pointer is stationary. Release still measures afresh.

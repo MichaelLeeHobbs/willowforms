@@ -8,12 +8,16 @@ import type {
 import type { Device, FormContext, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
 import {
   applyChange,
+  addressOf,
   autoValidateKeys,
+  dataKeyOf,
   decodeAddress,
   contextValues,
+  findNode,
   findParent,
   indexKit,
   jsonToString,
+  same,
   validateForm,
 } from '@formsmith/core'
 import { FormRenderer } from '@formsmith/renderer'
@@ -129,30 +133,10 @@ export function Canvas({
 }: CanvasProps): ReactNode {
   const [preview, setPreview] = useState(false)
 
-  /*
-   * The steps this document declares, read out of it rather than configured.
-   *
-   * A step is a container shown when `context.step` equals its own name, so the
-   * names the document compares that path against are the flow. Empty for a
-   * form with no steps, which is why the switcher only appears when there is
-   * something to switch between.
-   */
-  const steps = useMemo(
-    () =>
-      contextValues(api.document.root, 'step').filter(
-        (name): name is string => typeof name === 'string',
-      ),
-    [api.document.root],
-  )
-  const [step, setStep] = useState<string | undefined>(undefined)
+  const steps = useMemo(() => contextValues(api.document.root, 'step'), [api.document.root])
+  const [step, setStep] = useState<JsonValue | undefined>(undefined)
 
-  /*
-   * The canvas supplies the context, or a form whose visibility depends on the
-   * host renders as nothing in preview and the author cannot check their work.
-   * Only `step` for now: the rest of a host's context is not knowable here, and
-   * inventing values would be worse than showing none.
-   */
-  const current = step !== undefined && steps.includes(step) ? step : steps[0]
+  const current = step !== undefined && steps.some((value) => same(value, step)) ? step : steps[0]
   const context = useMemo<FormContext | undefined>(
     () => (current === undefined ? undefined : { step: current }),
     [current],
@@ -226,20 +210,7 @@ export function Canvas({
   }, [selected, selectedKey, parent, kit, addComponent, duplicateComponent, removeComponent])
 
   const surfaceRef = useRef<HTMLDivElement>(null)
-  /*
-   * Measured once when a drag begins, and held in state rather than a ref.
-   *
-   * Nothing edits the document mid-drag, so the tree cannot change under the
-   * measurement. What can change is where it is on screen: scrolling the canvas
-   * during a drag moves every rectangle and the indicator drawn from this
-   * snapshot drifts, which `05-canvas.md` lists as a known gap. The release is
-   * measured fresh, so the drop still lands where the pointer is -- it is only
-   * the bar that lies, and only while the pointer is moving.
-   *
-   * In state rather than a ref because that is what lets the indicator be
-   * derived during render as a pure function of state, instead of set from an
-   * effect that fires on every pointer move.
-   */
+  // Refresh on scrolling and resizing; pointer movement alone reuses the measurement.
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
   const errors = useMemo(() => {
@@ -254,25 +225,16 @@ export function Canvas({
      * it: showing "This field is required" on a field nobody has reached yet
      * is how a form greets someone with a wall of red.
      */
-    /*
-     * `autoValidateKeys` answers in node keys, because that is all a document
-     * can say — which row a field is in comes from the data. Errors are keyed by
-     * address, so comparing the two directly meant no field inside a repeater
-     * ever validated while typing: `addresses[1].street` is not `street`.
-     *
-     * The leaf of an address is the node key, so that is what is compared.
-     */
+    // Errors use node keys; touched values use data keys in the same row path.
     const eager = autoValidateKeys(api.document.root)
     let shown: FormErrors | undefined
     for (const address of Object.keys(all)) {
-      const key = decodeAddress(address)?.name ?? address
-      if (!eager.has(key) || !touched.has(address)) continue
-      /*
-       * Read, not asserted. `address` came from `Object.keys(all)`, so the
-       * value is there -- but an assertion that happens to be true is still an
-       * assertion, and `noUncheckedIndexedAccess` is on so that this file has
-       * to say what it does with a miss.
-       */
+      const decoded = decodeAddress(address)
+      const key = decoded?.name ?? address
+      const node = findNode(api.document.root, key)
+      const dataAddress = node && decoded ? addressOf(decoded.path, dataKeyOf(node)) : address
+      if (!eager.has(key) || !touched.has(dataAddress)) continue
+
       const message = all[address]
       if (message === undefined) continue
       shown ??= {}
@@ -315,17 +277,18 @@ export function Canvas({
     [measureNow],
   )
 
-  /*
-   * Capture-phase mousedown is what stops a click from focusing a text field,
-   * toggling a checkbox, or opening a select.
-   *
-   * Both calls are needed and they do different jobs. `preventDefault` cancels
-   * the browser's own action, which is what stops focus. `stopPropagation` keeps
-   * the event from reaching the kit's own handlers, which is what stops MUI's
-   * Select from opening: it opens from an onMouseDown on an element inside the
-   * one carrying data-fs-key, and cancelling the default does nothing to a
-   * React handler that has already been given the event.
-   */
+  const dragId = dragState?.id
+  useEffect(() => {
+    if (dragId === undefined || preview) return
+    const refresh = (): void => takeSnapshot(dragId)
+    window.addEventListener('scroll', refresh, true)
+    window.addEventListener('resize', refresh)
+    return () => {
+      window.removeEventListener('scroll', refresh, true)
+      window.removeEventListener('resize', refresh)
+    }
+  }, [dragId, preview, takeSnapshot])
+
   // `isOwnChrome` is defined above the component, so the callbacks below are not
   // closing over a value their dependency lists do not name.
   const onMouseDownCapture = useCallback((event: MouseEvent) => {
@@ -451,7 +414,7 @@ export function Canvas({
           ? {
               navigation: {
                 path: 'step',
-                onNavigate: (value: JsonValue) => setStep(jsonToString(value)),
+                onNavigate: setStep,
               },
             }
           : {})}
@@ -495,10 +458,13 @@ export function Canvas({
         {steps.length > 1 && (
           <label className="fs-canvas__step">
             Step
-            <select value={current ?? ''} onChange={(e) => setStep(e.target.value)}>
+            <select
+              value={JSON.stringify(current) ?? ''}
+              onChange={(e) => setStep(steps[e.target.selectedIndex])}
+            >
               {steps.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+                <option key={JSON.stringify(name)} value={JSON.stringify(name)}>
+                  {jsonToString(name)}
                 </option>
               ))}
             </select>
@@ -523,6 +489,16 @@ export function Canvas({
           </>
         )}
       </div>
+
+      {editing && api.document.root.children?.length === 0 && (
+        <div className="fs-canvas__empty">
+          <strong className="fs-empty__title">Start building your form</strong>
+          <span>
+            Click a component in the palette or drag it onto the canvas. Use the Tree tab to select
+            and arrange components with your keyboard.
+          </span>
+        </div>
+      )}
 
       <div
         ref={surfaceRef}

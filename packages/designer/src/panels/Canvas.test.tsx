@@ -613,7 +613,7 @@ describe('a document with steps', () => {
     open()
     const select = screen.getByLabelText('Step')
 
-    expect([...select.querySelectorAll('option')].map((o) => o.value)).toEqual(['one', 'two'])
+    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['one', 'two'])
   })
 
   it('shows no switcher for a form that declares no steps', () => {
@@ -631,7 +631,7 @@ describe('a document with steps', () => {
     expect(view.container.querySelector('[data-fs-key="step-one"]')).not.toBeNull()
     expect(view.container.querySelector('[data-fs-key="step-two"]')).toBeNull()
 
-    await user.selectOptions(screen.getByLabelText('Step'), 'two')
+    await user.selectOptions(screen.getByLabelText('Step'), JSON.stringify('two'))
 
     expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
     expect(view.container.querySelector('[data-fs-key="step-one"]')).toBeNull()
