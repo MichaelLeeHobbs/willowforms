@@ -24,3 +24,7 @@ changes must be deliberate and documented rather than arriving as incidental ref
 
 The package manifests are the source of truth for engine and peer ranges. The specification describes
 behaviour; when either changes, this policy and the relevant contract change together.
+
+## Pre-beta corrections
+
+Legacy `file` fields continue to load and validate as strings. JSON Schema export no longer adds `contentEncoding: base64`: neither the previous filename picker nor core validation established that encoding. Hosts that actually encode bytes must supply their own explicit schema annotation; stored documents and answers are unchanged.

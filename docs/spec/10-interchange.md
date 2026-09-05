@@ -94,18 +94,20 @@ export would then reject every one of them. [ARCHITECTURE.md](../ARCHITECTURE.md
 `FieldSchema['type']` also permits `array` and `object`. `Repeater` produces an `array` in both kits;
 nothing produces an `object` yet.
 
-| Model                                                      | Schema                                  |
-| ---------------------------------------------------------- | --------------------------------------- |
-| `string` / `number` / `boolean`                            | the matching type                       |
-| `date`                                                     | `string` with `format: date`            |
-| `file`                                                     | `string` with `contentEncoding: base64` |
-| `minLength` / `maxLength` on text                          | `minLength` / `maxLength`               |
-| `minLength` / `maxLength` on a list                        | `minItems` / `maxItems`                 |
-| `min` / `max`                                              | `minimum` / `maximum`                   |
-| `pattern`                                                  | `pattern`                               |
-| `email` / `url` / `uuid`                                   | `format: email` / `uri` / `uuid`        |
-| `required`, unguarded, on a component that is always shown | the parent object's `required` array    |
-| A static `label`, or `text`                                | `title`                                 |
+| Model                                                      | Schema                                |
+| ---------------------------------------------------------- | ------------------------------------- |
+| `string` / `number` / `boolean`                            | the matching type                     |
+| `date`                                                     | `string` with `format: date`          |
+| `file`                                                     | `string`; no inferred binary encoding |
+| `minLength` / `maxLength` on text                          | `minLength` / `maxLength`             |
+| `minLength` / `maxLength` on a list                        | `minItems` / `maxItems`               |
+| `min` / `max`                                              | `minimum` / `maximum`                 |
+| `pattern`                                                  | `pattern`                             |
+| `email` / `url` / `uuid`                                   | `format: email` / `uri` / `uuid`      |
+| `required`, unguarded, on a component that is always shown | the parent object's `required` array  |
+| A static `label`, or `text`                                | `title`                               |
+
+The legacy `file` data type remains a string for stored-document compatibility. It does not guarantee base64, a completed upload, or a durable attachment reference. Custom attachment components define their JSON answer contract with their host.
 
 ### What it cannot carry
 

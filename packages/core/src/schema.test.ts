@@ -92,7 +92,7 @@ describe('toJsonSchema', () => {
     expect(schema.properties['d']).toEqual({ type: 'string', format: 'date' })
     expect(schema.properties['a']).toEqual({ type: 'array', items: {} })
     expect(schema.properties['o']).toEqual({ type: 'object' })
-    expect(schema.properties['f']).toEqual({ type: 'string', contentEncoding: 'base64' })
+    expect(schema.properties['f']).toEqual({ type: 'string' })
   })
 
   it('turns length and range rules into keywords', () => {
