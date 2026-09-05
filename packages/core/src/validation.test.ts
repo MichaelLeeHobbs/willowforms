@@ -410,6 +410,41 @@ describe('isRequired', () => {
     expect(isRequired(node([{ key: 'email' }]))).toBe(false)
     expect(isRequired({ key: 'stack', type: 'Stack', props: {} })).toBe(false)
   })
+
+  it('evaluates a required rule against supplied host context', () => {
+    const field = node([
+      {
+        key: 'required',
+        when: {
+          kind: 'condition',
+          condition: {
+            op: 'truthy',
+            value: { kind: 'context', path: 'needsEmail' },
+          },
+        },
+      },
+    ])
+    expect(isRequired(field, {}, { context: { needsEmail: true } })).toBe(true)
+    expect(isRequired(field, {}, { context: { needsEmail: false } })).toBe(false)
+  })
+
+  it('uses the same computed guard policy as validation', () => {
+    const field = node([{ key: 'required', when: { kind: 'computed', expression: 'needsEmail' } }])
+    expect(isRequired(field, {})).toBe(false)
+    expect(isRequired(field, {}, { evaluate: () => true })).toBe(true)
+    expect(isRequired(field, {}, { evaluate: () => false })).toBe(false)
+    expect(
+      isRequired(
+        field,
+        {},
+        {
+          evaluate: () => {
+            throw new Error('Unavailable')
+          },
+        },
+      ),
+    ).toBe(true)
+  })
 })
 
 describe('validateField', () => {

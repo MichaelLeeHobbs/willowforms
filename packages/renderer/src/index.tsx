@@ -27,6 +27,7 @@ import {
   encodeRow,
   evaluateCondition,
   isRowScope,
+  isRequired,
   isVisible,
   keyProblem,
   pushRow,
@@ -74,6 +75,8 @@ export interface NodeRendererProps {
   value: JsonValue | undefined
   /** Validation message for this node, if any. */
   error: string | undefined
+  /** Required state evaluated against the current form, context, and row. */
+  required?: boolean | undefined
   onChange: (value: JsonValue) => void
   /** Event callbacks connected to this node's configured actions. */
   events?: NodeEventHandlers | undefined
@@ -644,6 +647,7 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
         // key; they can still fail for different reasons.
         value={valueOf(row?.values ?? data, dataKey)}
         error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
+        required={isRequired(node, data, scoped)}
         onChange={handleChange}
         events={events}
         navigation={ctx.navigation.get(node.key)}
