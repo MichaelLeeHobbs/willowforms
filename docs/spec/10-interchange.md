@@ -135,8 +135,7 @@ The last two appeared in no spec file until this was written, and the count said
 which left a reader unable to tell whether a bullet was missing or the number was stale. Both, as it
 turned out.
 
-**Known gap:** a required boolean exports as "the key must be present", which is not the same as "it must
-be `true`". A `const: true` would express it, and does not yet.
+An unguarded required boolean exports with `const: true` as well as membership in `required`, so an unchecked consent field is rejected. Rules guarded by `when` or by visibility on the component or any ancestor are omitted and reported as lossy; exporting them unconditionally would reject answers that runtime validation accepts.
 
 ## Not built
 

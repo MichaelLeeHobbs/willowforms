@@ -165,6 +165,43 @@ describe('toJsonSchema', () => {
     expect(schema.required).toBeUndefined()
   })
 
+  it('does not make guarded constraints unconditional in the exported schema', () => {
+    const node = field('code', 'string', [
+      { key: 'minLength', value: 8, when: { kind: 'static', value: false } },
+    ])
+    expect(toJsonSchema(doc([node])).properties['code']).toEqual({ type: 'string' })
+    expect(unexportableRules(doc([node]))).toEqual([{ key: 'code', rule: 'minLength' }])
+  })
+
+  it('does not require fields hidden by a conditional ancestor and reports the loss', () => {
+    const document = doc([
+      {
+        key: 'optionalSection',
+        type: 'Box',
+        props: {},
+        renderWhen: { kind: 'static', value: false },
+        children: [field('code', 'string', [{ key: 'required' }, { key: 'minLength', value: 8 }])],
+      },
+    ])
+    expect(toJsonSchema(document).required).toBeUndefined()
+    expect(toJsonSchema(document).properties['code']).toEqual({ type: 'string' })
+    expect(unexportableRules(document)).toEqual([
+      { key: 'code', rule: 'required' },
+      { key: 'code', rule: 'minLength' },
+    ])
+  })
+
+  it('requires an unconditional consent checkbox to be true, not merely present', () => {
+    const document = doc([
+      field('consent', 'boolean', [{ key: 'required' }]),
+      field('optional', 'boolean'),
+    ])
+    const exported = toJsonSchema(document)
+    expect(exported.properties['consent']).toEqual({ type: 'boolean', const: true })
+    expect(exported.properties['optional']).toEqual({ type: 'boolean' })
+    expect(exported.required).toEqual(['consent'])
+  })
+
   it('titles a property from its static label', () => {
     const schema = toJsonSchema(doc([field('email', 'string', [], 'Email address')]))
     expect(schema.properties['email']?.title).toBe('Email address')

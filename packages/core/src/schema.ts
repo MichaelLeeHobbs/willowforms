@@ -13,7 +13,7 @@
  * survives, because its rows are.
  */
 
-import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, validationsOf, walk } from './tree.js'
+import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, flatten, validationsOf, walk } from './tree.js'
 import { isRowScope } from './validation.js'
 import type {
   ComponentNode,
@@ -25,6 +25,7 @@ import type {
 
 export interface JsonSchemaProperty {
   type?: string
+  const?: boolean
   format?: string
   title?: string
   minLength?: number
@@ -59,6 +60,15 @@ export interface JsonSchema {
 
 const DRAFT = 'https://json-schema.org/draft/2020-12/schema'
 
+function conditionalKeys(root: ComponentNode): Set<string> {
+  const keys = new Set<string>()
+  for (const { node, parentKey } of flatten(root)) {
+    if (node.renderWhen !== undefined || (parentKey !== undefined && keys.has(parentKey)))
+      keys.add(node.key)
+  }
+  return keys
+}
+
 /**
  * Rules that JSON Schema has no vocabulary for.
  *
@@ -68,6 +78,7 @@ const DRAFT = 'https://json-schema.org/draft/2020-12/schema'
  */
 export function unexportableRules(document: FormDocument): { key: string; rule: string }[] {
   const lossy: { key: string; rule: string }[] = []
+  const conditional = conditionalKeys(document.root)
 
   const FORMAT_RULES = new Set(['email', 'url', 'uuid'])
   const claimed = new Set<string>()
@@ -80,7 +91,7 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
         continue
       }
 
-      if (rule.when || node.renderWhen !== undefined) {
+      if (rule.when || conditional.has(node.key)) {
         lossy.push({ key: node.key, rule: rule.key })
         continue
       }
@@ -300,6 +311,7 @@ function objectFor(
   root: ComponentNode,
 
   from = 0,
+  conditional = conditionalKeys(root),
 ): {
   properties: Record<string, JsonSchemaProperty>
   required: string[]
@@ -342,22 +354,22 @@ function objectFor(
      * all is enough: a static `true` is a document that could hold anything
      * tomorrow, and the export is not the place to start evaluating conditions.
      */
-    const conditional = node.renderWhen !== undefined
-
     for (const rule of validationsOf(node)) {
+      if (rule.when || conditional.has(node.key)) continue
       property = withRule(property, rule)
       /*
        * Only an unguarded `required` becomes a schema requirement. A guarded one
        * applies sometimes, and JSON Schema's `required` is unconditional, so
        * exporting it would reject payloads the form itself accepts.
        */
-      if (rule.key === 'required' && !rule.when && !conditional && !required.includes(name)) {
-        required.push(name)
+      if (rule.key === 'required') {
+        if (!required.includes(name)) required.push(name)
+        if (property.type === 'boolean') property = { ...property, const: true }
       }
     }
 
     if (isRowScope(node)) {
-      const row = objectFor(node, depth + 1)
+      const row = objectFor(node, depth + 1, conditional)
       const items: JsonSchemaProperty = { type: 'object', properties: row.properties }
       if (row.required.length > 0) items.required = row.required
       properties[name] = { ...property, items }
