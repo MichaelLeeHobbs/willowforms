@@ -128,7 +128,7 @@ function effectOf(value: unknown): Effect | undefined {
 
 function builtin(ref: ActionRef): Effect | undefined {
   try {
-    return effectOf({ kind: ref.name, ...(ref.params ?? {}) })
+    return effectOf({ ...(ref.params ?? {}), kind: ref.name })
   } catch {
     return undefined
   }
@@ -158,6 +158,7 @@ export function runActions(
       const effect = builtin(ref)
       if (!effect) return { ok: false, error: 'Invalid built-in action.', action: ref.name }
       effects.push(effect)
+      if (effect.kind === 'halt') return { ok: true, effects }
       continue
     }
 
@@ -195,12 +196,12 @@ export function runActions(
         if (!effect)
           return { ok: false, error: 'Code action returned an invalid effect.', action: ref.name }
         effects.push(effect)
+        if (effect.kind === 'halt') return { ok: true, effects }
       }
     } catch {
       return { ok: false, error: 'Code action returned an invalid effect.', action: ref.name }
     }
   }
 
-  const halt = effects.findIndex((effect) => effect.kind === 'halt')
-  return { ok: true, effects: halt < 0 ? effects : effects.slice(0, halt + 1) }
+  return { ok: true, effects }
 }
