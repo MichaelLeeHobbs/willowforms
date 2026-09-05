@@ -155,8 +155,7 @@ component library at all and a lint rule enforces that. The alternatives were a 
 path data, which makes the metadata half stop being plain data and has every kit redraw the same twenty
 glyphs, and a host-supplied renderer, which leaves the palette looking broken until someone writes one.
 
-`ComponentDef.icon` stays optional, because a third-party kit is allowed to ship without icons. The
-contract test requires one of the kits in this repository, since those are what a kit author copies.
+`ComponentDef.icon` is optional for third-party kits. This repository's reference-kit tests require icons for the shipped palette entries to keep their presentation consistent. Supplying an icon uses the shared vocabulary; omitting one does not invalidate a custom kit. See the [kit requirements](02-kit-contract.md#rules-every-kit-must-satisfy).
 
 The `icon` property editor named in [06-inspector.md](06-inspector.md#property-editors) exists: it offers
 the vocabulary as a select with the glyph drawn beside it, so a kit property whose value is an icon name

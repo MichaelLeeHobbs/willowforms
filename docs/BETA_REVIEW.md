@@ -4,13 +4,13 @@ Review date: 2026-09-05. This review covers the documented contracts, core and r
 
 ## Product decision
 
-The initial beta supports desktop form authoring, responsive form preview, JSON document interchange, localization, validation, repeaters, controlled step navigation, and host-dispatched actions. Following the [mission and product principles](spec/README.md#product-principles), richer expression tooling, generic attribute passthrough, and direct canvas keyboard selection have been removed from scope. The complete ordinary-property accessibility audit remains Partial; the earlier local verification below does not establish that expanded coverage.
+The initial beta supports desktop form authoring, responsive form preview, JSON document interchange, localization, validation, repeaters, controlled step navigation, and host-dispatched actions. Following the [mission and product principles](spec/README.md#product-principles), richer expression tooling, generic attribute passthrough, and direct canvas keyboard selection have been removed from scope. The complete ordinary-property accessibility audit and the approved removal of standard file inputs remain Partial; the earlier local verification below does not establish completion of those changes.
 
 | Contract       | Beta assessment                                                                                                                                 | Evidence                                                                      |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Document model | Implemented; version 1 loads through the canonical boundary.                                                                                    | Core document, JSON, tree, row, and depth suites.                             |
 | Kit contract   | Metadata and rendering are implemented; the complete ordinary-property accessibility audit remains Partial.                                     | Existing cross-kit contracts, accessibility audits, and kit rendering suites. |
-| Components     | The documented catalogue, repeaters, and step navigation are implemented.                                                                       | Catalogue checks, runtime suites, authoring and repeater browser tests.       |
+| Components     | The current catalogue is implemented; approved removal of built-in file inputs remains Partial.                                                 | Catalogue checks, runtime suites, authoring and repeater browser tests.       |
 | Shell          | Implemented; labels are isolated per designer and the shell fits a laptop viewport.                                                             | Embedding, accessibility, keyboard, and layout regressions.                   |
 | Canvas         | Implemented; the Tree and panels provide keyboard authoring. Direct canvas keyboard selection is outside scope.                                 | Preview, drag, scroll, hidden-component, and viewport regressions.            |
 | Inspector      | Editing is implemented. Accessibility uses ordinary properties; generic attribute passthrough is outside scope.                                 | Properties, style, actions, rules, and scoped-rename suites.                  |
@@ -39,10 +39,12 @@ Comment cleanup is limited to code changed for these outcomes. No document versi
 
 ## Explicit beta limits
 
+- Attachments belong to host-configured custom or community components. The current built-in `FileUpload` still reports filenames and is pending removal from the standard kits. Its earlier implementation checks do not establish an upload, storage, or attachment-viewing service.
+
 - Desktop authoring is the verified workflow. Mobile and tablet controls simulate the runtime form; they do not promise a phone-sized authoring workspace.
 - The Tree and panels provide keyboard authoring. Direct canvas keyboard selection is outside scope; palette-to-tree dragging remains an uncommitted idea.
 - Generic HTML attribute passthrough and richer expression tooling are outside scope. Ordinary properties supply accessibility intent, with complete cross-kit verification still outstanding. Hosts own sandboxing; the designer preview does not execute arbitrary source or apply host action effects.
-- JSON Schema import, archive bundles, and a controlled document prop remain outside this beta. A different React key loads another form through the supported mount API. Version migrations will be needed when a second document version exists.
+- Versioned Formsmith JSON is the supported import/export format. JSON Schema import and archive bundles are outside product scope; the existing schema projection remains an optional developer utility. A controlled document prop remains outside this beta: a different React key loads another form through the supported mount API. Version migrations will be needed when a second document version exists.
 - Structured references follow component key renames. Expressions and arbitrary action parameters need manual review; editing a Data key is an explicit payload mapping change and does not automatically rewrite references.
 - JSON Schema remains a lossy export, and `validateForm` is the authoritative validation engine. Conditional logic, cross-field rules, custom code, and shared data-key collisions cannot be represented completely by the export.
 - Chromium is the automated browser gate. Firefox, Safari, assistive-technology testing with real screen readers, and the full declared React/Node compatibility matrix have not been established by this local review.

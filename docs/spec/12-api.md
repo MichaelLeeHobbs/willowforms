@@ -101,6 +101,8 @@ nonce the page's policy names.
 receives the previous or next reachable context value. The renderer evaluates branches from the current
 answers and the kits display position without a potentially false total.
 
+The host may hold the current step in local state or its existing router. Formsmith provides neither routing nor a branching workflow engine. The built-in display remains position-only; a host may show a known total for a fixed linear form.
+
 ### The host owns the data
 
 `FormRenderer` is controlled and holds nothing. It reports one field at a time and never composes the

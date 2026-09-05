@@ -1,7 +1,12 @@
 # Import, export, and persistence
 
-**Status: built.** The JSON dialog, the schema projection, and the host contract all exist. There is no
-version migration, and JSON Schema import does not exist.
+**Status: built.** Versioned Formsmith JSON import/export, the document-loading boundary, and the host save contract are implemented. An existing JSON Schema projection remains a limited developer utility. The document format is currently version `1`; migrations are added only when an actual version change needs one.
+
+## Simple import and export
+
+The supported interchange format is one Formsmith JSON document. It contains the component tree, settings, actions, languages, and translations. An author can export it as a file and import it later; importing validates the document before replacing the current form. The host continues to own storage and distribution.
+
+The document's `version` and the core `loadDocument` boundary handle format compatibility. Package versions follow the [compatibility policy](../COMPATIBILITY.md). There is no separate archive format, conversion framework, or synchronization protocol.
 
 ## Formsmith does not persist
 
@@ -137,16 +142,8 @@ turned out.
 
 An unguarded required boolean exports with `const: true` as well as membership in `required`, so an unchecked consent field is rejected. Rules guarded by `when` or by visibility on the component or any ancestor are omitted and reported as lossy; exporting them unconditionally would reject answers that runtime validation accepts.
 
-## Not built
+## Format scope
 
-**JSON Schema import.** Generating a form from a schema is the obvious inverse and a genuinely useful
-onboarding path: point it at an API contract and get a form. It is lossy in the other direction — a
-schema says nothing about layout — so it is a _scaffold_, and should be honest about producing a starting
-point rather than a finished form.
+JSON Schema import, schema-generated form scaffolds, and form archives are outside product scope. The existing lossy JSON Schema export is an optional developer projection, not the saved document format or a replacement for Formsmith validation. Its existence does not commit the library to an inverse importer or additional conversion formats.
 
-**Version migration.** See [01-document-model.md](01-document-model.md#versioning-and-migration). Decided,
-not written: core owns migrations and `loadDocument` returns either a current document or the reasons it
-cannot be one.
-
-**A form bundle.** Document plus translations plus schema in one archive. Only worth building once
-someone needs to move a form between systems.
+Core already owns `loadDocument` and its version boundary. A new document format version requires the migration and compatibility treatment described in [01-document-model.md](01-document-model.md#versioning-and-migration). With only version `1`, the migration registry is empty; the library does not need a second version or extra migration machinery in anticipation of one.
