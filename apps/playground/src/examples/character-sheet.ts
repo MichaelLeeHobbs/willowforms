@@ -340,7 +340,8 @@ export const characterSheet = form(
                   ),
                 ])
               }),
-              2,
+              3,
+              280,
             ),
           ]),
           section('pactMagic', 'Pact Magic / other spell resources', [
