@@ -299,7 +299,12 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
   return { kind: 'condition', condition: inCondition(value.condition) }
 }
 
-export function repointDataKey(value: PropValue, from: string, to: string): PropValue {
+export function repointDataKey(
+  value: PropValue,
+  from: string,
+  to: string,
+  scope?: 'form' | 'row',
+): PropValue {
   if (!value || typeof value !== 'object' || value.kind !== 'condition') return value
 
   const inCondition = (condition: Condition, depth = 0): Condition => {
@@ -307,7 +312,11 @@ export function repointDataKey(value: PropValue, from: string, to: string): Prop
     if (depth > MAX_CONDITION_DEPTH) return condition
 
     const operand = (side: Operand | undefined): Operand | undefined =>
-      side?.kind === 'ref' && side.dataKey === from ? { ...side, dataKey: to } : side
+      side?.kind === 'ref' &&
+      side.dataKey === from &&
+      (scope === undefined || (side.scope ?? 'form') === scope)
+        ? { ...side, dataKey: to }
+        : side
 
     const shape = condition as unknown as Record<string, unknown>
     const next: Record<string, unknown> = { ...shape }
