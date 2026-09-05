@@ -68,6 +68,7 @@ interface NodeRendererProps {
   value: JsonValue | undefined // data-bound components
   error: string | undefined
   required?: boolean // evaluated against the current answers, host context, and row
+  itemLimits?: { min: number; max: number } // applicable repeater bounds; Infinity means no maximum
   onChange: (value: JsonValue) => void
   children?: ReactNode
 }

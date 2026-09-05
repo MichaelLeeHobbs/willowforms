@@ -140,6 +140,7 @@ export {
   UNREADABLE_RULE,
   validateField,
   isRequired,
+  itemLimits,
   isRowScope,
   patternProblem,
   submittedAcross,
