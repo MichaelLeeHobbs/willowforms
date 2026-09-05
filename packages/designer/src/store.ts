@@ -38,6 +38,7 @@ import {
   writersOf,
   repointDataKey,
   flatten,
+  walk,
   isRowScope,
 } from '@formsmith/core'
 
@@ -271,13 +272,12 @@ function withRoot(doc: FormDocument, root: ComponentNode): FormDocument {
   return root === doc.root ? doc : { ...doc, root }
 }
 
-function rowOwner(root: ComponentNode, key: string): string | undefined {
-  let parent = findParent(root, key)
-  while (parent) {
-    if (isRowScope(parent)) return parent.key
-    parent = findParent(root, parent.key)
-  }
-  return undefined
+function rowOwners(root: ComponentNode): Map<string, string | undefined> {
+  const owners = new Map<string, string | undefined>()
+  walk(root, (node, parent) => {
+    owners.set(node.key, parent && (isRowScope(parent) ? parent.key : owners.get(parent.key)))
+  })
+  return owners
 }
 
 function repointNodeData(
@@ -287,7 +287,7 @@ function repointNodeData(
   scope: 'form' | 'row',
 ): ComponentNode {
   const binding = (value: PropValue): PropValue => repointDataKey(value, from, to, scope)
-  return {
+  const next = {
     ...node,
     props: Object.fromEntries(
       Object.entries(node.props).map(([name, value]) => [name, binding(value)]),
@@ -310,6 +310,11 @@ function repointNodeData(
         }
       : {}),
   }
+  return (['props', 'renderWhen', 'schema'] as const).every((key) =>
+    same(node[key] as JsonValue | undefined, next[key] as JsonValue | undefined),
+  )
+    ? node
+    : next
 }
 
 const bindingKind = (value: PropValue | undefined): string => {
@@ -572,9 +577,11 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       }
 
       const movedName = dataKeyOf(before)
-      const owner = rowOwner(doc.root, key)
+      const owners = rowOwners(doc.root)
+      const owner = owners.get(key)
+      owners.set(trimmed, owner)
       const alsoWrites = writersOf(doc.root, movedName).filter(
-        (each) => each !== key && rowOwner(doc.root, each) === owner,
+        (each) => each !== key && owners.get(each) === owner,
       )
 
       const followsTheRename =
@@ -590,15 +597,22 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         if (!followsTheRename) return withRoot(doc, renamed)
 
         // Form references can occur in any row; row references belong to one repeater.
-        let repointed = renamed
-        for (const node of flatten(renamed)) {
-          if (owner !== undefined && rowOwner(renamed, node.node.key) !== owner) continue
-          repointed = writeNode({ ...doc, root: repointed }, node.node.key, (each) =>
-            repointNodeData(each, movedName, trimmed, owner === undefined ? 'form' : 'row'),
-          ).root
+        const repointed = new Map<string, ComponentNode>()
+        for (const { node } of flatten(renamed).reverse()) {
+          const next =
+            owner === undefined || owners.get(node.key) === owner
+              ? repointNodeData(node, movedName, trimmed, owner === undefined ? 'form' : 'row')
+              : node
+          const children = node.children?.map((child) => repointed.get(child.key) ?? child)
+          repointed.set(
+            node.key,
+            children?.some((child, index) => child !== node.children?.[index])
+              ? { ...next, children }
+              : next,
+          )
         }
 
-        return withRoot(doc, repointed)
+        return withRoot(doc, repointed.get(renamed.key) ?? renamed)
       })
       setSelectedKey((current) => (current === key ? trimmed : current))
       return { ok: true }
