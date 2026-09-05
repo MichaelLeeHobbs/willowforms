@@ -1,5 +1,6 @@
 import type { FormDocument } from '@formsmith/core'
 import { SAMPLE_DOCUMENT } from '../sample.js'
+import { characterSheet } from './character-sheet.js'
 import {
   customerFeedback,
   equipmentInspection,
@@ -21,6 +22,15 @@ export interface ExampleForm {
 }
 
 export const EXAMPLES: ExampleForm[] = [
+  {
+    id: characterSheet.id,
+    title: 'D&D character sheet',
+    description:
+      'An eight-page adventurer record: abilities, all 18 skills, combat, inventory, spells, backstory, and a session journal.',
+    category: 'Adventure',
+    features: ['8 pages', 'Repeaters', 'Conditional sections'],
+    document: characterSheet,
+  },
   {
     id: 'contact-request',
     title: 'Contact request',
