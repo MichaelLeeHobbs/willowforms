@@ -12,7 +12,7 @@
  * vocabulary is never finished.
  */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   indexKit,
@@ -59,6 +59,7 @@ export interface StyleTabProps {
 }
 
 export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNode {
+  const idBase = useId()
   const node = api.selectedNode
 
   if (!node) {
@@ -109,10 +110,10 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
       <h3 className="fs-style__heading">Custom CSS</h3>
 
       <div className="fs-prop-row">
-        <label htmlFor="fs-style-device">Applies to</label>
+        <label htmlFor={idBase + '-fs-style-device'}>Applies to</label>
         <div className="fs-prop-row__control">
           <select
-            id="fs-style-device"
+            id={idBase + '-fs-style-device'}
             value={device}
             onChange={(e) => onDevice(e.target.value as Device)}
           >
@@ -163,6 +164,7 @@ function DeclarationField({
   /** Answers whether the value was written. A refusal keeps the typed text. */
   onCommit: (next: string) => boolean
 }): ReactNode {
+  const idBase = useId()
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
 
@@ -201,17 +203,17 @@ function DeclarationField({
 
   return (
     <div className="fs-prop-row">
-      <label htmlFor={'fs-style-' + control.name}>{control.label}</label>
+      <label htmlFor={idBase + '-fs-style-' + control.name}>{control.label}</label>
       <div className="fs-prop-row__control">
         <input
-          id={'fs-style-' + control.name}
+          id={idBase + '-fs-style-' + control.name}
           type="text"
           placeholder={control.placeholder}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           aria-invalid={refused ? true : undefined}
-          aria-describedby={refused ? 'fs-style-' + control.name + '-error' : undefined}
+          aria-describedby={refused ? idBase + '-fs-style-' + control.name + '-error' : undefined}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
@@ -235,7 +237,11 @@ function DeclarationField({
           slice mounts a new element; this now does too.
         */}
         {refused && (
-          <p id={'fs-style-' + control.name + '-error'} className="fs-prop-row__error" role="alert">
+          <p
+            id={idBase + '-fs-style-' + control.name + '-error'}
+            className="fs-prop-row__error"
+            role="alert"
+          >
             {refused}
           </p>
         )}
@@ -258,6 +264,7 @@ function RawCss({
   value: string
   onCommit: (next: string) => void
 }): ReactNode {
+  const idBase = useId()
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
 
@@ -272,16 +279,16 @@ function RawCss({
 
   return (
     <div className="fs-prop-row">
-      <label htmlFor="fs-style-raw">CSS</label>
+      <label htmlFor={idBase + '-fs-style-raw'}>CSS</label>
       <div className="fs-prop-row__control">
         <textarea
-          id="fs-style-raw"
+          id={idBase + '-fs-style-raw'}
           className="fs-code__area"
           rows={5}
           spellCheck={false}
           placeholder="padding: 8px;&#10;color: var(--brand);"
           aria-invalid={refused ? true : undefined}
-          aria-describedby="fs-style-raw-hint"
+          aria-describedby={idBase + '-fs-style-raw-hint'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
@@ -292,7 +299,7 @@ function RawCss({
         />
       </div>
       <p
-        id="fs-style-raw-hint"
+        id={idBase + '-fs-style-raw-hint'}
         className={'fs-prop-row__hint' + (refused ? ' is-error' : '')}
         {...(refused ? { role: 'alert' as const } : {})}
       >

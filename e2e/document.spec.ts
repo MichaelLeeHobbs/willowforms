@@ -186,7 +186,7 @@ test('the same document renders through either kit', async ({ designer }) => {
    */
   await designer.select('email')
   await designer.openTab('Properties')
-  await designer.page.locator('#fs-prop-label').fill('Work email')
+  await designer.page.getByRole('textbox', { name: /^Label/ }).fill('Work email')
 
   await designer.page.locator('#pg-kit').selectOption('html')
 

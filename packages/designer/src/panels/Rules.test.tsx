@@ -578,7 +578,7 @@ describe('the data type of a component that repeats', () => {
     const select = screen.getByLabelText('Data type')
     const note = select.getAttribute('aria-describedby')
 
-    expect(note, 'the select points at no explanation').toBe('fs-field-type-note')
+    expect(note, 'the select points at no explanation').toMatch(/fs-field-type-note$/)
     expect(window.document.getElementById(note ?? '')?.textContent).toMatch(/once per row/)
   })
 

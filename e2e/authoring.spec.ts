@@ -11,7 +11,7 @@ import { expect, test } from './harness.js'
 
 test('editing a property updates the canvas', async ({ designer }) => {
   await designer.select('email')
-  await designer.page.locator('#fs-prop-label').fill('Work email')
+  await designer.page.getByRole('textbox', { name: /^Label/ }).fill('Work email')
 
   await expect(designer.node('email').locator('label').first()).toHaveText(/Work email/)
 })
@@ -26,7 +26,7 @@ test('typing a label is one undo step, not one per keystroke', async ({ designer
    * event: the label changed once, so one undo took it back whether or not
    * anything coalesced, and a build that pushed an entry per character passed.
    */
-  const label = designer.page.locator('#fs-prop-label')
+  const label = designer.page.getByRole('textbox', { name: /^Label/ })
   await label.click()
   await label.press('ControlOrMeta+a')
   await label.pressSequentially('Tell us more')
@@ -40,20 +40,22 @@ test('typing a label is one undo step, not one per keystroke', async ({ designer
 
 test('renaming to a key that is taken says so and changes nothing', async ({ designer }) => {
   await designer.select('website')
-  await designer.page.locator('#fs-prop-key').fill('email')
-  await designer.page.locator('#fs-prop-key').press('Enter')
+  await designer.page.getByRole('textbox', { name: 'Key', exact: true }).fill('email')
+  await designer.page.getByRole('textbox', { name: 'Key', exact: true }).press('Enter')
 
   await expect(designer.page.getByRole('alert')).toHaveText(/already used by another component/)
   // The refusal must not quietly move the panel onto the other component.
-  await expect(designer.page.locator('#fs-prop-key')).toHaveValue('website')
+  await expect(designer.page.getByRole('textbox', { name: 'Key', exact: true })).toHaveValue(
+    'website',
+  )
   await expect(designer.row('website')).toHaveAttribute('aria-selected', 'true')
   expect(await designer.rootChildren()).toContain('website')
 })
 
 test('renaming to a free key renames the component', async ({ designer }) => {
   await designer.select('website')
-  await designer.page.locator('#fs-prop-key').fill('homepage')
-  await designer.page.locator('#fs-prop-key').press('Enter')
+  await designer.page.getByRole('textbox', { name: 'Key', exact: true }).fill('homepage')
+  await designer.page.getByRole('textbox', { name: 'Key', exact: true }).press('Enter')
 
   expect(await designer.rootChildren()).toContain('homepage')
   await expect(designer.row('homepage')).toHaveAttribute('aria-selected', 'true')
@@ -138,8 +140,8 @@ test('a translated label reaches the canvas', async ({ designer }) => {
 test('adding a language leaves the document valid', async ({ designer }) => {
   await designer.openTab('Settings')
   // Scoped by id: "Name" and "Code" both appear in more than one panel.
-  await designer.page.locator('#fs-language-code').fill('fr')
-  await designer.page.locator('#fs-language-name').fill('French')
+  await designer.page.getByLabel('Code', { exact: true }).fill('fr')
+  await designer.page.getByRole('textbox', { name: 'Name', exact: true }).fill('French')
   await designer.page.getByRole('button', { name: 'Add language' }).click()
 
   const doc = await designer.document()

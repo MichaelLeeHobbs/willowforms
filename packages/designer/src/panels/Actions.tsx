@@ -187,7 +187,6 @@ export function Actions({ api, kit }: ActionsProps): ReactNode {
             )}
             <div className="fs-rules__add">
               <select
-                id={`fs-action-${event}`}
                 aria-label={`Action for ${event}`}
                 value={choices[event] ?? ''}
                 onChange={(change) =>

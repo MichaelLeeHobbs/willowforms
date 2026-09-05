@@ -52,7 +52,9 @@ test('focus selects, so the panels follow the keyboard', async ({ designer }) =>
   await designer.page.keyboard.press('ArrowDown')
 
   await expect(designer.row('heading')).toHaveAttribute('aria-selected', 'true')
-  await expect(designer.page.locator('#fs-prop-key')).toHaveValue('heading')
+  await expect(designer.page.getByRole('textbox', { name: 'Key', exact: true })).toHaveValue(
+    'heading',
+  )
 })
 
 test('Alt with the arrows reorders a component', async ({ designer }) => {

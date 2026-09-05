@@ -23,7 +23,7 @@ const MAX_IMPORT = 10 * 1024 * 1024
  * getting JSON out and putting edited JSON back in.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useId, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormDocument } from '@formsmith/core'
 import { loadDocument, toJsonSchema, unexportableRules } from '@formsmith/core'
@@ -80,6 +80,7 @@ interface DialogBodyProps {
 }
 
 function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): ReactNode {
+  const idBase = useId()
   const documentJson = JSON.stringify(doc, null, 2)
   const schemaJson = JSON.stringify(toJsonSchema(doc), null, 2)
   const lossy = unexportableRules(doc)
@@ -185,11 +186,11 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
       >
         {view === 'document' ? (
           <>
-            <label className="fs-visually-hidden" htmlFor="fs-document-json">
+            <label className="fs-visually-hidden" htmlFor={idBase + '-fs-document-json'}>
               Form document JSON
             </label>
             <textarea
-              id="fs-document-json"
+              id={idBase + '-fs-document-json'}
               className="fs-dialog__editor"
               spellCheck={false}
               value={draft}
@@ -271,11 +272,11 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
           </>
         ) : (
           <>
-            <label className="fs-visually-hidden" htmlFor="fs-schema-json">
+            <label className="fs-visually-hidden" htmlFor={idBase + '-fs-schema-json'}>
               JSON Schema
             </label>
             <textarea
-              id="fs-schema-json"
+              id={idBase + '-fs-schema-json'}
               className="fs-dialog__editor"
               spellCheck={false}
               readOnly
