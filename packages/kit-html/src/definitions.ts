@@ -575,7 +575,7 @@ export const htmlKit: Kit = {
       label: 'Breadcrumbs',
       icon: 'tabs',
       group: 'navigation',
-      defaultProps: { items: [], label: '' },
+      defaultProps: { items: [], label: 'Breadcrumb' },
       props: [
         {
           name: 'items',

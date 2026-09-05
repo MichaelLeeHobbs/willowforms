@@ -88,7 +88,7 @@ for (const kit of [htmlRendererKit, muiRendererKit]) {
           key: 'rowList',
           dataKey: 'rows',
           type: 'Repeater',
-          props: {},
+          props: { label: prop('Rows') },
           schema: { type: 'array' },
           children: [
             repeater([

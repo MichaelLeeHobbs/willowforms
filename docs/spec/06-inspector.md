@@ -118,10 +118,7 @@ A property with a value set shows a dot and, for a screen reader, the words `(mo
 label. The dot was previously a bare `<span aria-label="Modified">`, and ARIA prohibits `aria-label` on
 an element with no role, so it announced nothing at all while looking handled. axe found it.
 
-An unset property displays its effective value from the component definition's `defaultProps`. It has no
-modified marker or Reset button because the document still stores no override. Resetting a property
-therefore returns the control to a visible default rather than an empty field whose rendered result has
-to be guessed.
+An unset property displays its effective value from the component definition's `defaultProps`. It has no modified marker or Reset button because the document stores no override. The shipped kits apply these defaults when a resolved property is absent, so Reset restores the same value in the inspector and rendered form. Explicit values, including empty strings and `null`, override the default. Custom kits must keep their declared defaults and runtime behavior aligned.
 
 ## Style
 
