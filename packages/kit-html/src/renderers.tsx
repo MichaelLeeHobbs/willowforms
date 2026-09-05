@@ -17,7 +17,7 @@
  * these produces an inaccessible form no amount of designer polish can fix.
  */
 
-import { Children, createContext, createElement, useContext, useId, useState } from 'react'
+import { Children, createContext, createElement, useContext, useId } from 'react'
 import type { ReactNode } from 'react'
 import {
   isRequired,
@@ -881,105 +881,6 @@ function DatePickerNode({
   )
 }
 
-function FileUploadNode({
-  node,
-  required = isRequired(node),
-  props,
-  nodeProps,
-  value,
-  error,
-  onChange,
-  events,
-}: NodeRendererProps): ReactNode {
-  const id = useId()
-  /** How many files the last choice dropped for being over `maxSize`. */
-  const [dropped, setDropped] = useState(0)
-  /** How many refusals there have been, so a repeated one is a new string. */
-  const [attempt, setAttempt] = useState(0)
-
-  const filesHeld = (Array.isArray(value) ? value : [value])
-    .filter((name): name is string => typeof name === 'string' && name !== '')
-    .join(', ')
-
-  const multiple = bool(props['multiple'])
-  const heldId = id + '-held'
-  const refusedId = id + '-refused'
-
-  return (
-    <Field
-      id={id}
-      label={str(props['label'])}
-      helper={str(props['helperText'])}
-      error={error}
-      nodeProps={nodeProps}
-    >
-      <input
-        id={id}
-        type="file"
-        className="fsh-input"
-        accept={str(props['accept']) || undefined}
-        multiple={multiple}
-        disabled={bool(props['disabled'])}
-        aria-invalid={error ? true : undefined}
-        {...requiredProps(required)}
-
-        aria-describedby={
-          [id + '-message', filesHeld ? heldId : '', dropped > 0 ? refusedId : '']
-            .filter(Boolean)
-            .join(' ') || undefined
-        }
-
-        onChange={(e) => {
-          const limit = num(props['maxSize'], 0) * 1024
-          const chosen = Array.from(e.target.files ?? [])
-          const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
-
-          const refused = chosen.length - kept.length
-          setDropped(refused)
-          /*
-           * Bumped on a refusal, not on every choice.
-           *
-           * A live region only announces on mutation, and `setDropped` writes
-           * the same number for a second identical refusal -- React re-renders
-           * the same text and a screen reader says nothing, so the second
-           * attempt looked like the picker had stopped working.
-           *
-           * It counts refusals rather than choices because a choice that drops
-           * nothing lands between two identical refusals and, counted, returns
-           * the parity to where it started. That the notice also unmounts on
-           * the clean choice is not the guarantee: this string has to differ
-           * from the last one on its own, without resting on how a screen
-           * reader treats a re-inserted `role="alert"`.
-           * `docs/accessibility.md` records the same fix for the designer's own
-           * live region: an unchanged announcement is never read.
-           */
-          if (refused > 0) setAttempt((n) => n + 1)
-          changed(
-            onChange,
-            events,
-            multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null),
-          )
-        }}
-      />
-      {filesHeld ? (
-        <p id={heldId} className="fsh-field__message">
-          Holding {filesHeld}
-        </p>
-      ) : null}
-      {dropped > 0 ? (
-        <p id={refusedId} className="fsh-field__message is-error" role="alert">
-          {(dropped === 1
-            ? 'One file was too large and was not added.'
-            : String(dropped) + ' files were too large and were not added.') +
-            // A zero-width space per attempt, so a repeat of the same refusal
-            // is a different string and the live region reads it again.
-            '\u200b'.repeat(attempt % 2)}
-        </p>
-      ) : null}
-    </Field>
-  )
-}
-
 function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const severity = oneOf(
     props['severity'],
@@ -1126,7 +1027,6 @@ const renderers: Record<string, NodeRenderer> = {
   RadioGroup: RadioGroupNode,
   RadioItem: RadioItemNode,
   DatePicker: DatePickerNode,
-  FileUpload: FileUploadNode,
   Alert: AlertNode,
   Progress: ProgressNode,
   Link: LinkNode,

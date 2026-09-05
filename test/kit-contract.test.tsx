@@ -775,13 +775,6 @@ describe('a data-bound control hands back what the person entered', () => {
     fireEvent.click(screen.getByLabelText('Two'))
   }
 
-  const attach = (element: HTMLElement): void => {
-    const input = must(element, 'input[type="file"]', 'file input')
-    fireEvent.change(input, {
-      target: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] },
-    })
-  }
-
   type Entry = {
     props?: Record<string, JsonValue>
     enter: (el: HTMLElement) => void
@@ -797,7 +790,6 @@ describe('a data-bound control hands back what the person entered', () => {
     Switch: { enter: toggle, is: true },
     Select: { props: { options: OPTIONS }, enter: chooseTwo, is: 2 },
     RadioGroup: { props: { options: OPTIONS }, enter: pickTwo, is: 2 },
-    FileUpload: { enter: attach, is: 'notes.txt' },
   }
 
   /** Every value the kit reported for `target`, in order. */
@@ -2152,7 +2144,6 @@ const SEAM_CASES = KITS.flatMap(({ name, kit, renderers }) =>
     'Checkbox',
     'Switch',
     'DatePicker',
-    'FileUpload',
     'RadioGroup',
   ].map((type) => ({
     name,

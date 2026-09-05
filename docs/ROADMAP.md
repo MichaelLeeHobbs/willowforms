@@ -7,7 +7,7 @@ order and must not overstate a contract's status.
 
 - Keep package export-map checks and the production browser smoke in CI.
 - Complete the ordinary-property accessibility audit in both kits and fix concrete gaps; retain the Tree and panels as the keyboard authoring path.
-- Remove built-in file inputs in a focused implementation change with tests and compatibility notes. Host-configured custom components own attachment workflows through the existing kit interface.
+- Built-in file inputs have been removed with compatibility coverage. Host-configured custom components own attachment workflows through the existing kit interface; see the [replacement path](COMPATIBILITY.md#pre-beta-corrections).
 - Publish only after [RELEASING.md](RELEASING.md) passes from a clean commit.
 
 ## Recovery work completed

@@ -30,7 +30,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { Children, useId, useState } from 'react'
+import { Children, useId } from 'react'
 import type { ReactNode } from 'react'
 
 import type { JsonValue } from '@formsmith/core'
@@ -121,9 +121,6 @@ const message = (error: string | undefined, helper: string): string => error ?? 
 
 const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
   error ? { role: 'alert' } : {}
-
-const alertWhenSaying = (notice: string | undefined): { role?: 'alert' } =>
-  notice ? { role: 'alert' } : {}
 
 function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // Children need spacing of their own: MUI's outlined label sits on the border
@@ -826,102 +823,6 @@ function DatePickerNode({
   )
 }
 
-/** What a file input says when it left something out for being too large. */
-function tooLarge(count: number): string {
-  return count === 1
-    ? 'One file was too large and was not added.'
-    : String(count) + ' files were too large and were not added.'
-}
-
-function FileUploadNode({
-  node,
-  required = isRequired(node),
-  props,
-  nodeProps,
-  value,
-  error,
-  onChange,
-  events,
-}: NodeRendererProps): ReactNode {
-  /** How many files the last choice dropped for being over `maxSize`. */
-  const [dropped, setDropped] = useState(0)
-  /*
-   * Whichever of the two the helper line is carrying. An error wins, because a
-   * field that is invalid is a bigger fact than a file that was skipped.
-   */
-  const notice = error ?? (dropped > 0 ? tooLarge(dropped) : undefined)
-  const id = useId()
-
-  const filesHeld = (Array.isArray(value) ? value : [value])
-    .filter((name): name is string => typeof name === 'string' && name !== '')
-    .join(', ')
-
-  const multiple = bool(props['multiple'])
-  /*
-   * The value is the selected file's name and nothing more. A file input is
-   * uncontrolled by design, and turning bytes into form data is an upload
-   * protocol this project does not own.
-   */
-  return (
-    <TextField
-      {...nodeProps}
-      id={id}
-      fullWidth
-      type="file"
-      label={str(props['label'])}
-      disabled={bool(props['disabled'])}
-      error={Boolean(error)}
-      /*
-       * The held filename joins the helper text, because a MUI `TextField` is
-       * one element and there is nowhere else to put it without wrapping the
-       * component and moving where `nodeProps` is spread.
-       */
-      helperText={message(
-        notice,
-
-        filesHeld || str(props['helperText']),
-      )}
-      slotProps={{
-        // Whichever message the line is carrying. An error wins upstream, and a
-        // dropped file is announced with the same mechanism rather than silently.
-        formHelperText: alertWhenSaying(notice),
-        inputLabel: { shrink: true },
-        htmlInput: {
-          ...requiredProps(required),
-          multiple,
-          ...(str(props['accept']) ? { accept: str(props['accept']) } : {}),
-        },
-      }}
-      onChange={(e) => {
-        /*
-         * Narrowed, not laundered. `as unknown as HTMLInputElement` asserted a
-         * type nothing had checked -- and this handler is reachable from a
-         * `TextField` that is not a file input, where `files` is undefined and
-         * the assertion would have said otherwise.
-         */
-        const input = e.target
-        if (!(input instanceof HTMLInputElement)) return
-
-        const limit = num(props['maxSize'], 0) * 1024
-        const chosen = Array.from(input.files ?? [])
-        const kept = chosen.filter((file) => limit <= 0 || file.size <= limit)
-        /*
-         * And somebody is told. The filtering was silent, so choosing a file
-         * over the limit looked exactly like choosing none: the picker closed,
-         * the list did not change, and nothing appeared. A refusal nobody can
-         * see is indistinguishable from a broken picker.
-         */
-        setDropped(chosen.length - kept.length)
-        changed(
-          onChange,
-          events,
-          multiple ? kept.map((file) => file.name) : (kept[0]?.name ?? null),
-        )
-      }}
-    />
-  )
-}
-
 function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const raw = props['severity']
   const severity =
@@ -1046,7 +947,6 @@ const renderers: Record<string, NodeRenderer> = {
   RadioGroup: RadioGroupNode,
   RadioItem: RadioItemNode,
   DatePicker: DatePickerNode,
-  FileUpload: FileUploadNode,
   Alert: AlertNode,
   Progress: ProgressNode,
   Link: LinkNode,
