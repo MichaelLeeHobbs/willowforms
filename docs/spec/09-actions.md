@@ -72,8 +72,7 @@ The namespaces are intentional: form data uses an address, interface effects use
 and host context uses a path. `setContext` only requests a change to the browser-side context; the
 server must reconstruct trusted context from its own session.
 
-Every returned value is checked as bounded JSON. An unknown or malformed effect rejects the complete
-batch before `onEffects` is called. `halt` keeps effects through itself and discards later effects.
+Every returned value is checked as bounded JSON. An unknown or malformed effect rejects the complete batch before `onEffects` is called. `halt` keeps effects through itself and stops processing immediately: later effects and action references are neither validated nor evaluated. Built-in parameters cannot override the action kind selected by its name.
 
 The host receives the checked batch once and decides how to apply it. Formsmith therefore makes no
 claim that effects across DOM, form-data, and host-context owners are transactional. Programmatic writes

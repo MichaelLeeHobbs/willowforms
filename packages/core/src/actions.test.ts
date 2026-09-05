@@ -90,6 +90,35 @@ describe('runActions', () => {
     })
   })
 
+  it('does not evaluate or validate actions after halt', () => {
+    const evaluate = vi.fn(() => {
+      throw new Error('must not run')
+    })
+    const result = runActions(
+      [
+        { type: 'builtin', name: 'halt' },
+        { type: 'code', name: 'later' },
+        { type: 'builtin', name: 'unknown' },
+      ],
+      { later: { name: 'later', body: '', params: {} } },
+      {},
+      invocation,
+      { evaluate },
+    )
+    expect(result).toEqual({ ok: true, effects: [{ kind: 'halt' }] })
+    expect(evaluate).not.toHaveBeenCalled()
+  })
+
+  it('cannot replace a built-in action kind through its parameters', () => {
+    const result = runActions(
+      [{ type: 'builtin', name: 'unknown', params: { kind: 'announce', message: 'Unexpected' } }],
+      {},
+      {},
+      invocation,
+    )
+    expect(result).toEqual({ ok: false, error: 'Invalid built-in action.', action: 'unknown' })
+  })
+
   it('rejects cyclic or non-JSON effect values', () => {
     const cyclic: { self?: unknown } = {}
     cyclic.self = cyclic
