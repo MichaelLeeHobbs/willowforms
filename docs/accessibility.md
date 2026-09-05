@@ -102,9 +102,7 @@ people already know it. Without them, every rearrangement in this builder would 
 ## Kits own their own accessibility
 
 The renderer knows nothing about the markup a kit produces, so it cannot supply labels or error wiring.
-`@formsmith/kit-html` does it properly and is the reference: a real `<label for>` per field,
-`aria-invalid` on a failing field, `aria-describedby` pointing at a message element that always exists,
-`role="alert"` on the message, and a visible focus ring on everything interactive.
+The shipped kits associate labels with the intended controls or groups, set `aria-invalid` on failing controls, and point `aria-describedby` at a message element that always exists. The message receives `role="alert"` when it contains an error. Interactive elements retain a visible focus indicator. The ordinary-property acceptance table covers both individual controls and named groups; it does not require every control to use the same markup structure.
 
 The message element is rendered even when empty so that `aria-describedby` never points at a missing
 node, which is why an error appearing later is picked up rather than ignored.

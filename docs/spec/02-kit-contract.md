@@ -212,14 +212,14 @@ Run these checks for both kits, translated content, repeated rows, and multiple 
 The renderer knows nothing about the markup a kit produces, so it cannot supply labels or error wiring.
 A kit must:
 
-| Obligation                                                                | Attribute          | Enforced |
-| ------------------------------------------------------------------------- | ------------------ | -------- |
-| Give every field a real `<label for>` pointing at its control             | —                  | no       |
-| Set `aria-invalid` on a control whose `error` is set                      | `aria-invalid`     | yes      |
-| Mark a control the document requires, so it says so before a submit fails | `aria-required`    | yes      |
-| Point the description at a message element **that always exists**         | `aria-describedby` | yes      |
-| Put `role="alert"` on that message when it holds an error                 | `role="alert"`     | yes      |
-| Leave a visible focus indicator on everything interactive                 | —                  | no       |
+| Obligation                                                                    | Attribute          | Enforced |
+| ----------------------------------------------------------------------------- | ------------------ | -------- |
+| Associate each authored label with its control or group as an accessible name | —                  | no       |
+| Set `aria-invalid` on a control whose `error` is set                          | `aria-invalid`     | yes      |
+| Mark a control the document requires, so it says so before a submit fails     | `aria-required`    | yes      |
+| Point the description at a message element **that always exists**             | `aria-describedby` | yes      |
+| Put `role="alert"` on that message when it holds an error                     | `role="alert"`     | yes      |
+| Leave a visible focus indicator on everything interactive                     | —                  | no       |
 
 The description has to point at an element that is always in the DOM, so an error appearing later is
 picked up rather than referring to a node that was not there when the description was read.
