@@ -123,14 +123,10 @@ const [errors, setErrors] = useState<FormErrors>({})
 
 ### What `onChange` reports is an address, not a key
 
-Outside a repeater an address is the bare key and nothing has changed. Inside one it carries the row
+Outside a repeater a change address is the bare data key. Inside one it carries the row
 it came from, outermost first: `addresses[1].line1`.
 
-The row coordinate is built from **answer** names and the leaf from the **component** name, which are
-the same string until somebody sets a `dataKey`. So a `street` field holding `line1`, inside a repeater
-keyed `addressList` holding `addresses`, reports changes at `addresses[1].line1` and takes its error at
-`addresses[1].street`: two components may share an answer and still fail for different reasons.
-`validateForm` keys `errors` that way, and `FormRenderer` reads them that way.
+Repeated-row coordinates use answer names. A change address ends in the field's **data key**, while an error address ends in its **component key**. A `street` component with `dataKey: 'line1'`, inside an `addressList` repeater with `dataKey: 'addresses'`, reports changes at `addresses[1].line1` and reads errors at `addresses[1].street`. Two components may share an answer and fail for different reasons. `validateForm` and `FormRenderer` use the same error-address convention.
 
 Use `applyChange` from `@formsmith/core` to write one. Spreading the address into an object literal,
 `{ ...d, [address]: value }`, is the mistake this shape invites: it creates a property whose name is
@@ -195,8 +191,7 @@ takes only the first drops every answer given from step two onwards: the demo se
 scopes and then projected under `scopes[0]`, which is a form that validates a required field and then
 submits without it. See [03-components.md](03-components.md#steps).
 
-`contextValues(root, path)` reads one context path across every row of repeated scope, which is what a
-condition inside a repeater needs.
+`contextValues(root, path)` enumerates the distinct JSON comparison values authored for that context path in structured conditions. A host can use the declared `step` values to construct the explicit scopes passed to `validateAcross` and `submittedAcross`; this function does not read live context or repeated-row answers.
 
 `evaluatorKeys(root)` names every node that cannot be evaluated without a sandbox, and it is a startup
 question rather than a runtime one. A `computed` binding with no evaluator makes `isVisible` answer

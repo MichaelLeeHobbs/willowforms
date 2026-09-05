@@ -70,18 +70,18 @@ asked.
 
 Used precisely throughout, and worth pinning before the first file uses all of them in one sentence.
 
-| Term           | Means                                                                          |
-| -------------- | ------------------------------------------------------------------------------ |
-| **Document**   | One form. A `FormDocument`: a tree, its languages, translations, and actions.  |
-| **Node**       | One entry in that tree, a `ComponentNode`. Has a `key`, a `type`, and `props`. |
-| **Key**        | A node's identity, unique within a document. Also its key in submitted data.   |
-| **Type**       | Which component a node is, as a string. How a node finds its renderer.         |
-| **Component**  | A kind of thing a node can be, declared by a kit as a `ComponentDef`.          |
-| **Kit**        | A pairing of palette metadata and React renderers. What makes a form look MUI. |
-| **Container**  | A component that holds children. The root is one.                              |
-| **Data-bound** | A component that contributes a value to submitted data, and so has a schema.   |
-| **Binding**    | A `PropValue`: a property that is static, computed, or a translation key.      |
-| **Host**       | The application embedding the designer or the renderer. Owns data and saving.  |
+| Term           | Means                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Document**   | One form. A `FormDocument`: a tree, its languages, translations, and actions.                                         |
+| **Node**       | One entry in that tree, a `ComponentNode`. Has a `key`, a `type`, and `props`.                                        |
+| **Key**        | A node's identity, unique within a document. Its answer name defaults to this key and can be overridden by `dataKey`. |
+| **Type**       | Which component a node is, as a string. How a node finds its renderer.                                                |
+| **Component**  | A kind of thing a node can be, declared by a kit as a `ComponentDef`.                                                 |
+| **Kit**        | A pairing of palette metadata and React renderers. What makes a form look MUI.                                        |
+| **Container**  | A component that holds children. The root is one.                                                                     |
+| **Data-bound** | A component that contributes a value to submitted data, and so has a schema.                                          |
+| **Binding**    | A `PropValue`: a property that is static, computed, or a translation key.                                             |
+| **Host**       | The application embedding the designer or the renderer. Owns data and saving.                                         |
 
 ## Where this comes from
 

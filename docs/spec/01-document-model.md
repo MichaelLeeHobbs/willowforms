@@ -95,9 +95,7 @@ collision and says which component holds the name, rather than silently doing no
 and the renderer all address values through `dataKeyOf(node)`, which is the one helper that decides,
 so the two names cannot be used interchangeably by accident.
 
-The reason for two names is that a component's identity in the tree and the name of its answer in the
-payload are different concerns. Renaming a field for clarity should not change the shape of what the
-server receives.
+An explicit `dataKey` keeps the submitted answer name stable when the component key changes. Without one, the answer name follows the component key, and the inspector updates supported structured references during a rename.
 
 **Keys are unique. Data keys are not.** Two fields behind opposite `renderWhen` guards writing one answer
 is a real pattern, and forbidding it would buy nothing: the payload has one slot for that answer either
@@ -185,16 +183,7 @@ does and validation follows the renderer.
 
 **Status: built.** `evaluateCondition` in core, a fourth `PropValue` kind, and a picker in the panel.
 
-`renderWhen` is a `PropValue`, so the only conditional form it has is `computed`, which needs the
-injected evaluator. It also has no authoring UI. Put those together and **conditional visibility, the most
-common dynamic behaviour a form has, today requires a JavaScript sandbox and a hand-edited JSON
-document.**
-
-That makes the claim in [09-actions.md](09-actions.md) — that most forms should need no JavaScript —
-already false, and no set of actions can rescue it. A form that cannot show its second field without a
-sandbox has needed one long before anyone pressed a button.
-
-A fourth kind fixes both, closed and structured:
+`renderWhen` and validation guards support structured conditions authored in the inspector. Core evaluates these conditions without JavaScript or an injected evaluator. The closed vocabulary is:
 
 ```ts
 type Condition =
@@ -206,7 +195,7 @@ type Condition =
 
 type Operand =
   | { kind: 'literal'; value: JsonValue }
-  | { kind: 'ref'; dataKey: string }
+  | { kind: 'ref'; dataKey: string; scope?: 'form' | 'row' }
   | { kind: 'context'; path: string }
 ```
 
@@ -221,11 +210,7 @@ enumerated, given a picker in the panel, and evaluated by core with no sandbox a
 neither small nor finite, which is why they stay the evaluator's job: this is a condition vocabulary, not
 a language, and the moment it grows arithmetic it has become one.
 
-Three things follow, and they are the reason this outranks the rest of the roadmap:
-
-- A form with branching visibility runs in a host that injected nothing.
-- Conditions become authorable in the panel, because a closed set is a UI and an expression is a text box.
-- The same type serves a rule's `when` guard and, later, an action's guard, so one editor covers all three.
+Visibility and validation guards share the same condition editor and evaluation semantics. A reference reads form answers by default; `scope: 'row'` reads only the enclosing repeated row. Actions do not currently have condition guards.
 
 `computed` stays, for the conditions a vocabulary cannot express. It is the escape hatch now rather than
 the only door.
