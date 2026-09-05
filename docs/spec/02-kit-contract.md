@@ -1,7 +1,6 @@
 # Kit contract
 
-**Status: built.** Two kits ship, and `test/kit-contract.test.tsx` runs every rule below against every
-kit in the repository. Adding a third kit means adding one line to a list and nothing else.
+**Status: partial.** Both kits and the existing contract suites are built. The ordinary-property accessibility requirements below need a complete cross-kit audit before this contract can claim full coverage. The existing enforcement tables distinguish current checks from that remaining work.
 
 A kit is what makes Formsmith render as Material UI, as plain HTML, or as your own design system. It is
 the one seam that cannot be retrofitted, so it is specified before anything that depends on it.
@@ -183,6 +182,24 @@ All five now say 16, and `test/kit-contract.test.tsx` compares a shared prop's d
 kits rather than trusting either.
 
 ## Accessibility is the kit's job
+
+### Accessibility from ordinary properties
+
+**Status: partial.** Labels, help text, required and invalid state, and image alternative text already have authoring or rendering support. The complete acceptance checks below remain to be audited in both kits; existing tests are evidence for individual behaviors, not a claim that every combination is covered.
+
+Form authors configure meaningful content and behavior. Kits generate the corresponding semantic markup and accessibility attributes on the actual input, group, button, image, or landmark. A generic `id`, `data-*`, or `aria-*` attribute editor is outside the product scope.
+
+| Author intent                           | Required kit behavior                                                                                                                          | Acceptance check                                                                                                 |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Label a field or group                  | Use the authored label as its accessible name; a placeholder is not a substitute                                                               | Verify the control or group has the intended name and that label associations address the correct instance       |
+| Explain a question                      | Expose Help text as a first-class property where the question needs instructions and connect it to the control's accessible description        | Verify the displayed help text is programmatically associated with the actual control                            |
+| Require an answer and explain a failure | Derive required state from the applicable validation rules; expose invalid state and associate and announce the current error                  | Verify conditional required state, error appearance, and recovery on the actual control                          |
+| Describe an image                       | Expose alternative text as an ordinary property; an intentionally empty value identifies a decorative image                                    | Verify informative text is preserved and decorative images add no redundant announcement                         |
+| Name an action or navigation region     | Use authored button/link text or the region's label; if a supported variant has no visible name, provide a specific, localizable name property | Verify the intended accessible name without requiring author-supplied ARIA or introducing new component variants |
+
+Run these checks for both kits, translated content, repeated rows, and multiple rendered forms where applicable. Generated IDs and references must remain local to the intended instance. Verify native keyboard operation and visible focus in a browser; use real screen-reader checks to assess reading order and error announcements. Record gaps in [accessibility.md](../accessibility.md) and fix concrete failures before claiming the contract complete.
+
+### Existing markup obligations
 
 The renderer knows nothing about the markup a kit produces, so it cannot supply labels or error wiring.
 A kit must:

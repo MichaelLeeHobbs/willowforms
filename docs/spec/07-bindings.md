@@ -1,7 +1,6 @@
 # Property bindings
 
-**Status: partial.** Every mode is authored in the panel, and the weakest section here is expression
-authoring: a plain textarea with no completion, no syntax check and no way to try an expression out.
+**Status: built.** Static, translated, structured-condition, and computed bindings are supported. Computed bindings retain a plain text editor and a host-owned evaluator contract; richer expression tooling is outside the product scope.
 
 Any property can be a literal value, an expression computed at render time, a key into a translation
 bundle, or -- where the schema opts in -- a structured condition. Which of them a property may be is
@@ -56,8 +55,7 @@ reverse. Undo covers a mistake, and a visibly empty editor is better than a plau
 
 ## Computed
 
-**Status: partial.** Authored in a textarea. No completion, no syntax check, no way to test an expression
-without leaving the panel.
+**Status: built.** Expressions are a specialized integration surface authored in a plain textarea. Completion, syntax services, debugging, and in-panel evaluation are not planned. Ordinary visibility and conditional validation use the structured condition editor without an evaluator.
 
 The expression is a string. Formsmith does not evaluate it: the host injects an evaluator and owns the
 sandbox. With none injected the property resolves to `null` and the component still renders. See
@@ -66,8 +64,7 @@ sandbox. With none injected the property resolves to `null` and the component st
 The panel says so next to the editor, because a binding that silently produces nothing is otherwise
 indistinguishable from one that is wrong.
 
-**Planned:** a way to try an expression against the preview's current data without applying it. Authoring
-blind and switching to Preview to find out is the current loop and it is poor.
+Hosts that enable computed bindings own expression testing and evaluation. Retaining the runtime contract and source editor does not commit Formsmith to an expression development environment; removing richer tooling from scope does not remove stored expressions or change their evaluation semantics.
 
 ## Translations
 

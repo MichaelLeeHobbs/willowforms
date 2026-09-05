@@ -1,6 +1,6 @@
 # Canvas
 
-**Status: partial.** Selection, hover, drag and drop, an empty-state guide, hidden-selection feedback, and the selection toolbar are built. The structure tree provides keyboard selection and rearrangement; direct keyboard selection on the canvas remains deferred from the initial beta. See [Gaps](#gaps).
+**Status: built.** Selection, hover, drag and drop, an empty-state guide, hidden-selection feedback, and the selection toolbar are built. The Tree and panels are the supported keyboard authoring interface. Direct keyboard selection of rendered canvas nodes is outside the product scope.
 
 The canvas renders the real runtime renderer, not a design-time approximation. What is on screen is
 literally what ships, which is the only way a WYSIWYG builder stays honest as a kit evolves.
@@ -220,8 +220,6 @@ component regardless, which is what keeps that from being a hole.
 
 **Empty state — built.** A document whose root has no children shows a guide to adding components and using the keyboard-accessible tree. The guide is absent in preview.
 
-**Keyboard access to the canvas.** Components can only be selected there with a pointer; the tree is the
-keyboard path to the same thing. A roving tabindex over rendered nodes would fight the kit's own
-focusable controls, so this needs a design rather than an implementation.
+**Keyboard authoring.** The Tree selects, rearranges, duplicates, and removes components; palette buttons and property panels complete the keyboard workflow. Tree and canvas selection stay synchronized. Direct selection of rendered canvas nodes remains a pointer interaction, and a second keyboard selection system is not planned. This does not relax keyboard access to authoring operations or to the form's native controls in Preview.
 
 **Mid-drag scrolling — built.** Scrolling or resizing refreshes the measured drop candidates and their origin, even when the pointer is stationary. Release still measures afresh.

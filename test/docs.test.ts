@@ -1089,16 +1089,7 @@ describe('a section that calls itself planned is still planned', () => {
    * is an honest answer for a feature with no named surface — it is not an
    * excuse, because the next guard rejects a `null` with no reason.
    */
-  const DISPROOF: Record<string, { needle: string | null; because: string }> = {
-    '06-inspector.md: a passthrough for id,': {
-      needle: null,
-      because: 'an author-defined attribute has no store action and no element id yet',
-    },
-    '07-bindings.md: try an expression': {
-      needle: null,
-      because: 'a scratch evaluation surface has no element id yet',
-    },
-  }
+  const DISPROOF: Record<string, { needle: string | null; because: string }> = {}
 
   /** Every planned claim in the specification, named the way the table names it. */
   function claims(): string[] {

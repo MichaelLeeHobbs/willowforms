@@ -6,6 +6,10 @@ rather than by intention.
 
 Target is WCAG 2.2 AA.
 
+## Ordinary authoring properties
+
+Authors configure labels, help text, validation, image alternative text, and action or region names. Kits generate the semantic markup, IDs, and accessibility associations on the intended controls. There is no planned generic ARIA or HTML attribute editor. The [kit acceptance requirements](spec/02-kit-contract.md#accessibility-from-ordinary-properties) define the cross-kit audit still to complete; this scope decision is not a claim of full conformance.
+
 ## Enforced by tests
 
 These fail the build, not a review.
@@ -61,9 +65,7 @@ studied, sits at 5.49:1 light and 6.39:1 dark. See `docs/prior-art`.
 
 ## Keyboard
 
-Every panel is reachable without a pointer, and the structure tree is how a component is selected,
-moved, duplicated and deleted. The canvas itself is not: a component is selected there by clicking it,
-which is the gap this document lists below and does not claim to have closed.
+The Tree and panels are the supported keyboard authoring interface: palette buttons add components, the Tree selects and rearranges them, and the panels edit their properties. Canvas and Tree selection stay synchronized. Direct keyboard selection of rendered canvas nodes is outside scope. The form's own controls remain keyboard-operable in Preview, and equivalent authoring operations, clear focus, and understandable announcements remain requirements.
 
 | Key                                                 | Does                                                      |
 | --------------------------------------------------- | --------------------------------------------------------- |
@@ -117,7 +119,9 @@ word is visually hidden text inside the label.
 
 ## Known gaps
 
-Honest list. None of these are hard, they are simply not done.
+Verification gaps remain even with a defined keyboard authoring path.
+
+- **The full ordinary-property acceptance audit is incomplete.** Existing checks cover several label, description, required/invalid, and error behaviors. The [kit contract](spec/02-kit-contract.md#accessibility-from-ordinary-properties) additionally requires checking the applicable cases across both kits, translations, repeated rows, and multiple rendered forms, plus browser focus and screen-reader behavior.
 
 - **The automated audit cannot see layout.** axe-core runs over the designer in twelve states: at rest,
   with a component selected, on the Rules, Settings and Style tabs, with a condition being edited, in
@@ -127,9 +131,6 @@ Honest list. None of these are hard, they are simply not done.
   the stylesheets. Running axe in a real browser would close the rest.
 - **No screen reader has actually been used.** Everything above is verified from the DOM and from the
   spec, which catches wiring mistakes but not awkward phrasing or a confusing reading order.
-- **The canvas is not keyboard reachable.** Components are selected there by pointer only; the tree is
-  the keyboard path to the same thing. Reaching the canvas by keyboard would need a roving tabindex over
-  rendered nodes, which fights with the kit's own focusable controls.
 - **The palette is a plain list of buttons.** Reachable by Tab, but with no grouping semantics, so its
   category headings are visual only.
 - **Reduced motion is handled where something moves, and nowhere else.** The HTML kit's stylesheet has a

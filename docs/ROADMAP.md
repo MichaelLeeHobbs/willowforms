@@ -6,8 +6,7 @@ order and must not overstate a contract's status.
 ## Current milestone: release confidence
 
 - Keep package export-map checks and the production browser smoke in CI.
-- Resolve the remaining named `Partial` sections in the specification or explicitly defer them from the
-  first release.
+- Complete the ordinary-property accessibility audit in both kits and fix concrete gaps; retain the Tree and panels as the keyboard authoring path.
 - Publish only after [RELEASING.md](RELEASING.md) passes from a clean commit.
 
 ## Recovery work completed
@@ -23,3 +22,7 @@ order and must not overstate a contract's status.
 
 Changes advance only when implementation, regression coverage, specification status, and public
 documentation agree.
+
+## Scope decisions
+
+The [product principles](spec/README.md#product-principles) govern additions. Richer expression tooling and direct canvas keyboard selection are removed from product scope. Generic HTML attribute passthrough is replaced by specific accessibility requirements expressed through ordinary properties; existing expressions and keyboard authoring remain supported.
