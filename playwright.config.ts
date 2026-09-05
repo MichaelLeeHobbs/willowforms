@@ -15,6 +15,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = Number(process.env['FORMSMITH_E2E_PORT'] ?? 5180)
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65_535) {
+  throw new Error('FORMSMITH_E2E_PORT must be an integer from 1 to 65535.')
+}
 const baseURL = 'http://localhost:' + String(PORT)
 
 export default defineConfig({
