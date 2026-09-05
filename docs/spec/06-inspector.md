@@ -1,7 +1,6 @@
 # Inspector
 
-**Status: built.** Properties, Style, Actions and Rules are built, along with every property editor and
-the section routing.
+**Status: partial.** Properties, Style, Actions, Rules, and the property editors are built. HTML attribute passthrough remains planned and is deferred from the initial beta; see [Additional properties](#additional-properties).
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
 never knows what a `TextField` is, only that something declared a `label` property with a `string`

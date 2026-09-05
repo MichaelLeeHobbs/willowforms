@@ -18,6 +18,10 @@ clean commit whose specification status matches the implementation.
 8. Tag the reviewed commit, publish with provenance from CI, then install the published packages into a
    fresh consumer before promoting the release.
 
+## Local browser ports
+
+For concurrent local development, set `FORMSMITH_E2E_PORT` or `FORMSMITH_E2E_DIST_PORT` to an unused port before running the respective browser suite. Both suites still start their own server with `--strictPort` and refuse to reuse another checkout's server.
+
 ## Stop conditions
 
 Do not publish with a failing or skipped gate, an unexplained audit finding, a `Partial` contract being

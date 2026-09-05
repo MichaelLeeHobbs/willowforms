@@ -1,7 +1,6 @@
 # Public API
 
-**Status: partial.** The three entry points below are built and stable in practice. Nothing yet states a
-compatibility promise.
+**Status: built.** The public entry points, document-loading boundary, and pre-release compatibility policy are implemented and documented. [COMPATIBILITY.md](../COMPATIBILITY.md) defines supported platforms and change rules.
 
 The key grammar used to be named here as an outstanding weakness. It is not: `keyProblem` enforces the
 JavaScript identifier subset, called from both `validateDocument` and the panel's rename, so a paste and
@@ -52,9 +51,7 @@ import '@formsmith/designer/styles.css'
 | `theme`           | `'system' \| 'light' \| 'dark'`    | no       | Controlled designer colour mode         |
 | `onThemeChange`   | `(theme: DesignerTheme) => void`   | no       | Reports a toolbar colour-mode selection |
 
-`initialDocument` is a starting value, not a controlled prop. The designer owns the document from mount,
-and observing it means `onChange`; passing a different `initialDocument` later does nothing. A host that
-needs to replace the document from outside needs an API that does not exist yet.
+`initialDocument` is read at mount. Observe edits with `onChange`; to load a different form, remount `Designer` with a different React `key`. A controlled document prop is outside the initial beta API.
 
 The stylesheet is a separate import so a host theming by token override can load it once, in its own
 order. See [11-theming.md](11-theming.md).
@@ -444,15 +441,6 @@ one function.
 
 ## Stability
 
-**Status: undecided, deliberately.** Not an oversight, and not a question waiting on someone to find
-time. Nothing here is published yet, so there is no promise to break and no evidence about which parts of
-these types real kit authors lean on. Deciding now would mean guessing, and a compatibility promise is
-the one kind of decision that is expensive to walk back.
+**Status: built.** The [compatibility policy](../COMPATIBILITY.md) applies to the beta line. Additive optional fields are compatible; removing or renaming public contracts requires a migration path and release note. Deprecated APIs remain for at least one minor release after their replacement ships. Document migrations belong to `loadDocument` and are required when a new document version is introduced.
 
-What the decision will be about, when there is enough to go on: `ComponentDef` and `PropSchema` are the
-types that matter, because a kit is written against them by someone this project will never meet. Adding
-a required field to either breaks every kit at once. Adding an optional one does not, which is how
-`ComponentDef.root` and `ComponentDef.icon` were added.
-
-**Revisit before the first publish to npm.** That is the moment the question stops being theoretical,
-because the first published version is the first one anyone can depend on.
+Pre-release status permits deliberate breaking changes, not undocumented ones. Kit contract changes must land with cross-kit coverage, because a new required field in `ComponentDef` or `PropSchema` affects every kit consumer.

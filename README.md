@@ -2,9 +2,7 @@
 
 An MIT-licensed visual form designer for React. The **designer**, not just the renderer.
 
-> Status: beta. The core designer workflow is usable, but several specified runtime behaviours remain
-> incomplete. Nothing is published to npm and no release has been cut. See the
-> [roadmap](docs/ROADMAP.md) for the current priorities.
+> Status: initial beta candidate. Authoring, validation, repeaters, step navigation, and host-dispatched actions are implemented. Nothing is published to npm and no release has been cut. See the [beta review](docs/BETA_REVIEW.md) for verified workflows, deferred features, and release gates.
 
 Compatibility and release gates are documented in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) and
 [docs/RELEASING.md](docs/RELEASING.md).

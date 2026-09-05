@@ -5,10 +5,7 @@ covering all of it would be too large for anyone to read or keep true.
 
 ## How to read this
 
-Almost every section carries a status, and the status is the point. This specification is also the
-roadmap:
-there is no separate list of planned work to drift out of step with the code, because that has already
-happened twice in this project's short life.
+Each contract carries a status. The specification owns behavioral commitments; the [roadmap](../ROADMAP.md) records execution priorities and the [beta review](../BETA_REVIEW.md) records the release scope and verification evidence.
 
 | Status        | Means                                                                              |
 | ------------- | ---------------------------------------------------------------------------------- |
@@ -36,13 +33,13 @@ by anything.
 | [03-components.md](03-components.md)         | The component catalogue                                  | Built   |
 | [04-shell.md](04-shell.md)                   | Layout, panels, toolbar, viewport, keyboard              | Built   |
 | [05-canvas.md](05-canvas.md)                 | Selection, drag and drop, drop resolution                | Partial |
-| [06-inspector.md](06-inspector.md)           | Properties, Style, Actions, Rules, and the editors       | Built   |
+| [06-inspector.md](06-inspector.md)           | Properties, Style, Actions, Rules, and the editors       | Partial |
 | [07-bindings.md](07-bindings.md)             | Static, computed, and translated property values         | Partial |
 | [08-validation.md](08-validation.md)         | The rule catalogue and its semantics                     | Built   |
 | [09-actions.md](09-actions.md)               | Events, code actions, and the sandbox boundary           | Built   |
 | [10-interchange.md](10-interchange.md)       | Import, export, and JSON Schema                          | Built   |
 | [11-theming.md](11-theming.md)               | Token vocabulary for the designer and for kits           | Built   |
-| [12-api.md](12-api.md)                       | What a consumer imports, and the platform baseline       | Partial |
+| [12-api.md](12-api.md)                       | What a consumer imports, and the platform baseline       | Built   |
 
 Adjacent documents that are not contracts:
 
@@ -55,8 +52,7 @@ opens with. A reader scanning this table for what is safe to depend on is asking
 question, and an index that answers Partial over a file reading Built answers a third question nobody
 asked.
 
-`05`, `07` and `12` read Partial because each has a named gap in it, and each of those files
-says which one in its own preamble.
+`05`, `06`, and `07` remain Partial: direct canvas keyboard selection, HTML attribute passthrough, and richer expression authoring are explicitly deferred from the initial beta. The existing tree keyboard path, kit accessibility attributes, and host-owned evaluator contract remain supported.
 
 ## Vocabulary
 
