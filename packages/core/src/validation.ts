@@ -410,6 +410,24 @@ export function isRequired(
   )
 }
 
+/** Row counts allowed by all applicable list bounds. */
+export function itemLimits(
+  node: ComponentNode,
+  data?: FormData,
+  options: EvalOptions = {},
+): { min: number; max: number } {
+  let min = 0
+  let max = Number.POSITIVE_INFINITY
+  for (const rule of validationsOf(node)) {
+    if (rule?.key !== 'minItems' && rule?.key !== 'maxItems') continue
+    if (typeof rule.value !== 'number' || !Number.isFinite(rule.value)) continue
+    if (data === undefined ? rule.when : !guardPasses(rule.when, data, options)) continue
+    if (rule.key === 'minItems') min = Math.max(min, Math.ceil(rule.value))
+    else max = Math.min(max, Math.max(0, Math.floor(rule.value)))
+  }
+  return { min, max }
+}
+
 /** First failing rule for one field, or undefined when all pass. */
 export function validateField(
   node: ComponentNode,

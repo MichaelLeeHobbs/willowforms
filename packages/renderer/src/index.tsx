@@ -28,6 +28,7 @@ import {
   evaluateCondition,
   isRowScope,
   isRequired,
+  itemLimits,
   isVisible,
   keyProblem,
   pushRow,
@@ -77,6 +78,8 @@ export interface NodeRendererProps {
   error: string | undefined
   /** Required state evaluated against the current form, context, and row. */
   required?: boolean | undefined
+  /** Applicable row-count bounds, resolved in the repeater's enclosing scope. */
+  itemLimits?: { min: number; max: number } | undefined
   onChange: (value: JsonValue) => void
   /** Event callbacks connected to this node's configured actions. */
   events?: NodeEventHandlers | undefined
@@ -648,6 +651,7 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
         value={valueOf(row?.values ?? data, dataKey)}
         error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
         required={isRequired(node, data, scoped)}
+        itemLimits={repeats ? itemLimits(node, data, scoped) : undefined}
         onChange={handleChange}
         events={events}
         navigation={ctx.navigation.get(node.key)}

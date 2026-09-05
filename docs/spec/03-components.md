@@ -303,6 +303,8 @@ same bounds in core. As with every non-required rule, `minItems` passes on an em
 also carries `required`. Nested repeaters use composed row addresses and are covered in core and renderer
 tests.
 
+The controls use every currently applicable bound, including guards reading form answers, host context, or an enclosing row. If more than one bound applies, the strictest determines the limit. `FormRenderer` supplies these resolved counts through `NodeRendererProps.itemLimits`; kits do not evaluate guards themselves.
+
 ## Steps
 
 **Status: built.** The core of it is built. This section used to say a Step component was absent

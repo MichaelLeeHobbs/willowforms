@@ -19,9 +19,9 @@
 
 import { Children, createContext, createElement, useContext, useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { ComponentNode } from '@formsmith/core'
 import {
   isRequired,
+  itemLimits,
   jsonToString,
   optionEntry,
   optionValue,
@@ -115,15 +115,9 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
  * already expanded them, so a kit never counts rows, never sees an index, and
  * never learns what an address is.
  */
-function itemLimit(node: ComponentNode, key: 'minItems' | 'maxItems', fallback: number): number {
-  const rule = node.schema?.validations?.find((candidate) => candidate.key === key)
-  return rule && 'value' in rule && typeof rule.value === 'number' && Number.isFinite(rule.value)
-    ? Math.max(0, Math.floor(rule.value))
-    : fallback
-}
-
 function Repeater({
   node,
+  itemLimits: limits = itemLimits(node),
   props,
   nodeProps,
   value,
@@ -135,8 +129,6 @@ function Repeater({
   const messageId = id + '-message'
   const rows = Array.isArray(value) ? value : []
   const renderedRows = Children.toArray(children)
-  const minimum = itemLimit(node, 'minItems', 0)
-  const maximum = itemLimit(node, 'maxItems', Number.POSITIVE_INFINITY)
   const label = str(props['label'], node.dataKey ?? node.key)
   return (
     <div {...nodeProps}>
@@ -170,7 +162,7 @@ function Repeater({
               <button
                 type="button"
                 className="fsh-button fsh-button--plain fsh-repeater__remove"
-                disabled={rows.length <= minimum}
+                disabled={rows.length <= limits.min}
                 aria-label={`Remove ${label} item ${String(index + 1)}`}
                 onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
               >
@@ -183,7 +175,7 @@ function Repeater({
       <button
         type="button"
         className="fsh-button fsh-button--outline fsh-repeater__add"
-        disabled={rows.length >= maximum}
+        disabled={rows.length >= limits.max}
         onClick={() => onChange([...rows, {}])}
       >
         Add {label}

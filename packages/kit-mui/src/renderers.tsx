@@ -33,9 +33,10 @@ import Typography from '@mui/material/Typography'
 import { Children, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import type { ComponentNode, JsonValue } from '@formsmith/core'
+import type { JsonValue } from '@formsmith/core'
 import {
   isRequired,
+  itemLimits,
   jsonToString,
   optionEntry,
   optionValue,
@@ -157,15 +158,9 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
  * already expanded them, so a kit never counts rows, never sees an index, and
  * never learns what an address is.
  */
-function itemLimit(node: ComponentNode, key: 'minItems' | 'maxItems', fallback: number): number {
-  const rule = node.schema?.validations?.find((candidate) => candidate.key === key)
-  return rule && 'value' in rule && typeof rule.value === 'number' && Number.isFinite(rule.value)
-    ? Math.max(0, Math.floor(rule.value))
-    : fallback
-}
-
 function RepeaterNode({
   node,
+  itemLimits: limits = itemLimits(node),
   props,
   nodeProps,
   value,
@@ -187,8 +182,6 @@ function RepeaterNode({
   const name = str(props['label'], node.dataKey ?? node.key)
   const rows = Array.isArray(value) ? value : []
   const renderedRows = Children.toArray(children)
-  const minimum = itemLimit(node, 'minItems', 0)
-  const maximum = itemLimit(node, 'maxItems', Number.POSITIVE_INFINITY)
   return (
     <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
       {/*
@@ -216,7 +209,7 @@ function RepeaterNode({
               <Button
                 type="button"
                 size="small"
-                disabled={rows.length <= minimum}
+                disabled={rows.length <= limits.min}
                 aria-label={`Remove ${name} item ${String(index + 1)}`}
                 onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
               >
@@ -229,7 +222,7 @@ function RepeaterNode({
       <Button
         type="button"
         size="small"
-        disabled={rows.length >= maximum}
+        disabled={rows.length >= limits.max}
         onClick={() => onChange([...rows, {}])}
       >
         Add {name}
