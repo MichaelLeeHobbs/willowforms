@@ -4,13 +4,13 @@ Review date: 2026-09-05. This review covers the documented contracts, core and r
 
 ## Product decision
 
-The initial beta supports desktop form authoring, responsive form preview, JSON document interchange, localization, validation, repeaters, controlled step navigation, and host-dispatched actions. Following the [mission and product principles](spec/README.md#product-principles), richer expression tooling, generic attribute passthrough, and direct canvas keyboard selection have been removed from scope. The complete ordinary-property accessibility audit and the approved removal of standard file inputs remain Partial; the earlier local verification below does not establish completion of those changes.
+The initial beta supports desktop form authoring, responsive form preview, JSON document interchange, localization, validation, repeaters, controlled step navigation, and host-dispatched actions. Following the [mission and product principles](spec/README.md#product-principles), richer expression tooling, generic attribute passthrough, and direct canvas keyboard selection have been removed from scope. Standard file inputs have been removed with a documented custom-component replacement path. The complete ordinary-property accessibility audit remains Partial; the earlier local verification below does not establish complete accessibility conformance.
 
 | Contract       | Beta assessment                                                                                                                                 | Evidence                                                                      |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Document model | Implemented; version 1 loads through the canonical boundary.                                                                                    | Core document, JSON, tree, row, and depth suites.                             |
 | Kit contract   | Metadata and rendering are implemented; the complete ordinary-property accessibility audit remains Partial.                                     | Existing cross-kit contracts, accessibility audits, and kit rendering suites. |
-| Components     | The current catalogue is implemented; approved removal of built-in file inputs remains Partial.                                                 | Catalogue checks, runtime suites, authoring and repeater browser tests.       |
+| Components     | The standard catalogue is implemented; attachments use custom components.                                                                       | Catalogue checks, runtime suites, attachment compatibility and browser tests. |
 | Shell          | Implemented; labels are isolated per designer and the shell fits a laptop viewport.                                                             | Embedding, accessibility, keyboard, and layout regressions.                   |
 | Canvas         | Implemented; the Tree and panels provide keyboard authoring. Direct canvas keyboard selection is outside scope.                                 | Preview, drag, scroll, hidden-component, and viewport regressions.            |
 | Inspector      | Editing is implemented. Accessibility uses ordinary properties; generic attribute passthrough is outside scope.                                 | Properties, style, actions, rules, and scoped-rename suites.                  |
@@ -39,7 +39,7 @@ Comment cleanup is limited to code changed for these outcomes. No document versi
 
 ## Explicit beta limits
 
-- Attachments belong to host-configured custom or community components. The current built-in `FileUpload` still reports filenames and is pending removal from the standard kits. Its earlier implementation checks do not establish an upload, storage, or attachment-viewing service.
+- Attachments belong to host-configured custom or community components. Legacy `FileUpload` nodes remain loadable and show the missing-component fallback until the host supplies a renderer. The [compatibility notes](COMPATIBILITY.md#pre-beta-corrections) describe replacement; Formsmith supplies no upload, storage, or attachment-viewing service.
 
 - Desktop authoring is the verified workflow. Mobile and tablet controls simulate the runtime form; they do not promise a phone-sized authoring workspace.
 - The Tree and panels provide keyboard authoring. Direct canvas keyboard selection is outside scope; palette-to-tree dragging remains an uncommitted idea.

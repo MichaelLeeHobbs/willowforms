@@ -1,6 +1,6 @@
 # Component catalogue
 
-**Status: partial.** 27 of the 27 below are built in both kits, including repeated scope and controlled step navigation. The approved move of file inputs out of the standard kits is pending implementation; the current catalogue remains accurate until that removal lands.
+**Status: built.** 26 of the 26 below are built in both kits, including repeated scope and controlled step navigation. Attachments use host-configured custom components; the standard kits contain no file input.
 
 This file opened **Built** over those two lists. `README.md` calls that the direction that has been wrong
 most often, and it was wrong here on the file that is also the roadmap -- so a reader planning against it
@@ -11,7 +11,7 @@ The two numbers are digits rather than words on purpose: `test/docs.test.ts` rea
 them against the table below and against both kits' `definitions.ts`, so a component added to a kit and
 not to this page fails the build.
 
-This list records the current built-in catalogue. The target standard catalogue excludes file inputs, which belong to host-configured community or custom components as described below. A kit is free to offer a different catalogue; matching component types and value contracts make documents portable between compatible kits.
+This list records the built-in catalogue. File inputs belong to host-configured community or custom components as described below. A kit is free to offer a different catalogue; matching component types and value contracts make documents portable between compatible kits.
 
 Catalogue growth requires a concrete task for a form author or respondent. Existing components remain supported until an explicit removal lands; their presence does not commit Formsmith to matching a general UI library. Application navigation and surrounding page layout belong to the host.
 
@@ -81,7 +81,7 @@ uses it.
 
 ## The catalogue
 
-27 components. **Built** means both kits implement it and the contract test passes.
+26 components. **Built** means both kits implement it and the contract test passes.
 
 ### Layout
 
@@ -117,18 +117,6 @@ no index is ever authored. See [Repeated scope](#repeated-scope).
 | `Divider` | Built  | no         | `orientation`                |
 | `Image`   | Built  | no         | `src`, `alt`, `fit`, `width` |
 
-**`FileUpload` reports a file name, not a file.** A file input is uncontrolled by design, and turning
-bytes into form data is an upload protocol this project does not own: the host reads the input when it
-submits. The value is the selected name, or an array of them, which is enough for `required` to mean
-"a file was chosen" and for the schema to describe the field. This is the one place the catalogue promises
-less than the type suggests.
-
-`maxSize` is enforced by both kits at the moment of choosing: a file over it is dropped from the value and
-the count of what was dropped is announced. It is still not a security boundary -- the host reads the input
-itself when it submits, and nothing here can stop what a request contains -- so a host that cares has to
-check again. This paragraph said `maxSize` was advisory until a host enforced it, which was true before
-the kits did and had stayed on the page since.
-
 **`Link` refuses an address it does not recognise.** `href` comes from a document, and a form author is
 not always the person deploying the form, so `javascript:` in an `href` is the same code-execution
 boundary core refuses to cross anywhere else. `safeHref` allows http, https, mailto, tel and relative
@@ -140,25 +128,22 @@ statement from having forgotten.
 
 ### Inputs
 
-| Component     | Status | Data type | Properties                                                         |
-| ------------- | ------ | --------- | ------------------------------------------------------------------ |
-| `TextField`   | Built  | `string`  | `label`, `placeholder`, `helperText`, `multiline`, `disabled`      |
-| `TextArea`    | Built  | `string`  | `label`, `placeholder`, `helperText`, `rows`, `disabled`           |
-| `NumberField` | Built  | `number`  | `label`, `helperText`, `disabled`                                  |
-| `DatePicker`  | Built  | `date`    | `label`, `helperText`, `min`, `max`, `disabled`                    |
-| `FileUpload`  | Built  | `file`    | `label`, `helperText`, `accept`, `multiple`, `maxSize`, `disabled` |
-| `Button`      | Built  | no        | `text`, `variant`, `disabled`                                      |
-| `ButtonGroup` | Built  | no        | `orientation`                                                      |
+| Component     | Status | Data type | Properties                                                    |
+| ------------- | ------ | --------- | ------------------------------------------------------------- |
+| `TextField`   | Built  | `string`  | `label`, `placeholder`, `helperText`, `multiline`, `disabled` |
+| `TextArea`    | Built  | `string`  | `label`, `placeholder`, `helperText`, `rows`, `disabled`      |
+| `NumberField` | Built  | `number`  | `label`, `helperText`, `disabled`                             |
+| `DatePicker`  | Built  | `date`    | `label`, `helperText`, `min`, `max`, `disabled`               |
+| `Button`      | Built  | no        | `text`, `variant`, `disabled`                                 |
+| `ButtonGroup` | Built  | no        | `orientation`                                                 |
 
 `TextArea` exists separately rather than as `TextField` with `multiline`, because the two have different
 properties (`rows` versus nothing) and a palette entry that changes shape based on a checkbox is harder
 to find than two entries. `TextField.multiline` stays for documents that already use it.
 
-`FileUpload` currently produces filenames rather than durable attachment references. Its removal from the standard kits is approved but not yet implemented. See [Attachments](#attachments) for the target ownership boundary.
-
 ### Attachments
 
-**Status: partial.** File inputs are outside the target standard catalogue. Remove the built-in `FileUpload` entries and their implementation in a focused change, updating the catalogue, examples, tests, and compatibility notes together. Existing saved forms must not be silently rewritten; the removal needs a documented custom-component replacement or missing-component outcome.
+**Status: built.** File inputs are outside the standard catalogue. Legacy `FileUpload` nodes remain loadable and display the missing-component fallback until the host supplies a replacement renderer. Documents and answers are not silently rewritten. The [compatibility notes](../COMPATIBILITY.md#pre-beta-corrections) describe the replacement path.
 
 A host that needs attachments installs or provides a custom component through the [existing kit interface](02-kit-contract.md#community-component-packages). A component can present a picker, progress, retry, removal, and an existing-attachment view using a service supplied by the host. Those behaviors belong to that extension, not to a required Formsmith upload subsystem.
 
@@ -214,13 +199,13 @@ had to be complete: `onFocus` reaches only the two free-text inputs, `onBlur` on
 components that commit a value on leaving, and lifecycle events only `Screen`. Settle them when something
 reads them.
 
-| Event                   | Raised by                                                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `onChange`              | `TextField`, `NumberField`, `TextArea`, `Checkbox`, `Switch`, `Select`, `RadioGroup`, `DatePicker`, `FileUpload` |
-| `onClick`               | `Button`, `Link`                                                                                                 |
-| `onBlur`                | `TextField`, `TextArea`, `NumberField`, `DatePicker`                                                             |
-| `onFocus`               | `TextField`, `TextArea`                                                                                          |
-| `onMount` / `onUnmount` | `Screen`                                                                                                         |
+| Event                   | Raised by                                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------------------------- |
+| `onChange`              | `TextField`, `NumberField`, `TextArea`, `Checkbox`, `Switch`, `Select`, `RadioGroup`, `DatePicker` |
+| `onClick`               | `Button`, `Link`                                                                                   |
+| `onBlur`                | `TextField`, `TextArea`, `NumberField`, `DatePicker`                                               |
+| `onFocus`               | `TextField`, `TextArea`                                                                            |
+| `onMount` / `onUnmount` | `Screen`                                                                                           |
 
 ## What is deliberately absent
 

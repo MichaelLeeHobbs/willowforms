@@ -8,7 +8,7 @@ The README and specification now lead with the mission. The product definition e
 
 Richer expression tooling and direct canvas keyboard selection are removed from product scope. Generic HTML attribute passthrough is replaced by accessibility requirements expressed through ordinary properties, with a complete cross-kit audit still outstanding. Existing expressions, code actions, components, and the Tree keyboard workflow remain supported.
 
-Items 3–6 below have since been approved and reflected in the specification: simple versioned JSON interchange, task-driven catalogue growth, host-controlled navigation without routing, and a distinction between universal kit obligations and reference-kit preferences. Attachments now belong to host-configured custom or community components, with removal of the built-in file input pending implementation. Items 1–2 remain product discussions. These specification edits do not themselves remove runtime APIs or components.
+Items 3–6 below have since been approved and reflected in the specification: simple versioned JSON interchange, task-driven catalogue growth, host-controlled navigation without routing, and a distinction between universal kit obligations and reference-kit preferences. Attachments now belong to host-configured custom or community components; the subsequent implementation removed built-in file inputs with [compatibility notes](COMPATIBILITY.md#pre-beta-corrections). Items 1–2 remain product discussions.
 
 ## 1. Ordinary authoring exposes too much programming
 
@@ -52,7 +52,7 @@ The [catalogue](spec/03-components.md#the-catalogue) already includes Breadcrumb
 
 The accessibility audit is the approved next verification priority. Dropping a second keyboard selection system does not remove the need for equivalent authoring operations, clear focus, browser checks, and real screen-reader verification. See the [ordinary-property acceptance requirements](spec/02-kit-contract.md#accessibility-from-ordinary-properties).
 
-**Attachment decision applied to the spec:** attachments belong to custom or community components using the existing kit interface. The [component contract](spec/03-components.md#attachments) records removal of the built-in file input as pending implementation. The current component records a chosen name, while [schema export](spec/10-interchange.md#json-schema-export) and core label a file string as base64. The removal must address the compatibility and schema consequences explicitly; a filename must not become a durable attachment reference by relabeling it. Formsmith will not own upload, storage, or viewing services.
+**Attachment decision implemented:** the standard kits no longer include file inputs. Legacy definitions remain loadable, and schema export no longer infers base64 encoding. The [replacement path](COMPATIBILITY.md#pre-beta-corrections) preserves documents and requires a host component; a filename is never converted into a durable attachment reference by relabeling it. Formsmith owns no upload, storage, or viewing service.
 
 Several passages describe old implementation states as current: [conditions](spec/01-document-model.md#conditions) say conditional authoring needs JavaScript; [component events](spec/03-components.md#events) say nothing dispatches them; and [the API](spec/12-api.md#four-core-functions-a-host-has-to-call) describes `contextValues` as reading repeated-row context rather than enumerating comparison values. These are documentation defects, not reasons to expand the product. The interchange edit now correctly identifies the implemented loader. Historical explanations should be reduced to the current contract in separate focused edits.
 
@@ -60,4 +60,4 @@ Several passages describe old implementation states as current: [conditions](spe
 
 Structured conditions, useful validation, shared server validation, localization, repeaters, and steps all directly support ordinary forms. Immutable editing, document loading and migrations, safe handling of untrusted definitions, accessibility, and stable package boundaries protect those workflows. None should be cut merely because it requires technical implementation work.
 
-Recommended order: complete the approved accessibility audit; remove the standard file input with compatibility notes; decide how to simplify ordinary choice editing and advanced-surface exposure; and clean up the remaining contradictory prose. No additional removal or API change is authorized by this review document itself.
+Recommended remaining work: complete the approved accessibility audit, decide how to simplify ordinary choice editing and advanced-surface exposure, and clean up contradictory prose. No additional removal or API change is authorized by this review document itself.

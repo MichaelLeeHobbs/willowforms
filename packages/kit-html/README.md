@@ -22,7 +22,7 @@ is the evidence: it was added without touching `@formsmith/core`, `@formsmith/re
 `@formsmith/designer`, and the designer builds its palette and properties panel from the metadata here
 without ever importing it directly.
 
-It ships the same 27 component types as `@formsmith/kit-mui`, so a document authored against one kit
+It ships the same 26 component types as `@formsmith/kit-mui`, so a document authored against one kit
 renders against the other. Nothing in the kit contract requires that; it is a courtesy this repo keeps
 so swapping kits is a one-line change in the host.
 

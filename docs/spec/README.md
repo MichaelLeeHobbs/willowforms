@@ -41,7 +41,7 @@ by anything.
 | [00-product.md](00-product.md)               | Purpose, users, scope, non-goals                           | —       |
 | [01-document-model.md](01-document-model.md) | `FormDocument`, `ComponentNode`, `PropValue`, versioning   | Built   |
 | [02-kit-contract.md](02-kit-contract.md)     | Kit integration and accessibility from ordinary properties | Partial |
-| [03-components.md](03-components.md)         | The component catalogue                                    | Partial |
+| [03-components.md](03-components.md)         | The component catalogue                                    | Built   |
 | [04-shell.md](04-shell.md)                   | Layout, panels, toolbar, viewport, keyboard                | Built   |
 | [05-canvas.md](05-canvas.md)                 | Selection, drag and drop, drop resolution                  | Built   |
 | [06-inspector.md](06-inspector.md)           | Properties, Style, Actions, Rules, and the editors         | Built   |
@@ -64,7 +64,7 @@ opens with. A reader scanning this table for what is safe to depend on is asking
 question, and an index that answers Partial over a file reading Built answers a third question nobody
 asked.
 
-`02` remains Partial pending the complete audit of accessibility from ordinary properties. `03` remains Partial pending the approved removal of built-in file inputs; attachments belong to host-configured custom or community components. Richer expression tooling, generic HTML attribute passthrough, and direct canvas keyboard selection have been removed from product scope, rather than deferred to another release. The existing Tree keyboard workflow, component properties, stored expressions, and host-owned evaluator contract remain supported.
+`02` remains Partial pending the complete audit of accessibility from ordinary properties. Standard file inputs have been removed; attachments belong to host-configured custom or community components. Richer expression tooling, generic HTML attribute passthrough, and direct canvas keyboard selection have been removed from product scope. The existing Tree keyboard workflow, component properties, stored expressions, and host-owned evaluator contract remain supported.
 
 ## Vocabulary
 

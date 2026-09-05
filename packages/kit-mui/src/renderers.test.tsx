@@ -326,47 +326,6 @@ describe('a length the host theme must not rescale', () => {
  * could not make fail.
  */
 
-describe('the file field telling somebody a file was dropped', () => {
-  /*
-   * The "too large" notice could never be announced. The message was produced
-   * only when `error` was undefined, and `role="alert"` added only when `error`
-   * was set -- two conditions that cannot both hold. The comment at the call
-   * site said "And somebody is told", and nobody was.
-   *
-   * Driven through the input rather than asserted on internals, because the
-   * whole claim is about what a listener gets.
-   */
-  const upload: ComponentNode = {
-    key: 'attachment',
-    type: 'FileUpload',
-    props: { label: prop('Attachment'), maxSize: prop(1) },
-    schema: { type: 'string', validations: [] },
-  }
-
-  const overLimit = (): File =>
-    new File([new Uint8Array(4096)], 'large.pdf', { type: 'application/pdf' })
-
-  it('announces the refusal', () => {
-    const container = draw(upload)
-    const input = container.querySelector('input[type="file"]')
-    expect(input, 'the file field did not render').not.toBeNull()
-
-    Object.defineProperty(input, 'files', { value: [overLimit()], configurable: true })
-    fireEvent.change(input as Element)
-
-    const alert = container.querySelector('[role="alert"]')
-    expect(alert, 'the notice was produced but never announced').not.toBeNull()
-    expect(alert?.textContent).toContain('too large')
-  })
-
-  it('says nothing while nothing has been refused', () => {
-    // The control, so the alert cannot pass by being permanent.
-    const container = draw(upload)
-
-    expect(container.querySelector('[role="alert"]')).toBeNull()
-  })
-})
-
 describe('a Box under a host theme', () => {
   it('draws the authored radius under the default theme', () => {
     // The defect. Divided by 8 and multiplied by 4, an authored 24 drew at 12.
