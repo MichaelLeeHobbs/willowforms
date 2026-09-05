@@ -210,7 +210,7 @@ steps come out of the document — `contextValues(root, 'step')` reads the names
 that path against — so a form with fewer than two steps gets no control and an ordinary form is
 unchanged. One step is a form, not a wizard: a switcher with a single entry is furniture.
 
-Without it, preview showed an empty form for any wizard and an author could not check their own work.
+In Preview, changing pages through Next, Back, or the step switcher scrolls the canvas to the top and focuses the step switcher. The selected page is announced by its native select, and keyboard users can continue into the new page's controls. Editing answers preserves the current scroll position and field focus.
 
 Only `step`. The rest of a host's context is not knowable here, and inventing values would be worse than
 showing none, so a condition reading `user.role` on the canvas still reads as missing. Editing draws the

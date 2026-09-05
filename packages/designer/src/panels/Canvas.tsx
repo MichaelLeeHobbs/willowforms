@@ -210,6 +210,13 @@ export function Canvas({
   }, [selected, selectedKey, parent, kit, addComponent, duplicateComponent, removeComponent])
 
   const surfaceRef = useRef<HTMLDivElement>(null)
+  const stepSelectRef = useRef<HTMLSelectElement>(null)
+  useEffect(() => {
+    if (!preview || current === undefined) return
+    if (surfaceRef.current) surfaceRef.current.scrollTop = 0
+    stepSelectRef.current?.focus({ preventScroll: true })
+  }, [current, preview])
+
   // Refresh on scrolling and resizing; pointer movement alone reuses the measurement.
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
@@ -459,6 +466,7 @@ export function Canvas({
           <label className="fs-canvas__step">
             Step
             <select
+              ref={stepSelectRef}
               value={JSON.stringify(current) ?? ''}
               onChange={(e) => setStep(steps[e.target.selectedIndex])}
             >
@@ -541,7 +549,6 @@ export function Canvas({
           data-fs-viewport={viewport}
           style={frameWidth === undefined ? undefined : { width: frameWidth }}
         >
-          {}
           {form}
         </div>
 
