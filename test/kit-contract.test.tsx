@@ -1972,19 +1972,7 @@ describe('a default copied between kits', () => {
   })
 })
 
-/**
- * Two kits, one document, one heading rank.
- *
- * The two kits fell back to different ranks for a heading whose document names
- * none -- `h2` in the HTML kit and `h5` in MUI -- so the same document produced
- * a different outline depending on which kit drew it. A heading's rank is what
- * a screen reader navigates by, not a size, and "a document authored against
- * one kit renders against the other" is the contract's one obligation.
- *
- * The palettes may still start a *new* heading wherever suits them: that is the
- * kit's own call about appearance, and `defaultProps` is excluded from the
- * agreement check above for exactly that reason.
- */
+// Heading rank must agree across kits, including documents that omit it.
 describe('a heading whose document names no rank', () => {
   it.each(KITS)('$name renders it at the same rank as the other kit', ({ renderers }) => {
     const node: ComponentNode = { key: 'target', type: 'Heading', props: { text: prop('Title') } }

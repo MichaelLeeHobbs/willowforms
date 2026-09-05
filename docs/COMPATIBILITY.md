@@ -27,6 +27,8 @@ behaviour; when either changes, this policy and the relevant contract change tog
 
 ## Pre-beta corrections
 
+The shipped kits now use their declared `defaultProps` for omitted properties as well as newly created components. Reset therefore agrees with the inspector. Saved forms that omit properties may gain the declared starter text, labels, or presentation defaults; explicitly authored values are preserved. Both kits default headings to H2, and breadcrumbs receive the default region name `Breadcrumb`. Existing headings with an explicit H5 remain H5. This correction changes runtime fallbacks without rewriting documents or advancing the document version.
+
 The built-in `FileUpload` metadata and renderers were removed before the first npm release, following the approved attachment boundary. This is a documented pre-publication removal; there is no published version to deprecate. The document version remains `1`, and `loadDocument` preserves legacy nodes and the `file` string type.
 
 Hosts that used the old picker should register a custom renderer under `FileUpload` and supply compatible metadata when those nodes remain editable, or explicitly migrate the node to their own attachment component while retaining its `dataKey`. Until a renderer is supplied, the existing missing-component alert identifies the node and shows its validation error. A previous filename is not stored file content: if the host did not persist the bytes separately, the respondent must choose the file again. Do not silently convert a filename into an attachment ID. Custom components report JSON-compatible durable references after the host's upload succeeds.

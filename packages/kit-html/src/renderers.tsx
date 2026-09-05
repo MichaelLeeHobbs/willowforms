@@ -19,6 +19,7 @@
 
 import { Children, createContext, createElement, useContext, useId } from 'react'
 import type { ReactNode } from 'react'
+import { htmlKit } from './definitions.js'
 import {
   isRequired,
   itemLimits,
@@ -1018,4 +1019,17 @@ const renderers: Record<string, NodeRenderer> = {
   Breadcrumbs: BreadcrumbsNode,
 }
 
-export const htmlRendererKit: RendererKit = { id: 'html', renderers }
+export const htmlRendererKit: RendererKit = {
+  id: 'html',
+  renderers: Object.fromEntries(
+    htmlKit.components.map(({ type, defaultProps }) => {
+      const Renderer = renderers[type]!
+      return [
+        type,
+        function WithDefaults(input: NodeRendererProps): ReactNode {
+          return <Renderer {...input} props={{ ...defaultProps, ...input.props }} />
+        },
+      ]
+    }),
+  ),
+}

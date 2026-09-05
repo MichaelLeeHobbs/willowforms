@@ -80,7 +80,7 @@ export const muiKit: Kit = {
       label: 'Heading',
       icon: 'heading',
       group: 'display',
-      defaultProps: { text: 'Heading', level: 'h5' },
+      defaultProps: { text: 'Heading', level: 'h2' },
       props: [
         { name: 'text', label: 'Text', editor: 'string', localizable: true },
         {
@@ -593,7 +593,7 @@ export const muiKit: Kit = {
       label: 'Breadcrumbs',
       icon: 'tabs',
       group: 'navigation',
-      defaultProps: { items: [], label: '' },
+      defaultProps: { items: [], label: 'Breadcrumb' },
       props: [
         {
           name: 'items',

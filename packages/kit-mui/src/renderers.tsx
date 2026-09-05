@@ -32,6 +32,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { Children, useId } from 'react'
 import type { ReactNode } from 'react'
+import { muiKit } from './definitions.js'
 
 import type { JsonValue } from '@formsmith/core'
 import {
@@ -934,4 +935,17 @@ const renderers: Record<string, NodeRenderer> = {
   Breadcrumbs: BreadcrumbsNode,
 }
 
-export const muiRendererKit: RendererKit = { id: 'mui', renderers }
+export const muiRendererKit: RendererKit = {
+  id: 'mui',
+  renderers: Object.fromEntries(
+    muiKit.components.map(({ type, defaultProps }) => {
+      const Renderer = renderers[type]!
+      return [
+        type,
+        function WithDefaults(input: NodeRendererProps): ReactNode {
+          return <Renderer {...input} props={{ ...defaultProps, ...input.props }} />
+        },
+      ]
+    }),
+  ),
+}

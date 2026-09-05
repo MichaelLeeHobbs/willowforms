@@ -37,7 +37,7 @@ describe('beta authoring regressions', () => {
         key: 'contactList',
         dataKey: 'contacts',
         type: 'Repeater',
-        props: {},
+        props: { label: prop('contacts') },
         schema: { type: 'array', validations: [] },
         children: [email],
       },
