@@ -85,15 +85,15 @@ uses it.
 
 ### Layout
 
-| Component  | Status | Container | Properties                                         |
-| ---------- | ------ | --------- | -------------------------------------------------- |
-| `Screen`   | Built  | yes       | `maxWidth`, `gap`                                  |
-| `Step`     | Built  | yes       | `gap`; ships with a `renderWhen` on `context.step` |
-| `Stack`    | Built  | yes       | `direction`, `gap`                                 |
-| `Grid`     | Built  | yes       | `columns`, `gap`, `minColumnWidth`                 |
-| `Box`      | Built  | yes       | `padding`, `background`, `radius`                  |
-| `Card`     | Built  | yes       | `title`, `subtitle`, `variant`                     |
-| `Repeater` | Built  | yes       | `label`, `gap`; its value is the list of rows      |
+| Component  | Status | Container | Properties                                                  |
+| ---------- | ------ | --------- | ----------------------------------------------------------- |
+| `Screen`   | Built  | yes       | `maxWidth`, `gap`                                           |
+| `Step`     | Built  | yes       | `gap`; ships with a `renderWhen` on `context.step`          |
+| `Stack`    | Built  | yes       | `direction`, `gap`                                          |
+| `Grid`     | Built  | yes       | `columns`, `gap`, `minColumnWidth`                          |
+| `Box`      | Built  | yes       | `padding`, `background`, `radius`                           |
+| `Card`     | Built  | yes       | `title`, `subtitle`, `variant`                              |
+| `Repeater` | Built  | yes       | `label`, `helperText`, `gap`; its value is the list of rows |
 
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
 twelve-column system: a form author thinks "two side by side", not "six of twelve".

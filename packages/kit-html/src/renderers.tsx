@@ -132,22 +132,7 @@ function Repeater({
   const label = str(props['label'], node.dataKey ?? node.key)
   return (
     <div {...nodeProps}>
-      {/*
-       * A repeater is data-bound: its value is the list, so a rule about the
-       * list is its own error, not any row's. "Add at least one address" has
-       * nowhere else to appear, which is why the kit contract's message
-       * obligation applies here like anywhere else.
-       */}
-      {/*
-       * `role="group"` and a description, not `aria-invalid`.
-       *
-       * `aria-invalid` is supported on widget roles -- a textbox, a combobox, a
-       * radiogroup -- and this is a container of components. On a generic
-       * element it is inert: the attribute is in the DOM, a test can find it,
-       * and no screen reader will ever say it. What does work is a group that
-       * names the message describing it, plus the `role="alert"` below, which
-       * announces the error when it appears.
-       */}
+      {/* Group-level help and errors describe the list independently of its rows. */}
       <div
         role="group"
         className="fsh-stack"
@@ -185,7 +170,7 @@ function Repeater({
         className={'fsh-field__message' + (error ? ' is-error' : '')}
         {...(error ? { role: 'alert' } : {})}
       >
-        {error ?? ''}
+        {error ?? str(props['helperText'])}
       </p>
     </div>
   )

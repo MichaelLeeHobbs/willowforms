@@ -51,7 +51,8 @@ for (const [kit, renderer] of [
         children: [field],
       }
       document.root.children = [repeat]
-      document.translations['en-US'] = {
+      document.languages.push({ code: 'fr', dialect: 'CA', name: 'Français canadien', bidi: 'ltr' })
+      document.translations['fr-CA'] = {
         question_label: 'Votre réponse',
         question_help: 'Instructions pour répondre',
       }
@@ -59,6 +60,7 @@ for (const [kit, renderer] of [
         <FormRenderer
           document={document}
           kit={renderer}
+          language="fr-CA"
           data={data}
           errors={validateForm(document.root, data)}
           onChange={() => undefined}
