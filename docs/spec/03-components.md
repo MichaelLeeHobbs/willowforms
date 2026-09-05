@@ -99,7 +99,7 @@ uses it.
 twelve-column system: a form author thinks "two side by side", not "six of twelve".
 
 `Repeater` is the one structurally interesting component here, and it is built. It renders its children
-once per item in an array value, which makes it the only data-bound container, and it is how a form
+once per item in an array value, which makes it the array-valued repeated-scope container, and it is how a form
 expresses "add another address".
 
 **Rows never mint keys.** The authored subtree exists once in the document; a row exists in the DOM, in
@@ -190,14 +190,7 @@ rather than being two components, because they are one idea with two shapes.
 
 ## Events
 
-Every component declares which of the six `EventName`s it can raise. Authoring them is
-[09-actions.md](09-actions.md), which is not built.
-
-The right-hand column is what the two kits declare today, not a rule -- both declare the same lists, and
-`test/docs.test.ts` checks this table against them. Since nothing fires an event yet, the lists have never
-had to be complete: `onFocus` reaches only the two free-text inputs, `onBlur` only those two and the
-components that commit a value on leaving, and lifecycle events only `Screen`. Settle them when something
-reads them.
+Each component declares the events authors can bind in the inspector. The renderer dispatches those bindings to the host action executor; see [09-actions.md](09-actions.md). Both shipped kits declare the lists below, and `test/docs.test.ts` checks that the table matches their metadata. Focus and blur support is intentionally limited to the listed components; lifecycle events belong to `Screen`.
 
 | Event                   | Raised by                                                                                          |
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
@@ -303,31 +296,20 @@ A step is a container with a condition on it. That is not a workaround discovere
 it is what the pieces already do, and it was checked rather than assumed. A three-`Box` document, each
 gated on the current step, run against core:
 
-|                                                        | Result                                           |
-| ------------------------------------------------------ | ------------------------------------------------ |
-| `validateForm(root, { step: 2 })`                      | exactly step 2's fields                          |
-| A condition on step 3 reading a step 1 answer          | works; `FormData` is flat                        |
-| `toJsonSchema` over the whole document                 | requires all five fields, not the current step's |
-| Undo, tree operations, drag and drop, the kit contract | untouched; a step is a container                 |
+|                                                        | Result                                            |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| `validateForm(root, { step: 2 })`                      | exactly step 2's fields                           |
+| A condition on step 3 reading a step 1 answer          | works; `FormData` is flat                         |
+| `toJsonSchema` over the whole document                 | omits and reports rules beneath conditional steps |
+| Undo, tree operations, drag and drop, the kit contract | untouched; a step is a container                  |
 
 `validateForm` takes a `ComponentNode`, not a document, so **per-step validation is
 `validateForm(stepNode, data)`** and costs nothing. That was one of the two open questions and it was
 already answered by a parameter that has been there the whole time.
 
-### The one thing that is genuinely broken
+### Validation and submission across steps
 
-Submitting from the last step validates only the last step:
-
-```
-submit from step 3, city missing → { card: 'This field is required.' }
-```
-
-`city` was required, was never answered, and the form is accepted. That is `isVisible` behaving exactly
-as specified — a hidden field is not validated — and it is wrong for a wizard, because the earlier steps
-are not _unwanted_, they are _already done_. The distinction is the whole design: `renderWhen` false
-means the author excluded this, and a step the user is not on means not yet.
-
-So core gained three functions and no new concept:
+Validating only the current step cannot validate answers from completed steps. Hosts use the same explicit context scopes for validation and submission so earlier answers are checked and retained:
 
 ```ts
 validateAcross(root, data, scopes: EvalOptions[]): FormErrors

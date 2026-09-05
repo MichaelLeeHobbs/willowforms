@@ -20,8 +20,7 @@ people embedding it.
 <Designer initialDocument={doc} kit={kit} rendererKit={renderers} onChange={save} />
 ```
 
-`onChange` fires on every change, including every coalesced keystroke run. It is the only output the
-designer has today.
+`onChange` emits each document change, independently of undo-history coalescing. The optional `onSave` callback supports explicit saving.
 
 A host that wants a Save button rather than continuous saving passes `onSave`, and the toolbar shows
 one; without it there is no button, because a Save the designer cannot honour is worse than none. See
@@ -52,19 +51,7 @@ rather than having already replaced the form.
 **Status: built.** This is the one place a user hands the builder arbitrary data, so it gets the same
 treatment any untrusted input would.
 
-Apply runs three stages in order and stops at the first stage that reports anything:
-
-1. **Parse.** A syntax error is reported as one.
-2. **Check the shape.** `version`, `id`, `name`, and a `root` with a string `key` and `type`. This is what
-   makes the cast that follows honest.
-3. **Validate the structure.** `validateDocument` catches duplicate keys, empty keys, unknown action
-   references, and a `defaultLanguage` naming a language the document does not have.
-
-**Within a stage, every problem is reported at once.** A document missing four fields says so four times,
-because fixing them one round trip at a time is miserable. Between stages there is nothing to report
-together: a file that does not parse has no shape to check, and a document of the wrong shape cannot be
-walked. The guarantee is per stage, and stating it without that qualifier reads as a contradiction of the
-sentence above it.
+Apply first parses JSON, then passes the result to `loadDocument`, the shared normalization and validation boundary. Syntax failures are reported separately. Loading checks the version, normalizes supported optional fields, and validates the structure, including duplicate keys, invalid references, and language metadata. The form is replaced only when loading succeeds; loading diagnostics remain visible beside the editable draft.
 
 ### validateDocument never throws
 
@@ -112,14 +99,14 @@ The legacy `file` data type remains a string for stored-document compatibility. 
 ### What it cannot carry
 
 `unexportableRules()` names each dropped rule and the field it was on, and the dialog lists them rather
-than leaving the loss unmentioned. It used to describe all of them as custom rules, so a guarded
-`required` was reported as something it was not. There are five causes:
+than leaving the loss unmentioned. Losses include:
 
 - **`custom` rules.** Arbitrary JavaScript has no declarative equivalent.
+- **Cross-field rules.** `matches` and `after` compare answers and cannot be represented by this projection.
 - **Guarded rules.** A rule with a `when` guard applies only sometimes, and JSON Schema's `required` is
   unconditional. Exporting a guarded `required` as an unconditional one would reject payloads the form
   itself accepts.
-- **Every rule on a component carrying a `renderWhen`.** The same argument one level up: a component
+- **Every rule on a component or beneath an ancestor carrying a `renderWhen`.** The same argument one level up: a component
   that is sometimes on screen collects an answer sometimes, so its `required` is conditional however
   unguarded the rule is. This one is easy to miss because it is invisible in the rule -- and every `Step`
   carries a `renderWhen`, so a wizard's required fields are dropped from the exported `required` array
@@ -137,10 +124,6 @@ than leaving the loss unmentioned. It used to describe all of them as custom rul
 - **Two components sharing a `dataKey`.** Deliberate and documented -- two fields behind opposite guards
   writing one answer -- but a JSON Schema property is one property, so the last node visited wins and the
   first's type, format and constraints are discarded. Reported rather than resolved, for the same reason.
-
-The last two appeared in no spec file until this was written, and the count said four over three bullets,
-which left a reader unable to tell whether a bullet was missing or the number was stale. Both, as it
-turned out.
 
 An unguarded required boolean exports with `const: true` as well as membership in `required`, so an unchecked consent field is rejected. Rules guarded by `when` or by visibility on the component or any ancestor are omitted and reported as lossy; exporting them unconditionally would reject answers that runtime validation accepts.
 
