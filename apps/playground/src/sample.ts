@@ -1,7 +1,6 @@
 import type { FormDocument } from '@formsmith/core'
 import { prop } from '@formsmith/core'
 
-/** Boots the playground with something non-trivial to poke at, not an empty canvas. */
 export const SAMPLE_DOCUMENT: FormDocument = {
   version: '1',
   id: 'sample',
@@ -19,8 +18,6 @@ export const SAMPLE_DOCUMENT: FormDocument = {
       {
         key: 'name',
         type: 'Stack',
-        // Pixels, like every other length in both kits. This shipped the 2 that
-        // the MUI defaults used to carry, so the demo showed the defect.
         props: { direction: prop('row'), gap: prop(16) },
         children: [
           {
@@ -50,16 +47,7 @@ export const SAMPLE_DOCUMENT: FormDocument = {
         key: 'website',
         type: 'TextField',
         props: { label: prop('Website') },
-        /*
-         * Optional on purpose: a blank value passes.
-         *
-         * Only `required` fails on an empty value -- invariant 5 -- so a field
-         * carrying a `url` rule and nothing else is "optional, but must be a
-         * URL if given". A builder that folds requiredness into every other
-         * rule cannot express that at all, and the prior-art study found one
-         * that does not; naming it belongs in `docs/prior-art`, not in a
-         * sample document this repository publishes.
-         */
+        // Optional, but must be a URL when supplied.
         schema: { type: 'string', validations: [{ key: 'url' }] },
       },
       {
