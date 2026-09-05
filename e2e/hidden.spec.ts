@@ -25,6 +25,7 @@ test('a hidden container stays on the canvas and says it is hidden', async ({ de
 
   await expect(designer.node('name')).toBeVisible()
   await expect(designer.node('name')).toHaveAttribute('data-fs-hidden', 'true')
+  await expect(designer.page.locator('.fs-selection__label')).toContainText('Hidden in preview')
   // Its children come with it, or a conditional container is still a hole.
   await expect(designer.node('firstName')).toBeVisible()
 })
