@@ -29,6 +29,10 @@ what moves. Read the picture as the target.
 
 Both side panes are `--fs-panel-width` (288px) and fixed. The canvas takes what is left.
 
+The full-screen demo keeps overflow inside the panes and canvas rather than scrolling the document. A
+pane grip is 15px including its one-pixel divider, so its 14px glyph fits inside the border box instead
+of adding a fractional pixel of page overflow.
+
 ### Collapsible panes
 
 **Status: built.** A grip on the inner edge of each pane collapses it, and the canvas takes the space.

@@ -96,7 +96,13 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
       {styleProps.length > 0 && (
         <>
           <h3 className="fs-style__heading">From this component</h3>
-          <PropRows api={api} node={node} schemas={styleProps} scopes={scopes} />
+          <PropRows
+            api={api}
+            node={node}
+            schemas={styleProps}
+            scopes={scopes}
+            defaults={def?.defaultProps}
+          />
         </>
       )}
 

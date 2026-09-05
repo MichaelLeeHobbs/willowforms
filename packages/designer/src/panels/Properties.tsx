@@ -100,12 +100,18 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
        * author choosing between a Stack's gap and a hand-written margin sees
        * both at once.
        */}
-      <PropRows api={api} node={node} schemas={main} scopes={scopes} />
+      <PropRows api={api} node={node} schemas={main} scopes={scopes} defaults={def?.defaultProps} />
 
       {advanced.length > 0 && (
         <details className="fs-advanced">
           <summary>Advanced</summary>
-          <PropRows api={api} node={node} schemas={advanced} scopes={scopes} />
+          <PropRows
+            api={api}
+            node={node}
+            schemas={advanced}
+            scopes={scopes}
+            defaults={def?.defaultProps}
+          />
         </details>
       )}
     </section>
@@ -420,11 +426,13 @@ export function PropRows({
   node,
   schemas,
   scopes,
+  defaults,
 }: {
   api: DesignerApi
   node: ComponentNode
   schemas: PropSchema[]
   scopes: KeyScopes
+  defaults?: Record<string, JsonValue> | undefined
 }): ReactNode {
   /*
    * Unlike `renderWhen`, a property may test its own field: hiding a component
@@ -444,6 +452,7 @@ export function PropRows({
           key={node.key + ':' + schema.name}
           schema={schema}
           value={node.props[schema.name]}
+          defaultValue={defaults?.[schema.name]}
           componentKey={node.key}
           dataKeys={dataKeys}
           {...(scopes.row ? { rowDataKeys: scopes.row } : {})}
@@ -492,6 +501,7 @@ function seedProps(
 interface PropRowProps {
   schema: PropSchema
   value: PropValue | undefined
+  defaultValue: JsonValue | undefined
   componentKey: string
   /** Every data key in the document, so a condition can only name a real field. */
   dataKeys: string[]
@@ -507,6 +517,7 @@ interface PropRowProps {
 function PropRow({
   schema,
   value,
+  defaultValue,
   componentKey,
   dataKeys,
   rowDataKeys,
@@ -593,7 +604,7 @@ function PropRow({
     )
   }
 
-  const raw = value?.value
+  const raw = value?.kind === 'static' ? value.value : defaultValue
 
   return (
     <div className={'fs-prop-row' + (isSet ? ' is-set' : '')}>
