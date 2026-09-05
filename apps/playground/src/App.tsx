@@ -14,45 +14,47 @@ import '@formsmith/designer/styles.css'
 import '@formsmith/kit-html/styles.css'
 import './playground.css'
 import { SAMPLE_DOCUMENT } from './sample.js'
+import { EXAMPLES } from './examples/index.js'
+import { ExampleGallery } from './ExampleGallery.js'
 
 const STORAGE_KEY = 'formsmith.playground.document'
 
-/**
- * Which kit was chosen, kept beside the document.
- *
- * The kit switch is the demonstration this whole app exists for -- "a kit is a
- * package, not a rewrite" -- and it did not survive a reload. Somebody switched
- * to the HTML kit, pressed F5 to check something, and was back on MUI looking at
- * a document they had authored against the other one. The document was
- * persisted and the choice that framed it was not.
- */
 const KIT_KEY = 'formsmith.playground.kit'
 
-/**
- * Two kits, switchable at runtime.
- *
- * This is the demonstration behind the architecture's central claim. The same
- * document renders through either kit, the designer never imports either one,
- * and swapping them is the two props below. Adding `@formsmith/kit-html`
- * required no change to core, the renderer, or the designer.
- */
 const KITS: Record<string, { label: string; kit: Kit; renderers: RendererKit }> = {
   mui: { label: 'Material UI', kit: muiKit, renderers: muiRendererKit },
   html: { label: 'Plain HTML', kit: htmlKit, renderers: htmlRendererKit },
 }
 
-function loadDraft(): { document: FormDocument; error: string } {
+interface Draft {
+  id: string
+  document: FormDocument
+  error: string
+}
+
+function draftKey(id: string): string {
+  return id ? STORAGE_KEY + '.' + id : STORAGE_KEY
+}
+
+function initialExample(): string {
+  const id = new URLSearchParams(window.location.search).get('example')
+  return EXAMPLES.some((example) => example.id === id) ? (id ?? '') : ''
+}
+
+function loadDraft(id: string): Draft {
+  const document = EXAMPLES.find((example) => example.id === id)?.document ?? SAMPLE_DOCUMENT
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { document: SAMPLE_DOCUMENT, error: '' }
+    const raw = localStorage.getItem(draftKey(id))
+    if (!raw) return { id, document, error: '' }
 
     const loaded = parseDocument(JSON.parse(raw))
-    if (loaded.ok) return { document: loaded.document, error: '' }
+    if (loaded.ok) return { id, document: loaded.document, error: '' }
   } catch {
     // Preserve unreadable drafts and let the author export this session's work.
   }
   return {
-    document: SAMPLE_DOCUMENT,
+    id,
+    document,
     error:
       'Saved draft could not be loaded. Local saving is paused to preserve it. Export your changes from JSON.',
   }
@@ -71,13 +73,6 @@ function ThemeModeSync({ mode }: { mode: DesignerTheme }): null {
   return null
 }
 
-/**
- * The kit chosen last time, or MUI.
- *
- * Validated against `KITS` rather than trusted: this is `localStorage`, which a
- * person can edit and an older build of this app can have written, and an id
- * nothing registers would throw on the next line of `App`.
- */
 function loadKit(): string {
   try {
     const saved = localStorage.getItem(KIT_KEY)
@@ -89,42 +84,68 @@ function loadKit(): string {
 }
 
 export function App(): ReactNode {
-  const [boot] = useState(loadDraft)
-  const [initial, setInitial] = useState(boot.document)
-  const [saveError, setSaveError] = useState(boot.error)
+  const [session, setSession] = useState(() => loadDraft(initialExample()))
+  const [initial, setInitial] = useState(session.document)
+  const [saveError, setSaveError] = useState(session.error)
   const [kitId, setKitId] = useState<string>(loadKit)
   const [themeMode, setThemeMode] = useState<DesignerTheme>('system')
+  const [resetCount, setResetCount] = useState(0)
 
   const latest = useRef(initial)
+  const drafts = useRef(new Map<string, Draft>())
 
   const persist = useCallback(
     (doc: FormDocument) => {
       latest.current = doc
-      if (boot.error) return
+      drafts.current.set(session.id, { ...session, document: doc })
+      if (session.error) return
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(doc))
+        localStorage.setItem(draftKey(session.id), JSON.stringify(doc))
         setSaveError('')
       } catch {
         setSaveError('Local saving is unavailable. Export your changes from JSON before leaving.')
       }
     },
-    [boot.error],
+    [session],
   )
 
-  /*
-   * Both in one handler, so the remount happens against the current document
-   * rather than the one this component was born with.
-   */
+  const chooseExample = useCallback(
+    (id: string) => {
+      if (id === session.id) return
+      const next = drafts.current.get(id) ?? loadDraft(id)
+      latest.current = next.document
+      setInitial(next.document)
+      setSession(next)
+      setSaveError(next.error)
+      const url = new URL(window.location.href)
+      if (id) url.searchParams.set('example', id)
+      else url.searchParams.delete('example')
+      window.history.replaceState(null, '', url)
+    },
+    [session.id],
+  )
+
   const chooseKit = useCallback((id: string) => {
     setInitial(latest.current)
     setKitId(id)
     try {
       localStorage.setItem(KIT_KEY, id)
     } catch {
-      // Private-mode browsers throw on write, the way `persist` allows for.
-      // Forgetting the choice beats refusing to make it.
+      // The current choice still works when browser storage is unavailable.
     }
   }, [])
+
+  const resetExample = (): void => {
+    const example = EXAMPLES.find((entry) => entry.id === session.id)
+    if (!example) return
+    const next: Draft = { id: example.id, document: example.document, error: '' }
+    drafts.current.set(next.id, next)
+    latest.current = next.document
+    setInitial(next.document)
+    setSession(next)
+    setSaveError('')
+    setResetCount((count) => count + 1)
+  }
 
   const active = KITS[kitId] ?? KITS['mui']
 
@@ -134,11 +155,12 @@ export function App(): ReactNode {
     <ThemeProvider theme={theme}>
       <ThemeModeSync mode={themeMode} />
       <CssBaseline />
-      <div className="pg-app">
+      <div className="pg-app" data-pg-theme={themeMode}>
         <div className="pg-kit-switch">
           <strong className="pg-brand">
             Formsmith <span className="pg-beta">Beta</span>
           </strong>
+          <ExampleGallery activeId={session.id} onChoose={chooseExample} onReset={resetExample} />
           <label htmlFor="pg-kit">Kit</label>
           <select id="pg-kit" value={kitId} onChange={(e) => chooseKit(e.target.value)}>
             {Object.entries(KITS).map(([id, entry]) => (
@@ -148,7 +170,7 @@ export function App(): ReactNode {
             ))}
           </select>
           <span className="pg-kit-switch__note" role="status">
-            {saveError ? 'Not saved locally' : 'Saved in this browser'}
+            {saveError ? 'Not saved locally' : 'Design saved in this browser'}
           </span>
         </div>
 
@@ -160,7 +182,7 @@ export function App(): ReactNode {
 
         <div className="pg-designer">
           <Designer
-            key={kitId}
+            key={session.id + ':' + kitId + ':' + String(resetCount)}
             initialDocument={initial}
             kit={active.kit}
             rendererKit={active.renderers}

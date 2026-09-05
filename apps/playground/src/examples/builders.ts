@@ -61,8 +61,12 @@ export const choices = (
   field('Select', key, label, mandatory ? required : [], {
     options: options.map((value) => ({ label: value, value })),
   })
-export const grid = (key: string, children: ComponentNode[], columns = 2): ComponentNode =>
-  node('Grid', key, { columns, gap: 20, minColumnWidth: 200 }, children)
+export const grid = (
+  key: string,
+  children: ComponentNode[],
+  columns = 2,
+  minColumnWidth = 200,
+): ComponentNode => node('Grid', key, { columns, gap: 20, minColumnWidth }, children)
 export const section = (
   key: string,
   title: string,

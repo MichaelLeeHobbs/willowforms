@@ -276,7 +276,7 @@ test('an edit survives switching the kit', async ({ designer }) => {
 test('the JSON dialog is modal, not merely open', async ({ designer }) => {
   await designer.page.getByRole('button', { name: 'JSON' }).click()
 
-  const dialog = designer.page.locator('dialog')
+  const dialog = designer.page.getByRole('dialog', { name: 'Form JSON', exact: true })
   await expect(dialog).toBeVisible()
 
   // `:modal` is true only for a dialog in the top layer, which is what makes
@@ -286,28 +286,18 @@ test('the JSON dialog is modal, not merely open', async ({ designer }) => {
 
 test('focus stays inside the open dialog', async ({ designer }) => {
   await designer.page.getByRole('button', { name: 'JSON' }).click()
-  await expect(designer.page.locator('dialog')).toBeVisible()
+  await expect(designer.page.getByRole('dialog', { name: 'Form JSON', exact: true })).toBeVisible()
 
-  /*
-   * Enough presses to leave any dialog this size and reach the toolbar behind
-   * it. The browser owns this trap; what is being checked is that nothing in
-   * the designer has broken it -- a control rendered outside the dialog, or a
-   * `tabindex` on the background.
-   */
+  // Cycle past the last control to check that background controls stay inert.
   const outside: string[] = []
   for (let i = 0; i < 15; i += 1) {
     await designer.page.keyboard.press('Tab')
 
-    /*
-     * `body` is not a leak. Tabbing past the last control in a modal dialog
-     * hands focus back to the document while the browser walks its own chrome,
-     * and Chromium reports `body` for that step. What must never happen is
-     * focus landing on a control behind the dialog.
-     */
+    // Chromium reports body while focus passes through browser chrome.
     const offender = await designer.page.evaluate(() => {
       const active = document.activeElement
       if (!active || active === document.body) return null
-      return active.closest('dialog') ? null : active.outerHTML.slice(0, 80)
+      return active.closest('dialog[aria-label="Form JSON"]') ? null : active.outerHTML.slice(0, 80)
     })
 
     if (offender) outside.push(offender)

@@ -87,6 +87,8 @@ pnpm build        # tsc --build across all packages
 
 ## Using it
 
+The playground's **Examples** gallery includes ten editable forms, from feedback and event registration to a detailed eight-page D&D character sheet. Search or filter the gallery, open a form, and use **Preview** to try it with either kit. Each example keeps its own design draft; preview answers are temporary. See the [demo guide](apps/playground/EXAMPLES.md) for the full collection and direct links.
+
 The snippets below are maintained as typechecked consumer code in
 [examples/usage.tsx](examples/usage.tsx).
 
