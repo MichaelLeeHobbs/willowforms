@@ -113,7 +113,6 @@ removal unrecoverable except through undo, and an orphaned bundle costs nothing.
 
 **Status: built.** Rule messages can use translation bindings and are authored with the same per-language
 editor. See [08-validation.md](08-validation.md#messages).
-They should be `PropValue`. See [08-validation.md](08-validation.md#messages).
 
 ## The active language
 

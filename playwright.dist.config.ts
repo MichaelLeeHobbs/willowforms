@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 5181
+const PORT = Number(process.env['FORMSMITH_E2E_DIST_PORT'] ?? 5181)
 const baseURL = `http://localhost:${PORT}`
 
 export default defineConfig({

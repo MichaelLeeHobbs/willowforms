@@ -7,8 +7,7 @@ The shell is everything around the canvas: the panes, the toolbar, and the rules
 
 ## Layout
 
-Three panes under a toolbar. **Status: built** for the arrangement; the pane contents below are where it
-is going, not where it is.
+Three panes under a toolbar. **Status: built.** The diagram describes the current layout.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -23,9 +22,7 @@ is going, not where it is.
 └────────────┴────────────────────────────────────┴────────────────┘
 ```
 
-Today the left pane is one scrolling column of palette above tree, Settings is the inspector's third tab
-and is labelled **Form**, and the inspector has three tabs rather than four. The two sections below say
-what moves. Read the picture as the target.
+The left pane has Components, Tree, and Settings tabs. The inspector has Properties, Style, Actions, and Rules tabs. Toolbar controls wrap when space is limited, long form names truncate, and scrolling stays within the designer's panes and canvas.
 
 Both side panes are `--fs-panel-width` (288px) and fixed. The canvas takes what is left.
 
