@@ -1,6 +1,12 @@
 # Formsmith
 
-An MIT-licensed visual form designer for React. The **designer**, not just the renderer.
+An MIT-licensed visual form designer and runtime renderer for React.
+
+## Mission
+
+Formsmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
+
+The host application owns storage, permissions, distribution, and business workflows. Formsmith provides the form authoring and completion experience. The [product principles](docs/spec/README.md#product-principles) guide what belongs in the library.
 
 > Status: initial beta candidate. Authoring, validation, repeaters, step navigation, and host-dispatched actions are implemented. Nothing is published to npm and no release has been cut. See the [beta review](docs/BETA_REVIEW.md) for verified workflows, deferred features, and release gates.
 

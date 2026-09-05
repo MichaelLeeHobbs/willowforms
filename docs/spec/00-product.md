@@ -1,102 +1,59 @@
 # Product
 
-What Formsmith is, who it is for, and the lines it will not cross.
+## Mission
 
-This file carries no status. Every other file uses one to say whether the code matches the prose, and a
-statement of intent has nothing to match: marking a scope document "built" put four product commitments
-in the same category of trust as a function that exists, and one of those commitments was wrong for
-months without anything being able to notice.
+Formsmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
 
-## The one-line version
-
-An MIT-licensed visual form designer for React. The designer, not just the renderer.
+This is a statement of intent and carries no implementation status. The [product principles](README.md#product-principles) guide every contract in this specification.
 
 ## Why it exists
 
-Every good form builder splits the same way: the runtime is open source and the visual designer is not.
-FormEngine, SurveyJS and Vueform all publish an MIT runtime and sell the builder. The genuinely open
-alternatives are AGPL, which many organisations cannot take a dependency on. `@formio/js` is the one MIT
-builder, and it is a 2018-era architecture carrying `moment`, `dragula` and jQuery-shaped patterns.
-
-That leaves a real gap: teams that cannot take copyleft and will not pay four figures a year for a
-drag-and-drop panel. Formsmith is for them.
-
-The licence is the product decision, not a detail. **If the designer ever goes behind a licence, this
-project has become the thing it was built to replace.**
+Applications need to collect information through forms that their users can create and change without a developer building each one. Formsmith supplies an embeddable visual designer and runtime renderer, both MIT-licensed, so applications can offer that capability within their own product.
 
 ## Who uses it
 
-Three roles, and the design serves all three or it has failed.
+**The form author.** Creates questions, arranges sections, configures choices and validation, and previews the result. Common tasks should be understandable without programming or editing JSON.
 
-**The developer embedding it.** Wants a React component they can drop into an admin area without
-inheriting a component library, a state manager, or a theme fight. Cares that the runtime ships without
-the designer, that types are strict, and that the same validation runs on their server.
+**The respondent.** Completes a form another user created. Needs clear labels and instructions, accessible controls, predictable navigation, understandable errors, and answers that survive ordinary interactions.
 
-**The form author.** Not necessarily a developer. Composes a form by dragging, configures it in a panel,
-tests it with live data. Needs the tool to say what it is doing: refusals with reasons, undo that takes
-back a whole edit, errors that name the field.
+**The developer embedding it.** Integrates the designer and renderer with the application's design system, storage, permissions, and submission workflow. Needs documented boundaries, a renderer that ships independently of the designer, and shared browser/server validation.
 
-**The translator.** Adds a language and fills in strings. Should never need to see JSON.
+**The translator.** Supplies localized labels, instructions, and validation messages through ordinary property editors. Translation is part of form authoring and should not require JSON editing.
 
-All three are anonymous to Formsmith. It has no accounts, no session, and no opinion about who you are.
+The host identifies and authorizes these users. Formsmith does not supply accounts or sessions.
 
-## What it does
+## The everyday workflow
 
-- Compose a form visually, with nesting
-- Configure any component from metadata the kit supplies, not from hand-written panels
-- Bind a property to a literal, an expression, or a translation key
-- Attach validation that runs identically in the browser and on a server
-- Localise into any number of languages
-- Test against live data, with real errors
-- Take the definition in and out as JSON, and project a JSON Schema of the submitted data
+1. The host opens a new or stored form definition in the designer.
+2. An author adds fields and sections, configures their ordinary properties and structured conditions, and previews the form.
+3. The designer emits the definition; the host saves it and decides who can use it.
+4. Respondents complete the form in the host application using the runtime renderer.
+5. The host validates and handles the submitted answers using the same form definition and compatible evaluation context.
 
-## What it will never do
+Translation, repeaters, and steps support this workflow when the form needs them. Expressions and code actions are specialized host integrations; ordinary form creation must not depend on them.
 
-These are not "not yet". They are decisions.
+## Ownership boundaries
 
-**A backend.** No auth, no database, no multi-user story, no hosted forms. `apps/demo-server` is five
-routes over a JSON file whose only job is to prove that server-side validation shares one rule set. A
-hosted form service is somebody else's product, and building one would put Formsmith in competition with
-the people most likely to adopt it.
+**Formsmith owns form behavior.** The document model, visual authoring, runtime rendering, structured conditions, validation, localization, and the kit contract belong here. Ordinary configuration should produce accessible output, with verification recorded in [accessibility.md](../accessibility.md).
 
-**An open-core split.** No enterprise tier, no paid designer, no "advanced" package. See above.
+**The host owns the application.** Storage, accounts, permissions, publishing and distribution, networking, submission processing, and business workflows stay with the embedding application. `onChange` emits documents and answers; it does not prescribe where they go. The playground and demo server demonstrate integration rather than define a backend product.
 
-**A JavaScript sandbox.** Computed properties, custom rules and code actions all execute
-author-supplied JavaScript. In a single-user builder that is fine; in any multi-user deployment it is
-remote code execution by design. Core ships no evaluator, the host injects one and owns the boundary. A
-convenience `eval`-backed default would be indistinguishable from the vulnerability. See
-[09-actions.md](09-actions.md).
+**Kits own their markup and design system.** Metadata drives the designer's property editors; each kit implements rendering and accessibility wiring. The designer does not import a component library or restyle kit internals.
 
-**Persistence.** The designer holds a document and emits every version of it. Where that goes is the
-host's decision, and a builder that assumed localStorage or an API shape would be wrong for most of them.
-See [10-interchange.md](10-interchange.md).
+**The host owns code execution.** Core provides no default evaluator. A host enabling expressions or code actions supplies the evaluator and owns isolation and resource limits. The library's structured conditions and built-in validation work without one.
 
-## What "good" means here
+**Both designer and renderer stay MIT.** There is no planned proprietary designer, enterprise tier, or paid advanced package.
 
-Four commitments, each backed by something checkable rather than asserted.
+## What good means
 
-**Kits are pluggable.** Adding one is a new package, not a change to the designer. Checked: adding the
-second kit changed nothing in `core`, `renderer` or `designer`, and a contract test runs against every
-kit in the repository. It did touch build configuration, the playground, and one bug in the other kit
-that the new contract test exposed. An earlier draft of this paragraph said "four files, all build
-plumbing", which was the number of build files and not the number of files.
+Authors can build useful forms through understandable controls. Respondents can complete them with clear feedback and keyboard operation. Labels, descriptions, required state, and errors are wired by the kits from ordinary properties. The supported keyboard authoring path provides equivalent operations through the Tree and panels.
 
-**The designer has no UI-library dependency.** Its chrome is plain CSS driven by custom properties.
-A lint rule fails CI if anyone imports one of the named component libraries into it. The list is a deny
-list in `eslint.config.js` -- named libraries, not a category -- so it catches the ones this project has
-heard of and would not stop a kit nobody thought of, and it fails `pnpm lint` rather than `pnpm build`.
+Refused edits explain why, undo restores an edit, malformed imports report actionable problems, and unsupported host capabilities are identified. A working visual preview alone is not evidence that a form's validation or accessibility is correct.
 
-**Accessibility is not a later milestone.** Every button is named, the tabs are a real tablist, the tree
-is fully keyboard-operable including moving components, contrast is computed from the stylesheets in CI,
-and axe runs over the designer in twelve states. See [../accessibility.md](../accessibility.md).
-
-**Nothing degrades silently.** A missing sandbox makes rules pass rather than throw. A refused rename
-says which component holds the name. A malformed import lists every problem at once. A rule that cannot
-run says so in the panel. The failure mode this project treats as worst is the one where the tool appears
-to work.
+Existing verification includes cross-kit contracts, shared validation tests, keyboard browser checks, contrast checks, and axe over the designer in twelve states. [accessibility.md](../accessibility.md) distinguishes those checks from coverage still missing; this mission is not a claim of complete conformance.
 
 ## Scope of this specification
 
-Everything under `packages/`. The playground (`apps/playground`) is a demo of the designer and is
-specified only where it demonstrates a contract, such as switching kits at runtime. The demo server is
-not specified beyond its purpose.
+The contracts cover the library packages. The playground demonstrates authoring and preview, and the demo server demonstrates persistence and shared server validation. Neither app commits the library to hosting forms, managing users, or providing a backend.
+
+Proposed additions are evaluated against the [product principles](README.md#product-principles). A capability that already exists remains supported under the [compatibility policy](../COMPATIBILITY.md) until a separate change is approved; narrowing future scope does not silently remove APIs or invalidate stored forms.

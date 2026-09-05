@@ -1,7 +1,18 @@
 # Formsmith specification
 
-What Formsmith is meant to do, contract by contract. One file per contract, because a single document
-covering all of it would be too large for anyone to read or keep true.
+Formsmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
+
+## Product principles
+
+- **Design for form authors and respondents.** Common tasks use understandable controls and require no programming knowledge.
+- **Make accessibility and correctness automatic.** Ordinary configuration produces properly labeled controls, understandable validation, and usable keyboard interactions.
+- **Prioritize everyday needs.** Include features that materially help people build or complete real forms.
+- **Keep the library focused.** The host application owns storage, permissions, distribution, and business workflows.
+- **Provide extension points for specialized needs.** Advanced integrations fit without complicating the standard authoring experience.
+
+The central question for a feature is: **Does this help someone create a useful form or successfully complete one?** A proposal should identify the user, the concrete task, why existing controls or a host extension are insufficient, and how success will be verified. Existing capabilities remain documented even when we decide against expanding them; changing a public contract requires an explicit compatibility decision.
+
+The contracts below apply these principles. [00-product.md](00-product.md) defines the audience and ownership boundaries.
 
 ## How to read this
 
@@ -75,11 +86,7 @@ Used precisely throughout, and worth pinning before the first file uses all of t
 
 Two sources, and they are not the same kind of thing.
 
-The **capability bar** comes from driving the public demos of the commercial React form builders, mostly
-FormEngine. That study is research input, and it lives in [../prior-art](../prior-art/README.md). It
-records another product's exact property names, default key formats, enumerated option lists, and
-interface copy, none of which belongs in this repository. What crosses over is the answer to "what does a
-serious form designer have to do", and nothing else.
+The [prior-art study](../prior-art/README.md) is research input. Another builder's catalogue, property count, or advanced tooling does not establish a Formsmith requirement. Features are justified by the product principles and concrete author or respondent tasks. The study's exact property names, interface copy, and measured visual details are not a specification to reproduce.
 
 Naming them is deliberate. An earlier draft called FormEngine "the studied product" throughout while
 `docs/ARCHITECTURE.md` and `packages/core/src/types.ts` named it outright, so the euphemism protected
