@@ -36,21 +36,21 @@ by anything.
 
 ## Contracts
 
-| File                                         | Covers                                                   | State   |
-| -------------------------------------------- | -------------------------------------------------------- | ------- |
-| [00-product.md](00-product.md)               | Purpose, users, scope, non-goals                         | —       |
-| [01-document-model.md](01-document-model.md) | `FormDocument`, `ComponentNode`, `PropValue`, versioning | Built   |
-| [02-kit-contract.md](02-kit-contract.md)     | The two halves of a kit and the one obligation           | Built   |
-| [03-components.md](03-components.md)         | The component catalogue                                  | Built   |
-| [04-shell.md](04-shell.md)                   | Layout, panels, toolbar, viewport, keyboard              | Built   |
-| [05-canvas.md](05-canvas.md)                 | Selection, drag and drop, drop resolution                | Partial |
-| [06-inspector.md](06-inspector.md)           | Properties, Style, Actions, Rules, and the editors       | Partial |
-| [07-bindings.md](07-bindings.md)             | Static, computed, and translated property values         | Partial |
-| [08-validation.md](08-validation.md)         | The rule catalogue and its semantics                     | Built   |
-| [09-actions.md](09-actions.md)               | Events, code actions, and the sandbox boundary           | Built   |
-| [10-interchange.md](10-interchange.md)       | Import, export, and JSON Schema                          | Built   |
-| [11-theming.md](11-theming.md)               | Token vocabulary for the designer and for kits           | Built   |
-| [12-api.md](12-api.md)                       | What a consumer imports, and the platform baseline       | Built   |
+| File                                         | Covers                                                     | State   |
+| -------------------------------------------- | ---------------------------------------------------------- | ------- |
+| [00-product.md](00-product.md)               | Purpose, users, scope, non-goals                           | —       |
+| [01-document-model.md](01-document-model.md) | `FormDocument`, `ComponentNode`, `PropValue`, versioning   | Built   |
+| [02-kit-contract.md](02-kit-contract.md)     | Kit integration and accessibility from ordinary properties | Partial |
+| [03-components.md](03-components.md)         | The component catalogue                                    | Built   |
+| [04-shell.md](04-shell.md)                   | Layout, panels, toolbar, viewport, keyboard                | Built   |
+| [05-canvas.md](05-canvas.md)                 | Selection, drag and drop, drop resolution                  | Built   |
+| [06-inspector.md](06-inspector.md)           | Properties, Style, Actions, Rules, and the editors         | Built   |
+| [07-bindings.md](07-bindings.md)             | Static, computed, and translated property values           | Built   |
+| [08-validation.md](08-validation.md)         | The rule catalogue and its semantics                       | Built   |
+| [09-actions.md](09-actions.md)               | Events, code actions, and the sandbox boundary             | Built   |
+| [10-interchange.md](10-interchange.md)       | Import, export, and JSON Schema                            | Built   |
+| [11-theming.md](11-theming.md)               | Token vocabulary for the designer and for kits             | Built   |
+| [12-api.md](12-api.md)                       | What a consumer imports, and the platform baseline         | Built   |
 
 Adjacent documents that are not contracts:
 
@@ -63,7 +63,7 @@ opens with. A reader scanning this table for what is safe to depend on is asking
 question, and an index that answers Partial over a file reading Built answers a third question nobody
 asked.
 
-`05`, `06`, and `07` remain Partial: direct canvas keyboard selection, HTML attribute passthrough, and richer expression authoring are explicitly deferred from the initial beta. The existing tree keyboard path, kit accessibility attributes, and host-owned evaluator contract remain supported.
+`02` remains Partial pending the complete audit of accessibility from ordinary properties. Richer expression tooling, generic HTML attribute passthrough, and direct canvas keyboard selection have been removed from product scope, rather than deferred to another release. The existing Tree keyboard workflow, component properties, stored expressions, and host-owned evaluator contract remain supported.
 
 ## Vocabulary
 

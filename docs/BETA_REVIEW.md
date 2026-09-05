@@ -4,22 +4,22 @@ Review date: 2026-09-05. This review covers the documented contracts, core and r
 
 ## Product decision
 
-The initial beta supports desktop form authoring, responsive form preview, JSON document interchange, localization, validation, repeaters, controlled step navigation, and host-dispatched actions. The full specification is not yet complete: the three Partial contracts below retain their planned features. No major architectural or product-scope change is proposed.
+The initial beta supports desktop form authoring, responsive form preview, JSON document interchange, localization, validation, repeaters, controlled step navigation, and host-dispatched actions. Following the [mission and product principles](spec/README.md#product-principles), richer expression tooling, generic attribute passthrough, and direct canvas keyboard selection have been removed from scope. The complete ordinary-property accessibility audit remains Partial; the earlier local verification below does not establish that expanded coverage.
 
-| Contract       | Beta assessment                                                                                                                                   | Evidence                                                                 |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Document model | Implemented; version 1 loads through the canonical boundary.                                                                                      | Core document, JSON, tree, row, and depth suites.                        |
-| Kit contract   | Both kits implement the metadata and renderer contract.                                                                                           | Cross-kit contracts, accessibility audits, and kit rendering suites.     |
-| Components     | The documented catalogue, repeaters, and step navigation are implemented.                                                                         | Catalogue checks, runtime suites, authoring and repeater browser tests.  |
-| Shell          | Implemented; labels are isolated per designer and the shell fits a laptop viewport.                                                               | Embedding, accessibility, keyboard, and layout regressions.              |
-| Canvas         | Beta workflow implemented; direct keyboard selection on the canvas remains deferred.                                                              | Preview, drag, scroll, hidden-component, and viewport regressions.       |
-| Inspector      | Editing is implemented; HTML attribute passthrough remains deferred.                                                                              | Properties, style, actions, rules, and scoped-rename suites.             |
-| Bindings       | Literal, translation, expression, and conditional bindings work through the documented host contract. Rich expression authoring remains deferred. | Binding, localization, condition, and renderer suites.                   |
-| Validation     | Shared browser/server rules are implemented. Custom data keys now validate while typing in preview.                                               | Validation, row, demo-server, and preview regressions.                   |
-| Actions        | Events and validated host effect batches are implemented. Halt now stops processing immediately.                                                  | Core action, renderer event, and inspector action suites.                |
-| Interchange    | JSON import/export and lossy JSON Schema export are implemented. Conditional constraints and required booleans now export consistently.           | Schema, document-dialog, packaging, and import/export browser suites.    |
-| Theming        | Both palettes and documented tokens are implemented.                                                                                              | Contrast, CSS isolation, theme synchronization, and browser inspection.  |
-| Public API     | Entry points, compatibility policy, and package exports are documented.                                                                           | Typecheck, consumer examples, build, and production distribution checks. |
+| Contract       | Beta assessment                                                                                                                                 | Evidence                                                                      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Document model | Implemented; version 1 loads through the canonical boundary.                                                                                    | Core document, JSON, tree, row, and depth suites.                             |
+| Kit contract   | Metadata and rendering are implemented; the complete ordinary-property accessibility audit remains Partial.                                     | Existing cross-kit contracts, accessibility audits, and kit rendering suites. |
+| Components     | The documented catalogue, repeaters, and step navigation are implemented.                                                                       | Catalogue checks, runtime suites, authoring and repeater browser tests.       |
+| Shell          | Implemented; labels are isolated per designer and the shell fits a laptop viewport.                                                             | Embedding, accessibility, keyboard, and layout regressions.                   |
+| Canvas         | Implemented; the Tree and panels provide keyboard authoring. Direct canvas keyboard selection is outside scope.                                 | Preview, drag, scroll, hidden-component, and viewport regressions.            |
+| Inspector      | Editing is implemented. Accessibility uses ordinary properties; generic attribute passthrough is outside scope.                                 | Properties, style, actions, rules, and scoped-rename suites.                  |
+| Bindings       | Literal, translation, expression, and conditional bindings work through the documented host contract. Rich expression tooling is outside scope. | Binding, localization, condition, and renderer suites.                        |
+| Validation     | Shared browser/server rules are implemented. Custom data keys now validate while typing in preview.                                             | Validation, row, demo-server, and preview regressions.                        |
+| Actions        | Events and validated host effect batches are implemented. Halt now stops processing immediately.                                                | Core action, renderer event, and inspector action suites.                     |
+| Interchange    | JSON import/export and lossy JSON Schema export are implemented. Conditional constraints and required booleans now export consistently.         | Schema, document-dialog, packaging, and import/export browser suites.         |
+| Theming        | Both palettes and documented tokens are implemented.                                                                                            | Contrast, CSS isolation, theme synchronization, and browser inspection.       |
+| Public API     | Entry points, compatibility policy, and package exports are documented.                                                                         | Typecheck, consumer examples, build, and production distribution checks.      |
 
 ## Fixes in this review
 
@@ -40,8 +40,8 @@ Comment cleanup is limited to code changed for these outcomes. No document versi
 ## Explicit beta limits
 
 - Desktop authoring is the verified workflow. Mobile and tablet controls simulate the runtime form; they do not promise a phone-sized authoring workspace.
-- The Tree tab is the keyboard path for selecting and moving components. Direct canvas keyboard selection and palette-to-tree dragging remain deferred.
-- HTML attribute passthrough and expression completion, syntax checking, and in-panel evaluation remain planned. Hosts still own sandboxing; the designer preview does not execute arbitrary source or apply host action effects.
+- The Tree and panels provide keyboard authoring. Direct canvas keyboard selection is outside scope; palette-to-tree dragging remains an uncommitted idea.
+- Generic HTML attribute passthrough and richer expression tooling are outside scope. Ordinary properties supply accessibility intent, with complete cross-kit verification still outstanding. Hosts own sandboxing; the designer preview does not execute arbitrary source or apply host action effects.
 - JSON Schema import, archive bundles, and a controlled document prop remain outside this beta. A different React key loads another form through the supported mount API. Version migrations will be needed when a second document version exists.
 - Structured references follow component key renames. Expressions and arbitrary action parameters need manual review; editing a Data key is an explicit payload mapping change and does not automatically rewrite references.
 - JSON Schema remains a lossy export, and `validateForm` is the authoritative validation engine. Conditional logic, cross-field rules, custom code, and shared data-key collisions cannot be represented completely by the export.

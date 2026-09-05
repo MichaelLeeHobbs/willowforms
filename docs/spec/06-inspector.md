@@ -1,6 +1,6 @@
 # Inspector
 
-**Status: partial.** Properties, Style, Actions, Rules, and the property editors are built. HTML attribute passthrough remains planned and is deferred from the initial beta; see [Additional properties](#additional-properties).
+**Status: built.** Properties, Style, Actions, Rules, and the property editors are built. Generic HTML attribute passthrough is outside the product scope. Accessibility is expressed through ordinary component properties and implemented by each kit; the complete accessibility audit remains Partial in [02-kit-contract.md](02-kit-contract.md#accessibility-from-ordinary-properties).
 
 The right-hand pane edits whatever is selected. It is built entirely from kit metadata — the designer
 never knows what a `TextField` is, only that something declared a `label` property with a `string`
@@ -248,9 +248,7 @@ expression. Structured conditions use the same closed editor as component visibi
 
 ## Additional properties
 
-**Status: partial.** Two things a kit cannot anticipate. The first is built and has been for a while --
-a section reading Planned above a bullet reading Built is the kind of status a reader stops trusting the
-rest of the file over -- and the second is not started.
+**Status: built.** Visibility is authored here. Accessibility uses the component's ordinary properties and the [kit contract](02-kit-contract.md#accessibility-from-ordinary-properties).
 
 - **`renderWhen`.** **Built.** A Show when row offering Always, Never, a condition, or an expression.
   `renderWhen` is a `PropValue`, so a document can hold any of its kinds: a static falsy reads as
@@ -261,9 +259,7 @@ rest of the file over -- and the second is not started.
   control that could fill it. The field list comes from the document, so a condition cannot name a key
   that does not exist, and a hand-edited one that does is shown rather than silently reassigned.
   See [01-document-model.md](01-document-model.md#conditions).
-- **HTML attributes.** **Planned:** a passthrough for `id`, `data-*`, `aria-*`. Needs an allowlist rather
-  than an open door: letting an author set arbitrary attributes on a kit's root element includes `style`
-  and `onclick`, and this project already draws the code-execution boundary elsewhere.
+- **Accessibility properties.** Authors use Label, Help text, validation messages, image alternative text, and the relevant action or region name. Kits handle generated IDs, label associations, descriptions, and required/invalid state. Where a supported variant needs a name that visible text cannot supply, it gets a specific name property. This is not a general attribute bag, and the [remaining cross-kit acceptance checks](02-kit-contract.md#accessibility-from-ordinary-properties) must be completed before claiming full coverage.
 
 ## Editing granularity
 
