@@ -41,22 +41,21 @@ const KITS: Record<string, { label: string; kit: Kit; renderers: RendererKit }> 
   html: { label: 'Plain HTML', kit: htmlKit, renderers: htmlRendererKit },
 }
 
-function loadDraft(): FormDocument {
+function loadDraft(): { document: FormDocument; error: string } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return SAMPLE_DOCUMENT
+    if (!raw) return { document: SAMPLE_DOCUMENT, error: '' }
 
     const loaded = parseDocument(JSON.parse(raw))
-    if (loaded.ok) return loaded.document
-
-    console.warn(
-      'Formsmith playground: the stored draft does not validate, so the sample was loaded instead. ' +
-        loaded.errors.map((problem) => problem.message).join(' '),
-    )
+    if (loaded.ok) return { document: loaded.document, error: '' }
   } catch {
-    // A corrupt draft should not brick the playground; fall through to the sample.
+    // Preserve unreadable drafts and let the author export this session's work.
   }
-  return SAMPLE_DOCUMENT
+  return {
+    document: SAMPLE_DOCUMENT,
+    error:
+      'Saved draft could not be loaded. Local saving is paused to preserve it. Export your changes from JSON.',
+  }
 }
 
 const theme = createTheme({ colorSchemes: { dark: true } })
@@ -90,37 +89,27 @@ function loadKit(): string {
 }
 
 export function App(): ReactNode {
-  /*
-   * The document the designer is mounted with, and it has to be able to change.
-   *
-   * A kit change remounts the designer, and the designer reads
-   * `initialDocument` only at mount — so remounting with the *boot* document
-   * threw away every edit since page load. Worse, silently: the designer's mount
-   * effect fires `onChange` with what it was given, which this persists, so the
-   * loss reached `localStorage` and a reload did not recover it.
-   */
-  const [initial, setInitial] = useState(loadDraft)
+  const [boot] = useState(loadDraft)
+  const [initial, setInitial] = useState(boot.document)
+  const [saveError, setSaveError] = useState(boot.error)
   const [kitId, setKitId] = useState<string>(loadKit)
   const [themeMode, setThemeMode] = useState<DesignerTheme>('system')
 
-  /*
-   * The latest document, for the remount to start from.
-   *
-   * A ref rather than state: this is written on every keystroke, and putting it
-   * in state would re-render the whole designer from up here for a value only a
-   * kit change ever reads. Written from a callback and read from a handler,
-   * never during render.
-   */
   const latest = useRef(initial)
 
-  const persist = useCallback((doc: FormDocument) => {
-    latest.current = doc
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(doc))
-    } catch {
-      // Private-mode browsers throw on write. Losing the draft beats crashing.
-    }
-  }, [])
+  const persist = useCallback(
+    (doc: FormDocument) => {
+      latest.current = doc
+      if (boot.error) return
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(doc))
+        setSaveError('')
+      } catch {
+        setSaveError('Local saving is unavailable. Export your changes from JSON before leaving.')
+      }
+    },
+    [boot.error],
+  )
 
   /*
    * Both in one handler, so the remount happens against the current document
@@ -138,21 +127,18 @@ export function App(): ReactNode {
   }, [])
 
   const active = KITS[kitId] ?? KITS['mui']
-  /*
-   * Unreachable, and it stays. `KITS` is a non-empty literal in this file and
-   * `kitId` only ever holds one of its ids, so the lookup cannot miss --
-   * `noUncheckedIndexedAccess` cannot know that, and the alternative is a
-   * non-null assertion, which is the same claim with nothing behind it. A throw
-   * that cannot happen is cheaper than a lie that can.
-   */
+
   if (!active) throw new Error('No kit registered')
 
   return (
     <ThemeProvider theme={theme}>
       <ThemeModeSync mode={themeMode} />
       <CssBaseline />
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div className="pg-app">
         <div className="pg-kit-switch">
+          <strong className="pg-brand">
+            Formsmith <span className="pg-beta">Beta</span>
+          </strong>
           <label htmlFor="pg-kit">Kit</label>
           <select id="pg-kit" value={kitId} onChange={(e) => chooseKit(e.target.value)}>
             {Object.entries(KITS).map(([id, entry]) => (
@@ -161,19 +147,19 @@ export function App(): ReactNode {
               </option>
             ))}
           </select>
-          <span className="pg-kit-switch__note">
-            The same document, rendered through a different kit. The designer imports neither.
+          <span className="pg-kit-switch__note" role="status">
+            {saveError ? 'Not saved locally' : 'Saved in this browser'}
           </span>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0 }}>
+        {saveError && (
+          <p className="pg-save-error" role="alert">
+            {saveError}
+          </p>
+        )}
+
+        <div className="pg-designer">
           <Designer
-            /*
-             * Remounting on a kit change is deliberate. The designer holds a
-             * selection and an undo stack keyed to component types the previous
-             * kit defined, and carrying those across would leave the properties
-             * panel describing a component the new kit may not have.
-             */
             key={kitId}
             initialDocument={initial}
             kit={active.kit}
