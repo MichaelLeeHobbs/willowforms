@@ -14,19 +14,20 @@ Authors configure labels, help text, validation, image alternative text, and act
 
 These fail the build, not a review.
 
-| Check                                                                         | Where                                               |
-| ----------------------------------------------------------------------------- | --------------------------------------------------- |
-| Contrast for both stylesheets, in both themes                                 | `test/contrast.test.ts`                             |
-| Every button in the designer shell has an accessible name                     | `packages/designer/src/panels/Tree.test.tsx`        |
-| Every form control in the shell has a label                                   | same                                                |
-| Landmarks carry accessible names                                              | same                                                |
-| One tab stop for the whole structure tree                                     | same                                                |
-| Arrow-key navigation and keyboard moves                                       | same, plus `packages/designer/src/keyboard.test.ts` |
-| The live region is polite, is a status region, and repeats identical messages | same                                                |
-| Inspector tabs are a real tablist with roving tabindex and arrow keys         | `packages/designer/src/panels/Rules.test.tsx`       |
-| axe-core over the whole designer in twelve states                             | `test/a11y.test.tsx`                                |
-| Focus really lands where it should, in a real browser                         | `e2e/keyboard.spec.ts`                              |
-| The JSON dialog is modal, traps focus and closes on Escape                    | `e2e/document.spec.ts`                              |
+| Check                                                                                         | Where                                               |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Contrast for both stylesheets, in both themes                                                 | `test/contrast.test.ts`                             |
+| Every button in the designer shell has an accessible name                                     | `packages/designer/src/panels/Tree.test.tsx`        |
+| Every form control in the shell has a label                                                   | same                                                |
+| Landmarks carry accessible names                                                              | same                                                |
+| One tab stop for the whole structure tree                                                     | same                                                |
+| Arrow-key navigation and keyboard moves                                                       | same, plus `packages/designer/src/keyboard.test.ts` |
+| The live region is polite, is a status region, and repeats identical messages                 | same                                                |
+| Inspector tabs are a real tablist with roving tabindex and arrow keys                         | `packages/designer/src/panels/Rules.test.tsx`       |
+| axe-core over the whole designer in twelve states                                             | `test/a11y.test.tsx`                                |
+| Focus really lands where it should, in a real browser                                         | `e2e/keyboard.spec.ts`                              |
+| The JSON dialog is modal, traps focus and closes on Escape                                    | `e2e/document.spec.ts`                              |
+| Conditional required state, translated help, and error recovery in both kits' repeated fields | `test/kit-required.test.tsx`                        |
 
 Two of those twelve axe states draw the form with `@formsmith/kit-mui` rather than the HTML kit. Nothing
 in this repository put a MUI form in front of axe before, so the kit most consumers will use was covered

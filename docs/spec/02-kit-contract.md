@@ -67,6 +67,7 @@ interface NodeRendererProps {
   nodeProps: NodeAttributes // spread these
   value: JsonValue | undefined // data-bound components
   error: string | undefined
+  required?: boolean // evaluated against the current answers, host context, and row
   onChange: (value: JsonValue) => void
   children?: ReactNode
 }
@@ -75,6 +76,8 @@ interface NodeRendererProps {
 `props` arrives resolved. A renderer never sees a `PropValue`, never resolves a translation, and never
 evaluates an expression — that happens once, in the renderer, for every kit. A renderer that reached for
 `node.props` directly would be reimplementing that badly.
+
+`required` is supplied by `FormRenderer` using the same guard evaluation as validation, including conditional rules in repeated rows. Kits apply it to the actual control or radiogroup. It is optional for compatibility with hosts that invoke kit components directly; without it, kits can only establish unconditional required rules from the node.
 
 ## Rules every kit must satisfy
 

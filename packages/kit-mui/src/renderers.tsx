@@ -103,21 +103,9 @@ const changed = (
 
 const GAP = 16
 
-/**
- * What a control has to say about itself beyond its value.
- *
- * `aria-required` rather than the platform `required`, deliberately: the
- * obligation is WCAG 3.3.2, which is about the accessibility tree, and native
- * `required` also turns on the browser's own validation — a second validator
- * with its own messages, competing with the form's, inside whatever `<form>` a
- * host has wrapped this in.
- *
- * `isRequired` lives in core so the two kits cannot answer differently, and it
- * counts only an *unguarded* required rule: a field that is required sometimes
- * cannot be announced as one that always is.
- */
-const requiredProps = (node: ComponentNode): { 'aria-required'?: true } =>
-  isRequired(node) ? { 'aria-required': true } : {}
+// ARIA exposes required state without enabling a second, browser-owned validator.
+const requiredProps = (required: boolean): { 'aria-required'?: true } =>
+  required ? { 'aria-required': true } : {}
 
 /*
  * The message a field is described by.
@@ -301,6 +289,7 @@ function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function TextFieldNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -326,7 +315,7 @@ function TextFieldNode({
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
+      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(required) }}
       onBlur={() => events?.onBlur?.()}
       onFocus={() => events?.onFocus?.()}
       onChange={(e) => changed(onChange, events, e.target.value)}
@@ -336,6 +325,7 @@ function TextFieldNode({
 
 function NumberFieldNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -355,7 +345,7 @@ function NumberFieldNode({
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
+      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(required) }}
       onBlur={() => events?.onBlur?.()}
       onChange={(e) =>
         changed(onChange, events, e.target.value === '' ? null : Number(e.target.value))
@@ -366,6 +356,7 @@ function NumberFieldNode({
 
 function CheckboxNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -395,7 +386,7 @@ function CheckboxNode({
                  * missing here and present on all three in the HTML kit.
                  */
                 ...(error ? { 'aria-invalid': true } : {}),
-                ...(isRequired(node) ? { 'aria-required': true } : {}),
+                ...requiredProps(required),
               },
             }}
             onChange={(e) => changed(onChange, events, e.target.checked)}
@@ -411,6 +402,7 @@ function CheckboxNode({
 
 function SelectNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -436,8 +428,8 @@ function SelectNode({
 
       slotProps={{
         formHelperText: alertWhenError(error),
-        htmlInput: requiredProps(node),
-        select: { SelectDisplayProps: requiredProps(node) },
+        htmlInput: requiredProps(required),
+        select: { SelectDisplayProps: requiredProps(required) },
       }}
       onChange={(e) => changed(onChange, events, optionValue(options, e.target.value))}
     >
@@ -613,6 +605,7 @@ function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function TextAreaNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -637,7 +630,7 @@ function TextAreaNode({
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(node) }}
+      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(required) }}
       onBlur={() => events?.onBlur?.()}
       onChange={(e) => changed(onChange, events, e.target.value)}
     />
@@ -662,6 +655,7 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
 
 function SwitchNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -683,7 +677,7 @@ function SwitchNode({
               input: {
                 'aria-describedby': messageId,
                 ...(error ? { 'aria-invalid': true } : {}),
-                ...(isRequired(node) ? { 'aria-required': true } : {}),
+                ...requiredProps(required),
               },
             }}
             onChange={(e) => changed(onChange, events, e.target.checked)}
@@ -699,6 +693,7 @@ function SwitchNode({
 
 function RadioGroupNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -720,13 +715,16 @@ function RadioGroupNode({
       disabled={bool(props['disabled'])}
     >
       {/* A legend, not a label: one question, many answers. */}
-      <FormLabel component="legend">{str(props['label'])}</FormLabel>
+      <FormLabel component="legend" id={messageId + '-label'}>
+        {str(props['label'])}
+      </FormLabel>
       <RadioGroup
+        aria-labelledby={messageId + '-label'}
         row={row}
         value={jsonToString(value)}
         aria-describedby={messageId}
         {...(error ? { 'aria-invalid': true } : {})}
-        {...requiredProps(node)}
+        {...requiredProps(required)}
         onChange={(e) => changed(onChange, events, optionValue(options, e.target.value))}
       >
         {options.map((option, i) => {
@@ -794,6 +792,7 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function DatePickerNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -823,7 +822,7 @@ function DatePickerNode({
         // Without this the label sits on top of the browser's date placeholder.
         inputLabel: { shrink: true },
         htmlInput: {
-          ...requiredProps(node),
+          ...requiredProps(required),
           ...(str(props['min']) ? { min: str(props['min']) } : {}),
           ...(str(props['max']) ? { max: str(props['max']) } : {}),
         },
@@ -843,6 +842,7 @@ function tooLarge(count: number): string {
 
 function FileUploadNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -894,7 +894,7 @@ function FileUploadNode({
         formHelperText: alertWhenSaying(notice),
         inputLabel: { shrink: true },
         htmlInput: {
-          ...requiredProps(node),
+          ...requiredProps(required),
           multiple,
           ...(str(props['accept']) ? { accept: str(props['accept']) } : {}),
         },

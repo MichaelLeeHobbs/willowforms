@@ -396,9 +396,18 @@ export function applyRule(
   }
 }
 
-export function isRequired(node: ComponentNode): boolean {
+/** Without runtime data, only unconditional required rules can be established. */
+export function isRequired(
+  node: ComponentNode,
+  data?: FormData,
+  options: EvalOptions = {},
+): boolean {
   const rules = validationsOf(node)
-  return rules.some((rule) => rule?.key === 'required' && !rule.when)
+  return rules.some(
+    (rule) =>
+      rule?.key === 'required' &&
+      (data === undefined ? !rule.when : guardPasses(rule.when, data, options)),
+  )
 }
 
 /** First failing rule for one field, or undefined when all pass. */

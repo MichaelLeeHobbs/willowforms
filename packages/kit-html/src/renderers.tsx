@@ -60,19 +60,9 @@ const str = (v: unknown, fallback = ''): string => {
 const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
   allowed.includes(v as T) ? (v as T) : fallback
 
-/**
- * What a control has to say about itself beyond its value.
- *
- * `aria-required` rather than the platform `required`: the obligation is WCAG
- * 3.3.2, which is about the accessibility tree, and native `required` also turns
- * on the browser's own validation — a second validator with its own messages
- * competing with the form's, inside whatever `<form>` a host has wrapped this
- * in. `isRequired` is in core so the two kits cannot answer differently, and it
- * counts only an unguarded rule: a field required sometimes cannot be announced
- * as one that always is.
- */
-const requiredProps = (node: ComponentNode): { 'aria-required'?: true } =>
-  isRequired(node) ? { 'aria-required': true } : {}
+// ARIA exposes required state without enabling a second, browser-owned validator.
+const requiredProps = (required: boolean): { 'aria-required'?: true } =>
+  required ? { 'aria-required': true } : {}
 const bool = (v: unknown): boolean => v === true
 /*
  * A finite number, or the fallback.
@@ -316,6 +306,7 @@ function Field({
 
 function TextFieldNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -332,7 +323,7 @@ function TextFieldNode({
     value: jsonToString(value),
     'aria-invalid': error ? true : undefined,
     'aria-describedby': id + '-message',
-    ...requiredProps(node),
+    ...requiredProps(required),
     onBlur: () => events?.onBlur?.(),
     onFocus: () => events?.onFocus?.(),
   }
@@ -364,6 +355,7 @@ function TextFieldNode({
 
 function NumberFieldNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -387,7 +379,7 @@ function NumberFieldNode({
         disabled={bool(props['disabled'])}
         value={jsonToString(value)}
         aria-invalid={error ? true : undefined}
-        {...requiredProps(node)}
+        {...requiredProps(required)}
         aria-describedby={id + '-message'}
         onBlur={() => events?.onBlur?.()}
         onChange={(e) =>
@@ -400,6 +392,7 @@ function NumberFieldNode({
 
 function CheckboxNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -418,7 +411,7 @@ function CheckboxNode({
         disabled={bool(props['disabled'])}
         checked={value === true}
         aria-invalid={error ? true : undefined}
-        {...requiredProps(node)}
+        {...requiredProps(required)}
         aria-describedby={messageId}
         onChange={(e) => changed(onChange, events, e.target.checked)}
       />
@@ -444,6 +437,7 @@ function CheckboxNode({
 
 function SelectNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -469,7 +463,7 @@ function SelectNode({
         disabled={bool(props['disabled'])}
         value={jsonToString(value)}
         aria-invalid={error ? true : undefined}
-        {...requiredProps(node)}
+        {...requiredProps(required)}
         aria-describedby={id + '-message'}
         onChange={(e) => changed(onChange, events, optionValue(options, e.target.value))}
       >
@@ -620,6 +614,7 @@ function Image({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function TextAreaNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -644,7 +639,7 @@ function TextAreaNode({
         disabled={bool(props['disabled'])}
         value={jsonToString(value)}
         aria-invalid={error ? true : undefined}
-        {...requiredProps(node)}
+        {...requiredProps(required)}
         aria-describedby={id + '-message'}
         onBlur={() => events?.onBlur?.()}
         onChange={(e) => changed(onChange, events, e.target.value)}
@@ -673,6 +668,7 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
 
 function SwitchNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -698,7 +694,7 @@ function SwitchNode({
           checked={bool(value)}
           disabled={bool(props['disabled'])}
           aria-invalid={error ? true : undefined}
-          {...requiredProps(node)}
+          {...requiredProps(required)}
           aria-describedby={messageId}
           onChange={(e) => changed(onChange, events, e.target.checked)}
         />
@@ -736,6 +732,7 @@ const RadioGroupContext = createContext<RadioContext | undefined>(undefined)
 
 function RadioGroupNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -756,7 +753,7 @@ function RadioGroupNode({
       className="fsh-field"
       disabled={bool(props['disabled'])}
       aria-invalid={error ? true : undefined}
-      {...requiredProps(node)}
+      {...requiredProps(required)}
       aria-describedby={messageId}
     >
       <legend className="fsh-field__label">{str(props['label'])}</legend>
@@ -857,6 +854,7 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function DatePickerNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -882,7 +880,7 @@ function DatePickerNode({
         disabled={bool(props['disabled'])}
         value={jsonToString(value)}
         aria-invalid={error ? true : undefined}
-        {...requiredProps(node)}
+        {...requiredProps(required)}
         aria-describedby={id + '-message'}
         onBlur={() => events?.onBlur?.()}
         onChange={(e) => changed(onChange, events, e.target.value || null)}
@@ -893,6 +891,7 @@ function DatePickerNode({
 
 function FileUploadNode({
   node,
+  required = isRequired(node),
   props,
   nodeProps,
   value,
@@ -930,7 +929,7 @@ function FileUploadNode({
         multiple={multiple}
         disabled={bool(props['disabled'])}
         aria-invalid={error ? true : undefined}
-        {...requiredProps(node)}
+        {...requiredProps(required)}
 
         aria-describedby={
           [id + '-message', filesHeld ? heldId : '', dropped > 0 ? refusedId : '']
