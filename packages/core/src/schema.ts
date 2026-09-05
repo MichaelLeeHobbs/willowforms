@@ -46,7 +46,7 @@ export interface JsonSchemaProperty {
    */
   properties?: Record<string, JsonSchemaProperty>
   required?: string[]
-  /** Draft 2020-12 keyword, used for file fields. */
+  /** Optional encoding annotation for host-authored schemas; not inferred from a file field. */
   contentEncoding?: string
 }
 
@@ -179,8 +179,6 @@ function baseType(type: FieldSchema['type']): JsonSchemaProperty {
     case 'object':
       return { type: 'object' }
     case 'file':
-      // No file type exists; a base64 payload is the conventional stand-in.
-      return { type: 'string', contentEncoding: 'base64' }
     case 'string':
     default:
       return { type: 'string' }
