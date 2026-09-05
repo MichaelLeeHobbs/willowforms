@@ -73,6 +73,8 @@ Undo and redo cover all of it.
 Two apps, neither published: `apps/playground` (Vite demo) and `apps/demo-server` (a deliberately tiny
 Hono server so the demo can persist a document and prove server-side validation shares one rule set).
 
+Custom and community components use the [kit interface](docs/spec/02-kit-contract.md#community-component-packages): a package supplies authoring metadata and a React renderer, and the host adds them to its kit. Service-dependent features such as attachments belong to these host-configured extensions. Formsmith does not install plugins from form documents or provide file storage; removing the current built-in file input is recorded as pending implementation in the [component contract](docs/spec/03-components.md#attachments).
+
 ## Quick start
 
 ```bash

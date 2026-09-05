@@ -6,6 +6,10 @@ in [spec/README.md](spec/README.md) is where decisions live, and an idea graduat
 The point of this file is that a good idea with no evidence behind it is still a good idea tomorrow, and
 building it today costs the same as building the wrong thing.
 
+## Tooltip for supplementary information
+
+**Trigger: a demonstrated form task needs supplementary information that visible Help text cannot reasonably provide.** There is no planned tooltip component or shared trait. Any proposal must work with keyboard, touch, and assistive technology, and must keep essential instructions available without revealing a tooltip.
+
 ## Splitting the left pane, to get palette-to-tree drops back
 
 **Trigger: if dragging from the palette into the tree turns out to be missed.**

@@ -1,7 +1,6 @@
 # Component catalogue
 
-**Status: built.** 27 of the 27 below are built in both kits, including editable repeated scope and
-controlled, branch-aware step navigation.
+**Status: partial.** 27 of the 27 below are built in both kits, including repeated scope and controlled step navigation. The approved move of file inputs out of the standard kits is pending implementation; the current catalogue remains accurate until that removal lands.
 
 This file opened **Built** over those two lists. `README.md` calls that the direction that has been wrong
 most often, and it was wrong here on the file that is also the roadmap -- so a reader planning against it
@@ -12,9 +11,9 @@ The two numbers are digits rather than words on purpose: `test/docs.test.ts` rea
 them against the table below and against both kits' `definitions.ts`, so a component added to a kit and
 not to this page fails the build.
 
-This is the list Formsmith commits to. A kit is free to offer more or fewer — nothing in the contract
-requires this catalogue — but the two kits in this repository implement it, which is what lets a document
-authored against one render against the other.
+This list records the current built-in catalogue. The target standard catalogue excludes file inputs, which belong to host-configured community or custom components as described below. A kit is free to offer a different catalogue; matching component types and value contracts make documents portable between compatible kits.
+
+Catalogue growth requires a concrete task for a form author or respondent. Existing components remain supported until an explicit removal lands; their presence does not commit Formsmith to matching a general UI library. Application navigation and surrounding page layout belong to the host.
 
 ## How components are specified
 
@@ -155,8 +154,17 @@ statement from having forgotten.
 properties (`rows` versus nothing) and a palette entry that changes shape based on a checkbox is harder
 to find than two entries. `TextField.multiline` stays for documents that already use it.
 
-`FileUpload` does not upload. It produces a value and the host decides what that means; a component that
-posted somewhere would be a backend, which is a non-goal.
+`FileUpload` currently produces filenames rather than durable attachment references. Its removal from the standard kits is approved but not yet implemented. See [Attachments](#attachments) for the target ownership boundary.
+
+### Attachments
+
+**Status: partial.** File inputs are outside the target standard catalogue. Remove the built-in `FileUpload` entries and their implementation in a focused change, updating the catalogue, examples, tests, and compatibility notes together. Existing saved forms must not be silently rewritten; the removal needs a documented custom-component replacement or missing-component outcome.
+
+A host that needs attachments installs or provides a custom component through the [existing kit interface](02-kit-contract.md#community-component-packages). A component can present a picker, progress, retry, removal, and an existing-attachment view using a service supplied by the host. Those behaviors belong to that extension, not to a required Formsmith upload subsystem.
+
+A typical integration sends selected bytes to the host's service and reports a durable attachment ID as its JSON answer after success. When the form is reopened, the component uses that ID to ask the host for authorized metadata, download, or preview access. A filename alone is not proof of an uploaded file, and a browser `File` object is not a persisted form answer.
+
+The host decides where and how bytes are stored, how access is authorized, which file types and sizes are accepted, and how incomplete uploads and deletions are handled. Formsmith defines no storage provider, upload endpoint, binary encoding, attachment database schema, or file-viewing service. Custom attachment components still satisfy the kit's accessibility and value-reporting obligations.
 
 ### Selection
 
@@ -216,8 +224,7 @@ reads them.
 
 ## What is deliberately absent
 
-- **Tooltip as a component.** It is a property of the thing it describes, not a sibling in the tree.
-  Planned as a shared trait instead.
+- **Tooltip as a component or shared trait.** There is no tooltip commitment. Visible Help text is the ordinary way to explain a question; a tooltip needs a concrete accessible use case before it becomes a requirement. See [ideas](../ideas.md#tooltip-for-supplementary-information).
 - **Modal and Dialog layout.** A form builder composes a form; where that form appears is the host's
   layout problem.
 - **A Wizard component.** There is no wizard type, and the two questions it was waiting on are answered
@@ -361,10 +368,7 @@ path that was never missing.
 
 ### Where the current step lives
 
-Not in `data`, which is submitted. Not held by the renderer, which holds no state and whose state core
-could never see. It is host-supplied context, and it is navigation: the URL owns it, so the back button
-and a deep link work without Formsmith knowing they exist. See
-[12-api.md](12-api.md#state-that-is-not-an-answer).
+The current step is host-supplied context, separate from submitted answers. A host may keep it in local state, its existing router, or another application state owner. URL state is an option for deep links and browser navigation, not a library requirement. Formsmith reports navigation intent and does not provide a router. See [12-api.md](12-api.md#state-that-is-not-an-answer).
 
 ### Branching needs no new vocabulary
 
@@ -379,9 +383,9 @@ Two consequences fall out rather than being designed:
   `submittedData` already drops its answers from the payload while leaving them in `data`, so changing
   the answer back restores them. No `clearOnHide`, which would make hiding destructive against a model
   that has no runtime undo.
-- **Progress must refuse to claim a total.** "Step 2 of 5" is a lie in a branching flow: counting
-  visible steps understates, counting every step overstates, and there is no third number. Position is
-  knowable and a total is not, so the renderer should expose the first and not the second.
+- **Progress must be truthful.** The built-in controls report position without a total. A host may display a known total for a fixed linear form; a flow whose length depends on later answers must not present an uncertain total as fixed.
+
+Conditional steps reuse the existing tree order, structured conditions, and validation. They do not commit the library to a branching workflow engine, graph editor, or application routing system.
 
 ### What was blocking this, and it was not steps
 

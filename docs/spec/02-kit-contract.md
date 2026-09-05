@@ -78,8 +78,13 @@ evaluates an expression — that happens once, in the renderer, for every kit. A
 
 ## Rules every kit must satisfy
 
-Each is a test in `test/kit-contract.test.tsx`, run against every registered kit. A failure names the
-obligation missed.
+Every kit must pair compatible metadata and renderers, render the components it offers, preserve node identity and container structure, report answers correctly, and satisfy the accessibility requirements below. The kit implements the components and properties it declares; it need not reproduce this repository's full catalogue.
+
+Icons are optional for third-party kits. A renderer used internally or by existing documents need not appear as a palette entry. If its nodes are editable, the host supplies compatible metadata for that authoring surface. Neither allowance weakens the node identity, data, validation-display, or accessibility obligations.
+
+### Reference-kit verification
+
+The two tables below record the checks in `test/kit-contract.test.tsx` for this repository's HTML and MUI kits. They include reference-kit choices, such as full catalogue correspondence and palette icons, as well as universal integration obligations. A third-party kit should adapt the applicable fixtures to its declared vocabulary; this suite is not a published generic kit-certification runner.
 
 There are two tables. This one is the obligations checked inside the per-kit block; the one after it is
 the rules that are driven per kit from outside that block, which for a long time were written down
@@ -91,7 +96,7 @@ met a suite naming rules that did not exist on paper. Both counts are checked ag
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Both halves declare the same `id`                                | A mismatched pairing is otherwise impossible to spot                         |
 | Every palette entry has a renderer                               | A component that cannot render should not be offered                         |
-| Every renderer has a palette entry                               | An orphan renderer is dead code or a missing entry                           |
+| Every reference-kit renderer has matching metadata               | Keeps this repository's authoring and rendering catalogues aligned           |
 | At least one component is a container                            | Nothing can be composed otherwise                                            |
 | Component types are unique                                       | The type is the lookup key                                                   |
 | Every data-bound component declares a `dataType`                 | The Rules tab has nothing to validate against otherwise                      |
@@ -105,7 +110,7 @@ met a suite naming rules that did not exist on paper. Both counts are checked ag
 | The message carries `role="alert"` when it errors                | A silent failure is announced to nobody                                      |
 | Every control describes itself by an element that already exists | A description added with the error is announced late or not at all           |
 | Exactly one component is the root, and it is not in the palette  | The root exists already; a second one nests a screen in a screen             |
-| Every palette entry declares an icon                             | Half a palette with icons reads as a bug rather than a choice                |
+| Every reference-kit palette entry declares an icon               | Keeps the shipped palette presentation consistent                            |
 | A RadioItem child can be selected in its group                   | A child that looks like an option and answers nothing is worse than no child |
 | The palette index has no colliding types                         | The type is how a node finds its renderer                                    |
 | A length-valued prop is CSS pixels                               | A number that means two things is a document that renders two ways           |
@@ -119,8 +124,7 @@ met a suite naming rules that did not exist on paper. Both counts are checked ag
 
 ### And the rules driven per kit from outside that block
 
-Same suite, same kits, same consequence for a kit that fails one. They sit outside the per-kit block
-because each drives its own fixture rather than sweeping every component.
+The same reference-kit suite drives these fixtures outside the per-kit block. Component-specific cases apply when a kit implements the named component or equivalent behavior.
 
 | Rule                                                                         | Why                                                                              |
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -237,7 +241,7 @@ definitions and CSS, with no dependencies beyond React.
 
 1. Export a `Kit` from `@formsmith/core` and a `RendererKit` from `@formsmith/renderer`, sharing an `id`.
 2. Spread `nodeProps` in every renderer.
-3. Add the kit to the list in `test/kit-contract.test.tsx` and make it pass.
+3. Verify the universal integration and accessibility obligations using fixtures for your kit's components. Reuse the relevant cases from `test/kit-contract.test.tsx`; its reference-catalogue and icon expectations are specific to the shipped kits.
 
 Matching another kit's component `type` strings is optional. This repository does it so a document
 authored against one kit renders against the other, and the playground can switch between them at
@@ -250,3 +254,13 @@ vocabulary is legitimate, it just will not be a drop-in replacement.
 - **Expression evaluation.** The host injects an evaluator and owns the sandbox. See
   [09-actions.md](09-actions.md).
 - **Validation.** Core owns the rules so the same ones run on a server. A kit displays the result.
+
+## Community component packages
+
+The existing kit interface supports community extensions as ordinary application dependencies. A package can export one or more `ComponentDef` entries and matching `NodeRenderer` components. The host combines the metadata with `Kit.components` and the React components with `RendererKit.renderers`, using unique component type names and matching kit IDs. The same component set must be available in the designer and wherever those forms are rendered.
+
+Service-dependent components receive their integration through a host wrapper or React context. Their compiled React code is part of the application's trusted code, separate from author-controlled expressions. The host installs and configures the package; a form document contains component types and JSON properties, never instructions to download or execute a package.
+
+The package owns its component's user interface, ordinary properties, accessible markup, and compatible value contract. The host owns service credentials, permissions, persistence, and deployment. Extensions use the existing JSON-compatible answer types and built-in validation where applicable; application-specific checks remain the host's responsibility.
+
+This supports an open-source component ecosystem without a new plugin API, runtime package installer, marketplace, discovery service, or plugin sandbox. Authors see only the components their application provides. A form imported into a host without a required component uses the existing missing-component fallback; it does not install that component automatically.
