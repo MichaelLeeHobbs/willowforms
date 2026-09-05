@@ -167,31 +167,12 @@ function RepeaterNode({
 }: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
-  /*
-   * A name for the group below, because an unnamed one is announced as "group"
-   * and tells a listener nothing about which list they have entered.
-   *
-   * The answer's name is the only author-written string a repeater has --
-   * `Repeater` declares one property, `gap` -- so it is what the group is called.
-   * A `label` property on both kits would be better and is a contract change;
-   * it is written up in the run's `found.md` rather than smuggled in here.
-   */
   const name = str(props['label'], node.dataKey ?? node.key)
   const rows = Array.isArray(value) ? value : []
   const renderedRows = Children.toArray(children)
   return (
     <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
-      {/*
-       * A repeater is data-bound: its value is the list, so a rule about the
-       * list is its own error, not any row's. "Add at least one address" has
-       * nowhere else to appear, which is why the kit contract's message
-       * obligation applies here like anywhere else.
-       */}
-      {/*
-       * `role="group"` and a description, not `aria-invalid`, which is supported
-       * on widget roles and inert on a container of components. The message
-       * below carries `role="alert"`, which is what actually announces it.
-       */}
+      {/* Group-level help and errors describe the list independently of its rows. */}
       <Stack
         role="group"
         aria-label={name}
@@ -225,7 +206,7 @@ function RepeaterNode({
         Add {name}
       </Button>
       <FormHelperText id={messageId} error={Boolean(error)} {...alertWhenError(error)}>
-        {message(error, '')}
+        {message(error, str(props['helperText']))}
       </FormHelperText>
     </Stack>
   )

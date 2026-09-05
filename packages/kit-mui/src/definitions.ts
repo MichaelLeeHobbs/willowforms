@@ -261,8 +261,8 @@ export const muiKit: Kit = {
        */
       dataBound: true,
       dataType: 'array',
-      defaultProps: { label: 'Items', gap: 16 },
-      props: [label, { name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      defaultProps: { label: 'Items', helperText: '', gap: 16 },
+      props: [label, helperText, { name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
       events: [],
     },
     {

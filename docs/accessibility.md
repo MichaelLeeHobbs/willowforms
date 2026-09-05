@@ -14,25 +14,24 @@ Authors configure labels, help text, validation, image alternative text, and act
 
 These fail the build, not a review.
 
-| Check                                                                                         | Where                                               |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Contrast for both stylesheets, in both themes                                                 | `test/contrast.test.ts`                             |
-| Every button in the designer shell has an accessible name                                     | `packages/designer/src/panels/Tree.test.tsx`        |
-| Every form control in the shell has a label                                                   | same                                                |
-| Landmarks carry accessible names                                                              | same                                                |
-| One tab stop for the whole structure tree                                                     | same                                                |
-| Arrow-key navigation and keyboard moves                                                       | same, plus `packages/designer/src/keyboard.test.ts` |
-| The live region is polite, is a status region, and repeats identical messages                 | same                                                |
-| Inspector tabs are a real tablist with roving tabindex and arrow keys                         | `packages/designer/src/panels/Rules.test.tsx`       |
-| axe-core over the whole designer in twelve states                                             | `test/a11y.test.tsx`                                |
-| Focus really lands where it should, in a real browser                                         | `e2e/keyboard.spec.ts`                              |
-| The JSON dialog is modal, traps focus and closes on Escape                                    | `e2e/document.spec.ts`                              |
-| Conditional required state, translated help, and error recovery in both kits' repeated fields | `test/kit-required.test.tsx`                        |
+| Check                                                                                              | Where                                               |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Contrast for both stylesheets, in both themes                                                      | `test/contrast.test.ts`                             |
+| Every button in the designer shell has an accessible name                                          | `packages/designer/src/panels/Tree.test.tsx`        |
+| Every form control in the shell has a label                                                        | same                                                |
+| Landmarks carry accessible names                                                                   | same                                                |
+| One tab stop for the whole structure tree                                                          | same                                                |
+| Arrow-key navigation and keyboard moves                                                            | same, plus `packages/designer/src/keyboard.test.ts` |
+| The live region is polite, is a status region, and repeats identical messages                      | same                                                |
+| Inspector tabs are a real tablist with roving tabindex and arrow keys                              | `packages/designer/src/panels/Rules.test.tsx`       |
+| axe-core over the whole designer in twelve states                                                  | `test/a11y.test.tsx`                                |
+| Focus really lands where it should, in a real browser                                              | `e2e/keyboard.spec.ts`                              |
+| The JSON dialog is modal, traps focus and closes on Escape                                         | `e2e/document.spec.ts`                              |
+| Conditional required state, translated help, and error recovery in both kits' repeated fields      | `test/kit-required.test.tsx`                        |
+| Translated repeater help, error recovery, and unique description IDs across two forms              | `test/kit-descriptions.test.tsx`                    |
+| Both runtime catalogues in light and dark mode, browser axe checks, and repeated-field focus order | `e2e/runtime-accessibility.spec.ts`                 |
 
-Two of those twelve axe states draw the form with `@formsmith/kit-mui` rather than the HTML kit. Nothing
-in this repository put a MUI form in front of axe before, so the kit most consumers will use was covered
-only by the hand-written rules in `test/kit-contract.test.tsx` -- which are, by construction, the ones
-somebody thought of.
+Two designer axe states use the MUI kit. A separate Chromium audit renders both complete runtime catalogues in light and dark mode, with labelled inputs, informative images, navigation, and populated repeated rows. That browser audit enables all axe rules tagged for WCAG 2.0–2.2 A/AA; it also checks repeated-field descriptions and keyboard focus order.
 
 The dialog row is in a browser and not in the axe pass on purpose. jsdom has no `<dialog>`, so
 `test/a11y.test.tsx` polyfills `showModal()` as `this.open = true`: there is no top layer, no inert
@@ -129,7 +128,7 @@ Verification gaps remain even with a defined keyboard authoring path.
   validated preview, with both panes collapsed, and with the JSON dialog open. jsdom has no
   rendering engine, so `color-contrast`, `target-size`, and `scrollable-region-focusable` are disabled by
   name rather than reporting nothing useful. Contrast is covered separately by computing the ratios from
-  the stylesheets. Running axe in a real browser would close the rest.
+  the stylesheets. The runtime catalogue now has a separate browser audit; the designer states still need equivalent browser coverage.
 - **No screen reader has actually been used.** Everything above is verified from the DOM and from the
   spec, which catches wiring mistakes but not awkward phrasing or a confusing reading order.
 - **The palette is a plain list of buttons.** Reachable by Tab, but with no grouping semantics, so its
