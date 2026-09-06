@@ -21,6 +21,10 @@ The following links use the default development port. On another deployment, kee
 
 ## Drafts and preview
 
+Every example has a completion button wired to the built-in `emit` action with event `submit`. Most also offer **Check answers**. Multi-page applications show these buttons on the last page; **Save character** remains available on every character-sheet page. Preview checks all declared pages, reveals errors, and explicitly reports a simulated submission when valid. No response is sent or saved. Use **Form data JSON** to inspect or copy the current answers; **Diagnostics** also shows errors. The bilingual workshop translates its buttons along with its fields.
+
+An embedding application handles these events through `FormRenderer.onEffects` and supplies its own validation, API call, and success or failure UI. See [Submitting a form](../../README.md#submitting-a-form). If a saved example draft predates these buttons, use **Reset example → Reset design** to load the latest bundled example.
+
 Each example saves its design edits separately in this browser. **Back to your draft** restores the playground document you were editing before opening an example. A direct link selects an example and restores its local design draft if one exists. **Reset example** sits beside **Examples** in the header while an example is active, in both editing and Preview. It asks before replacing that example's edits and preview answers with the latest bundled design. Cancel or Escape preserves your work.
 
 Preview answers are temporary. Switching examples or kits, resetting an example, or reloading the page discards them; **Back to editing** retains them in the current designer session. The gallery does not submit responses to a backend. Export JSON to keep a form design independently of browser storage. If storage is unavailable, edits remain available while switching examples in the current session, and the playground explains that local saving is unavailable.

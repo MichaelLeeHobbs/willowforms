@@ -366,6 +366,8 @@ export const workshopEnrollment = form(
 workshopEnrollment.languages.push({ code: 'fr', dialect: 'CA', name: 'Français', bidi: 'ltr' })
 workshopEnrollment.translations = {
   'en-US': {
+    checkAnswers: 'Check answers',
+    submit: 'Enroll',
     heading: 'Creative workshop',
     introduction:
       'Make space for something creative. Tell us who is joining and what you would like to explore.',
@@ -382,6 +384,8 @@ workshopEnrollment.translations = {
     maxPlaces: 'Book up to eight places.',
   },
   'fr-CA': {
+    checkAnswers: 'Vérifier les réponses',
+    submit: 'S’inscrire',
     heading: 'Atelier créatif',
     introduction:
       'Faites place à la créativité. Dites-nous qui participe et ce que vous aimeriez explorer.',
@@ -401,7 +405,7 @@ workshopEnrollment.translations = {
 function localize(): void {
   const visit = (entries: (typeof workshopEnrollment.root)[]): void => {
     for (const entry of entries) {
-      const property = ['heading', 'introduction'].includes(entry.key)
+      const property = ['heading', 'introduction', 'checkAnswers', 'submit'].includes(entry.key)
         ? 'text'
         : entry.key === 'workshopDetails'
           ? 'title'

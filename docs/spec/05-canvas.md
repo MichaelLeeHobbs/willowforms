@@ -171,8 +171,10 @@ The selected size is an authoring view preference, retained while switching view
 
 ## Preview
 
+Example completion buttons use the [Preview action demonstration](09-actions.md#submission-and-preview): check all declared pages, reveal errors, and report simulated submissions without sending or saving data. The renderer's host event contract remains unchanged.
+
 **Status: built.** Toggles the canvas between authoring and using the form. In preview the kit's
-components receive their own events, data is collected, and Validate runs the real rule engine. Field errors appear beside the affected controls. The optional **Diagnostics** toggle exposes keyboard-scrollable Data and Errors views; these are hidden initially and whenever Preview is entered again. Preview temporarily hides authoring panels and restores the author's desktop panel preferences on return to editing. Answers survive this mode switch.
+components receive their own events, data is collected, and Validate runs the real rule engine. Field errors appear beside the affected controls. The **Form data JSON** button opens a read-only modal showing the current Preview answers, using the same data object supplied to the runtime renderer. It preserves data keys, nested repeater arrays, and JSON value types without adding document metadata or synthesizing unanswered fields. Copy JSON and Select all support sharing the output; a refused clipboard request selects the text and explains how to copy it manually. Escape or Close returns focus to the trigger. Viewing or copying the output does not validate, submit, or change the form. The optional **Diagnostics** toggle exposes keyboard-scrollable Data and Errors views; these are hidden initially and whenever Preview is entered again. Preview temporarily hides authoring panels and restores the author's desktop panel preferences on return to editing. Answers survive this mode switch.
 
 The same `validateForm` that a server would call. See [08-validation.md](08-validation.md#server-parity).
 

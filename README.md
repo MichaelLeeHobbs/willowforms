@@ -87,7 +87,7 @@ pnpm build        # tsc --build across all packages
 
 ## Using it
 
-The playground's **Examples** gallery includes ten editable forms, from feedback and event registration to a detailed eight-page D&D character sheet. Search or filter the gallery, open a form, and use **Preview** to try it with either kit. Each example keeps its own design draft; preview answers are temporary. See the [demo guide](apps/playground/EXAMPLES.md) for the full collection and direct links.
+The playground's **Examples** gallery includes ten editable forms, from feedback and event registration to a detailed six-page D&D character sheet. Search or filter the gallery, open a form, and use **Preview** to try it with either kit. **Form data JSON** shows the current answers. Completion buttons simulate submission without sending data. Each example keeps its own design draft; preview answers are temporary. See the [demo guide](apps/playground/EXAMPLES.md) for the full collection and direct links.
 
 The snippets below are maintained as typechecked consumer code in
 [examples/usage.tsx](examples/usage.tsx).
@@ -123,6 +123,22 @@ const errors = validateForm(doc.root, data)
 
 The same `validateForm` runs in Node, so the server enforces the form's own rules without a second
 implementation to keep in sync.
+
+## Submitting a form
+
+A button raises an event for the host frontend through `FormRenderer.onEffects`. The host validates the answers, calls its backend, and displays success or failure. FormSmith does not choose an endpoint or store responses. Configure a Button in **Actions → On click → Emit event**, with event name `submit`; its document contains:
+
+```ts
+events: {
+  onClick: [{ type: 'builtin', name: 'emit', params: { event: 'submit' } }]
+}
+```
+
+`submit`, `saveDraft`, and `cancel` are names your host defines, not special renderer commands. Built-in events need no code evaluator. A button's text alone does not give it submission behavior, and a `validate` action requests validation without automatically blocking subsequent effects.
+
+The typechecked [SubmissionExample](examples/usage.tsx) demonstrates `onEffects`, validation across every page, highlighting errors, preventing duplicate sends, and handling a failed request without losing answers. It accepts a host-provided `save(answers)` function. Use `submittedAcross` to project the payload from the document's active fields; the Preview JSON dialog shows raw current answers, which can still include values from fields subsequently hidden.
+
+The backend must validate again against its stored form definition and trusted context before saving. The [demo server](apps/demo-server/src/index.ts) demonstrates this with `POST /api/forms/:id/submit`; it returns validated answers as a demonstration, rather than storing responses. See the [action contract](docs/spec/09-actions.md) and [multi-page validation contract](docs/spec/08-validation.md) for the complete integration details.
 
 ## Design commitments
 

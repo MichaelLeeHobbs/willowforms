@@ -464,6 +464,15 @@
   border-block-end: 1px solid var(--fs-border);
 }
 
+.fs-canvas__notice:not(:empty) {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--fs-border);
+  color: var(--fs-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .fs-canvas__preview[aria-pressed='false'] {
   color: var(--fs-primary-text);
   background: var(--fs-primary);
@@ -1723,4 +1732,10 @@
 .fs-prop-row--wide > .fs-prop-row__clear {
   grid-column: 3;
   grid-row: 1;
+}
+
+.fs-preview-data__description {
+  margin: 8px 0 12px;
+  color: var(--fs-text-muted);
+  line-height: 1.5;
 }

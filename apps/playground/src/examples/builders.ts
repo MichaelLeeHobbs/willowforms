@@ -123,11 +123,34 @@ export function form(
   children: ComponentNode[],
 ): FormDocument {
   const document = createDocument(name, id)
+  const labels: Record<string, string> = {
+    'event-registration': 'Register',
+    'customer-feedback': 'Send feedback',
+    'job-application': 'Submit application',
+    'project-brief': 'Send brief',
+    'expense-report': 'Submit expenses',
+    'volunteer-signup': 'Sign up',
+    'equipment-inspection': 'Complete inspection',
+    'workshop-enrollment': 'Enroll',
+    'dnd-character-sheet': 'Save character',
+  }
+  const checkAnswers = node('Button', 'checkAnswers', { text: 'Check answers', variant: 'outline' })
+  checkAnswers.events = { onClick: [{ type: 'builtin', name: 'validate' }] }
+  const submit = node('Button', 'submit', { text: labels[id] ?? 'Submit' })
+  submit.events = { onClick: [{ type: 'builtin', name: 'emit', params: { event: 'submit' } }] }
+  const actions = node('Stack', 'formActions', { direction: 'row', gap: 12 }, [
+    checkAnswers,
+    submit,
+  ])
+  actions.css = { any: 'flex-wrap: wrap;' }
+  const lastStep = children.filter((child) => child.type === 'Step').at(-1)
+  if (lastStep?.renderWhen && id !== 'dnd-character-sheet') actions.renderWhen = lastStep.renderWhen
   document.root.props = { maxWidth: prop(880), gap: prop(24) }
   document.root.children = [
     node('Heading', 'heading', { text: name, level: 'h1' }),
     node('Text', 'introduction', { text: introduction }),
     ...children,
+    actions,
   ]
   return document
 }
