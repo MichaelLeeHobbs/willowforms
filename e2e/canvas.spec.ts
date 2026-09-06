@@ -146,13 +146,9 @@ test('dragging a component on the canvas moves it', async ({ designer }) => {
 
 test('dropping into a row container infers the horizontal axis', async ({ designer }) => {
   await designer.openTab('Components')
-  // `name` lays its children out in a row, so the insertion point comes from x.
-  const first = await designer.node('firstName').boundingBox()
-  if (!first) throw new Error('nothing to measure')
-
   const palette = designer.page.getByRole('button', { name: 'Text field', exact: true })
-  const start = await palette.boundingBox()
-  if (!start) throw new Error('nothing to measure')
+  const start = await dragFrom(palette)
+  const first = await stableBox(designer.node('firstName'))
 
   await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
   await designer.page.mouse.down()

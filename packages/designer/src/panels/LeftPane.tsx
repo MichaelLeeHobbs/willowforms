@@ -4,6 +4,7 @@ import type { ComponentDef, Kit } from '@formsmith/core'
 
 import type { DragController } from '../drag.js'
 import type { DesignerApi } from '../store.js'
+import type { AuthoringPreset } from '../presets.js'
 import { FormSettings } from './FormSettings.js'
 import { Palette } from './Palette.js'
 import { Tabs } from './Tabs.js'
@@ -24,6 +25,7 @@ export interface LeftPaneProps {
   drag: DragController
   announce: (message: string) => void
   onAdd: (def: ComponentDef) => void
+  onAddPreset?: (preset: AuthoringPreset) => void
   onDragStart: (def: ComponentDef, event: ReactPointerEvent) => void
 }
 
@@ -33,6 +35,7 @@ export function LeftPane({
   drag,
   announce,
   onAdd,
+  onAddPreset,
   onDragStart,
 }: LeftPaneProps): ReactNode {
   const [active, setActive] = useState<TabId>('components')
@@ -56,6 +59,7 @@ export function LeftPane({
           query={query}
           onQuery={setQuery}
           onAdd={onAdd}
+          {...(onAddPreset ? { onAddPreset } : {})}
           onDragStart={onDragStart}
           consumeClick={drag.consumeClick}
         />
