@@ -215,7 +215,7 @@ function signatureOf(node: ComponentNode): string {
 
 function useRenderContext(): RenderContext {
   const ctx = useContext(Ctx)
-  if (!ctx) throw new Error('Formsmith renderer components must be used inside <FormRenderer>.')
+  if (!ctx) throw new Error('FormSmith renderer components must be used inside <FormRenderer>.')
   return ctx
 }
 

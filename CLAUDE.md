@@ -1,6 +1,6 @@
-# Formsmith — MIT visual form designer for React
+# FormSmith — MIT visual form designer for React
 
-Formsmith is an open-source drag-and-drop form designer. The designer and renderer are both MIT.
+FormSmith is an open-source drag-and-drop form designer. The designer and renderer are both MIT.
 
 ## Read first
 

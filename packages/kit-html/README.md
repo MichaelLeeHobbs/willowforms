@@ -1,6 +1,6 @@
 # @formsmith/kit-html
 
-A dependency-free HTML kit for [Formsmith](https://github.com/MichaelLeeHobbs/formsmith): semantic
+A dependency-free HTML kit for [FormSmith](https://github.com/MichaelLeeHobbs/formsmith): semantic
 elements and a stylesheet, no component library.
 
 ```bash
@@ -17,7 +17,7 @@ export const renderers = htmlRendererKit
 
 ## Why this exists
 
-Formsmith claims that adding a kit is a new package rather than a rewrite of the designer. This package
+FormSmith claims that adding a kit is a new package rather than a rewrite of the designer. This package
 is the evidence: it was added without touching `@formsmith/core`, `@formsmith/renderer`, or
 `@formsmith/designer`, and the designer builds its palette and properties panel from the metadata here
 without ever importing it directly.

@@ -170,7 +170,7 @@ export function App(): ReactNode {
                 strokeLinecap="round"
               />
             </svg>
-            Formsmith <span className="pg-beta">Beta</span>
+            FormSmith <span className="pg-beta">Beta</span>
           </strong>
           <ExampleGallery activeId={session.id} onChoose={chooseExample} />
           {session.id && <ResetExample onReset={resetExample} />}

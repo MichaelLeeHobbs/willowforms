@@ -356,7 +356,7 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
         Code actions <span className="fs-rules__count">{Object.keys(actions).length}</span>
       </h3>
       <p className="fs-rules__note">
-        Formsmith stores this source but never executes it directly. The host must provide a
+        FormSmith stores this source but never executes it directly. The host must provide a
         sandboxed action evaluator.
       </p>
       {Object.keys(actions).length > 0 && (

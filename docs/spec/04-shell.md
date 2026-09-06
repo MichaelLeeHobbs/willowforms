@@ -148,7 +148,7 @@ kind of status a reader cannot act on.
 | Language    | Built  | Which language the canvas renders in; hidden below two languages |
 | Theme       | Built  | System / light / dark for the designer chrome                    |
 
-**Save needs care.** Formsmith does not persist, so a Save button that appears unconditionally promises
+**Save needs care.** FormSmith does not persist, so a Save button that appears unconditionally promises
 something the designer cannot deliver. It renders only when the host passes `onSave`, and its absence is
 the honest default: `onChange` already emits every version, and many hosts save from that.
 

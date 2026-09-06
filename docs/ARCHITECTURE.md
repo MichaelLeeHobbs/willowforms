@@ -35,7 +35,7 @@ Three things fall out of that:
 - **Adding a kit is a new package.** `@formsmith/kit-shadcn` implements the same two exports. No change
   to core, renderer, or designer.
 - **Core runs in Node.** No React import anywhere in `@formsmith/core`, so the same validation runs on a
-  server. `apps/demo-server` exists to prove that, not because Formsmith needs a backend.
+  server. `apps/demo-server` exists to prove that, not because FormSmith needs a backend.
 - **Runtime ships without the designer.** Most consumers embed a form and never embed a builder. They
   pay for `@formsmith/renderer` plus their kit, and nothing else.
 

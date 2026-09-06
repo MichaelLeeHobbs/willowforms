@@ -2,13 +2,13 @@
 
 ## Mission
 
-Formsmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
+FormSmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
 
 This is a statement of intent and carries no implementation status. The [product principles](README.md#product-principles) guide every contract in this specification.
 
 ## Why it exists
 
-Applications need to collect information through forms that their users can create and change without a developer building each one. Formsmith supplies an embeddable visual designer and runtime renderer, both MIT-licensed, so applications can offer that capability within their own product.
+Applications need to collect information through forms that their users can create and change without a developer building each one. FormSmith supplies an embeddable visual designer and runtime renderer, both MIT-licensed, so applications can offer that capability within their own product.
 
 ## Who uses it
 
@@ -20,7 +20,7 @@ Applications need to collect information through forms that their users can crea
 
 **The translator.** Supplies localized labels, instructions, and validation messages through ordinary property editors. Translation is part of form authoring and should not require JSON editing.
 
-The host identifies and authorizes these users. Formsmith does not supply accounts or sessions.
+The host identifies and authorizes these users. FormSmith does not supply accounts or sessions.
 
 ## The everyday workflow
 
@@ -34,7 +34,7 @@ Translation, repeaters, and steps support this workflow when the form needs them
 
 ## Ownership boundaries
 
-**Formsmith owns form behavior.** The document model, visual authoring, runtime rendering, structured conditions, validation, localization, and the kit contract belong here. Ordinary configuration should produce accessible output, with verification recorded in [accessibility.md](../accessibility.md).
+**FormSmith owns form behavior.** The document model, visual authoring, runtime rendering, structured conditions, validation, localization, and the kit contract belong here. Ordinary configuration should produce accessible output, with verification recorded in [accessibility.md](../accessibility.md).
 
 **The host owns the application.** Storage, accounts, permissions, publishing and distribution, networking, submission processing, and business workflows stay with the embedding application. `onChange` emits documents and answers; it does not prescribe where they go. The playground and demo server demonstrate integration rather than define a backend product.
 

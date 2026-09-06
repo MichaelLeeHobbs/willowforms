@@ -63,7 +63,7 @@ order. See [11-theming.md](11-theming.md).
 The playground uses the pair to keep MUI fields aligned with the designer in editing and preview modes.
 
 `onSave` is what makes the toolbar show a Save button, and its absence is why there is no button by
-default: Formsmith does not persist, and one it cannot honour is worse than none. See
+default: FormSmith does not persist, and one it cannot honour is worse than none. See
 [04-shell.md](04-shell.md#toolbar).
 
 ## Rendering a form
@@ -103,7 +103,7 @@ nonce the page's policy names.
 receives the previous or next reachable context value. The renderer evaluates branches from the current
 answers and the kits display position without a potentially false total.
 
-The host may hold the current step in local state or its existing router. Formsmith provides neither routing nor a branching workflow engine. The built-in display remains position-only; a host may show a known total for a fixed linear form.
+The host may hold the current step in local state or its existing router. FormSmith provides neither routing nor a branching workflow engine. The built-in display remains position-only; a host may show a known total for a fixed linear form.
 
 ### The host owns the data
 
@@ -240,7 +240,7 @@ So the split is not "important" against "transient". It is: can a value be hande
 ```
 
 A dot path, because a host's context already is nested and making every host flatten `{ user: { role } }`
-into `{ 'user.role': … }` is work Formsmith would be creating rather than doing. Every step is an
+into `{ 'user.role': … }` is work FormSmith would be creating rather than doing. Every step is an
 own-property read that must land on a plain object, so `constructor.prototype` reads as missing and a
 path cannot walk into a string's `length`. A key containing a dot is unreachable, which is a stated limit
 rather than an escape syntax, because an escape syntax is a parser and a parser is a thing with its own

@@ -125,7 +125,7 @@ Three of these degrade towards failing rather than passing, and they are the one
   alternatives are safe to evaluate. Backreferences, lookarounds, and unsupported or malformed syntax
   are refused and shown by `patternProblem` in the Rules tab.
 - Pattern matching remains unanchored and the accepted subset exports directly to JSON Schema. A host
-  that evaluates exported schemas must choose a validator with appropriate resource limits; Formsmith
+  that evaluates exported schemas must choose a validator with appropriate resource limits; FormSmith
   controls only its own validation engine.
 
 - A **rule key the engine does not recognise fails with `UNREADABLE_RULE`.** This is the one place a rule

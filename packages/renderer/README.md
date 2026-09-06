@@ -1,6 +1,6 @@
 # @formsmith/renderer
 
-The runtime renderer for [Formsmith](https://github.com/MichaelLeeHobbs/formsmith) documents.
+The runtime renderer for [FormSmith](https://github.com/MichaelLeeHobbs/formsmith) documents.
 
 Ships independently of the designer, because most consumers embed a form and never embed a builder.
 It walks a document and resolves property bindings; it knows nothing about which component library draws

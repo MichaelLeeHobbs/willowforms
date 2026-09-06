@@ -1,6 +1,6 @@
 # Compatibility policy
 
-Formsmith is pre-release software. Until the first published `1.0.0`, public contracts may change, but
+FormSmith is pre-release software. Until the first published `1.0.0`, public contracts may change, but
 changes must be deliberate and documented rather than arriving as incidental refactors.
 
 ## Supported platforms

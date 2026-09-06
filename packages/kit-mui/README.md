@@ -1,6 +1,6 @@
 # @formsmith/kit-mui
 
-The Material UI kit for [Formsmith](https://github.com/MichaelLeeHobbs/formsmith), and the reference
+The Material UI kit for [FormSmith](https://github.com/MichaelLeeHobbs/formsmith), and the reference
 implementation of the kit contract.
 
 ```bash
