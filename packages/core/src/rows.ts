@@ -7,11 +7,8 @@
  * what keeps `tree.ts` untouched: every way duplicate keys break it needs the
  * same key at three places in the tree, and it never is.
  *
- * No address string ever appears in a document. Addresses are formed here at the
- * boundary and consumed at the boundary — an error key, a DOM attribute, a read
- * into data. An author never types an index, so there is no path grammar in the
- * document for a later feature to overload, which is how one library ended up
- * with eight flavours of path per component.
+ * Components store data keys; runtime addresses add row coordinates at the boundary.
+ * Built-in action parameters can also name a concrete address to target a fixed row.
  *
  * The grammar parses unambiguously because `KEY_PATTERN` excludes `.`, `[` and
  * `]`. That is the return on holding them back when the key grammar landed.
