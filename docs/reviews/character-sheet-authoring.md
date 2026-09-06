@@ -1,6 +1,6 @@
 # Form authoring improvements from the character sheet redesign
 
-These four recommendations were approved and implemented as focused changes. The original rationale and acceptance criteria below record why they were needed. The redesigned demo preserves all eight pages and answer keys using the existing document model.
+These four recommendations were approved and implemented as focused changes. The original rationale and acceptance criteria below record why they were needed. The subsequent character-sheet layout consolidates play statistics onto one page with five supporting pages, preserving the answer keys and existing document model.
 
 The subsequent [visual direction](design-direction.md) makes the D&D example desktop-first. The narrow-layout criteria below concern the authoring shell and responsive forms; they do not require the character folio to fit a phone. Its desktop minimum width is an intentional document design choice.
 

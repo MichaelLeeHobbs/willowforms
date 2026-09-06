@@ -2,16 +2,14 @@ import { expect, it } from 'vitest'
 import { contextValues, flatten, validateForm } from '@formsmith/core'
 import { characterSheet } from './character-sheet.js'
 
-it('organizes the character sheet into eight navigable sections', () => {
+it('keeps the play sheet together with five supporting pages', () => {
   expect(contextValues(characterSheet.root, 'step')).toEqual([
-    '1 · Identity and origins',
-    '2 · Abilities, saves, and skills',
-    '3 · Combat and conditions',
-    '4 · Features and resources',
-    '5 · Equipment and treasure',
-    '6 · Spellcasting',
-    '7 · Personality and backstory',
-    '8 · Adventures and notes',
+    '1 · Character and combat',
+    '2 · Classes and features',
+    '3 · Equipment and treasure',
+    '4 · Spellcasting',
+    '5 · Personality and backstory',
+    '6 · Adventures and notes',
   ])
 })
 
@@ -59,7 +57,7 @@ it('includes six abilities, eighteen distinct skills, and all nine spell-slot le
 })
 
 it('validates each spell only when the character uses magic', () => {
-  const context = { step: '6 · Spellcasting' }
+  const context = { step: '4 · Spellcasting' }
   expect(
     validateForm(characterSheet.root, { usesMagic: false, spells: [{}] }, { context }),
   ).toEqual({})

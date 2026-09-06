@@ -15,18 +15,16 @@ for (const kit of ['mui', 'html']) {
     const step = page.getByRole('combobox', { name: 'Step', exact: true })
     await expect(form.getByText('Step 1', { exact: true })).toBeVisible()
     await expect(form.getByRole('button', { name: 'Back', exact: true })).toBeDisabled()
-    await form.getByRole('button', { name: 'Add Class', exact: true }).click()
-    const identity = (await form.locator('[data-fs-key="identityCard"]').boundingBox())!
-    const classes = (await form.locator('[data-fs-key="classesSection"]').boundingBox())!
-    expect(Math.abs(identity.y - classes.y)).toBeLessThan(2)
-    expect(classes.x).toBeGreaterThan(identity.x + identity.width)
-    expect((await form.locator('[data-fs-key="classesRow"]').boundingBox())!.width).toBeGreaterThan(
-      classes.width - 30,
+    const [abilities, skills, combat] = await Promise.all(
+      ['abilities', 'skills', 'combatColumn'].map((key) =>
+        form.locator(`[data-fs-key="${key}"]`).boundingBox(),
+      ),
     )
-    expect(
-      (await form.getByRole('button', { name: 'Next', exact: true }).boundingBox())!.x,
-    ).toBeGreaterThan(1200)
-    await step.selectOption({ label: '2 · Abilities, saves, and skills' })
+    expect(Math.abs(abilities!.y - skills!.y)).toBeLessThan(2)
+    expect(Math.abs(skills!.y - combat!.y)).toBeLessThan(2)
+    expect(abilities!.width).toBeLessThan(skills!.width * 0.6)
+    expect(skills!.x).toBeGreaterThan(abilities!.x + abilities!.width)
+    expect(combat!.x).toBeGreaterThan(skills!.x + skills!.width)
     const scores = await Promise.all(
       ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].map((name) =>
         form.getByRole('spinbutton', { name: name + ' score', exact: true }).boundingBox(),
@@ -34,21 +32,36 @@ for (const kit of ['mui', 'html']) {
     )
     expect(scores.every((box) => box !== null)).toBe(true)
     expect(
-      Math.max(...scores.map((box) => box!.y)) - Math.min(...scores.map((box) => box!.y)),
+      Math.max(...scores.map((box) => box!.x)) - Math.min(...scores.map((box) => box!.x)),
     ).toBeLessThan(2)
-    expect(scores[5]!.x - scores[0]!.x).toBeGreaterThan(800)
-    const skills = form.locator('[data-fs-key="skillRows"]')
-    expect((await skills.boundingBox())!.width).toBeGreaterThan(1000)
-    const skillColumns = await Promise.all(
-      ['Acrobatics', 'AnimalHandling', 'Arcana'].map((key) =>
-        skills.locator(`[data-fs-key="${key}Skill"]`).boundingBox(),
-      ),
-    )
+    expect(scores[5]!.y - scores[0]!.y).toBeGreaterThan(500)
+    expect(scores[0]!.width).toBeLessThan(110)
+    const clippedLabels = await form
+      .locator('[data-fs-key="abilityCards"] label')
+      .evaluateAll((labels) =>
+        labels
+          .filter((label) => label.scrollWidth > label.clientWidth + 1)
+          .map((label) => label.textContent),
+      )
+    expect(clippedLabels).toEqual([])
+    const skillRows = form.locator('[data-fs-key="skillRows"] > [data-fs-key]')
+    await expect(skillRows).toHaveCount(18)
+    for (const row of await skillRows.all()) {
+      const box = (await row.boundingBox())!
+      expect(box.height).toBeLessThan(70)
+      expect(box.width).toBeLessThan(510)
+    }
     expect(
-      Math.max(...skillColumns.map((box) => box!.y)) -
-        Math.min(...skillColumns.map((box) => box!.y)),
-    ).toBeLessThan(2)
-    expect(skillColumns[2]!.x - skillColumns[0]!.x).toBeGreaterThan(700)
+      (await form
+        .getByRole('spinbutton', { name: 'Current hit points', exact: true })
+        .boundingBox())!.width,
+    ).toBeCloseTo(110, 0)
+    await form.getByRole('button', { name: 'Add Attack', exact: true }).click()
+    const attacks = (await form.locator('[data-fs-key="attacksSection"]').boundingBox())!
+    expect(attacks.width).toBeGreaterThan(1200)
+    const currentCombat = (await form.locator('[data-fs-key="combatColumn"]').boundingBox())!
+    expect(attacks.y).toBeGreaterThan(currentCombat.y + currentCombat.height)
+    await form.getByRole('textbox', { name: 'Weapon / attack name', exact: true }).fill('Longsword')
     for (const theme of ['light', 'dark']) {
       await page.getByLabel('Designer theme').selectOption(theme)
       await page.addScriptTag({ content: axe.source })
@@ -70,7 +83,7 @@ for (const kit of ['mui', 'html']) {
       await expect(
         form.getByText(`Step ${String(pages.indexOf(title) + 1)}`, { exact: true }),
       ).toBeVisible()
-      if (title === '6 · Spellcasting') {
+      if (title === '4 · Spellcasting') {
         await form.getByRole('checkbox', { name: 'This character uses spells' }).check()
         const slots = await Promise.all(
           Array.from({ length: 9 }, (_, index) =>

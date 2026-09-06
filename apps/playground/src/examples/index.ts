@@ -28,7 +28,7 @@ export const EXAMPLES: ExampleForm[] = [
     description:
       'A desktop character folio: abilities, all 18 skills, combat, inventory, spells, backstory, and a session journal.',
     category: 'Adventure',
-    features: ['Desktop layout', '8 pages', 'Repeaters'],
+    features: ['Desktop layout', '6 pages', 'Repeaters'],
     document: characterSheet,
   },
   {

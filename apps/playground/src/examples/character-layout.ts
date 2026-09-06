@@ -64,10 +64,10 @@ export const wide = (component: ComponentNode): ComponentNode =>
 
 export function step(key: string, title: string, children: ComponentNode[]): ComponentNode {
   const result = baseStep(key, title, children)
-  result.props['gap'] = prop(24)
+  result.props['gap'] = prop(18)
   styled(
     result.children![0]!,
-    'font-family:Cambria,Georgia,serif; font-size:25px; font-weight:500;',
+    'font-family:Cambria,Georgia,serif; font-size:22px; font-weight:500;',
   )
   return result
 }
