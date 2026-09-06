@@ -60,7 +60,11 @@ import type {
   PropValue,
 } from '@formsmith/core'
 
+export type FormDensity = 'comfortable' | 'compact'
+
 export interface NodeRendererProps {
+  /** Resolved from the nearest density setting; undefined preserves the kit's host defaults. */
+  density?: FormDensity | undefined
   node: ComponentNode
   /** Property values with bindings already resolved to plain JSON. */
   props: Record<string, JsonValue>
@@ -98,6 +102,7 @@ export interface NodeNavigation {
 }
 
 export interface NodeAttributes {
+  'data-fs-density'?: FormDensity
   'data-fs-key': string
   'data-fs-type': string
   /**
@@ -158,6 +163,7 @@ interface RenderContext {
 }
 
 const Ctx = createContext<RenderContext | null>(null)
+const DensityCtx = createContext<FormDensity | undefined>(undefined)
 
 /*
  * Shared empty objects, so an absent `errors` prop or a language with no
@@ -511,6 +517,7 @@ function NodeLifecycle({
 }
 
 function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
+  const inheritedDensity = useContext(DensityCtx)
   const ctx = useRenderContext()
   const { scope, revealHidden, kit, data, errors, translations, options, onChange, dispatch } = ctx
   const row = useContext(RowCtx)
@@ -550,6 +557,10 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
     () => resolveProps(node, translations, forProps, scoped),
     [node, translations, forProps, scoped],
   )
+  const density =
+    props['density'] === 'compact' || props['density'] === 'comfortable'
+      ? props['density']
+      : inheritedDensity
 
   // On the derived string, not on the node. Depending on the node re-creates
   // this on any edit to it, which defeats memoisation in every kit component
@@ -579,10 +590,11 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
       'data-fs-key': node.key,
       'data-fs-type': node.type,
       'data-fs-scope': scope,
+      ...(density ? { 'data-fs-density': density } : {}),
       ...(row ? { 'data-fs-row': encodeRow(row.path) } : {}),
       ...(visible ? {} : { 'data-fs-hidden': 'true' as const }),
     }),
-    [node.key, node.type, scope, visible, row],
+    [node.key, node.type, scope, visible, row, density],
   )
 
   if (!visible && !revealHidden) return null
@@ -642,22 +654,25 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 
   return (
     <NodeLifecycle nodeKey={node.key} events={events}>
-      <Component
-        node={node}
-        props={props}
-        nodeProps={nodeProps}
-        // Value by data key, error by node key. Two components may share a data
-        // key; they can still fail for different reasons.
-        value={valueOf(row?.values ?? data, dataKey)}
-        error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
-        required={isRequired(node, data, scoped)}
-        itemLimits={repeats ? itemLimits(node, data, scoped) : undefined}
-        onChange={handleChange}
-        events={events}
-        navigation={ctx.navigation.get(node.key)}
-      >
-        {children}
-      </Component>
+      <DensityCtx.Provider value={density}>
+        <Component
+          density={density}
+          node={node}
+          props={props}
+          nodeProps={nodeProps}
+          // Value by data key, error by node key. Two components may share a data
+          // key; they can still fail for different reasons.
+          value={valueOf(row?.values ?? data, dataKey)}
+          error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
+          required={isRequired(node, data, scoped)}
+          itemLimits={repeats ? itemLimits(node, data, scoped) : undefined}
+          onChange={handleChange}
+          events={events}
+          navigation={ctx.navigation.get(node.key)}
+        >
+          {children}
+        </Component>
+      </DensityCtx.Provider>
     </NodeLifecycle>
   )
 }
@@ -1006,7 +1021,9 @@ export function FormRenderer({
        * otherwise is worse than saying nothing.
        */}
       {sheet && <style {...(nonce === undefined ? {} : { nonce })}>{sheet}</style>}
-      <RenderNode node={document.root} />
+      <DensityCtx.Provider value={undefined}>
+        <RenderNode node={document.root} />
+      </DensityCtx.Provider>
     </Ctx.Provider>
   )
 }

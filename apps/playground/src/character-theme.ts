@@ -18,18 +18,6 @@ export const characterTheme = createTheme({
     },
   },
   components: {
-    MuiTextField: { defaultProps: { size: 'small' } },
-    MuiFormControl: { defaultProps: { size: 'small' } },
-    MuiCheckbox: { defaultProps: { size: 'small' } },
-    MuiInputBase: { styleOverrides: { root: { fontSize: 14 } } },
-    MuiInputLabel: { defaultProps: { shrink: true } },
-    MuiOutlinedInput: { defaultProps: { notched: true } },
-    MuiFormControlLabel: {
-      styleOverrides: { root: { marginLeft: -6, marginRight: 0 }, label: { fontSize: 13 } },
-    },
-    MuiFormHelperText: {
-      styleOverrides: { root: { fontSize: 12, lineHeight: 1.3, marginTop: 2 } },
-    },
     MuiButton: { styleOverrides: { root: { textTransform: 'none' } } },
   },
 })

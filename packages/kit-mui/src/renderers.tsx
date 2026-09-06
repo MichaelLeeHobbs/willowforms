@@ -33,6 +33,7 @@ import Typography from '@mui/material/Typography'
 import { Children, useId } from 'react'
 import type { ReactNode } from 'react'
 import { muiKit } from './definitions.js'
+import { DensityTheme } from './DensityTheme.js'
 
 import type { JsonValue } from '@formsmith/core'
 import {
@@ -942,7 +943,20 @@ export const muiRendererKit: RendererKit = {
       return [
         type,
         function WithDefaults(input: NodeRendererProps): ReactNode {
-          return <Renderer {...input} props={{ ...defaultProps, ...input.props }} />
+          const props = { ...defaultProps, ...input.props }
+          if (
+            input.density === 'compact' &&
+            input.props['gap'] === undefined &&
+            defaultProps['gap'] !== undefined
+          )
+            props['gap'] = 12
+          const rendered = <Renderer {...input} props={props} />
+          const density = input.props['density']
+          return density === 'compact' || density === 'comfortable' ? (
+            <DensityTheme density={density}>{rendered}</DensityTheme>
+          ) : (
+            rendered
+          )
         },
       ]
     }),

@@ -29,7 +29,7 @@ The D&D example is a detailed editable record sheet. It includes repeatable clas
 
 Players enter modifiers, totals, progression, and resource counts themselves. The sheet demonstrates ordinary form fields, conditions, repeaters, validation, and page navigation; it does not implement a rules engine or calculate a legal character build. Spell and feature descriptions are personal notes rather than a bundled rules database.
 
-The sheet uses responsive columns, separate ability and saving-throw blocks, alphabetical skill rows, and simple ruled sections. Its layout and typography use standard nodes with document CSS, so they remain editable and export with the document. The playground also applies a compact Material UI theme from `src/character-theme.ts`; a host importing the JSON must supply that theme separately to reproduce the Material UI colors, input sizes, and persistent labels. Plain HTML uses the same document layout with its own controls.
+The sheet uses responsive Grid controls, separate ability and saving-throw blocks, alphabetical skill rows, and simple ruled sections. Its layout, typography, and compact density remain editable and export with the document. Both kits honor density; change **Settings → Form density**, or override a group's Density on its Style tab. The playground's Material UI theme in `src/character-theme.ts` supplies the parchment/green colors and button typography. A host importing the JSON supplies its own palette or reuses that theme.
 
 If you have opened an older version, choose **Examples → Reset this example → Reset design** to load the updated design. Export any edits you want to retain first. Preview hides authoring panels automatically; use **Diagnostics** when you want to inspect answers and errors.
 

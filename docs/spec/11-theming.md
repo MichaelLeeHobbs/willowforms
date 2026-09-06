@@ -30,6 +30,12 @@ theme-independent, so relying on its background can place a dark-system kit's li
 designer chrome. The HTML Screen uses its surface token; the MUI Screen uses `background.default` and
 `text.primary`. Browser coverage holds that boundary in both editing and preview modes.
 
+## Form density
+
+`density` is a form-author choice independent of color. The renderer exports `FormDensity` (`comfortable | compact`), passes the inherited value through optional `NodeRendererProps.density`, and includes `data-fs-density` in node attributes when a choice is active. Older documents omit it and keep their host styling. Custom kits may use this value without depending on either reference kit.
+
+The HTML kit styles its own controls using that attribute. The MUI kit applies a nested theme at explicit density boundaries, preserving the host palette, variants, and unrelated component defaults. Compact MUI labels remain above their controls even when empty. Comfortable restores normal sizing within a compact form. Authored gaps override density's fallback spacing. The D&D example uses a document-level compact choice; its host theme now supplies colors and button typography rather than required sizing overrides.
+
 ## Designer tokens
 
 Every value is a custom property on `.fs-shell`, so a host restyles by overriding tokens rather than

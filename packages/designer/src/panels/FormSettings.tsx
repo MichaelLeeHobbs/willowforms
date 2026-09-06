@@ -13,13 +13,14 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { languagesOf } from '../language.js'
-import { keyProblem, languageTag } from '@formsmith/core'
-import type { CodeAction, JsonValue, Language } from '@formsmith/core'
+import { indexKit, keyProblem, languageTag, prop } from '@formsmith/core'
+import type { CodeAction, JsonValue, Kit, Language } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
 
 export interface FormSettingsProps {
   api: DesignerApi
+  kit?: Kit
 }
 
 function nameOf(language: { name?: unknown }): string {
@@ -96,9 +97,20 @@ function CodeActionEditor({
   )
 }
 
-export function FormSettings({ api }: FormSettingsProps): ReactNode {
+export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
   const idBase = useId()
   const { document: doc } = api
+  const supportsDensity =
+    kit &&
+    indexKit(kit)
+      .get(doc.root.type)
+      ?.props.some((entry) => entry.name === 'density')
+  const authoredDensity = doc.root.props['density']
+  const density =
+    authoredDensity?.kind === 'static' &&
+    (authoredDensity.value === 'compact' || authoredDensity.value === 'comfortable')
+      ? authoredDensity.value
+      : 'inherit'
 
   const languages = languagesOf(doc)
   const [code, setCode] = useState('')
@@ -186,6 +198,25 @@ export function FormSettings({ api }: FormSettingsProps): ReactNode {
           onChange={(e) => api.renameDocument(e.target.value)}
         />
       </div>
+
+      {supportsDensity && (
+        <div className="fs-prop-row">
+          <label htmlFor={idBase + '-fs-form-density'}>Form density</label>
+          <select
+            id={idBase + '-fs-form-density'}
+            value={density}
+            onChange={(event) => {
+              const value = event.target.value
+              if (value === 'compact' || value === 'comfortable' || value === 'inherit')
+                api.setProp(doc.root.key, 'density', value === 'inherit' ? undefined : prop(value))
+            }}
+          >
+            <option value="inherit">Host default</option>
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </div>
+      )}
 
       <h3 className="fs-rules__heading">
         {/*

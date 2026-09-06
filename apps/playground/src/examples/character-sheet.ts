@@ -491,7 +491,7 @@ export const characterSheet = form(
     }),
   ],
 )
-characterSheet.root.props = { maxWidth: prop(1080), gap: prop(16) }
+characterSheet.root.props = { maxWidth: prop(1080), gap: prop(16), density: prop('compact') }
 styled(
   characterSheet.root,
   '--sheet-line:color-mix(in srgb,currentColor 22%,transparent); --sheet-accent:#9e7851; --sheet-panel:color-mix(in srgb,currentColor 3%,transparent); padding:24px; border-top:4px solid var(--sheet-accent); overflow-wrap:anywhere;',

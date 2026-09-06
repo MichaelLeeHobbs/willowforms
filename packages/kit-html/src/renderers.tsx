@@ -1035,7 +1035,14 @@ export const htmlRendererKit: RendererKit = {
       return [
         type,
         function WithDefaults(input: NodeRendererProps): ReactNode {
-          return <Renderer {...input} props={{ ...defaultProps, ...input.props }} />
+          const props = { ...defaultProps, ...input.props }
+          if (
+            input.density === 'compact' &&
+            input.props['gap'] === undefined &&
+            defaultProps['gap'] !== undefined
+          )
+            props['gap'] = 12
+          return <Renderer {...input} props={props} />
         },
       ]
     }),

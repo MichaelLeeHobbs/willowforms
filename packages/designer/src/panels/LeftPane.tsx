@@ -73,7 +73,7 @@ export function LeftPane({
           drag={drag}
         />
       )}
-      {active === 'settings' && <FormSettings api={api} />}
+      {active === 'settings' && <FormSettings api={api} kit={kit} />}
     </Tabs>
   )
 }

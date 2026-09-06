@@ -62,6 +62,7 @@ renderer buys exact frames.
 
 ```ts
 interface NodeRendererProps {
+  density?: FormDensity | undefined // inherited comfortable or compact; undefined keeps host defaults
   node: ComponentNode
   props: Record<string, JsonValue> // bindings already resolved to plain JSON
   nodeProps: NodeAttributes // spread these
