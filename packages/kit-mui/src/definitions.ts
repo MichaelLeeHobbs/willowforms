@@ -1,3 +1,4 @@
+import { backgroundImageProps, backgroundImageDefaults } from '@formsmith/core'
 /**
  * Palette metadata for the Material UI kit.
  *
@@ -75,9 +76,10 @@ export const muiKit: Kit = {
       group: 'layout',
       container: true,
       root: true,
-      defaultProps: { density: 'inherit', maxWidth: 640, gap: 16 },
+      defaultProps: { ...backgroundImageDefaults, density: 'inherit', maxWidth: 640, gap: 16 },
       props: [
         density,
+        ...backgroundImageProps,
         { name: 'maxWidth', label: 'Max width', editor: 'number', section: 'style' },
         { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
       ],
@@ -89,9 +91,15 @@ export const muiKit: Kit = {
       icon: 'stack',
       group: 'layout',
       container: true,
-      defaultProps: { density: 'inherit', direction: 'column', gap: 16 },
+      defaultProps: {
+        ...backgroundImageDefaults,
+        density: 'inherit',
+        direction: 'column',
+        gap: 16,
+      },
       props: [
         density,
+        ...backgroundImageProps,
         {
           name: 'direction',
           label: 'Direction',
@@ -239,6 +247,7 @@ export const muiKit: Kit = {
       group: 'layout',
       container: true,
       defaultProps: {
+        ...backgroundImageDefaults,
         density: 'inherit',
         columns: 2,
         gap: 16,
@@ -248,6 +257,7 @@ export const muiKit: Kit = {
       initialProps: { fillWidth: true },
       props: [
         density,
+        ...backgroundImageProps,
         { name: 'fillWidth', label: 'Fill width', editor: 'boolean', section: 'style' },
         { name: 'columns', label: 'Columns', editor: 'number', section: 'style' },
         { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
@@ -286,8 +296,12 @@ export const muiKit: Kit = {
       // spacing scale ... 16 here would be 128px", which stopped being true when
       // `renderers.tsx` moved gaps to pixels and left every default eight times
       // too tight.
-      defaultProps: { density: 'inherit', gap: 16 },
-      props: [density, { name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      defaultProps: { ...backgroundImageDefaults, density: 'inherit', gap: 16 },
+      props: [
+        ...backgroundImageProps,
+        density,
+        { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
+      ],
       events: [],
     },
     {
@@ -308,9 +322,16 @@ export const muiKit: Kit = {
        */
       dataBound: true,
       dataType: 'array',
-      defaultProps: { density: 'inherit', label: 'Items', helperText: '', gap: 16 },
+      defaultProps: {
+        ...backgroundImageDefaults,
+        density: 'inherit',
+        label: 'Items',
+        helperText: '',
+        gap: 16,
+      },
       props: [
         density,
+        ...backgroundImageProps,
         label,
         helperText,
         { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
@@ -323,9 +344,16 @@ export const muiKit: Kit = {
       icon: 'box',
       group: 'layout',
       container: true,
-      defaultProps: { density: 'inherit', padding: 16, background: '', radius: 0 },
+      defaultProps: {
+        ...backgroundImageDefaults,
+        density: 'inherit',
+        padding: 16,
+        background: '',
+        radius: 0,
+      },
       props: [
         density,
+        ...backgroundImageProps,
         { name: 'padding', label: 'Padding', editor: 'number', section: 'style' },
         {
           name: 'background',
@@ -344,9 +372,16 @@ export const muiKit: Kit = {
       icon: 'card',
       group: 'layout',
       container: true,
-      defaultProps: { density: 'inherit', title: '', subtitle: '', variant: 'outlined' },
+      defaultProps: {
+        ...backgroundImageDefaults,
+        density: 'inherit',
+        title: '',
+        subtitle: '',
+        variant: 'outlined',
+      },
       props: [
         density,
+        ...backgroundImageProps,
         { name: 'title', label: 'Title', editor: 'string', localizable: true },
         { name: 'subtitle', label: 'Subtitle', editor: 'string', localizable: true },
         {
@@ -420,16 +455,12 @@ export const muiKit: Kit = {
       label: 'Image',
       icon: 'image',
       group: 'display',
-      defaultProps: { src: '', alt: '', fit: 'cover', width: 0 },
+      defaultProps: { src: '', alt: '', fit: 'cover', width: 0, height: 0 },
       props: [
         {
           name: 'src',
           label: 'Source',
-          editor: 'string',
-          // The same allowlist `Link.href` documents, and the same sink:
-          // `safeHref`. Saying it on one and not the other made the rule
-          // look like a property of links rather than of addresses.
-          hint: 'http, https, mailto, tel, or a path. Anything else is refused.',
+          editor: 'image',
         },
         {
           name: 'alt',
@@ -455,6 +486,13 @@ export const muiKit: Kit = {
           editor: 'number',
           section: 'style',
           hint: 'Zero means full width.',
+        },
+        {
+          name: 'height',
+          label: 'Height',
+          editor: 'number',
+          section: 'style',
+          hint: 'Pixels. Zero keeps the image�s proportions; set a height to use Cover or Contain.',
         },
       ],
       events: [],

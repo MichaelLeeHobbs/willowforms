@@ -23,6 +23,29 @@ export const eventRegistration = form(
   'Community conference',
   'Make it your day. Choose how you will join us and tell us what will help you feel welcome.',
   [
+    {
+      ...node(
+        'Box',
+        'conferenceBanner',
+        {
+          backgroundImage: 'images/community-banner.svg',
+          backgroundFit: 'cover',
+          backgroundOverlay: 'dark',
+          padding: 24,
+          radius: 8,
+        },
+        [
+          node('Heading', 'conferenceWelcome', {
+            text: 'A day of ideas and connection',
+            level: 'h2',
+          }),
+          node('Text', 'conferenceInvitation', {
+            text: 'In person or online. Everyone is welcome.',
+          }),
+        ],
+      ),
+      css: { any: 'color: #fff; min-height: 130px' },
+    },
     section('attendee', 'Your place at the table', [
       grid('attendeeName', [
         text('firstName', 'First name', required),

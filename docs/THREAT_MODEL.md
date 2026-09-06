@@ -13,7 +13,7 @@
 - Core does not provide an `eval`-based evaluator. Hosts that enable expressions must isolate execution,
   enforce time and memory limits, and use equivalent policy on client and server.
 - Document CSS is limited to declarations that cannot escape the component rule or initiate fetching.
-- Document URLs are restricted to schemes appropriate for navigation and media use.
+- Document URLs are restricted to schemes appropriate for navigation and media use. Image and decorative background properties permit http/https, relative paths, and base64 PNG/JPEG/WebP/GIF up to 2 MiB per image. Embedded SVG and non-image data URLs are refused; linked SVGs use image contexts. Hosts control asset access and image CSP. Background URLs are escaped into React inline styles and never interpolated into stylesheet text.
 - Validation and submission traverse bounded tree depth and bounded repeater rows.
 - Server code validates the document, validates submitted value types and rules, checks required context,
   and stores only `submittedData` or `submittedAcross` output.

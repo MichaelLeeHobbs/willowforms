@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   indexKit,
+  backgroundImageProps,
   keyScopesFor,
   readDeclaration,
   safeDeclarations,
@@ -53,26 +54,43 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
   const def = indexKit(kit).get(node.type)
   const styleProps = (def?.props ?? []).filter((prop) => prop.section === 'style')
 
+  const backgroundProps = styleProps.filter((prop) =>
+    backgroundImageProps.some((imageProp) => imageProp.name === prop.name),
+  )
+  const componentProps = styleProps.filter((prop) => !backgroundProps.includes(prop))
+
   const stored = node.css?.[device]
   const text = typeof stored === 'string' ? stored : ''
   const scopes = keyScopesFor(api.document.root, node.key)
 
   return (
     <section className="fs-style">
-      {styleProps.length > 0 && (
+      {componentProps.length > 0 && (
         <>
-          <h3 className="fs-style__heading">From this component</h3>
+          <h2 className="fs-style__heading">From this component</h2>
           <PropRows
             api={api}
             node={node}
-            schemas={styleProps}
+            schemas={componentProps}
             scopes={scopes}
             defaults={def?.defaultProps}
           />
         </>
       )}
 
-      <h3 className="fs-style__heading">Appearance</h3>
+      {backgroundProps.length > 0 && (
+        <details className="fs-style-tools__section">
+          <summary>Background image</summary>
+          <PropRows
+            api={api}
+            node={node}
+            schemas={backgroundProps}
+            scopes={scopes}
+            defaults={def?.defaultProps}
+          />
+        </details>
+      )}
+      <h2 className="fs-style__heading">Appearance</h2>
 
       <div className="fs-prop-row">
         <label htmlFor={idBase + '-fs-style-device'}>Applies to</label>

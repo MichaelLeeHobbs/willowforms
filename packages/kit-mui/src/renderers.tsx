@@ -44,6 +44,8 @@ import {
   optionEntry,
   optionValue,
   safeHref,
+  safeImageSource,
+  backgroundImageStyle,
   safeStyleValue,
 } from '@formsmith/core'
 import type {
@@ -177,6 +179,7 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   return (
     <Box
       {...nodeProps}
+      style={backgroundImageStyle(props)}
       sx={{
         maxWidth: px(num(props['maxWidth'], 640)),
         mx: 'auto',
@@ -193,7 +196,12 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
 function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   const direction = props['direction'] === 'row' ? 'row' : 'column'
   return (
-    <Stack {...nodeProps} direction={direction} gap={px(num(props['gap'], GAP))}>
+    <Stack
+      {...nodeProps}
+      style={backgroundImageStyle(props)}
+      direction={direction}
+      gap={px(num(props['gap'], GAP))}
+    >
       {children}
     </Stack>
   )
@@ -220,7 +228,12 @@ function RepeaterNode({
   const rows = Array.isArray(value) ? value : []
   const renderedRows = Children.toArray(children)
   return (
-    <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
+    <Stack
+      {...nodeProps}
+      style={backgroundImageStyle(props)}
+      direction="column"
+      gap={px(num(props['gap'], GAP))}
+    >
       {/* Group-level help and errors describe the list independently of its rows. */}
       <Stack
         role="group"
@@ -264,7 +277,12 @@ function RepeaterNode({
 
 function StepNode({ props, nodeProps, children, navigation }: NodeRendererProps): ReactNode {
   return (
-    <Stack {...nodeProps} direction="column" gap={px(num(props['gap'], GAP))}>
+    <Stack
+      {...nodeProps}
+      style={backgroundImageStyle(props)}
+      direction="column"
+      gap={px(num(props['gap'], GAP))}
+    >
       {children}
       {navigation && (
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
@@ -501,6 +519,7 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   return (
     <Box
       {...nodeProps}
+      style={backgroundImageStyle(props)}
       sx={{
         display: 'grid',
         gridTemplateColumns: `repeat(auto-fit, minmax(min(${track}, 100%), 1fr))`,
@@ -522,6 +541,7 @@ function BoxNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   return (
     <Box
       {...nodeProps}
+      style={backgroundImageStyle(props)}
       sx={{
         padding: px(num(props['padding'], 16)),
         background: safeStyleValue(str(props['background'])),
@@ -538,7 +558,12 @@ function CardNode({ props, nodeProps, children }: NodeRendererProps): ReactNode 
   const subtitle = str(props['subtitle'])
   const elevated = props['variant'] === 'elevated'
   return (
-    <Card {...nodeProps} variant={elevated ? 'elevation' : 'outlined'} elevation={elevated ? 2 : 0}>
+    <Card
+      {...nodeProps}
+      style={backgroundImageStyle(props)}
+      variant={elevated ? 'elevation' : 'outlined'}
+      elevation={elevated ? 2 : 0}
+    >
       {(title || subtitle) && (
         <CardHeader
           {...(title ? { title } : {})}
@@ -580,43 +605,20 @@ function ImageNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const width = num(props['width'], 0)
   const rawFit = props['fit']
   const fit = rawFit === 'contain' || rawFit === 'fill' ? rawFit : 'cover'
-  /*
-   * `alt` is always present, never omitted. An empty string is the platform's
-   * way of saying decorative, and it is a different statement from a missing
-   * attribute, which leaves a screen reader reading out the file name.
-   */
   return (
     <Box
       {...nodeProps}
       component="img"
-      /*
-       * Omitted when refused, not emptied.
-       *
-       * `src=""` is a request for the current page in several browsers and a
-       * broken-image glyph in the rest, and this and `LinkNode` read the same
-       * allowlist: one refusal, two behaviours, where the link degrades to plain
-       * text and says why. Without the attribute the element falls back to its
-       * `alt`, which is the platform's own answer and the nearest thing to what
-       * the link does.
-       *
-       * A plain prop rather than a conditional spread, and it is equivalent
-       * because `safeHref` answers `undefined` for an unsafe address and for an
-       * empty one alike -- `if (!raw) return undefined` is its first line. React
-       * omits an attribute whose value is `undefined`, so this is the same
-       * markup with one call instead of two.
-       */
-      src={safeHref(props['src'])}
+      src={safeImageSource(props['src'])}
       alt={str(props['alt'])}
-      /*
-       * `px(width)`, not the bare number.
-       *
-       * `sx.width` runs MUI's `sizingTransform`, which reads a number at or
-       * below 1 as a fraction: `width: 1` rendered as `100%` and `0.5` as
-       * `50%`, against a palette hint that says only "Zero means full width".
-       * That is the same reinterpretation `px()` exists for everywhere else in
-       * this file.
-       */
-      sx={{ objectFit: fit, width: width > 0 ? px(width) : '100%', display: 'block' }}
+      sx={{
+        objectFit: fit,
+        width: width > 0 ? px(width) : '100%',
+        height: num(props['height'], 0) > 0 ? px(num(props['height'], 0)) : 'auto',
+        maxWidth: '100%',
+        minHeight: safeImageSource(props['src']) ? undefined : '80px',
+        display: 'block',
+      }}
     />
   )
 }
