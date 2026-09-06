@@ -1,7 +1,7 @@
 # @formsmith/core
 
 The document model, tree operations, and validation engine behind
-[Formsmith](https://github.com/MichaelLeeHobbs/formsmith).
+[FormSmith](https://github.com/MichaelLeeHobbs/formsmith).
 
 No React, no component library. That is deliberate: the same validation runs in the browser during
 preview and in Node on a server, so a form's rules are written once and cannot drift between the two.

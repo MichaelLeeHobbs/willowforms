@@ -315,7 +315,7 @@ describe('emitting the document to the host', () => {
 
 describe('the Save button', () => {
   it('is absent when the host passes no onSave', () => {
-    // Formsmith does not persist. A Save button it cannot honour is worse
+    // FormSmith does not persist. A Save button it cannot honour is worse
     // than no button at all.
     setup()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()

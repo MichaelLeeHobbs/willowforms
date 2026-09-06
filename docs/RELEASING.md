@@ -25,7 +25,7 @@ For concurrent local development, set `FORMSMITH_E2E_PORT` or `FORMSMITH_E2E_DIS
 ## Stop conditions
 
 Do not publish with a failing or skipped gate, an unexplained audit finding, a `Partial` contract being
-advertised as complete, an untested migration, or a code-action evaluator bundled into Formsmith.
+advertised as complete, an untested migration, or a code-action evaluator bundled into FormSmith.
 
 Rollback means deprecating or replacing a bad package version; npm packages are immutable and must not
 be silently republished under the same version.

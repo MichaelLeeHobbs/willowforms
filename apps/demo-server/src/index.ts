@@ -1,7 +1,7 @@
 /**
  * Demo persistence.
  *
- * Formsmith is a frontend library; this exists to show that the same document and
+ * FormSmith is a frontend library; this exists to show that the same document and
  * the same validation rules work on a server -- `validateDocument` on a request
  * body, `validateAcross` over a wizard's steps, `submittedData` before anything
  * is stored, and a host context the browser cannot forge.
@@ -744,7 +744,7 @@ const SHUTDOWN_GRACE = 5000
 export const stopper =
   (server: { close: (done: () => void) => void }, exit: () => void) =>
   (signal: string): void => {
-    console.log('Formsmith demo server stopping on ' + signal)
+    console.log('FormSmith demo server stopping on ' + signal)
     server.close(exit)
 
     // Unrefed, so a connection that will not close cannot itself hang the exit,
@@ -769,7 +769,7 @@ if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
    * happened to be on — a coffee shop, a conference, a client's office.
    */
   const server = serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' })
-  console.log('Formsmith demo server on http://localhost:' + String(PORT))
+  console.log('FormSmith demo server on http://localhost:' + String(PORT))
 
   const stop = stopper(server, () => process.exit(0))
 

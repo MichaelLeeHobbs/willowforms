@@ -1,7 +1,7 @@
 {
   "name": "@formsmith/kit-mui",
   "version": "0.0.0",
-  "description": "Material UI component kit for Formsmith. The reference implementation of the kit contract.",
+  "description": "Material UI component kit for FormSmith. The reference implementation of the kit contract.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

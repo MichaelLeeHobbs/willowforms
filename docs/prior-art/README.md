@@ -1,6 +1,6 @@
 # Prior art
 
-Formsmith was not designed in a vacuum. Before any of it was written, the leading commercial React form
+FormSmith was not designed in a vacuum. Before any of it was written, the leading commercial React form
 builder was studied by driving its public demo in a browser and recording what it does: a black-box UX
 study, no source, no decompilation, no code taken.
 
@@ -11,7 +11,7 @@ not something this repository should be publishing, whatever its research value 
 
 ## What a serious form designer has to do
 
-The capability bar, which is now roughly where Formsmith sits:
+The capability bar, which is now roughly where FormSmith sits:
 
 - A searchable, grouped palette of components
 - A structure tree showing nesting, with selection shared between tree and canvas
@@ -29,7 +29,7 @@ The interesting output of studying a mature competitor is not its feature list, 
 but the places where it falls short. These were the targets, and each one is now something this
 repository enforces rather than aspires to.
 
-| What was observed                                  | What Formsmith does                                                                           |
+| What was observed                                  | What FormSmith does                                                                           |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Submits blocked with no error                      | Every refusal names its reason. The JSON dialog reports every problem at once, not the first. |
 | Buttons with no accessible name                    | Zero, enforced by a test that walks the shell.                                                |
@@ -50,7 +50,7 @@ mature commercial tool to be.
 Reimplementing a feature set from a black-box study is ordinary competitive engineering. Copying a
 product's distinctive appearance or its interface copy is a different thing and a worse argument to have.
 
-- Formsmith has its own design tokens, in `designer.css` and `kit-html.css`, and writes its own strings.
+- FormSmith has its own design tokens, in `designer.css` and `kit-html.css`, and writes its own strings.
 - Feature ideas, information architecture, the shape of the data model, and the vocabulary of component
   properties are all fair game. A label, a placeholder, a disabled state and a gap are universal ideas;
   arriving at the same ones is getting the domain right, not copying.

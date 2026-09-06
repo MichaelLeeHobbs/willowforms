@@ -1,7 +1,7 @@
 {
   "name": "@formsmith/kit-html",
   "version": "0.0.0",
-  "description": "Dependency-free HTML kit for Formsmith. Semantic elements and a stylesheet you can override.",
+  "description": "Dependency-free HTML kit for FormSmith. Semantic elements and a stylesheet you can override.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,7 +1,7 @@
 {
   "name": "@formsmith/renderer",
   "version": "0.0.0",
-  "description": "Runtime renderer for Formsmith documents. Kit-agnostic; embed without the designer.",
+  "description": "Runtime renderer for FormSmith documents. Kit-agnostic; embed without the designer.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

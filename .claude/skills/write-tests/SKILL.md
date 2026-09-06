@@ -1,6 +1,6 @@
 ---
 name: write-tests
-description: Write or fix a test in Formsmith without writing one that passes while proving nothing — vacuous assertions, tests that encode the bug, green from two cancelling faults, unscoped queries, fixtures the product never produces, fixtures whose two names are the same string so the branch under test is invisible, geometry or browser behaviour checked in jsdom, guards that name a DOM scope the DOM has since moved, and positional tests that pass only because the fixture happens to fit on screen. Use whenever authoring a test, changing one, or asking whether a green suite actually means anything.
+description: Write or fix a test in FormSmith without writing one that passes while proving nothing — vacuous assertions, tests that encode the bug, green from two cancelling faults, unscoped queries, fixtures the product never produces, fixtures whose two names are the same string so the branch under test is invisible, geometry or browser behaviour checked in jsdom, guards that name a DOM scope the DOM has since moved, and positional tests that pass only because the fixture happens to fit on screen. Use whenever authoring a test, changing one, or asking whether a green suite actually means anything.
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write
 ---
 

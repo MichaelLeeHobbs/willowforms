@@ -210,7 +210,7 @@ available without one.
 **Status: built.** See [08-validation.md](08-validation.md) for semantics.
 
 The field's data type and its validate-while-typing flag sit above a list of rules. That flag writes
-`FieldSchema.autoValidate`, which is a hint to whoever owns the form's data, since Formsmith never does.
+`FieldSchema.autoValidate`, which is a hint to whoever owns the form's data, since FormSmith never does.
 The canvas preview reads it: a field that asked for it shows its error once the user has touched it,
 rather than waiting for Validate. It was written by this checkbox and read by nothing at all until
 recently, which made it a setting that did nothing. Each rule gets the

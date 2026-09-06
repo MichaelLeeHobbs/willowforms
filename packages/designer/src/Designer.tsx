@@ -46,7 +46,7 @@ export interface DesignerProps {
    * Save the current document. The toolbar shows a Save button only when this
    * is passed.
    *
-   * Formsmith does not persist, so a Save button that appeared unconditionally
+   * FormSmith does not persist, so a Save button that appeared unconditionally
    * would promise something the designer cannot deliver. Its absence is the
    * honest default: `onChange` already emits every version, and many hosts save
    * from that.

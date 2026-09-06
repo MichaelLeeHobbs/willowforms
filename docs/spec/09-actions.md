@@ -5,7 +5,7 @@ turns them into a validated effect batch, and the renderer hands that batch to t
 
 ## Security boundary
 
-Formsmith never evaluates stored action source. A host that wants code actions must inject an
+FormSmith never evaluates stored action source. A host that wants code actions must inject an
 `ActionEvaluator` backed by a sandbox with no ambient page, network, or server capabilities. The source
 must not be passed to `eval`, `Function`, or an equivalent main-realm executor.
 
@@ -74,7 +74,7 @@ server must reconstruct trusted context from its own session.
 
 Every returned value is checked as bounded JSON. An unknown or malformed effect rejects the complete batch before `onEffects` is called. `halt` keeps effects through itself and stops processing immediately: later effects and action references are neither validated nor evaluated. Built-in parameters cannot override the action kind selected by its name.
 
-The host receives the checked batch once and decides how to apply it. Formsmith therefore makes no
+The host receives the checked batch once and decides how to apply it. FormSmith therefore makes no
 claim that effects across DOM, form-data, and host-context owners are transactional. Programmatic writes
 do not synthesize component events, which prevents action loops inside the renderer.
 

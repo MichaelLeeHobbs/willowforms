@@ -266,7 +266,7 @@ export function valueOf(data: FormData, dataKey: string): JsonValue | undefined 
  *
  * Nested, unlike {@link valueOf}, because a host's context already is: nobody
  * has `{ 'user.role': 'admin' }` sitting around, they have `{ user: { role } }`,
- * and making every host flatten it before handing it over is work Formsmith
+ * and making every host flatten it before handing it over is work FormSmith
  * would be creating rather than doing.
  *
  * Every step is an own-property read, for the reason `valueOf` is one, and the

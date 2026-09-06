@@ -2,7 +2,7 @@
 
 **Status: partial.** Both kits and the existing contract suites are built. The ordinary-property accessibility requirements below need a complete cross-kit audit before this contract can claim full coverage. The existing enforcement tables distinguish current checks from that remaining work.
 
-A kit is what makes Formsmith render as Material UI, as plain HTML, or as your own design system. It is
+A kit is what makes FormSmith render as Material UI, as plain HTML, or as your own design system. It is
 the one seam that cannot be retrofitted, so it is specified before anything that depends on it.
 
 ## Two halves, two packages

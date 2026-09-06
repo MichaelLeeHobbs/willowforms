@@ -1,12 +1,12 @@
-# Formsmith
+# FormSmith
 
 An MIT-licensed visual form designer and runtime renderer for React.
 
 ## Mission
 
-Formsmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
+FormSmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
 
-The host application owns storage, permissions, distribution, and business workflows. Formsmith provides the form authoring and completion experience. The [product principles](docs/spec/README.md#product-principles) guide what belongs in the library.
+The host application owns storage, permissions, distribution, and business workflows. FormSmith provides the form authoring and completion experience. The [product principles](docs/spec/README.md#product-principles) guide what belongs in the library.
 
 > Status: initial beta candidate. Authoring, validation, repeaters, step navigation, and host-dispatched actions are implemented. Nothing is published to npm and no release has been cut. See the [beta review](docs/BETA_REVIEW.md) for verified workflows, deferred features, and release gates.
 
@@ -23,13 +23,13 @@ Every good form builder splits the same way: the runtime is open source, the vis
 | SurveyJS         | `survey-core` — MIT              | `survey-creator-core` — commercial                                                  |
 | Vueform          | `@vueform/vueform` — MIT         | Vueform Builder — commercial                                                        |
 | OpnForm, HeyForm | AGPL-3.0                         | AGPL-3.0                                                                            |
-| **Formsmith**    | **MIT**                          | **MIT**                                                                             |
+| **FormSmith**    | **MIT**                          | **MIT**                                                                             |
 
 `@formio/js` is the one honest exception and ships an MIT builder, but it is a 2018-era architecture
-carrying `moment`, `dragula`, and jQuery-shaped patterns. Formsmith is the modern take.
+carrying `moment`, `dragula`, and jQuery-shaped patterns. FormSmith is the modern take.
 
 The AGPL projects are genuinely open, and if AGPL suits you they are further along than this one is.
-Formsmith exists for everyone who cannot take a copyleft dependency and refuses to pay four figures a
+FormSmith exists for everyone who cannot take a copyleft dependency and refuses to pay four figures a
 year for a drag-and-drop panel.
 
 ## What works
@@ -73,7 +73,7 @@ Undo and redo cover all of it.
 Two apps, neither published: `apps/playground` (Vite demo) and `apps/demo-server` (a deliberately tiny
 Hono server so the demo can persist a document and prove server-side validation shares one rule set).
 
-Custom and community components use the [kit interface](docs/spec/02-kit-contract.md#community-component-packages): a package supplies authoring metadata and a React renderer, and the host adds them to its kit. Service-dependent features such as attachments belong to these host-configured extensions. Formsmith does not install plugins from form documents or provide file storage. The standard kits contain no file input; [compatibility notes](docs/COMPATIBILITY.md#pre-beta-corrections) explain how hosts can replace legacy file fields.
+Custom and community components use the [kit interface](docs/spec/02-kit-contract.md#community-component-packages): a package supplies authoring metadata and a React renderer, and the host adds them to its kit. Service-dependent features such as attachments belong to these host-configured extensions. FormSmith does not install plugins from form documents or provide file storage. The standard kits contain no file input; [compatibility notes](docs/COMPATIBILITY.md#pre-beta-corrections) explain how hosts can replace legacy file fields.
 
 ## Quick start
 

@@ -3,7 +3,7 @@
 The visual form designer. MIT licensed, which is the entire point.
 
 Every comparable product opens its runtime and paywalls the builder.
-[Formsmith](https://github.com/MichaelLeeHobbs/formsmith) opens both.
+[FormSmith](https://github.com/MichaelLeeHobbs/formsmith) opens both.
 
 ```bash
 npm install @formsmith/designer @formsmith/core @formsmith/renderer @formsmith/kit-mui

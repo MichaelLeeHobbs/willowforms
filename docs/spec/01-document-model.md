@@ -283,9 +283,9 @@ identities directly now.
 other way.
 
 A document holds exactly one `root`. FormEngine puts several named forms in one document and gives them
-a panel. Formsmith will not.
+a panel. FormSmith will not.
 
-Formsmith has no persistence of its own by design, so "a project" is already the host's concept: a host
+FormSmith has no persistence of its own by design, so "a project" is already the host's concept: a host
 that needs many forms holds many documents, and it already can. Putting them in one document would break
 the format, complicate every panel, and buy nothing the host does not have.
 

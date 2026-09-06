@@ -22,7 +22,7 @@
 
 ## Out of scope
 
-Formsmith cannot make a malicious host application or component kit safe. It also cannot make author
+FormSmith cannot make a malicious host application or component kit safe. It also cannot make author
 code safe when a host executes it with access to page, network, filesystem, process, or secrets.
 
 Security regression tests may contain representative hostile inputs. Runtime comments and public API
