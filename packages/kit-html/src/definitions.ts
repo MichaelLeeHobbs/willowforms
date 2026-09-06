@@ -172,8 +172,8 @@ export const htmlKit: Kit = {
         {
           name: 'options',
           label: 'Options',
-          editor: 'json',
-          hint: 'Array of { label, value }. Bind to an expression to load remotely.',
+          editor: 'options',
+          hint: 'Labels are displayed; values are saved with the answer.',
         },
         /*
          * The empty choice, and the reason it is a property.
@@ -504,7 +504,7 @@ export const htmlKit: Kit = {
         {
           name: 'options',
           label: 'Options',
-          editor: 'json',
+          editor: 'options',
           hint: 'Array of { label, value }. Leave empty and add Radio item children instead.',
         },
         {

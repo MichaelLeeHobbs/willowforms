@@ -61,7 +61,16 @@ export type IconName =
 
 /** Which editor the properties panel renders for a prop. */
 export type PropEditor =
-  'string' | 'multiline' | 'number' | 'boolean' | 'select' | 'color' | 'icon' | 'code' | 'json'
+  | 'string'
+  | 'multiline'
+  | 'number'
+  | 'boolean'
+  | 'select'
+  | 'color'
+  | 'icon'
+  | 'code'
+  | 'json'
+  | 'options'
 
 export interface PropOption {
   label: string
