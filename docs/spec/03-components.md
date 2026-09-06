@@ -33,17 +33,13 @@ interface ComponentDef {
   dataBound?: boolean // appears in submitted data
   dataType?: FieldSchema['type']
   defaultProps: Record<string, JsonValue>
+  initialProps?: Record<string, JsonValue>
   props: PropSchema[]
   events: EventName[]
 }
 ```
 
-`root` and `defaultRenderWhen` were missing from this block while both were load-bearing elsewhere:
-[02-kit-contract.md](02-kit-contract.md) makes "exactly one component is the root, and it is not in the
-palette" a rule the contract suite enforces, and this block gave a kit author no field to declare one
-with. A third-party kit written against it shipped no root and failed a rule whose mechanism was
-undocumented. `test/docs.test.ts` now compares the fields in this block against `ComponentDef` in
-`packages/core/src/kit.ts`.
+`defaultProps` supplies runtime fallbacks and seeds new controls. Optional `initialProps` overrides those values only during `instantiate`; it does not change a renderer's fallback for an omitted property in a saved node. This additive metadata field lets newly created controls adopt improved defaults while preserving old documents. Kits without it keep their existing behavior. `test/docs.test.ts` compares this block with `ComponentDef` in core.
 
 ### Property count is a design decision
 
@@ -90,13 +86,15 @@ uses it.
 | `Screen`   | Built  | yes       | `maxWidth`, `gap`                                           |
 | `Step`     | Built  | yes       | `gap`; ships with a `renderWhen` on `context.step`          |
 | `Stack`    | Built  | yes       | `direction`, `gap`                                          |
-| `Grid`     | Built  | yes       | `columns`, `gap`, `minColumnWidth`                          |
+| `Grid`     | Built  | yes       | `columns`, `gap`, `minColumnWidth`, `fillWidth`             |
 | `Box`      | Built  | yes       | `padding`, `background`, `radius`                           |
 | `Card`     | Built  | yes       | `title`, `subtitle`, `variant`                              |
 | `Repeater` | Built  | yes       | `label`, `helperText`, `gap`; its value is the list of rows |
 
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
 twelve-column system: a form author thinks "two side by side", not "six of twelve".
+
+With `fillWidth: true`, Grid fills its parent, treats `columns` as a maximum count, and wraps when columns would be narrower than `minColumnWidth`. A parent narrower than that minimum still fits one column. Both kits use the same geometry. New palette grids default to this mode; existing documents with `fillWidth` missing or false retain the previous width cap, `columns * (minColumnWidth + gap)`. This additive compatibility choice does not migrate saved layouts. In fill mode, column count is rounded down and bounded to at least one, minimum width to at least 1px, and gap to at least zero; non-finite inputs use the normal defaults.
 
 `Repeater` is the one structurally interesting component here, and it is built. It renders its children
 once per item in an array value, which makes it the array-valued repeated-scope container, and it is how a form

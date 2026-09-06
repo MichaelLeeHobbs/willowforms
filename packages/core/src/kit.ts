@@ -128,6 +128,8 @@ export interface ComponentDef {
   /** Default FieldSchema type for data-bound components. */
   dataType?: FieldSchema['type']
   defaultProps: Record<string, JsonValue>
+  /** Creation-only values; omitted properties in saved nodes still use defaultProps. */
+  initialProps?: Record<string, JsonValue>
   props: PropSchema[]
   events: EventName[]
 }

@@ -287,6 +287,15 @@
  * Every value below comes from a token or from the component's own props, so a
  * host restyles by overriding tokens rather than by fighting these rules.
  */
+.fsh-grid--fill {
+  overflow-wrap: anywhere;
+}
+
+.fsh-grid--fill,
+.fsh-grid--fill > * {
+  min-width: 0;
+}
+
 .fsh-grid {
   display: grid;
 }

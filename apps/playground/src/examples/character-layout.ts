@@ -25,10 +25,7 @@ export function grid(
   columns = 2,
   minimum = 220,
 ): ComponentNode {
-  return styled(
-    node('Box', key, { padding: 0 }, children),
-    `display:grid; gap:12px; align-items:start; width:100%; grid-template-columns:repeat(auto-fit,minmax(min(100%,max(${minimum}px,calc((100% - ${(columns - 1) * 12}px) / ${columns}))),1fr));`,
-  )
+  return node('Grid', key, { columns, minColumnWidth: minimum, gap: 12, fillWidth: true }, children)
 }
 
 export function section(key: string, title: string, children: ComponentNode[]): ComponentNode {

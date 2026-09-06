@@ -43,10 +43,11 @@ export function createDocument(name: string, id: string): FormDocument {
 export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNode | undefined {
   const built = Object.create(null) as Record<string, PropValue>
 
-  const defaults: unknown = def.defaultProps
-  if (defaults && typeof defaults === 'object' && !Array.isArray(defaults)) {
-    for (const [name, value] of Object.entries(defaults as Record<string, JsonValue>)) {
-      built[name] = prop(value)
+  for (const defaults of [def.defaultProps, def.initialProps]) {
+    if (defaults && typeof defaults === 'object' && !Array.isArray(defaults)) {
+      for (const [name, value] of Object.entries(defaults)) {
+        built[name] = prop(value)
+      }
     }
   }
 
