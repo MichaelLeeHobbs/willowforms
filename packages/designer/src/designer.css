@@ -284,6 +284,26 @@
   gap: 6px;
 }
 
+.fs-palette__presets {
+  display: grid;
+  gap: 6px;
+}
+
+.fs-palette__preset {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: start;
+}
+
+.fs-palette__preset small {
+  display: block;
+  margin-block-start: 3px;
+  color: var(--fs-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .fs-palette__item {
   display: flex;
   align-items: center;

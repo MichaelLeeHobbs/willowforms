@@ -17,9 +17,13 @@ import type {
   FieldSchema,
   FormDocument,
   JsonValue,
+  Kit,
   Language,
   PropValue,
 } from '@formsmith/core'
+
+import { buildPreset } from './presets.js'
+import type { PresetId } from './presets.js'
 import {
   same,
   duplicateNode,
@@ -115,6 +119,8 @@ export interface DesignerApi {
   /** Add a palette entry under a parent, selecting the new node. */
 
   addComponent: (def: ComponentDef, parentKey?: string, index?: number) => boolean
+  /** Insert an editable composition as one undoable action. */
+  addPreset: (id: PresetId, kit: Kit, parentKey?: string) => boolean
   setProp: (key: string, name: string, value: PropValue | undefined) => void
   /**
    * Replace a component's field schema, which is where its validation rules
@@ -404,22 +410,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const addComponent = useCallback(
     (def: ComponentDef, parentKey?: string, index?: number) => {
-      /*
-       * Everything is decided here and the updater only writes. It used to do both
-       * in the updater and schedule the selection out of it with `queueMicrotask`,
-       * which is a side effect inside a function three lines of its own comment
-       * said had to be pure.
-       */
       const doc = latest.current
-
-      /*
-       * A definition a kit got wrong produces no node, and no drop.
-       *
-       * `instantiate` refuses a `ComponentDef` with no usable `type` -- a kit
-       * built from JSON can arrive without one -- rather than handing
-       * `generateKey` something it will call `.charAt` on. Nothing to insert is
-       * the same outcome as an insert the tree refuses, three lines down.
-       */
       const node = instantiate(def, doc.root)
       if (!node) return false
 
@@ -427,6 +418,20 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
       if (root === doc.root) return false
 
+      commitDecided(doc, { ...doc, root })
+      setSelectedKey(node.key)
+      return true
+    },
+    [commitDecided],
+  )
+
+  const addPreset = useCallback(
+    (id: PresetId, kit: Kit, parentKey?: string) => {
+      const doc = latest.current
+      const node = buildPreset(id, kit, doc.root)
+      if (!node) return false
+      const root = insertNode(doc.root, containerFor(doc.root, parentKey), node)
+      if (root === doc.root) return false
       commitDecided(doc, { ...doc, root })
       setSelectedKey(node.key)
       return true
@@ -872,6 +877,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       canRedo: history.future.length > 0,
       select: setSelectedKey,
       addComponent,
+      addPreset,
       setProp,
       setFieldSchema,
       renameDocument,
@@ -896,6 +902,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       selectedNode,
       history,
       addComponent,
+      addPreset,
       setProp,
       setFieldSchema,
       renameDocument,

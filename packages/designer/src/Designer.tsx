@@ -324,6 +324,12 @@ export function Designer({
                 setDrawer(undefined)
               }
             }}
+            onAddPreset={(preset) => {
+              if (api.addPreset(preset.id, kit, api.selectedKey)) {
+                announce(preset.label + ' added.')
+                setDrawer(undefined)
+              }
+            }}
             onDragStart={(def, event) => {
               if (!narrow) drag.begin({ kind: 'new', def }, event)
             }}

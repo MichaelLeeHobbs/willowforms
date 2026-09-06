@@ -32,6 +32,8 @@ have one. Two things follow from that and are worth saying rather than discoveri
 that `Designer` makes on its behalf, and the hook's shape is not covered by the stability this table
 implies for `Designer`.
 
+The hook's `addPreset(id, kit, parentKey?)` inserts one of the built-in authoring compositions (`'section'`, `'statistics'`, or `'entry'`, exported as `PresetId`). It returns whether insertion succeeded and creates one history entry. The kit must support the composition; an unavailable preset or refused insertion leaves the document, selection, and history unchanged.
+
 ## Embedding the designer
 
 **Status: built.**
