@@ -2,6 +2,8 @@
 
 These four recommendations were approved and implemented as focused changes. The original rationale and acceptance criteria below record why they were needed. The redesigned demo preserves all eight pages and answer keys using the existing document model.
 
+The subsequent [visual direction](design-direction.md) makes the D&D example desktop-first. The narrow-layout criteria below concern the authoring shell and responsive forms; they do not require the character folio to fit a phone. Its desktop minimum width is an intentional document design choice.
+
 - Preview now hides authoring panels and optional diagnostics, with modal drawers for narrow authoring layouts. See [the shell contract](../spec/04-shell.md#narrow-layouts-and-preview).
 - New Grids fill their parent; saved Grids without the new property retain their previous geometry. The D&D example uses the standard Grid. See [the component contract](../spec/03-components.md).
 - Form and section density are stored in ordinary document properties and supported by both kits. The D&D host theme now supplies its palette, while compact sizing travels with its JSON. See [the theming contract](../spec/11-theming.md#form-density).

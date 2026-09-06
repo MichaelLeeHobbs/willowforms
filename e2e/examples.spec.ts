@@ -170,7 +170,7 @@ for (const kit of ['mui', 'html']) {
     }
     await expect(form.getByRole('button', { name: 'Add Spell', exact: true })).toHaveCount(0)
     await form.getByRole('checkbox', { name: 'This character uses spells' }).check()
-    await form.getByRole('spinbutton', { name: 'Level 9 available slots', exact: true }).fill('1')
+    await form.getByRole('spinbutton', { name: 'L9 available', exact: true }).fill('1')
     await form.getByRole('button', { name: 'Add Spell', exact: true }).click()
     await form.getByRole('textbox', { name: 'Spell name', exact: true }).fill('Guiding spark')
     await form.getByRole('spinbutton', { name: 'Spell level (0 = cantrip)', exact: true }).fill('0')
@@ -186,8 +186,8 @@ for (const kit of ['mui', 'html']) {
     await expect(
       form.getByRole('spinbutton', { name: 'Spell level (0 = cantrip)', exact: true }),
     ).toHaveValue('0')
-    await expect(
-      form.getByRole('spinbutton', { name: 'Level 9 available slots', exact: true }),
-    ).toHaveValue('1')
+    await expect(form.getByRole('spinbutton', { name: 'L9 available', exact: true })).toHaveValue(
+      '1',
+    )
   })
 }

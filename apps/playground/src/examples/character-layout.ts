@@ -23,17 +23,17 @@ export function grid(
   key: string,
   children: ComponentNode[],
   columns = 2,
-  minimum = 220,
+  minimum = 160,
 ): ComponentNode {
   return node('Grid', key, { columns, minColumnWidth: minimum, gap: 12, fillWidth: true }, children)
 }
 
 export function section(key: string, title: string, children: ComponentNode[]): ComponentNode {
   return styled(
-    node('Stack', key, { gap: 14 }, [
+    node('Stack', key, { gap: 12 }, [
       styled(
         node('Heading', key + 'Title', { text: title, level: 'h3' }),
-        'font-family:Georgia,serif; font-size:20px; font-weight:600; padding-bottom:8px; border-bottom:1px solid var(--sheet-line);',
+        'font-family:Cambria,Georgia,serif; font-size:20px; font-weight:600; padding-bottom:8px; border-bottom:1px solid var(--sheet-line);',
       ),
       ...children,
     ]),
@@ -59,12 +59,29 @@ export const notes = (key: string, label: string, help = ''): ComponentNode => {
   return result
 }
 
+export const wide = (component: ComponentNode): ComponentNode =>
+  styled(component, 'grid-column:1 / -1;')
+
 export function step(key: string, title: string, children: ComponentNode[]): ComponentNode {
   const result = baseStep(key, title, children)
   result.props['gap'] = prop(24)
   styled(
     result.children![0]!,
-    'font-family:Georgia,serif; font-size:28px; font-weight:500; letter-spacing:-0.02em;',
+    'font-family:Cambria,Georgia,serif; font-size:25px; font-weight:500;',
   )
   return result
+}
+
+export function folioStep(key: string, title: string, children: ComponentNode[]): ComponentNode {
+  return step(key, title, [
+    styled(
+      node(
+        'Grid',
+        key + 'Columns',
+        { columns: 2, minColumnWidth: 480, gap: 28, fillWidth: true },
+        children,
+      ),
+      'align-items:start;',
+    ),
+  ])
 }
