@@ -25,6 +25,7 @@ import {
 } from './FixedCanvas.js'
 import type { FixedCanvasSize } from './FixedCanvas.js'
 import { ResponsivePanel, useNarrowShell } from './ResponsivePanel.js'
+import { PanelResize, usePanelWidths } from './PanelResize.js'
 import { Canvas, canvasSwallowsFocus } from './panels/Canvas.js'
 import type { Viewport } from './panels/Canvas.js'
 import { DocumentDialog } from './panels/DocumentDialog.js'
@@ -186,6 +187,7 @@ export function Designer({
    * hiding the inspector to see the tree are different intentions.
    */
   const [collapsed, setCollapsed] = useState({ left: false, right: false })
+  const { widths, resize } = usePanelWidths()
   const toggle = useCallback((side: 'left' | 'right') => {
     setCollapsed((current) => ({ ...current, [side]: !current[side] }))
   }, [])
@@ -308,7 +310,7 @@ export function Designer({
           </button>
         </nav>
       )}
-      <div className="fs-body">
+      <div className="fs-body" data-fs-desktop-editing={(!narrow && !preview) || undefined}>
         {!preview && !narrow && (
           <PaneHandle
             side="left"
@@ -322,6 +324,7 @@ export function Designer({
           id={idBase + '-left'}
           side="left"
           narrow={narrow}
+          width={widths.left}
           onClose={() => setDrawer(undefined)}
           hidden={preview || (narrow ? drawer !== 'left' : collapsed.left)}
         >
@@ -348,6 +351,15 @@ export function Designer({
           />
         </ResponsivePanel>
 
+        {!preview && !narrow && !collapsed.left && (
+          <PanelResize
+            side="left"
+            controls={idBase + '-left'}
+            preferred={widths.left}
+            onResize={(width, save) => resize('left', width, save)}
+          />
+        )}
+
         <main className="fs-canvas" aria-label="Form canvas">
           <Canvas
             api={canvasApi}
@@ -362,10 +374,20 @@ export function Designer({
           />
         </main>
 
+        {!preview && !narrow && !collapsed.right && (
+          <PanelResize
+            side="right"
+            controls={idBase + '-right'}
+            preferred={widths.right}
+            onResize={(width, save) => resize('right', width, save)}
+          />
+        )}
+
         <ResponsivePanel
           id={idBase + '-right'}
           side="right"
           narrow={narrow}
+          width={widths.right}
           onClose={() => setDrawer(undefined)}
           hidden={preview || (narrow ? drawer !== 'right' : collapsed.right)}
         >

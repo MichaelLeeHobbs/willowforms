@@ -198,7 +198,10 @@ export default tseslint.config(
        * Widened by one role rather than switched off, so a `tabIndex` on a
        * `<div>` with no role at all is still an error.
        */
-      'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['tabpanel', 'group'] }],
+      'jsx-a11y/no-noninteractive-tabindex': [
+        'error',
+        { roles: ['tabpanel', 'group', 'separator'] },
+      ],
     },
   },
 

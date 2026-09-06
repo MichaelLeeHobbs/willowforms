@@ -22,6 +22,7 @@ export function ResponsivePanel({
   hidden,
   onClose,
   children,
+  width,
 }: {
   id: string
   side: 'left' | 'right'
@@ -29,6 +30,7 @@ export function ResponsivePanel({
   hidden: boolean
   onClose: () => void
   children: ReactNode
+  width?: number | undefined
 }): ReactNode {
   const ref = useRef<HTMLDialogElement>(null)
   const label = side === 'left' ? 'Components and structure' : 'Component properties'
@@ -54,7 +56,13 @@ export function ResponsivePanel({
       {children}
     </dialog>
   ) : (
-    <aside id={id} className={className} aria-label={label} hidden={hidden}>
+    <aside
+      id={id}
+      className={className}
+      aria-label={label}
+      hidden={hidden}
+      style={width === undefined ? undefined : { width, flexBasis: width }}
+    >
       {children}
     </aside>
   )
