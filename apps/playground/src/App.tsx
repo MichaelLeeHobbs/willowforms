@@ -7,7 +7,7 @@ import type { FormDocument, Kit } from '@formsmith/core'
 import { Designer } from '@formsmith/designer'
 import type { DesignerTheme } from '@formsmith/designer'
 import type { RendererKit } from '@formsmith/renderer'
-import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
+import { htmlKit } from '@formsmith/kit-html'
 import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
 
 import '@formsmith/designer/styles.css'
@@ -17,6 +17,7 @@ import { SAMPLE_DOCUMENT } from './sample.js'
 import { EXAMPLES } from './examples/index.js'
 import { ExampleGallery } from './ExampleGallery.js'
 import { characterTheme } from './character-theme.js'
+import { playgroundHtmlRendererKit } from './html-theme.js'
 
 const STORAGE_KEY = 'formsmith.playground.document'
 
@@ -24,7 +25,7 @@ const KIT_KEY = 'formsmith.playground.kit'
 
 const KITS: Record<string, { label: string; kit: Kit; renderers: RendererKit }> = {
   mui: { label: 'Material UI', kit: muiKit, renderers: muiRendererKit },
-  html: { label: 'Plain HTML', kit: htmlKit, renderers: htmlRendererKit },
+  html: { label: 'Plain HTML', kit: htmlKit, renderers: playgroundHtmlRendererKit },
 }
 
 interface Draft {
