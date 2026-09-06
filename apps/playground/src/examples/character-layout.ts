@@ -1,0 +1,73 @@
+import type { ComponentNode } from '@formsmith/core'
+import { prop } from '@formsmith/core'
+import { node, notes as baseNotes, repeat as baseRepeat, step as baseStep } from './builders.js'
+
+const RECORD_TITLES: Record<string, string> = {
+  classes: 'Classes and Hit Dice',
+  attacks: 'Attacks',
+  features: 'Features and feats',
+  resources: 'Limited-use resources',
+  inventory: 'Inventory',
+  spells: 'Spellbook',
+  connections: 'Allies and connections',
+  quests: 'Quests',
+  sessions: 'Session journal',
+}
+
+export function styled(component: ComponentNode, css: string): ComponentNode {
+  component.css = { ...component.css, any: (component.css?.any ?? '') + css }
+  return component
+}
+
+export function grid(
+  key: string,
+  children: ComponentNode[],
+  columns = 2,
+  minimum = 220,
+): ComponentNode {
+  return styled(
+    node('Box', key, { padding: 0 }, children),
+    `display:grid; gap:12px; align-items:start; width:100%; grid-template-columns:repeat(auto-fit,minmax(min(100%,max(${minimum}px,calc((100% - ${(columns - 1) * 12}px) / ${columns}))),1fr));`,
+  )
+}
+
+export function section(key: string, title: string, children: ComponentNode[]): ComponentNode {
+  return styled(
+    node('Stack', key, { gap: 14 }, [
+      styled(
+        node('Heading', key + 'Title', { text: title, level: 'h3' }),
+        'font-family:Georgia,serif; font-size:20px; font-weight:600; padding-bottom:8px; border-bottom:1px solid var(--sheet-line);',
+      ),
+      ...children,
+    ]),
+    'min-width:0;',
+  )
+}
+
+export function repeat(
+  key: string,
+  label: string,
+  children: ComponentNode[],
+  help: string,
+): ComponentNode {
+  const result = baseRepeat(key, label, children, help)
+  result.props['gap'] = prop(12)
+  result.children = [node('Stack', key + 'Row', { gap: 12 }, children)]
+  return section(key + 'Section', RECORD_TITLES[key] ?? label, [result])
+}
+
+export const notes = (key: string, label: string, help = ''): ComponentNode => {
+  const result = baseNotes(key, label, help)
+  result.props['rows'] = prop(2)
+  return result
+}
+
+export function step(key: string, title: string, children: ComponentNode[]): ComponentNode {
+  const result = baseStep(key, title, children)
+  result.props['gap'] = prop(24)
+  styled(
+    result.children![0]!,
+    'font-family:Georgia,serif; font-size:28px; font-weight:500; letter-spacing:-0.02em;',
+  )
+  return result
+}

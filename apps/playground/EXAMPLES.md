@@ -29,4 +29,8 @@ The D&D example is a detailed editable record sheet. It includes repeatable clas
 
 Players enter modifiers, totals, progression, and resource counts themselves. The sheet demonstrates ordinary form fields, conditions, repeaters, validation, and page navigation; it does not implement a rules engine or calculate a legal character build. Spell and feature descriptions are personal notes rather than a bundled rules database.
 
+The sheet uses responsive columns, separate ability and saving-throw blocks, alphabetical skill rows, and simple ruled sections. Its layout and typography use standard nodes with document CSS, so they remain editable and export with the document. The playground also applies a compact Material UI theme from `src/character-theme.ts`; a host importing the JSON must supply that theme separately to reproduce the Material UI colors, input sizes, and persistent labels. Plain HTML uses the same document layout with its own controls.
+
+If you have opened an older version, choose **Examples → Reset this example → Reset design** to load the updated design. Export any edits you want to retain first. For more space in Preview, collapse the Components and structure and Component properties panels using the edge toggles.
+
 The example includes attribution to the [System Reference Document 5.2.1](https://www.dndbeyond.com/srd), available under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). That attribution is part of the form document and remains in exported designs.

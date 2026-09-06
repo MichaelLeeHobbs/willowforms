@@ -16,6 +16,7 @@ import './playground.css'
 import { SAMPLE_DOCUMENT } from './sample.js'
 import { EXAMPLES } from './examples/index.js'
 import { ExampleGallery } from './ExampleGallery.js'
+import { characterTheme } from './character-theme.js'
 
 const STORAGE_KEY = 'formsmith.playground.document'
 
@@ -152,7 +153,7 @@ export function App(): ReactNode {
   if (!active) throw new Error('No kit registered')
 
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={session.document.id === 'dnd-character-sheet' ? characterTheme : theme}>
       <ThemeModeSync mode={themeMode} />
       <CssBaseline />
       <div className="pg-app" data-pg-theme={themeMode}>

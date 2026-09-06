@@ -152,15 +152,13 @@ for (const kit of ['mui', 'html']) {
     await expect(
       form.getByRole('heading', { name: '2 · Abilities, saves, and skills' }),
     ).toBeVisible()
-    await form.getByRole('spinbutton', { name: 'Strength score', exact: true }).fill('16')
+    await form.getByRole('spinbutton', { name: 'STR score', exact: true }).fill('16')
     await form.getByRole('button', { name: 'Back', exact: true }).click()
     await expect(form.getByRole('textbox', { name: 'Character name', exact: true })).toHaveValue(
       'Mira Ashvale',
     )
     await form.getByRole('button', { name: 'Next', exact: true }).click()
-    await expect(form.getByRole('spinbutton', { name: 'Strength score', exact: true })).toHaveValue(
-      '16',
-    )
+    await expect(form.getByRole('spinbutton', { name: 'STR score', exact: true })).toHaveValue('16')
     for (const title of [
       '3 · Combat and conditions',
       '4 · Features and resources',
