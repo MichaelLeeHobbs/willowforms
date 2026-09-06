@@ -1579,6 +1579,10 @@
   padding: 4px;
 }
 
+.fs-style-tools__buttons--format {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .fs-style-tools__buttons button[aria-pressed='true'] {
   border-color: var(--fs-primary);
   color: var(--fs-primary-text);
