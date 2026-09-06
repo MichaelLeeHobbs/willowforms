@@ -16,6 +16,7 @@ import './playground.css'
 import { SAMPLE_DOCUMENT } from './sample.js'
 import { EXAMPLES } from './examples/index.js'
 import { ExampleGallery } from './ExampleGallery.js'
+import { ResetExample } from './ResetExample.js'
 import { characterTheme } from './character-theme.js'
 import { playgroundHtmlRendererKit } from './html-theme.js'
 
@@ -171,7 +172,8 @@ export function App(): ReactNode {
             </svg>
             Formsmith <span className="pg-beta">Beta</span>
           </strong>
-          <ExampleGallery activeId={session.id} onChoose={chooseExample} onReset={resetExample} />
+          <ExampleGallery activeId={session.id} onChoose={chooseExample} />
+          {session.id && <ResetExample onReset={resetExample} />}
           <div className="pg-kit-switch__control">
             <label htmlFor="pg-kit">Kit</label>
             <select id="pg-kit" value={kitId} onChange={(e) => chooseKit(e.target.value)}>
