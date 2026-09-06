@@ -540,6 +540,7 @@ describe('a component a condition hides', () => {
     it('are focusable, so a keyboard can scroll them', () => {
       const view = open()
       fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Diagnostics' }))
 
       const dumps = [...view.container.querySelectorAll('.fs-canvas__data pre')]
       expect(dumps.length, 'preview rendered no dumps, so this asserts nothing').toBe(2)
@@ -554,6 +555,7 @@ describe('a component a condition hides', () => {
       // "group" and has to guess which of the two they are in.
       const view = open()
       fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Diagnostics' }))
 
       const named = [...view.container.querySelectorAll('.fs-canvas__data pre')].map((dump) =>
         dump.getAttribute('aria-label'),
@@ -900,15 +902,13 @@ describe('a press that is not the primary button', () => {
  * would report is a browser question; what it observed is answerable here.
  */
 describe('the selection layer and the elements it watches', () => {
-  it('observes the surface and the form root as soon as it mounts', () => {
+  it('observes the shell, surface, and form root as soon as it mounts', () => {
     const before = observerCount()
     setup()
     const after = observerCount()
 
-    expect(after.made - before.made, 'observers built on mount').toBe(1)
-    // The scrolling surface and the form root, which is the pair the effect
-    // observes. Watching the frames it draws itself would loop.
-    expect(after.observing - before.observing, 'elements watched on mount').toBe(2)
+    expect(after.made - before.made, 'observers built on mount').toBe(2)
+    expect(after.observing - before.observing, 'elements watched on mount').toBe(3)
   })
 
   it('does not rebuild the observer while the pointer sweeps across components', async () => {
@@ -936,7 +936,7 @@ describe('the selection layer and the elements it watches', () => {
     view.unmount()
     const after = observerCount()
 
-    expect(after.disconnects - before.disconnects, 'observers disconnected').toBe(1)
+    expect(after.disconnects - before.disconnects, 'observers disconnected').toBe(2)
     // Back where it started. A residue here is an observer still holding an
     // element after the component that made it is gone, which is the leak these
     // counters exist to show.

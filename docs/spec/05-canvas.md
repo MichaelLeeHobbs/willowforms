@@ -166,8 +166,7 @@ Escape abandons a drag. The release that follows is not treated as a click.
 ## Preview
 
 **Status: built.** Toggles the canvas between authoring and using the form. In preview the kit's
-components receive their own events, data is collected, and Validate runs the real rule engine and shows
-both the data and the errors.
+components receive their own events, data is collected, and Validate runs the real rule engine. Field errors appear beside the affected controls. The optional **Diagnostics** toggle exposes keyboard-scrollable Data and Errors views; these are hidden initially and whenever Preview is entered again. Preview temporarily hides authoring panels and restores the author's desktop panel preferences on return to editing. Answers survive this mode switch.
 
 The same `validateForm` that a server would call. See [08-validation.md](08-validation.md#server-parity).
 

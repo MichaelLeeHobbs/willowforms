@@ -82,6 +82,7 @@ test('a rule authored in the panel fails a real submit with its own message', as
   await designer.page.getByRole('button', { name: 'Preview' }).click()
   await designer.node('email').locator('input').fill('a@b.co')
   await designer.page.getByRole('button', { name: 'Validate' }).click()
+  await designer.page.getByRole('button', { name: 'Diagnostics' }).click()
 
   /*
    * The Errors block, not the whole pane.

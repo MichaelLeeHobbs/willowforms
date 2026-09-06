@@ -172,8 +172,34 @@
   background: var(--fs-bg-panel);
 }
 
-.fs-panel[hidden] {
+.fs-panel[hidden],
+.fs-canvas__data[hidden],
+.fs-drawer:not([open]) {
   display: none;
+}
+
+.fs-mobile-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.fs-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  margin: 0;
+  width: min(360px, calc(100vw - 24px));
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  border: 1px solid var(--fs-border);
+  color: var(--fs-text);
+}
+
+.fs-drawer.fs-panel--right {
+  inset: 0 0 0 auto;
 }
 
 .fs-panel--left {
@@ -206,7 +232,7 @@
  * must inherit nothing from here.
  */
 
-:where(.fs-toolbar, .fs-panel, .fs-canvas__bar) button {
+:where(.fs-toolbar, .fs-panel, .fs-canvas__bar, .fs-mobile-panels) button {
   font: inherit;
   color: inherit;
   padding: 5px 10px;
@@ -216,7 +242,7 @@
   cursor: pointer;
 }
 
-:where(.fs-toolbar, .fs-panel, .fs-canvas__bar) button:hover:not(:disabled) {
+:where(.fs-toolbar, .fs-panel, .fs-canvas__bar, .fs-mobile-panels) button:hover:not(:disabled) {
   background: var(--fs-bg-well);
 }
 
@@ -479,7 +505,8 @@
   font-size: var(--fs-font-size);
 }
 
-.fs-dialog::backdrop {
+.fs-dialog::backdrop,
+.fs-drawer::backdrop {
   background: rgb(0 0 0 / 0.5);
 }
 
