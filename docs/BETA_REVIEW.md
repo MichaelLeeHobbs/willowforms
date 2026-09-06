@@ -37,6 +37,12 @@ The initial beta supports desktop form authoring, responsive form preview, JSON 
 
 Comment cleanup is limited to code changed for these outcomes. No document version or package version is changed.
 
+## September 6 polish follow-up
+
+The follow-up review added discoverable Preview answer JSON, event-wired completion buttons across the gallery, all-page validation for simulated submissions, and a typechecked host submission example. Both kits now preserve button emphasis when given the other kit's variant names. The JSON file importer ignores superseded reads and explains its existing 10 MiB limit, including the impact of embedded images. Relevant comment cleanup removed stale assumptions about document size.
+
+These are refinements within the existing product contract. The remaining release evidence should come from integration in a real host, Firefox/Safari checks, and assistive-technology testing. Chromium automation and local package checks do not establish those results. GitHub Actions is currently unable to start because of account billing restrictions; successful local verification must not be represented as a green CI run.
+
 ## Explicit beta limits
 
 - Attachments belong to host-configured custom or community components. Legacy `FileUpload` nodes remain loadable and show the missing-component fallback until the host supplies a renderer. The [compatibility notes](COMPATIBILITY.md#pre-beta-corrections) describe replacement; FormSmith supplies no upload, storage, or attachment-viewing service.
