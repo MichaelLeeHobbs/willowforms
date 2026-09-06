@@ -17,7 +17,7 @@ it('preserves distinct JSON types and extra fields when their displayed values c
     />,
   )
   fireEvent.change(
-    within(screen.getByRole('group', { name: 'Option 2', exact: true })).getByLabelText('Label'),
+    within(screen.getByRole('group', { name: 'Option 2' })).getByLabelText('Label'),
     { target: { value: 'Zero text' } },
   )
   expect(onChange).toHaveBeenLastCalledWith([
