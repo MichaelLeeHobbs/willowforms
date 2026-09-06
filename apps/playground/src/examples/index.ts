@@ -26,9 +26,9 @@ export const EXAMPLES: ExampleForm[] = [
     id: characterSheet.id,
     title: 'D&D character sheet',
     description:
-      'An eight-page adventurer record: abilities, all 18 skills, combat, inventory, spells, backstory, and a session journal.',
+      'A desktop character folio: abilities, all 18 skills, combat, inventory, spells, backstory, and a session journal.',
     category: 'Adventure',
-    features: ['8 pages', 'Repeaters', 'Conditional sections'],
+    features: ['Desktop layout', '8 pages', 'Repeaters'],
     document: characterSheet,
   },
   {

@@ -183,12 +183,13 @@ function RepeaterNode({
         aria-describedby={messageId}
       >
         {renderedRows.map((row, index) => (
-          <Stack key={index} gap={1} alignItems="flex-start">
+          <Stack key={index} gap={1}>
             {row}
             {index < rows.length && (
               <Button
                 type="button"
                 size="small"
+                sx={{ alignSelf: 'flex-start' }}
                 disabled={rows.length <= limits.min}
                 aria-label={`Remove ${name} item ${String(index + 1)}`}
                 onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}

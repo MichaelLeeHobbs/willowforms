@@ -1,6 +1,6 @@
 import { prop } from '@formsmith/core'
 import { check, choices, date, form, node, number, required, text, when } from './builders.js'
-import { grid, notes, repeat, section, step, styled } from './character-layout.js'
+import { folioStep, grid, notes, repeat, section, step, styled, wide } from './character-layout.js'
 
 const ABILITIES = [
   ['Strength', ['Athletics']],
@@ -17,7 +17,7 @@ export const characterSheet = form(
   'D&D character sheet',
   'A record of your character, their abilities, and the adventures ahead.',
   [
-    step('identity', '1 · Identity and origins', [
+    folioStep('identity', '1 · Identity and origins', [
       section('identityCard', 'The adventurer', [
         grid('characterNames', [
           text('characterName', 'Character name', required),
@@ -87,12 +87,12 @@ export const characterSheet = form(
             node('Stack', key + 'Card', { gap: 8 }, [
               styled(
                 node('Heading', key + 'Title', { text: name, level: 'h3' }),
-                'font-family:Georgia,serif;font-size:16px;font-weight:600;',
+                'font-family:Cambria,Georgia,serif;font-size:18px;font-weight:600;',
               ),
               number(key + 'Score', short + ' score', 1, 30),
               number(key + 'Modifier', short + ' modifier', -5, 10),
             ]),
-            'padding:14px 12px 4px; border:1px solid var(--sheet-line); border-top:3px solid var(--sheet-accent); border-radius:4px; background:var(--sheet-panel);',
+            'padding:16px 12px 4px; border-top:3px solid var(--sheet-accent); background:var(--sheet-panel);',
           )
         }),
         6,
@@ -135,11 +135,11 @@ export const characterSheet = form(
                   ]),
                 ],
                 2,
-                180,
+                130,
               ),
             ),
-          2,
-          380,
+          3,
+          300,
         ),
       ]),
       section('awareness', 'Awareness and proficiencies', [
@@ -157,7 +157,7 @@ export const characterSheet = form(
         notes('senses', 'Special senses and situational bonuses'),
       ]),
     ]),
-    step('combat', '3 · Combat and conditions', [
+    folioStep('combat', '3 · Combat and conditions', [
       section('defenses', 'Ready for the encounter', [
         grid(
           'combatStats',
@@ -212,32 +212,35 @@ export const characterSheet = form(
         ],
         'Keep a separate entry for each weapon, attack, or commonly used action.',
       ),
-      section('conditions', 'Current conditions', [
-        grid(
-          'conditionFlags',
-          [
-            'Blinded',
-            'Charmed',
-            'Deafened',
-            'Frightened',
-            'Grappled',
-            'Incapacitated',
-            'Invisible',
-            'Paralyzed',
-            'Petrified',
-            'Poisoned',
-            'Prone',
-            'Restrained',
-            'Stunned',
-            'Unconscious',
-          ].map((name) => check('condition' + name, name)),
-          3,
-        ),
-        number('exhaustion', 'Exhaustion level', 0, 6),
-        notes('ongoingEffects', 'Ongoing effects, durations, and reminders'),
-      ]),
+      wide(
+        section('conditions', 'Current conditions', [
+          grid(
+            'conditionFlags',
+            [
+              'Blinded',
+              'Charmed',
+              'Deafened',
+              'Frightened',
+              'Grappled',
+              'Incapacitated',
+              'Invisible',
+              'Paralyzed',
+              'Petrified',
+              'Poisoned',
+              'Prone',
+              'Restrained',
+              'Stunned',
+              'Unconscious',
+            ].map((name) => check('condition' + name, name)),
+            7,
+            130,
+          ),
+          number('exhaustion', 'Exhaustion level', 0, 6),
+          notes('ongoingEffects', 'Ongoing effects, durations, and reminders'),
+        ]),
+      ),
     ]),
-    step('features', '4 · Features and resources', [
+    folioStep('features', '4 · Features and resources', [
       repeat(
         'features',
         'Feature',
@@ -284,17 +287,19 @@ export const characterSheet = form(
         'Track limited-use abilities and consumable resources separately.',
       ),
     ]),
-    step('equipment', '5 · Equipment and treasure', [
-      section('coins', 'Coin purse', [
-        grid(
-          'coinAmounts',
-          ['Copper', 'Silver', 'Electrum', 'Gold', 'Platinum'].map((coin) =>
-            number(coin.toLowerCase(), coin + ' pieces'),
+    folioStep('equipment', '5 · Equipment and treasure', [
+      wide(
+        section('coins', 'Coin purse', [
+          grid(
+            'coinAmounts',
+            ['Copper', 'Silver', 'Electrum', 'Gold', 'Platinum'].map((coin) =>
+              number(coin.toLowerCase(), coin + ' pieces'),
+            ),
+            5,
+            160,
           ),
-          5,
-          160,
-        ),
-      ]),
+        ]),
+      ),
       repeat(
         'inventory',
         'Item',
@@ -349,18 +354,12 @@ export const characterSheet = form(
               Array.from({ length: 9 }, (_, index) => {
                 const level = index + 1
                 return section('slotLevel' + String(level), 'Level ' + String(level), [
-                  number(
-                    'slots' + String(level) + 'Total',
-                    'Level ' + String(level) + ' total slots',
-                  ),
-                  number(
-                    'slots' + String(level) + 'Available',
-                    'Level ' + String(level) + ' available slots',
-                  ),
+                  number('slots' + String(level) + 'Total', 'L' + String(level) + ' total slots'),
+                  number('slots' + String(level) + 'Available', 'L' + String(level) + ' available'),
                 ])
               }),
-              3,
-              280,
+              9,
+              100,
             ),
           ]),
           section('pactMagic', 'Pact Magic / other spell resources', [
@@ -424,7 +423,7 @@ export const characterSheet = form(
         true,
       ),
     ]),
-    step('story', '7 · Personality and backstory', [
+    folioStep('story', '7 · Personality and backstory', [
       section('appearance', 'First impressions', [
         grid(
           'appearanceDetails',
@@ -443,20 +442,22 @@ export const characterSheet = form(
         notes('backstory', 'Backstory'),
         notes('goals', 'Goals and unresolved questions'),
       ]),
-      repeat(
-        'connections',
-        'Connection',
-        [
-          grid('connectionDetails', [
-            text('connectionName', 'Person / faction', required),
-            text('relationship', 'Relationship'),
-          ]),
-          notes('connectionNotes', 'History, promises, and complications'),
-        ],
-        'Keep allies, rivals, organizations, and important contacts close at hand.',
+      wide(
+        repeat(
+          'connections',
+          'Connection',
+          [
+            grid('connectionDetails', [
+              text('connectionName', 'Person / faction', required),
+              text('relationship', 'Relationship'),
+            ]),
+            notes('connectionNotes', 'History, promises, and complications'),
+          ],
+          'Keep allies, rivals, organizations, and important contacts close at hand.',
+        ),
       ),
     ]),
-    step('journal', '8 · Adventures and notes', [
+    folioStep('journal', '8 · Adventures and notes', [
       repeat(
         'quests',
         'Quest',
@@ -483,7 +484,7 @@ export const characterSheet = form(
         ],
         'Add a short journal entry after each session.',
       ),
-      notes('tableRules', 'Table rules and character-specific agreements'),
+      wide(notes('tableRules', 'Table rules and character-specific agreements')),
     ]),
     node('Text', 'srdAttribution', {
       variant: 'caption',
@@ -491,14 +492,14 @@ export const characterSheet = form(
     }),
   ],
 )
-characterSheet.root.props = { maxWidth: prop(1080), gap: prop(16), density: prop('compact') }
+characterSheet.root.props = { maxWidth: prop(1320), gap: prop(20), density: prop('compact') }
 styled(
   characterSheet.root,
-  '--sheet-line:color-mix(in srgb,currentColor 22%,transparent); --sheet-accent:#9e7851; --sheet-panel:color-mix(in srgb,currentColor 3%,transparent); padding:24px; border-top:4px solid var(--sheet-accent); overflow-wrap:anywhere;',
+  '--sheet-line:color-mix(in srgb,currentColor 22%,transparent); --sheet-accent:#a47449; --sheet-panel:color-mix(in srgb,currentColor 3%,transparent); min-width:1120px; padding:32px; border-top:4px solid var(--sheet-accent); overflow-wrap:anywhere;',
 )
 styled(
   characterSheet.root.children![0]!,
-  'font-family:Georgia,serif;font-size:17px;font-weight:600;letter-spacing:0.04em;',
+  'font-family:Cambria,Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-0.025em; padding-bottom:16px; border-bottom:1px solid var(--sheet-line);',
 )
 characterSheet.root.children![1]!.renderWhen = characterSheet.root.children![2]!.renderWhen!
 styled(characterSheet.root.children![1]!, 'font-size:14px;')

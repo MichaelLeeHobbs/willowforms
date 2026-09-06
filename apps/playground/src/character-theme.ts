@@ -4,16 +4,16 @@ export const characterTheme = createTheme({
   colorSchemes: {
     light: {
       palette: {
-        primary: { main: '#456456' },
-        background: { default: '#fcfaf5', paper: '#fcfaf5' },
-        text: { primary: '#283b33', secondary: '#5a665e' },
+        primary: { main: '#80542f' },
+        background: { default: '#ffffff', paper: '#ffffff' },
+        text: { primary: '#292723', secondary: '#625d55' },
       },
     },
     dark: {
       palette: {
-        primary: { main: '#b2ccbf' },
-        background: { default: '#18231f', paper: '#18231f' },
-        text: { primary: '#eeeade', secondary: '#bec8bf' },
+        primary: { main: '#dfb990' },
+        background: { default: '#242321', paper: '#242321' },
+        text: { primary: '#f1eee9', secondary: '#c8c2b9' },
       },
     },
   },
