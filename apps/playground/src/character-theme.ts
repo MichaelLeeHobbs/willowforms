@@ -19,5 +19,12 @@ export const characterTheme = createTheme({
   },
   components: {
     MuiButton: { styleOverrides: { root: { textTransform: 'none' } } },
+    MuiFormHelperText: {
+      styleOverrides: {
+        root: ({ ownerState }) => ({
+          display: ownerState.children === '\u00a0' ? 'none' : undefined,
+        }),
+      },
+    },
   },
 })

@@ -146,25 +146,21 @@ for (const kit of ['mui', 'html']) {
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const form = page.locator('[data-fs-key="root"]')
     await form.getByRole('textbox', { name: 'Character name', exact: true }).fill('Mira Ashvale')
-    await form.getByRole('button', { name: 'Add Class', exact: true }).click()
-    await expect(form.getByRole('button', { name: 'Remove Class item 1' })).toBeVisible()
-    await form.getByRole('button', { name: 'Next', exact: true }).click()
-    await expect(
-      form.getByRole('heading', { name: '2 · Abilities, saves, and skills' }),
-    ).toBeVisible()
     await form.getByRole('spinbutton', { name: 'STR score', exact: true }).fill('16')
+    await form.getByRole('button', { name: 'Next', exact: true }).click()
+    await expect(form.getByRole('heading', { name: '2 · Classes and features' })).toBeVisible()
+    await form.getByRole('button', { name: 'Add Class', exact: true }).click()
+    await form.getByRole('textbox', { name: 'Subclass', exact: true }).fill('Champion')
     await form.getByRole('button', { name: 'Back', exact: true }).click()
     await expect(form.getByRole('textbox', { name: 'Character name', exact: true })).toHaveValue(
       'Mira Ashvale',
     )
-    await form.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(form.getByRole('spinbutton', { name: 'STR score', exact: true })).toHaveValue('16')
-    for (const title of [
-      '3 · Combat and conditions',
-      '4 · Features and resources',
-      '5 · Equipment and treasure',
-      '6 · Spellcasting',
-    ]) {
+    await form.getByRole('button', { name: 'Next', exact: true }).click()
+    await expect(form.getByRole('textbox', { name: 'Subclass', exact: true })).toHaveValue(
+      'Champion',
+    )
+    for (const title of ['3 · Equipment and treasure', '4 · Spellcasting']) {
       await form.getByRole('button', { name: 'Next', exact: true }).click()
       await expect(form.getByRole('heading', { name: title, exact: true })).toBeVisible()
     }
@@ -174,7 +170,7 @@ for (const kit of ['mui', 'html']) {
     await form.getByRole('button', { name: 'Add Spell', exact: true }).click()
     await form.getByRole('textbox', { name: 'Spell name', exact: true }).fill('Guiding spark')
     await form.getByRole('spinbutton', { name: 'Spell level (0 = cantrip)', exact: true }).fill('0')
-    for (const title of ['7 · Personality and backstory', '8 · Adventures and notes']) {
+    for (const title of ['5 · Personality and backstory', '6 · Adventures and notes']) {
       await form.getByRole('button', { name: 'Next', exact: true }).click()
       await expect(form.getByRole('heading', { name: title, exact: true })).toBeVisible()
     }

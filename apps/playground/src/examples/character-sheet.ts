@@ -1,41 +1,15 @@
 import { prop } from '@formsmith/core'
 import { check, choices, date, form, node, number, required, text, when } from './builders.js'
 import { folioStep, grid, notes, repeat, section, step, styled, wide } from './character-layout.js'
-
-const ABILITIES = [
-  ['Strength', ['Athletics']],
-  ['Dexterity', ['Acrobatics', 'Sleight of Hand', 'Stealth']],
-  ['Constitution', []],
-  ['Intelligence', ['Arcana', 'History', 'Investigation', 'Nature', 'Religion']],
-  ['Wisdom', ['Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival']],
-  ['Charisma', ['Deception', 'Intimidation', 'Performance', 'Persuasion']],
-] as const
-const keyOf = (label: string): string => label.replaceAll(' ', '')
+import { ABILITIES, playSheet } from './character-play.js'
 
 export const characterSheet = form(
   'dnd-character-sheet',
   'D&D character sheet',
-  'A record of your character, their abilities, and the adventures ahead.',
+  'Keep the numbers you need during play together. Use the other pages for your detailed records.',
   [
-    folioStep('identity', '1 · Identity and origins', [
-      section('identityCard', 'The adventurer', [
-        grid('characterNames', [
-          text('characterName', 'Character name', required),
-          text('playerName', 'Player name'),
-        ]),
-        grid('campaignDetails', [text('campaign', 'Campaign'), text('gameMaster', 'Game master')]),
-        grid('origins', [text('species', 'Species / ancestry'), text('background', 'Background')]),
-        grid(
-          'characterProgress',
-          [
-            number('level', 'Total level', 1, 20),
-            number('experiencePoints', 'Experience points'),
-            number('proficiencyBonus', 'Proficiency bonus', 2, 6),
-          ],
-          3,
-        ),
-        check('heroicInspiration', 'Heroic Inspiration available'),
-      ]),
+    playSheet,
+    folioStep('features', '2 · Classes and features', [
       repeat(
         'classes',
         'Class',
@@ -76,171 +50,12 @@ export const characterSheet = form(
         ],
         'Add one entry for each class, including multiclass levels and Hit Dice.',
       ),
-    ]),
-    step('abilities', '2 · Abilities, saves, and skills', [
-      grid(
-        'abilityCards',
-        ABILITIES.map(([name]) => {
-          const key = name.toLowerCase()
-          const short = name.slice(0, 3).toUpperCase()
-          return styled(
-            node('Stack', key + 'Card', { gap: 8 }, [
-              styled(
-                node('Heading', key + 'Title', { text: name, level: 'h3' }),
-                'font-family:Cambria,Georgia,serif;font-size:18px;font-weight:600;',
-              ),
-              number(key + 'Score', short + ' score', 1, 30),
-              number(key + 'Modifier', short + ' modifier', -5, 10),
-            ]),
-            'padding:16px 12px 4px; border-top:3px solid var(--sheet-accent); background:var(--sheet-panel);',
-          )
-        }),
-        6,
-        160,
-      ),
-      section('savingThrows', 'Saving throws', [
-        grid(
-          'saveFields',
-          ABILITIES.map(([name]) => {
-            const key = name.toLowerCase()
-            const short = name.slice(0, 3).toUpperCase()
-            return node('Stack', key + 'Save', { gap: 0 }, [
-              number(key + 'SaveBonus', short + ' save bonus', -5),
-              check(key + 'SaveProficiency', short + ' proficient'),
-            ])
-          }),
-          6,
-          160,
-        ),
-      ]),
-      section('skills', 'Skills', [
-        node('Text', 'abilityInstructions', {
-          text: 'Record your final bonuses. Training is a reference; modifiers are entered manually.',
-          variant: 'small',
-        }),
-        grid(
-          'skillRows',
-          ABILITIES.flatMap(([, skills]) => skills)
-            .sort()
-            .map((skill) =>
-              grid(
-                keyOf(skill) + 'Skill',
-                [
-                  number(keyOf(skill) + 'Bonus', skill + ' bonus', -5),
-                  choices(keyOf(skill) + 'Training', skill + ' training', [
-                    'None',
-                    'Proficient',
-                    'Expertise',
-                    'Other',
-                  ]),
-                ],
-                2,
-                130,
-              ),
-            ),
-          3,
-          300,
-        ),
-      ]),
-      section('awareness', 'Awareness and proficiencies', [
-        grid(
-          'passiveScores',
-          [
-            number('passivePerception', 'Passive Perception'),
-            number('passiveInsight', 'Passive Insight'),
-            number('passiveInvestigation', 'Passive Investigation'),
-          ],
-          3,
-        ),
+
+      section('training', 'Training and experience', [
+        number('experiencePoints', 'Experience points'),
         notes('languagesKnown', 'Languages and communication'),
         notes('equipmentTraining', 'Armor, weapon, and tool proficiencies'),
-        notes('senses', 'Special senses and situational bonuses'),
       ]),
-    ]),
-    folioStep('combat', '3 · Combat and conditions', [
-      section('defenses', 'Ready for the encounter', [
-        grid(
-          'combatStats',
-          [
-            number('armorClass', 'Armor Class'),
-            number('initiative', 'Initiative bonus', -5),
-            number('speed', 'Speed (feet)'),
-          ],
-          3,
-        ),
-        grid(
-          'health',
-          [
-            number('maxHp', 'Maximum hit points'),
-            number('currentHp', 'Current hit points'),
-            number('temporaryHp', 'Temporary hit points'),
-          ],
-          3,
-        ),
-        grid(
-          'movement',
-          [
-            number('flySpeed', 'Flying speed (feet)'),
-            number('swimSpeed', 'Swimming speed (feet)'),
-            number('climbSpeed', 'Climbing speed (feet)'),
-          ],
-          3,
-        ),
-        grid('deathSaves', [
-          number('deathSaveSuccesses', 'Death save successes', 0, 3),
-          number('deathSaveFailures', 'Death save failures', 0, 3),
-        ]),
-        notes('damageDefenses', 'Resistances, immunities, and vulnerabilities'),
-      ]),
-      repeat(
-        'attacks',
-        'Attack',
-        [
-          grid('attackIdentity', [
-            text('attackName', 'Weapon / attack name', required),
-            number('attackBonus', 'Attack bonus', -5),
-          ]),
-          grid('attackDamage', [
-            text('damageDice', 'Damage dice / formula'),
-            text('damageType', 'Damage type'),
-          ]),
-          grid('attackReach', [
-            text('reachRange', 'Reach / range'),
-            text('attackMastery', 'Mastery / properties'),
-          ]),
-          notes('attackNotes', 'Ammunition, effects, and other notes'),
-        ],
-        'Keep a separate entry for each weapon, attack, or commonly used action.',
-      ),
-      wide(
-        section('conditions', 'Current conditions', [
-          grid(
-            'conditionFlags',
-            [
-              'Blinded',
-              'Charmed',
-              'Deafened',
-              'Frightened',
-              'Grappled',
-              'Incapacitated',
-              'Invisible',
-              'Paralyzed',
-              'Petrified',
-              'Poisoned',
-              'Prone',
-              'Restrained',
-              'Stunned',
-              'Unconscious',
-            ].map((name) => check('condition' + name, name)),
-            7,
-            130,
-          ),
-          number('exhaustion', 'Exhaustion level', 0, 6),
-          notes('ongoingEffects', 'Ongoing effects, durations, and reminders'),
-        ]),
-      ),
-    ]),
-    folioStep('features', '4 · Features and resources', [
       repeat(
         'features',
         'Feature',
@@ -287,7 +102,7 @@ export const characterSheet = form(
         'Track limited-use abilities and consumable resources separately.',
       ),
     ]),
-    folioStep('equipment', '5 · Equipment and treasure', [
+    folioStep('equipment', '3 · Equipment and treasure', [
       wide(
         section('coins', 'Coin purse', [
           grid(
@@ -326,7 +141,7 @@ export const characterSheet = form(
         notes('storedTreasure', 'Treasure stored elsewhere'),
       ]),
     ]),
-    step('spellcasting', '6 · Spellcasting', [
+    step('spellcasting', '4 · Spellcasting', [
       check('usesMagic', 'This character uses spells'),
       when(
         section('magic', 'Spellcasting record', [
@@ -423,8 +238,9 @@ export const characterSheet = form(
         true,
       ),
     ]),
-    folioStep('story', '7 · Personality and backstory', [
+    folioStep('story', '5 · Personality and backstory', [
       section('appearance', 'First impressions', [
+        grid('campaignDetails', [text('campaign', 'Campaign'), text('gameMaster', 'Game master')]),
         grid(
           'appearanceDetails',
           [text('age', 'Age'), text('height', 'Height'), text('build', 'Build')],
@@ -457,7 +273,7 @@ export const characterSheet = form(
         ),
       ),
     ]),
-    folioStep('journal', '8 · Adventures and notes', [
+    folioStep('journal', '6 · Adventures and notes', [
       repeat(
         'quests',
         'Quest',
@@ -492,14 +308,15 @@ export const characterSheet = form(
     }),
   ],
 )
-characterSheet.root.props = { maxWidth: prop(1320), gap: prop(20), density: prop('compact') }
+characterSheet.root.props = { maxWidth: prop(1320), gap: prop(12), density: prop('compact') }
 styled(
   characterSheet.root,
-  '--sheet-line:color-mix(in srgb,currentColor 22%,transparent); --sheet-accent:#a47449; --sheet-panel:color-mix(in srgb,currentColor 3%,transparent); min-width:1120px; padding:32px; border-top:4px solid var(--sheet-accent); overflow-wrap:anywhere;',
+  '--sheet-line:color-mix(in srgb,currentColor 22%,transparent); --sheet-accent:#a47449; --sheet-panel:color-mix(in srgb,currentColor 3%,transparent); min-width:1120px; padding:24px; border-top:4px solid var(--sheet-accent); overflow-wrap:anywhere;',
 )
 styled(
   characterSheet.root.children![0]!,
-  'font-family:Cambria,Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-0.025em; padding-bottom:16px; border-bottom:1px solid var(--sheet-line);',
+  'font-family:Cambria,Georgia,serif;font-size:26px;font-weight:600;letter-spacing:-0.025em; padding-bottom:8px; border-bottom:1px solid var(--sheet-line);',
 )
-characterSheet.root.children![1]!.renderWhen = characterSheet.root.children![2]!.renderWhen!
-styled(characterSheet.root.children![1]!, 'font-size:14px;')
+characterSheet.root.children = characterSheet.root.children!.filter(
+  ({ key }) => key !== 'introduction',
+)
