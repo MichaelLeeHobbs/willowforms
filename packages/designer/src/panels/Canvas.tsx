@@ -456,6 +456,7 @@ export function Canvas({
     <div className="fs-canvas__inner">
       <div className="fs-canvas__bar">
         <button
+          className="fs-canvas__preview"
           type="button"
           onClick={() => {
             onPreview(!preview)

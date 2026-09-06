@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react'
+import { useId, useMemo, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { ComponentDef, Kit, PaletteGroup } from '@formsmith/core'
 import { groupKit } from '@formsmith/core'
@@ -41,6 +41,7 @@ export function Palette({
   consumeClick,
 }: PaletteProps): ReactNode {
   const idBase = useId()
+  const [presetsOpen, setPresetsOpen] = useState(false)
   const groups = useMemo(() => groupKit(kit), [kit])
   const presets = useMemo(() => availablePresets(kit), [kit])
   const matchingPresets = onAddPreset
@@ -81,8 +82,25 @@ export function Palette({
 
       {matchingPresets.length > 0 && (
         <section aria-label="Starting layouts">
-          <h3 className="fs-palette__group-title">Starting layouts</h3>
-          <div className="fs-palette__presets">
+          {query.trim() ? (
+            <h3 className="fs-palette__group-title">Starting layouts</h3>
+          ) : (
+            <button
+              className="fs-palette__disclosure"
+              type="button"
+              aria-expanded={presetsOpen}
+              aria-controls={idBase + '-presets'}
+              onClick={() => setPresetsOpen((open) => !open)}
+            >
+              <Icon name="chevron" /> Starting layouts
+              <span aria-hidden="true">{matchingPresets.length}</span>
+            </button>
+          )}
+          <div
+            id={idBase + '-presets'}
+            className="fs-palette__presets"
+            hidden={!presetsOpen && !query.trim()}
+          >
             {matchingPresets.map((preset) => (
               <button
                 key={preset.id}

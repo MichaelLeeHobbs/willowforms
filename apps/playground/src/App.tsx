@@ -159,17 +159,28 @@ export function App(): ReactNode {
       <div className="pg-app" data-pg-theme={themeMode}>
         <div className="pg-kit-switch">
           <strong className="pg-brand">
+            <svg className="pg-brand__mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+              <rect x="1" y="1" width="26" height="26" rx="7" fill="currentColor" />
+              <path
+                d="M8 8h12M8 14h8M8 20h4"
+                stroke="var(--pg-surface)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
             Formsmith <span className="pg-beta">Beta</span>
           </strong>
           <ExampleGallery activeId={session.id} onChoose={chooseExample} onReset={resetExample} />
-          <label htmlFor="pg-kit">Kit</label>
-          <select id="pg-kit" value={kitId} onChange={(e) => chooseKit(e.target.value)}>
-            {Object.entries(KITS).map(([id, entry]) => (
-              <option key={id} value={id}>
-                {entry.label}
-              </option>
-            ))}
-          </select>
+          <div className="pg-kit-switch__control">
+            <label htmlFor="pg-kit">Kit</label>
+            <select id="pg-kit" value={kitId} onChange={(e) => chooseKit(e.target.value)}>
+              {Object.entries(KITS).map(([id, entry]) => (
+                <option key={id} value={id}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <span className="pg-kit-switch__note" role="status">
             {saveError ? 'Not saved locally' : 'Design saved in this browser'}
           </span>

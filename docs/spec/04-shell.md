@@ -77,6 +77,8 @@ subtly wrong twice, and the inspector's copy had already been wrong once.
 
 ### Starting layouts
 
+Starting layouts are collapsed by default so individual components stay close at hand. The disclosure button opens them with a pointer or keyboard; searching automatically reveals matching presets.
+
 The Components tab offers three searchable presets: **Ruled section** (heading, divider, and field), **Statistics row** (three compact number fields in a responsive Grid), and **Repeatable entry** (a compact item-and-quantity Repeater). They are available when the active kit declares the ordinary component types, properties, container behavior, and data types needed by each composition. Unsupported presets are omitted.
 
 Clicking or keyboard-activating a preset inserts its entire subtree under the selected container, or the selected field's parent, and selects the new group. Insertion is one undoable action and closes a narrow-layout drawer. Each inserted node receives a fresh key; existing answer aliases also reserve names. Presets expand immediately into ordinary editable nodes that can be rearranged, removed, and exported/imported through the existing versioned JSON document. They introduce no new component types, runtime behavior, or interchange format.
