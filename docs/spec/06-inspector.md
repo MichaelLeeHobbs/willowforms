@@ -130,29 +130,13 @@ scoped to the viewport currently simulated on the canvas, so **viewport simulati
 Authoring a tablet rule with no way to see a tablet is writing blind. See
 [04-shell.md](04-shell.md#the-canvas-and-the-wasted-space).
 
-### Two ways to write the same text
+### Common appearance controls and advanced CSS
 
-Structured controls for the common properties, and a raw CSS field underneath. The structured controls
-write into the same string the raw field edits, so there is one stored value and no second format to keep
-in step.
+The Style tab leads with plain controls for text alignment (Left, Center, Right), Bold, Italic, Underline, text color, and component width. Spacing offers separate Top, Right, Bottom, and Left sizes for inside and outside spacing. Background and border controls provide a color picker, thickness, appearance, and corner rounding. Sizes use numeric inputs with explicit units; authors do not need to learn CSS shorthand. Text alignment positions content within a component; whole-component placement uses the parent layout's alignment properties.
 
-Both, rather than either, because they fail in opposite directions. Raw text alone makes padding a typing
-exercise and offers nothing to discover. A structured form alone turns every gap in its vocabulary into a
-wall, and the vocabulary is never finished. Structured for what most authors want, raw for everything
-else, and the raw field is what the structured controls are a shortcut for.
+Raw declarations and shorthand inputs live in a collapsed **Advanced CSS** section for experienced authors and AI-assisted editing. Both interfaces edit the same `node.css` string. Friendly controls read shorthand declarations and device overrides, preserve unrelated declarations and text decorations, and leave unsupported values visible as custom values rather than silently replacing them. Individual spacing edits affect only the chosen side. Border appearance controls apply to all four sides. Clearing a size removes that explicit longhand override, revealing any shorthand or inherited base value.
 
-The structured set is deliberately small: padding, margin, alignment, width, background, border, radius.
-Anything beyond that is the raw field's job. A property earns a control the same way a component property
-earns a row, by being something a form author changes rather than by existing.
-
-The structured set is `padding`, `margin`, `text-align`, `width`, `background`, `border` and
-`border-radius`. A control only ever touches its own declaration, so anything typed by hand survives
-sitting next to a widget, and a property with no widget is left alone rather than discarded. That is the
-property that lets one string have two editors.
-
-The kit's own styling properties — the ones whose `PropSchema.section` is `style` — appear above the CSS
-rather than on the Properties tab. A `Stack`'s `gap` is a better answer than a hand-written margin, and
-an author who writes the CSS first will never discover the property afterwards.
+The kit's own properties whose `PropSchema.section` is `style` appear first. A Stack's gap and alignment are available without writing CSS. All per-node appearance changes participate in undo and retain the existing CSS safety boundary.
 
 ### It applies to the component's own element only
 

@@ -1,17 +1,3 @@
-/**
- * The Style tab: per-component CSS, and the kit properties that are styling.
- *
- * Two ways to write one string. Structured controls for the handful of things
- * most authors change, and a raw field underneath for everything else, both
- * editing the same declarations. Storing them apart would be two sources for
- * one value and a merge nobody can specify.
- *
- * Both, rather than either, because they fail in opposite directions. Raw text
- * alone makes padding a typing exercise and offers nothing to discover; a
- * structured form alone turns every gap in its vocabulary into a wall, and the
- * vocabulary is never finished.
- */
-
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -25,14 +11,8 @@ import type { Device, Kit } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
 import { PropRows } from './Properties.js'
+import { FriendlyStyle } from './FriendlyStyle.js'
 
-/**
- * The controls that earn a widget.
- *
- * Deliberately small, and chosen the way a component property is: by being
- * something a form author changes, not by existing. Anything else is the raw
- * field's job.
- */
 const CONTROLS: { name: string; label: string; placeholder: string }[] = [
   { name: 'padding', label: 'Padding', placeholder: '8px, or 8px 16px' },
   { name: 'margin', label: 'Margin', placeholder: '0, or 8px auto' },
@@ -53,7 +33,7 @@ const DEVICE_LABEL: Record<Device, string> = {
 export interface StyleTabProps {
   api: DesignerApi
   kit: Kit
-  /** Which breakpoint is being edited, which is the canvas's simulated device. */
+
   device: Device
   onDevice: (next: Device) => void
 }
@@ -72,28 +52,13 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
 
   const def = indexKit(kit).get(node.type)
   const styleProps = (def?.props ?? []).filter((prop) => prop.section === 'style')
-  /*
-   * The stored text, if it is text.
-   *
-   * `node.css` comes out of a document, so the entry for a device can be a
-   * number or an object -- and `readDeclaration` walks it as a string, which
-   * throws out of the render of the panel somebody opened to repair it. An
-   * unreadable entry reads as empty here; the raw box below shows what a person
-   * can then overwrite.
-   */
+
   const stored = node.css?.[device]
   const text = typeof stored === 'string' ? stored : ''
-  // A style property can be bound to a condition too, and one authored inside a
-  // repeater has to be able to name that row's answers.
   const scopes = keyScopesFor(api.document.root, node.key)
 
   return (
     <section className="fs-style">
-      {/*
-       * The kit's own styling properties come first: a Stack's gap is a better
-       * answer than a hand-written margin, and an author who writes the CSS
-       * first will not discover the property afterwards.
-       */}
       {styleProps.length > 0 && (
         <>
           <h3 className="fs-style__heading">From this component</h3>
@@ -107,7 +72,7 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
         </>
       )}
 
-      <h3 className="fs-style__heading">Custom CSS</h3>
+      <h3 className="fs-style__heading">Appearance</h3>
 
       <div className="fs-prop-row">
         <label htmlFor={idBase + '-fs-style-device'}>Applies to</label>
@@ -131,25 +96,34 @@ export function StyleTab({ api, kit, device, onDevice }: StyleTabProps): ReactNo
         </p>
       </div>
 
-      {CONTROLS.map((control) => (
-        <DeclarationField
-          key={node.key + ':' + device + ':' + control.name}
-          control={control}
-          value={readDeclaration(text, control.name)}
-          onCommit={(next) => {
-            const written = setDeclaration(text, control.name, next)
-            if (written && !safeDeclarations(written)) return false
-            api.setNodeCss(node.key, device, written)
-            return true
-          }}
-        />
-      ))}
-
-      <RawCss
-        key={node.key + ':' + device}
-        value={text}
-        onCommit={(next) => api.setNodeCss(node.key, device, next)}
+      <FriendlyStyle
+        key={node.key + ':friendly:' + device}
+        text={text}
+        base={device === 'any' ? '' : typeof node.css?.any === 'string' ? node.css.any : ''}
+        onChange={(next) => api.setNodeCss(node.key, device, next)}
       />
+      <details className="fs-style-tools__section">
+        <summary>Advanced CSS</summary>
+        {CONTROLS.map((control) => (
+          <DeclarationField
+            key={node.key + ':' + device + ':' + control.name}
+            control={control}
+            value={readDeclaration(text, control.name)}
+            onCommit={(next) => {
+              const written = setDeclaration(text, control.name, next)
+              if (written && !safeDeclarations(written)) return false
+              api.setNodeCss(node.key, device, written)
+              return true
+            }}
+          />
+        ))}
+
+        <RawCss
+          key={node.key + ':' + device}
+          value={text}
+          onCommit={(next) => api.setNodeCss(node.key, device, next)}
+        />
+      </details>
     </section>
   )
 }
@@ -161,18 +135,13 @@ function DeclarationField({
 }: {
   control: { name: string; label: string; placeholder: string }
   value: string
-  /** Answers whether the value was written. A refusal keeps the typed text. */
+
   onCommit: (next: string) => boolean
 }): ReactNode {
   const idBase = useId()
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
 
-  /*
-   * Re-sync when the document changes underneath, without losing an edit in
-   * progress: only the version this control last saw is replaced. Undo, redo,
-   * and the raw field rewriting this same declaration all reach here.
-   */
   const [refused, setRefused] = useState('')
 
   if (value !== committed) {
@@ -225,17 +194,7 @@ function DeclarationField({
             }
           }}
         />
-        {/*
-          Mounted when there is something to say, rather than a `role="alert"`
-          added to an element that is already there.
 
-          A role applied to a live element is unreliably announced -- assistive
-          technology watches a live region for *mutations*, and changing what an
-          element is is not one it can be relied on to report. So the one
-          control in this panel that refused input silently would also have been
-          the one whose refusal might not be spoken. Every other error in this
-          slice mounts a new element; this now does too.
-        */}
         {refused && (
           <p
             id={idBase + '-fs-style-' + control.name + '-error'}
@@ -250,13 +209,6 @@ function DeclarationField({
   )
 }
 
-/**
- * The raw declarations, committed on blur.
- *
- * A draft rather than a controlled value derived from the parse, for the reason
- * the options box in the condition editor learned: re-deriving the text on
- * every keystroke normalises away what is being typed before it is finished.
- */
 function RawCss({
   value,
   onCommit,
@@ -267,9 +219,6 @@ function RawCss({
   const idBase = useId()
   const [draft, setDraft] = useState(value)
   const [committed, setCommitted] = useState(value)
-
-  // Re-sync when the document changes underneath, without losing an edit in
-  // progress. Undo, redo, and a structured control above all reach here.
   if (value !== committed) {
     setCommitted(value)
     setDraft(value)

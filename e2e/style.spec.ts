@@ -41,6 +41,7 @@ const expectStyle = (
 test('a structured control styles the component on the canvas', async ({ designer }) => {
   await designer.select('website')
   await designer.openTab('Style')
+  await designer.page.getByText('Advanced CSS', { exact: true }).click()
 
   /*
    * Enter commits, and so does moving focus away. The control holds a draft
@@ -59,6 +60,7 @@ test('a structured control styles the component on the canvas', async ({ designe
 test('a device rule overrides the base layer when that device is shown', async ({ designer }) => {
   await designer.select('website')
   await designer.openTab('Style')
+  await designer.page.getByText('Advanced CSS', { exact: true }).click()
 
   await designer.page.getByLabel('Padding').fill('24px')
   await designer.page.getByLabel('Padding').press('Enter')
@@ -83,6 +85,7 @@ test('CSS that would escape the component is not applied', async ({ designer }) 
    */
   await designer.select('website')
   await designer.openTab('Style')
+  await designer.page.getByText('Advanced CSS', { exact: true }).click()
 
   // A real declaration first, so there is a stylesheet on the page to inspect
   // and the refusal below can be told apart from "no styling at all".
