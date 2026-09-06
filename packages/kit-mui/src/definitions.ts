@@ -36,6 +36,20 @@ const disabled: PropSchema = {
   section: 'advanced',
 }
 
+const inlineLabel: PropSchema = {
+  name: 'inlineLabel',
+  label: 'Inline label',
+  editor: 'boolean',
+  section: 'style',
+}
+const inputWidth: PropSchema = {
+  name: 'inputWidth',
+  label: 'Input width',
+  editor: 'number',
+  section: 'style',
+  hint: 'Control width in pixels when Inline label is enabled. Minimum 40px.',
+}
+
 const density: PropSchema = {
   name: 'density',
   label: 'Density',
@@ -135,8 +149,8 @@ export const muiKit: Kit = {
       group: 'inputs',
       dataBound: true,
       dataType: 'number',
-      defaultProps: { label: 'Label', helperText: '' },
-      props: [label, helperText, disabled],
+      defaultProps: { inlineLabel: false, inputWidth: 80, label: 'Label', helperText: '' },
+      props: [inlineLabel, inputWidth, label, helperText, disabled],
       events: ['onChange', 'onBlur'],
     },
     {
@@ -158,8 +172,16 @@ export const muiKit: Kit = {
       group: 'selection',
       dataBound: true,
       dataType: 'string',
-      defaultProps: { label: 'Label', options: [], placeholder: 'Choose…' },
+      defaultProps: {
+        inlineLabel: false,
+        inputWidth: 120,
+        label: 'Label',
+        options: [],
+        placeholder: 'Choose…',
+      },
       props: [
+        inlineLabel,
+        inputWidth,
         label,
         {
           name: 'options',

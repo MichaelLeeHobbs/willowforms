@@ -255,6 +255,8 @@ function Field({
   error,
   nodeProps,
   children,
+  inline = false,
+  inputWidth = 80,
 }: {
   id: string
   label: string
@@ -262,11 +264,25 @@ function Field({
   error: string | undefined
   nodeProps: NodeRendererProps['nodeProps']
   children: ReactNode
+  inline?: boolean
+  inputWidth?: number
 }): ReactNode {
   const messageId = id + '-message'
 
   return (
-    <div {...nodeProps} className={'fsh-field' + (error ? ' is-invalid' : '')}>
+    <div
+      {...nodeProps}
+      className={
+        'fsh-field' + (inline ? ' fsh-field--label-inline' : '') + (error ? ' is-invalid' : '')
+      }
+      style={
+        inline
+          ? {
+              gridTemplateColumns: `minmax(0, 1fr) minmax(0, ${String(Math.max(40, inputWidth))}px)`,
+            }
+          : undefined
+      }
+    >
       <label className="fsh-field__label" htmlFor={id}>
         {label}
       </label>
@@ -349,6 +365,8 @@ function NumberFieldNode({
       helper={str(props['helperText'])}
       error={error}
       nodeProps={nodeProps}
+      inline={bool(props['inlineLabel'])}
+      inputWidth={num(props['inputWidth'], 80)}
     >
       <input
         id={id}
@@ -434,6 +452,8 @@ function SelectNode({
       helper={str(props['helperText'])}
       error={error}
       nodeProps={nodeProps}
+      inline={bool(props['inlineLabel'])}
+      inputWidth={num(props['inputWidth'], 120)}
     >
       <select
         id={id}

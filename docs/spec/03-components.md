@@ -373,6 +373,10 @@ nothing for rows to inherit. Repeated scope is next but one: the key grammar com
 a path grammar on top of a key grammar that does not exist is how the mistake those libraries made would
 get made here. See `docs/decisions.md`.
 
+### Inline field labels
+
+NumberField and Select offer **Inline label** and **Input width** on the Style tab. Inline labels sit beside their controls; the input uses the configured pixel width while the label uses the remaining space and may wrap. Width defaults to 80px for numbers and 120px for selects, with a 40px minimum. Helper text and errors occupy a separate row beneath the field. Labels remain visible and programmatically associated, and errors retain their accessible descriptions and announcement behavior. The default remains the kit's existing label layout. These properties travel with the form document and work in both kits.
+
 ### Controlled navigation
 
 Advancing a step is navigation, so the host still owns the current value in `context` and receives each destination through `FormRenderer.navigation.onNavigate`. When that controlled prop is supplied, both kits draw Back and Next controls. The renderer discovers step nodes from their own context conditions, evaluates each candidate against current data to skip inactive branches, and reports a one-based position without claiming a total that can change as answers change. Nodes sharing the same destination value belong to one page: conditional introductory text and other shared content do not add positions or make Back/Next return to the current page. All navigation controls on that page receive the same position and adjacent destinations.

@@ -29,6 +29,7 @@ import Link from '@mui/material/Link'
 import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
+import type { TextFieldProps } from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { Children, useId } from 'react'
 import type { ReactNode } from 'react'
@@ -123,6 +124,52 @@ const message = (error: string | undefined, helper: string): string => error ?? 
 
 const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
   error ? { role: 'alert' } : {}
+
+function fieldLayout(
+  props: NodeRendererProps['props'],
+  error: string | undefined,
+  required: boolean,
+  defaultWidth: number,
+): Pick<TextFieldProps, 'sx' | 'slotProps' | 'helperText'> {
+  const inline = bool(props['inlineLabel'])
+  return {
+    helperText: inline
+      ? (error ?? str(props['helperText']))
+      : message(error, str(props['helperText'])),
+    sx: inline
+      ? {
+          display: 'grid',
+          gridTemplateColumns: `minmax(0, 1fr) minmax(0, ${px(Math.max(40, num(props['inputWidth'], defaultWidth)))})`,
+          alignItems: 'center',
+          columnGap: '8px',
+        }
+      : undefined,
+    slotProps: {
+      htmlInput: requiredProps(required),
+      formHelperText: {
+        ...alertWhenError(error),
+        sx: inline ? { gridColumn: '1 / -1', marginLeft: 0 } : undefined,
+      },
+      ...(inline
+        ? {
+            input: { notched: false },
+            inputLabel: {
+              shrink: true,
+              sx: {
+                position: 'static',
+                transform: 'none',
+                fontSize: '13px',
+                lineHeight: 1.25,
+                whiteSpace: 'normal',
+                maxWidth: 'none',
+                overflow: 'visible',
+              },
+            },
+          }
+        : {}),
+    },
+  }
+}
 
 function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   // Children need spacing of their own: MUI's outlined label sits on the border
@@ -318,8 +365,7 @@ function NumberFieldNode({
       disabled={bool(props['disabled'])}
       value={jsonToString(value)}
       error={Boolean(error)}
-      helperText={message(error, str(props['helperText']))}
-      slotProps={{ formHelperText: alertWhenError(error), htmlInput: requiredProps(required) }}
+      {...fieldLayout(props, error, required, 80)}
       onBlur={() => events?.onBlur?.()}
       onChange={(e) =>
         changed(onChange, events, e.target.value === '' ? null : Number(e.target.value))
@@ -387,6 +433,7 @@ function SelectNode({
   const raw = props['options']
   const options = Array.isArray(raw) ? raw : []
   const id = useId()
+  const layout = fieldLayout(props, error, required, 120)
   return (
     <TextField
       {...nodeProps}
@@ -398,11 +445,9 @@ function SelectNode({
 
       value={jsonToString(value)}
       error={Boolean(error)}
-      helperText={message(error, str(props['helperText']))}
-
+      {...layout}
       slotProps={{
-        formHelperText: alertWhenError(error),
-        htmlInput: requiredProps(required),
+        ...layout.slotProps,
         select: { SelectDisplayProps: requiredProps(required) },
       }}
       onChange={(e) => changed(onChange, events, optionValue(options, e.target.value))}
