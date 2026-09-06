@@ -62,19 +62,20 @@ panel silently began editing a different node.
 
 ### Property editors
 
-`PropEditor` declares nine. All nine exist.
+`PropEditor` declares ten. All ten exist.
 
-| Editor      | Status | Control                                                 |
-| ----------- | ------ | ------------------------------------------------------- |
-| `string`    | Built  | Single-line text                                        |
-| `multiline` | Built  | Textarea                                                |
-| `number`    | Built  | Number input; clearing it clears the property           |
-| `boolean`   | Built  | Checkbox                                                |
-| `select`    | Built  | Picker; options come from the schema                    |
-| `json`      | Built  | Textarea, committed on blur when it parses              |
-| `color`     | Built  | Swatch plus a text field, so a token name is typeable   |
-| `icon`      | Built  | Picker over the shared icon vocabulary                  |
-| `code`      | Built  | Monospace editor with a line count; no language service |
+| Editor      | Status | Control                                                                   |
+| ----------- | ------ | ------------------------------------------------------------------------- |
+| `string`    | Built  | Single-line text                                                          |
+| `multiline` | Built  | Textarea                                                                  |
+| `number`    | Built  | Number input; clearing it clears the property                             |
+| `boolean`   | Built  | Checkbox                                                                  |
+| `select`    | Built  | Picker; options come from the schema                                      |
+| `options`   | Built  | Label/value rows with add, remove, manual moves, and alphabetical sorting |
+| `json`      | Built  | Textarea, committed on blur when it parses                                |
+| `color`     | Built  | Swatch plus a text field, so a token name is typeable                     |
+| `icon`      | Built  | Picker over the shared icon vocabulary                                    |
+| `code`      | Built  | Monospace editor with a line count; no language service                   |
 
 An editor with no branch of its own still falls back to a single-line text input rather than failing.
 Nothing reaches that fallback now, but it is worth knowing it is there: `multiline` sat behind it from
@@ -104,6 +105,10 @@ Booleans use the same vertical arrangement. Although a checkbox needs little wid
 the picker fails as soon as a modified value adds Reset in the row's third column: the picker keeps its
 readable width and the checkbox is clipped. Keeping the checkbox below the picker leaves both controls
 visible before and after the property is modified.
+
+### Choice options
+
+Select and Radio group use the options editor for static label/value arrays. Authors can add and remove rows, move them up or down, or sort labels alphabetically in either direction. Sorting writes the saved array order; subsequent edits return to fixed/manual mode. Values keep their JSON types, including numbers and booleans, and unrelated option fields are preserved. Computed bindings retain their expression editor. All edits participate in undo.
 
 ### The JSON editor is controlled
 

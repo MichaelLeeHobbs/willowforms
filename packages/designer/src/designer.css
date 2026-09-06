@@ -1658,3 +1658,31 @@
 .fs-prop-row__hint.is-error {
   color: var(--fs-danger);
 }
+
+.fs-prop-row--wide > .fs-prop-row__control {
+  grid-column: 1 / -1;
+}
+.fs-options-editor,
+.fs-options-editor__row,
+.fs-options-editor__row label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.fs-options-editor__row {
+  margin: 4px 0;
+  padding: 10px;
+  border: 1px solid var(--fs-border);
+  border-radius: 4px;
+}
+.fs-options-editor__row legend {
+  padding: 0 4px;
+}
+.fs-options-editor__actions {
+  display: flex;
+  gap: 6px;
+}
+.fs-options-editor__actions button {
+  min-width: 28px;
+  min-height: 28px;
+}

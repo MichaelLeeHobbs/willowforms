@@ -12,6 +12,7 @@ import type {
 } from '@formsmith/core'
 import { dataKeyOf, indexKit, jsonToString, keyScopesFor, optionValue } from '@formsmith/core'
 
+import { OptionsEditor } from './OptionsEditor.js'
 import { Icon, ICON_NAMES } from '../Icon.js'
 import { languagesOf } from '../language.js'
 import { BindingMode, ComputedEditor, TranslationEditor } from './Binding.js'
@@ -613,7 +614,13 @@ function PropRow({
   const raw = value?.kind === 'static' ? value.value : defaultValue
 
   return (
-    <div className={'fs-prop-row' + (isSet ? ' is-set' : '')}>
+    <div
+      className={
+        'fs-prop-row' +
+        (isSet ? ' is-set' : '') +
+        (schema.editor === 'options' ? ' fs-prop-row--wide' : '')
+      }
+    >
       <label htmlFor={id}>
         {schema.label}
         {isSet && (
@@ -698,6 +705,8 @@ function PropRow({
               </option>
             ))}
           </select>
+        ) : schema.editor === 'options' ? (
+          <OptionsEditor id={id} value={raw} onChange={set} />
         ) : schema.editor === 'json' ? (
           <JsonEditor id={id} value={raw} onChange={set} onClear={() => onChange(undefined)} />
         ) : schema.editor === 'color' ? (
