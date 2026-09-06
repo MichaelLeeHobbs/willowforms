@@ -1,34 +1,12 @@
-/**
- * How much of a chosen file the import will read.
- *
- * `accept="application/json,.json"` is a picker filter, not a constraint: a
- * person can choose anything, and `file.text()` on a multi-hundred-megabyte
- * file decodes the whole thing into a string and then puts it in a textarea. A
- * form document is kilobytes; ten megabytes is far past anything real and far
- * short of what hurts.
- */
-const MAX_IMPORT = 10 * 1024 * 1024
-
-/**
- * Import, export, and raw JSON editing.
- *
- * A native `<dialog>` opened with `showModal()`, which brings focus trapping,
- * Escape to close, an inert background, and a backdrop with no code and no
- * dependency. Hand-rolling those is where accessible modals usually go wrong,
- * and the designer has no component library to borrow one from.
- *
- * The designer persists nothing itself. Storage is the host's job, the same way
- * the JavaScript sandbox is: `onChange` hands out every version of the document.
- * This covers the two things a host cannot do on the user's behalf, which are
- * getting JSON out and putting edited JSON back in.
- */
-
 import { useId, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormDocument } from '@formsmith/core'
 import { loadDocument, toJsonSchema, unexportableRules } from '@formsmith/core'
 
 import { Tabs } from './Tabs.js'
+
+// Bound memory use before decoding a file into the editor.
+const MAX_IMPORT = 10 * 1024 * 1024
 
 type View = 'document' | 'schema'
 
@@ -89,8 +67,17 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   const [draft, setDraft] = useState(documentJson)
   const [errors, setErrors] = useState<string[]>([])
   const [note, setNote] = useState('')
+  const fileRead = useRef({ version: 0 })
+  useEffect(() => {
+    const pending = fileRead.current
+    return () => {
+      pending.version++
+    }
+  }, [])
 
   const apply = useCallback(() => {
+    fileRead.current.version++
+    setNote('')
     let parsed: unknown
     try {
       parsed = JSON.parse(draft)
@@ -111,16 +98,7 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   }, [draft, onClose, onReplace])
 
   const copy = useCallback((text: string, what: string) => {
-    /*
-     * Clipboard access can be denied, and the API can be absent entirely.
-     *
-     * The comment said "Say so rather than appearing to work" and the optional
-     * chain did the opposite: with no `navigator.clipboard` -- any page not on a
-     * secure origin, which includes a plain-HTTP host and some embedded
-     * webviews -- the expression evaluated to `undefined`, no handler ran, and
-     * the button did nothing at all. Silence is the one outcome the comment
-     * ruled out.
-     */
+    // Clipboard access can be denied or unavailable in an embedding host.
     const clipboard = navigator.clipboard
     if (!clipboard) {
       setNote('This browser offers no clipboard here. Select the text and copy it instead.')
@@ -152,27 +130,35 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
 
   const onFile = useCallback((file: File | undefined) => {
     if (!file) return
+    const version = ++fileRead.current.version
+    setNote('')
     if (file.size > MAX_IMPORT) {
-      setErrors(['That file is too large to be a form document.'])
+      setErrors([
+        'That file is too large. JSON files must be 10 MiB or smaller. Use linked images to reduce file size.',
+      ])
       return
     }
+    setErrors([])
+    setNote('Reading ' + file.name + '…')
     file
       .text()
       .then((text) => {
-        // Loaded into the editor rather than applied, so a bad file is visible
-        // and fixable instead of replacing the form outright.
+        if (version !== fileRead.current.version) return
         setDraft(text)
         setErrors([])
         setNote('Loaded ' + file.name + '. Review it, then apply.')
       })
-      .catch(() => setErrors(['That file could not be read.']))
+      .catch(() => {
+        if (version !== fileRead.current.version) return
+        setNote('')
+        setErrors(['That file could not be read.'])
+      })
   }, [])
 
   const slug = slugify(doc.name)
 
   return (
     <>
-      {}
       <Tabs
         label="JSON view"
         tabs={VIEWS}
@@ -194,7 +180,11 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
               className="fs-dialog__editor"
               spellCheck={false}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                fileRead.current.version++
+                setDraft(e.target.value)
+                setNote('')
+              }}
             />
 
             {errors.length > 0 && (
@@ -216,13 +206,6 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
               <button type="button" className="is-primary" onClick={apply}>
                 Apply
               </button>
-              {/*
-               * The draft, not the stored document. These serialised `doc`, so
-               * after editing the textarea both handed over the version from
-               * before the edit -- silently, with the edit still on screen. Copy
-               * and Download are about what is in front of you; Revert is the
-               * button that means "give me the stored one back".
-               */}
               <button type="button" onClick={() => copy(draft, 'The document')}>
                 Copy
               </button>
@@ -235,32 +218,18 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
                   type="file"
                   accept="application/json,.json"
                   className="fs-visually-hidden"
+                  aria-describedby={idBase + '-import-hint'}
                   onChange={(e) => {
                     onFile(e.target.files?.[0])
-                    /*
-                     * Cleared, so importing the same file twice does something
-                     * the second time. A file input fires nothing when the
-                     * chosen file has not changed, so re-importing after
-                     * editing it on disk silently did nothing at all — no note,
-                     * no error, just a button that had stopped working.
-                     */
+                    // Allow selecting the same file again after it changes on disk.
                     e.target.value = ''
                   }}
                 />
               </label>
-              {/*
-               * The errors and the note go back with the draft.
-               *
-               * Revert put the stored document into the editor and left
-               * everything else alone, so the `role="alert"` list went on
-               * naming problems with a draft that is no longer on screen --
-               * four complaints about a document the box no longer holds, and
-               * nothing to click to clear them. `onFile` clears both for the
-               * same reason.
-               */}
               <button
                 type="button"
                 onClick={() => {
+                  fileRead.current.version++
                   setDraft(documentJson)
                   setErrors([])
                   setNote('')
@@ -269,6 +238,10 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
                 Revert
               </button>
             </div>
+            <p id={idBase + '-import-hint'} className="fs-dialog__note">
+              JSON files up to 10 MiB. Linked images keep image-heavy forms smaller than embedded
+              images.
+            </p>
           </>
         ) : (
           <>

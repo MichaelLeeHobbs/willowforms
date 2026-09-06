@@ -11,7 +11,7 @@
  * is a real guard rather than a formality.
  */
 
-import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
@@ -275,6 +275,100 @@ describe('the JSON dialog', () => {
   const asFile = (name: string, text: string): File =>
     new File([text], name, { type: 'application/json' })
 
+  const pendingFile = (
+    name: string,
+  ): {
+    file: File
+    promise: Promise<string>
+    resolve: (text: string) => void
+    reject: (reason: Error) => void
+  } => {
+    let resolve!: (text: string) => void
+    let reject!: (reason: Error) => void
+    const promise = new Promise<string>((accept, refuse) => {
+      resolve = accept
+      reject = refuse
+    })
+    const file = asFile(name, '')
+    Object.defineProperty(file, 'text', { value: () => promise })
+    return { file, promise, resolve, reject }
+  }
+
+  it('keeps the latest selected file when earlier reads finish later', async () => {
+    const { user, open, editor } = setup()
+    await open()
+    const first = pendingFile('first.json')
+    const second = pendingFile('second.json')
+    await chooseFile(user, first.file)
+    await chooseFile(user, second.file)
+    await act(() => {
+      second.resolve('{"latest":true}')
+      return second.promise
+    })
+    expect(editor().value).toBe('{"latest":true}')
+    await act(() => {
+      first.resolve('{"old":true}')
+      return first.promise
+    })
+    expect(editor().value).toBe('{"latest":true}')
+    expect(within(screen.getByRole('dialog')).getByRole('status').textContent).toContain(
+      'Loaded second.json',
+    )
+  })
+
+  it.each(['edit', 'revert'])(
+    'preserves an explicit %s after a file read starts',
+    async (operation) => {
+      const { user, open, editor } = setup()
+      await open()
+      const original = editor().value
+      const pending = pendingFile('slow.json')
+      await chooseFile(user, pending.file)
+      if (operation === 'edit') await replaceEditor(user, editor(), '{"manual":true}')
+      else await user.click(screen.getByRole('button', { name: 'Revert' }))
+      await act(() => {
+        pending.resolve('{"old":true}')
+        return pending.promise
+      })
+      expect(editor().value).toBe(operation === 'edit' ? '{"manual":true}' : original)
+      expect(within(screen.getByRole('dialog')).queryByRole('status')).toBeNull()
+    },
+  )
+
+  it('does not report a stale read failure over a newer successful import', async () => {
+    const { user, open, editor } = setup()
+    await open()
+    const pending = pendingFile('slow.json')
+    await chooseFile(user, pending.file)
+    await chooseFile(user, asFile('latest.json', '{"latest":true}'))
+    await act(() => {
+      pending.reject(new Error('unreadable'))
+      return pending.promise.catch(() => undefined)
+    })
+    expect(editor().value).toBe('{"latest":true}')
+    expect(within(screen.getByRole('dialog')).queryByRole('alert')).toBeNull()
+    expect(within(screen.getByRole('dialog')).getByRole('status').textContent).toContain(
+      'Loaded latest.json',
+    )
+  })
+
+  it('cancels a pending read even when the next selected file exceeds the limit', async () => {
+    const { user, open, editor } = setup()
+    await open()
+    const original = editor().value
+    const pending = pendingFile('slow.json')
+    await chooseFile(user, pending.file)
+    const huge = asFile('huge.json', '{}')
+    Object.defineProperty(huge, 'size', { value: 11 * 1024 * 1024 })
+    await chooseFile(user, huge)
+    await act(() => {
+      pending.resolve('{"old":true}')
+      return pending.promise
+    })
+    expect(editor().value).toBe(original)
+    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toContain('too large')
+  })
+
   it('loads a chosen file into the editor rather than applying it', async () => {
     const { user, open, editor, latest } = setup()
     await open()
@@ -315,12 +409,6 @@ describe('the JSON dialog', () => {
   })
 
   it('refuses a file too large to be a form document', async () => {
-    /*
-     * `accept="application/json,.json"` is a picker filter, not a constraint:
-     * anything can be chosen, and `file.text()` on a very large file decodes
-     * the whole thing into a string and then puts it in a textarea. A form
-     * document is kilobytes.
-     */
     const { user, open, editor } = setup()
     await open()
 

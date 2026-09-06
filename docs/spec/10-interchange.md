@@ -46,6 +46,8 @@ Actions: Apply, Copy, Download, Import file, Revert.
 An imported file is loaded **into the editor**, not applied. A bad file is then visible and fixable
 rather than having already replaced the form.
 
+The file picker accepts JSON files up to 10 MiB and explains the limit before selection. Embedded image data counts toward the total; linked images keep larger forms smaller. This is an editor file-read limit, not a document-version rule or a host storage policy. A newer selection, manual edit, Revert, Apply, or closing the dialog supersedes an in-flight read; late results and errors cannot overwrite the user's subsequent work.
+
 ## Pasted JSON is untrusted input
 
 **Status: built.** This is the one place a user hands the builder arbitrary data, so it gets the same
