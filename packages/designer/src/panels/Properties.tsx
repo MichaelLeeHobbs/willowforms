@@ -12,6 +12,7 @@ import type {
 } from '@formsmith/core'
 import { dataKeyOf, indexKit, jsonToString, keyScopesFor, optionValue } from '@formsmith/core'
 
+import { ImageSource } from './ImageSource.js'
 import { OptionsEditor } from './OptionsEditor.js'
 import { Icon, ICON_NAMES } from '../Icon.js'
 import { languagesOf } from '../language.js'
@@ -618,7 +619,7 @@ function PropRow({
       className={
         'fs-prop-row' +
         (isSet ? ' is-set' : '') +
-        (schema.editor === 'options' ? ' fs-prop-row--wide' : '')
+        (schema.editor === 'options' || schema.editor === 'image' ? ' fs-prop-row--wide' : '')
       }
     >
       <label htmlFor={id}>
@@ -705,6 +706,8 @@ function PropRow({
               </option>
             ))}
           </select>
+        ) : schema.editor === 'image' ? (
+          <ImageSource id={id} value={typeof raw === 'string' ? raw : ''} onChange={set} />
         ) : schema.editor === 'options' ? (
           <OptionsEditor id={id} value={raw} onChange={set} />
         ) : schema.editor === 'json' ? (

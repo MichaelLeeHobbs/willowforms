@@ -62,7 +62,7 @@ panel silently began editing a different node.
 
 ### Property editors
 
-`PropEditor` declares ten. All ten exist.
+`PropEditor` declares eleven. All eleven exist.
 
 | Editor      | Status | Control                                                                   |
 | ----------- | ------ | ------------------------------------------------------------------------- |
@@ -71,6 +71,7 @@ panel silently began editing a different node.
 | `number`    | Built  | Number input; clearing it clears the property                             |
 | `boolean`   | Built  | Checkbox                                                                  |
 | `select`    | Built  | Picker; options come from the schema                                      |
+| `image`     | Built  | Linked or embedded image with preview, removal, and load errors           |
 | `options`   | Built  | Label/value rows with add, remove, manual moves, and alphabetical sorting |
 | `json`      | Built  | Textarea, committed on blur when it parses                                |
 | `color`     | Built  | Swatch plus a text field, so a token name is typeable                     |
@@ -256,3 +257,9 @@ of reach.
 A run breaks on a different property, a different component, a structural edit, or an undo. Deliberately
 not on a timer: coalescing by wall clock makes the behaviour depend on how fast someone types and the
 tests depend on how fast the machine runs them.
+
+### Image sources and decorative backgrounds
+
+Image sources have a URL field and preview, a local file picker that embeds PNG, JPEG, WebP, or GIF up to 2 MiB per image, and Remove image. Invalid sources and failed previews show an actionable error. Embedded data stays inside the document; FormSmith does not upload assets or manage storage. SVG is supported through linked image URLs, never injected markup or embedded SVG. Hosts supply accessible asset URLs and an appropriate image CSP.
+
+Layout containers, including the root Screen, expose Background image, Image fit (Cover, Contain, Tile), Image position, and Readability overlay (None, Light, Dark) in a Background image disclosure in Style. These are ordinary version-1 properties and support the normal property binding modes and undo; they apply across devices. Backgrounds are decorative and affect only the container�s own element. Meaningful artwork uses an Image component with alternative text. Dedicated image properties permit image fetching through a shared image-source allowlist; raw CSS continues to reject URL functions.

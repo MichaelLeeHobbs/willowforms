@@ -94,6 +94,8 @@ uses it.
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
 twelve-column system: a form author thinks "two side by side", not "six of twelve".
 
+All seven layout components expose `backgroundImage`, `backgroundFit`, `backgroundPosition`, and `backgroundOverlay` on Style. The [image controls](06-inspector.md#image-sources-and-decorative-backgrounds) define their source and rendering policy.
+
 All seven layout components also expose `density` on the Style tab: `inherit`, `comfortable`, or `compact`. The Settings tab offers the root's choice as **Form density** when the kit supports it. The nearest explicit choice applies to descendants, including repeated rows; a nested group can override it. Missing, inherit, or unsupported values preserve the inherited choice, and a form with no choice preserves host defaults. Each renderer instance starts its own density context. Compact mode reduces control sizes and uses 12px fallback gaps; explicit authored gaps retain their pixel values. It does not hide labels, helper text, errors, or focus indicators. This is an additive version-1 node property, not a new document setting or migration.
 
 With `fillWidth: true`, Grid fills its parent, treats `columns` as a maximum count, and wraps when columns would be narrower than `minColumnWidth`. A parent narrower than that minimum still fits one column. Both kits use the same geometry. New palette grids default to this mode; existing documents with `fillWidth` missing or false retain the previous width cap, `columns * (minColumnWidth + gap)`. This additive compatibility choice does not migrate saved layouts. In fill mode, column count is rounded down and bounded to at least one, minimum width to at least 1px, and gap to at least zero; non-finite inputs use the normal defaults.
@@ -110,12 +112,14 @@ no index is ever authored. See [Repeated scope](#repeated-scope).
 
 ### Display
 
-| Component | Status | Data-bound | Properties                   |
-| --------- | ------ | ---------- | ---------------------------- |
-| `Heading` | Built  | no         | `text`, `level`              |
-| `Text`    | Built  | no         | `text`, `variant`, `align`   |
-| `Divider` | Built  | no         | `orientation`                |
-| `Image`   | Built  | no         | `src`, `alt`, `fit`, `width` |
+| Component | Status | Data-bound | Properties                             |
+| --------- | ------ | ---------- | -------------------------------------- |
+| `Heading` | Built  | no         | `text`, `level`                        |
+| `Text`    | Built  | no         | `text`, `variant`, `align`             |
+| `Divider` | Built  | no         | `orientation`                          |
+| `Image`   | Built  | no         | `src`, `alt`, `fit`, `width`, `height` |
+
+Image width and height are pixels. Zero width means full width; zero height keeps intrinsic proportions. An explicit height makes Cover, Contain, and Fill useful. Sources allow http/https, relative paths, and bounded embedded raster images; linked SVGs render in an image context.
 
 **`Link` refuses an address it does not recognise.** `href` comes from a document, and a form author is
 not always the person deploying the form, so `javascript:` in an `href` is the same code-execution

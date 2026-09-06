@@ -71,6 +71,7 @@ export type PropEditor =
   | 'code'
   | 'json'
   | 'options'
+  | 'image'
 
 export interface PropOption {
   label: string

@@ -27,6 +27,8 @@ import {
   optionEntry,
   optionValue,
   safeHref,
+  safeImageSource,
+  backgroundImageStyle,
   safeStyleValue,
 } from '@formsmith/core'
 import type { JsonValue } from '@formsmith/core'
@@ -91,7 +93,11 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
     <div
       {...nodeProps}
       className="fsh-screen"
-      style={{ maxWidth: num(props['maxWidth'], 640), gap: num(props['gap'], 16) }}
+      style={{
+        ...backgroundImageStyle(props),
+        maxWidth: num(props['maxWidth'], 640),
+        gap: num(props['gap'], 16),
+      }}
     >
       {children}
     </div>
@@ -104,7 +110,11 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
     <div
       {...nodeProps}
       className="fsh-stack"
-      style={{ flexDirection: direction, gap: num(props['gap'], 16) }}
+      style={{
+        ...backgroundImageStyle(props),
+        flexDirection: direction,
+        gap: num(props['gap'], 16),
+      }}
     >
       {children}
     </div>
@@ -132,12 +142,15 @@ function Repeater({
   const renderedRows = Children.toArray(children)
   const label = str(props['label'], node.dataKey ?? node.key)
   return (
-    <div {...nodeProps}>
+    <div {...nodeProps} style={backgroundImageStyle(props)}>
       {/* Group-level help and errors describe the list independently of its rows. */}
       <div
         role="group"
         className="fsh-stack"
-        style={{ flexDirection: 'column', gap: num(props['gap'], 16) }}
+        style={{
+          flexDirection: 'column',
+          gap: num(props['gap'], 16),
+        }}
         aria-label={label}
         aria-describedby={messageId}
       >
@@ -182,7 +195,11 @@ function Step({ props, nodeProps, children, navigation }: NodeRendererProps): Re
     <div
       {...nodeProps}
       className="fsh-stack"
-      style={{ flexDirection: 'column', gap: num(props['gap'], 16) }}
+      style={{
+        ...backgroundImageStyle(props),
+        flexDirection: 'column',
+        gap: num(props['gap'], 16),
+      }}
     >
       {children}
       {navigation && (
@@ -518,6 +535,7 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
       {...nodeProps}
       className={'fsh-grid' + (fill ? ' fsh-grid--fill' : '')}
       style={{
+        ...backgroundImageStyle(props),
         gridTemplateColumns: `repeat(auto-fit, minmax(min(${track}, 100%), 1fr))`,
         gap,
         width: fill ? '100%' : undefined,
@@ -538,6 +556,7 @@ function Box({ props, nodeProps, children }: NodeRendererProps): ReactNode {
         padding: num(props['padding'], 16),
         background: safeStyleValue(str(props['background'])),
         borderRadius: num(props['radius'], 0),
+        ...backgroundImageStyle(props),
       }}
     >
       {children}
@@ -550,7 +569,11 @@ function Card({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   const subtitle = str(props['subtitle'])
   const variant = props['variant'] === 'elevated' ? 'elevated' : 'outlined'
   return (
-    <section {...nodeProps} className={'fsh-card fsh-card--' + variant}>
+    <section
+      {...nodeProps}
+      style={backgroundImageStyle(props)}
+      className={'fsh-card fsh-card--' + variant}
+    >
       {(title || subtitle) && (
         <header className="fsh-card__header">
           {title && <h3 className="fsh-card__title">{title}</h3>}
@@ -599,20 +622,18 @@ function Image({ props, nodeProps }: NodeRendererProps): ReactNode {
   const width = num(props['width'], 0)
   const rawFit = props['fit']
   const fit = rawFit === 'contain' || rawFit === 'fill' ? rawFit : 'cover'
-  /*
-   * `alt` is always present, never omitted. An empty string is the platform's
-   * way of saying decorative, and it is a different statement from a missing
-   * attribute, which leaves a screen reader reading out the file name.
-   */
   return (
     <img
       {...nodeProps}
       className="fsh-image"
-      src={safeHref(props['src'])}
+      src={safeImageSource(props['src'])}
       alt={str(props['alt'])}
       style={{
         objectFit: fit,
         width: width > 0 ? width : '100%',
+        height: num(props['height'], 0) > 0 ? num(props['height'], 0) : 'auto',
+        maxWidth: '100%',
+        minHeight: safeImageSource(props['src']) ? undefined : 80,
       }}
     />
   )

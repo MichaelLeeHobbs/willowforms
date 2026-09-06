@@ -152,3 +152,10 @@ export { createDocument, emptyRoot, instantiate, prop } from './factory.js'
 
 export type { DocumentLoadResult } from './document.js'
 export { CURRENT_DOCUMENT_VERSION, loadDocument } from './document.js'
+
+export { safeImageSource, MAX_EMBEDDED_IMAGE_BYTES } from './image.js'
+export {
+  backgroundImageProps,
+  backgroundImageDefaults,
+  backgroundImageStyle,
+} from './background.js'

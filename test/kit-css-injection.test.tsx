@@ -5,7 +5,7 @@
 /**
  * A document's style value cannot author a rule, in either kit.
  *
- * `background` on `Box` is the only string-typed style value either kit has,
+ * `background` on `Box` is the only free-form CSS style value either kit has,
  * and a document is data. That sentence is checked rather than remembered --
  * see the first test below, which reads it back off `kit.components`. The two kits reach the page by different routes, so
  * the obligation is one sentence with two sinks:
@@ -160,15 +160,8 @@ function serverStyleAttribute(kit: RendererKit, background: string): string {
   return style
 }
 
-/**
- * Editors whose value a document cannot choose freely.
- *
- * `number` and `boolean` are not strings by the time they reach the page, and
- * `select` is a closed list the designer offers. What is left in a `style`
- * section is a free string that becomes CSS, and that is the sink this file is
- * about.
- */
-const CONSTRAINED = new Set(['number', 'select', 'boolean'])
+// Image sources use their own allowlist and inline-style path, covered in e2e/image-backgrounds.spec.ts.
+const CONSTRAINED = new Set(['number', 'select', 'boolean', 'image'])
 
 /** Every style prop in a kit whose value a document writes as it likes. */
 function freeStyleValues(kit: {
@@ -185,19 +178,28 @@ function freeStyleValues(kit: {
 }
 
 describe('a document CSS value cannot author a rule', () => {
-  /**
-   * The file's premise, read off the kits rather than remembered.
-   *
-   * Everything below tests one property on one component, on the strength of a
-   * sentence at the top of this file saying that is the only one there is. A
-   * sentence cannot notice a kit gaining a second. This can: add a `string` or
-   * `color` prop in a `style` section and this fails, naming it, before the new
-   * sink has been anywhere near a page.
-   */
   it('has one free-text style value per kit, which is the one the rest of this file uses', () => {
     expect(freeStyleValues(muiKit), '@formsmith/kit-mui').toEqual(['Box.background'])
     expect(freeStyleValues(htmlKit), '@formsmith/kit-html').toEqual(['Box.background'])
   })
+
+  it.each([muiKit, htmlKit])(
+    '$id declares only the image style sinks exercised in the browser',
+    (kit) => {
+      const images = kit.components
+        .flatMap((component) =>
+          component.props
+            .filter((entry) => entry.section === 'style' && entry.editor === 'image')
+            .map((entry) => component.type + '.' + entry.name),
+        )
+        .sort()
+      expect(images).toEqual(
+        ['Box', 'Card', 'Grid', 'Repeater', 'Screen', 'Stack', 'Step'].map(
+          (type) => type + '.backgroundImage',
+        ),
+      )
+    },
+  )
 
   beforeEach(() => {
     // Emotion caches by content hash across renders in one file, and a stale
