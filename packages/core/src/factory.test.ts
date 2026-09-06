@@ -62,6 +62,19 @@ describe('a component definition a kit got wrong', () => {
     expect(made(def, root).props['label']).toEqual({ kind: 'static', value: 'Email' })
   })
 
+  it('seeds new controls without replacing runtime defaults for saved controls', () => {
+    const def: ComponentDef = {
+      ...base,
+      defaultProps: { label: 'Email', fillWidth: false },
+      initialProps: { fillWidth: true },
+    }
+    expect(made(def, root).props).toEqual({
+      label: { kind: 'static', value: 'Email' },
+      fillWidth: { kind: 'static', value: true },
+    })
+    expect(def.defaultProps['fillWidth']).toBe(false)
+  })
+
   it('instantiates without a condition when defaultRenderWhen throws', () => {
     const def: ComponentDef = {
       ...base,

@@ -440,31 +440,30 @@ function ButtonNode({ props, nodeProps, events }: NodeRendererProps): ReactNode 
 }
 
 function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
-  const minWidth = num(props['minColumnWidth'], 200)
-  const columns = num(props['columns'], 2)
-  const gap = num(props['gap'], 16)
+  const fill = bool(props['fillWidth'])
+  const columns = fill
+    ? Math.max(1, Math.floor(num(props['columns'], 2)))
+    : num(props['columns'], 2)
+  const minWidth = fill
+    ? Math.max(1, num(props['minColumnWidth'], 200))
+    : num(props['minColumnWidth'], 200)
+  const gap = fill ? Math.max(0, num(props['gap'], 16)) : num(props['gap'], 16)
+  const track = fill
+    ? `max(${minWidth}px, calc((100% - ${(columns - 1) * gap}px) / ${columns}))`
+    : `${minWidth}px`
   return (
     <Box
       {...nodeProps}
       sx={{
         display: 'grid',
-        // auto-fit with a floor: columns collapse when they cannot fit, so the
-        // author never writes a breakpoint.
-        gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(${track}, 100%), 1fr))`,
         gap: px(gap),
-        // `columns` caps how many can ever fit, which is what makes it mean
-        // something alongside auto-fit. Ignoring it here made the same document
-        // lay out differently in the two kits.
-        // `px()`, for the reason `Screen`'s own comment gives: MUI reads a
-        // bare number at or below 1 as a percentage. `px()` hands it a CSS
-        // string instead, which the sizing transform passes through untouched,
-        // so the range stops mattering rather than being avoided.
-        //
-        // Worth having rather than relying on the arithmetic staying large:
-        // `minColumnWidth` is an ordinary number prop with no floor, so a
-        // document saying `1` and `columns: 1` reaches exactly the value that
-        // would be read as 100%.
-        maxWidth: columns > 0 ? px(columns * (minWidth + gap)) : undefined,
+        width: fill ? '100%' : undefined,
+        minWidth: fill ? 0 : undefined,
+        overflowWrap: fill ? 'anywhere' : undefined,
+        '& > *': fill ? { minWidth: 0 } : undefined,
+        // Missing fillWidth keeps the sizing of saved documents, in pixels.
+        maxWidth: !fill && columns > 0 ? px(columns * (minWidth + gap)) : undefined,
       }}
     >
       {children}

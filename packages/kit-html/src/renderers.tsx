@@ -482,18 +482,26 @@ function ButtonNode({ props, nodeProps, events }: NodeRendererProps): ReactNode 
 }
 
 function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
-  const columns = num(props['columns'], 2)
-  const minWidth = num(props['minColumnWidth'], 200)
+  const fill = bool(props['fillWidth'])
+  const columns = fill
+    ? Math.max(1, Math.floor(num(props['columns'], 2)))
+    : num(props['columns'], 2)
+  const minWidth = fill
+    ? Math.max(1, num(props['minColumnWidth'], 200))
+    : num(props['minColumnWidth'], 200)
+  const gap = fill ? Math.max(0, num(props['gap'], 16)) : num(props['gap'], 16)
+  const track = fill
+    ? `max(${minWidth}px, calc((100% - ${(columns - 1) * gap}px) / ${columns}))`
+    : `${minWidth}px`
   return (
     <div
       {...nodeProps}
-      className="fsh-grid"
+      className={'fsh-grid' + (fill ? ' fsh-grid--fill' : '')}
       style={{
-        // `auto-fit` with a floor is what makes this responsive without asking
-        // the author for breakpoints: columns collapse when they cannot fit.
-        gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
-        gap: num(props['gap'], 16),
-        maxWidth: columns > 0 ? columns * (minWidth + num(props['gap'], 16)) : undefined,
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(${track}, 100%), 1fr))`,
+        gap,
+        width: fill ? '100%' : undefined,
+        maxWidth: !fill && columns > 0 ? columns * (minWidth + gap) : undefined,
       }}
     >
       {children}

@@ -200,8 +200,10 @@ export const muiKit: Kit = {
       icon: 'grid',
       group: 'layout',
       container: true,
-      defaultProps: { columns: 2, gap: 16, minColumnWidth: 200 },
+      defaultProps: { columns: 2, gap: 16, minColumnWidth: 200, fillWidth: false },
+      initialProps: { fillWidth: true },
       props: [
+        { name: 'fillWidth', label: 'Fill width', editor: 'boolean', section: 'style' },
         { name: 'columns', label: 'Columns', editor: 'number', section: 'style' },
         { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
         {
