@@ -98,7 +98,13 @@ evaluator failures, and invalid evaluator output without throwing through the fo
 ## Authoring
 
 The component inspector's Actions tab lists only events declared by the selected kit component. Each
-event has an ordered list with add, remove, and move controls. Parameters are JSON objects.
+event has an ordered list with add, remove, and move controls.
+
+Built-ins use structured controls. Set value and Clear value offer existing field labels and data addresses; Set value follows the selected field with a text, multiline, number, date, boolean, or static-choice input. Option values retain their JSON types. Selecting a different target starts with no value. Array and object values use a JSON value editor. Focus offers component keys; messages, context paths, validation scopes, event names, and stop reasons use named inputs. Host-owned context values and event payloads have an explicit value-type selector.
+
+Repeated fields use the repeater's data key and explicit row numbers, counted from 1 in the editor and stored as zero-based coordinates. This targets a fixed row, not the invocation's current row; the existing host effect contract decides what happens when that row is absent. Unknown or removed targets remain visible and are never silently reassigned.
+
+Advanced parameters exposes the existing JSON object for custom parameters, unavailable targets, and host-specific use. Code action parameters remain JSON because no authoring schema is declared for them. Structured edits preserve unrelated parameters, invalid drafts are reported without committing, and raw edits and undo refresh the structured fields.
 
 Document Settings owns code-action names, source, and default parameters. The editor states that the
 source requires a host-injected sandbox; saving a source string does not make it executable.

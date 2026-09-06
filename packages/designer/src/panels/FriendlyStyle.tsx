@@ -219,15 +219,18 @@ function Length({
   const [draft, setDraft] = useState(match?.[1] ?? '')
   const [seen, setSeen] = useState(value)
   const [chosenUnit, setChosenUnit] = useState(unit)
+  const [badInput, setBadInput] = useState(false)
   const invalid =
-    draft !== '' && (!Number.isFinite(Number(draft)) || (!negative && Number(draft) < 0))
+    badInput ||
+    (draft !== '' && (!Number.isFinite(Number(draft)) || (!negative && Number(draft) < 0)))
   if (seen !== value) {
     setSeen(value)
     setDraft(match?.[1] ?? '')
     setChosenUnit(unit)
+    setBadInput(false)
   }
   const commit = (): void => {
-    if (draft === (match?.[1] ?? '')) return
+    if (invalid || draft === (match?.[1] ?? '')) return
     const number = Number(draft)
     if (draft === '') onChange('')
     else if (Number.isFinite(number) && (negative || number >= 0)) onChange(draft + chosenUnit)
@@ -246,14 +249,20 @@ function Length({
           aria-describedby={invalid ? id + '-error' : undefined}
           value={draft}
           placeholder={value && !match ? 'Custom' : 'Default'}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value)
+            setBadInput(e.target.validity.badInput)
+          }}
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
               commit()
             }
-            if (e.key === 'Escape') setDraft(match?.[1] ?? '')
+            if (e.key === 'Escape') {
+              setDraft(match?.[1] ?? '')
+              setBadInput(false)
+            }
           }}
         />
         <select
@@ -272,7 +281,7 @@ function Length({
       </span>
       {invalid && (
         <span id={id + '-error'} role="alert">
-          Enter a nonnegative size.
+          Enter a valid size.
         </span>
       )}
       {value && !match && (

@@ -1,9 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { indexKit } from '@formsmith/core'
-import type { ActionRef, EventName, JsonValue, Kit } from '@formsmith/core'
+import type { ActionRef, EventName, FormDocument, JsonValue, Kit } from '@formsmith/core'
 
 import type { DesignerApi } from '../store.js'
+import { ActionFields } from './ActionFields.js'
+
+const LABELS: Record<string, string> = {
+  setValue: 'Set field value',
+  clearValue: 'Clear field value',
+  focus: 'Focus component',
+  announce: 'Announce message',
+  setContext: 'Update context',
+  validate: 'Validate form',
+  emit: 'Emit event',
+  halt: 'Stop actions',
+}
 
 const BUILTINS: ReadonlyArray<{ name: string; params: Record<string, JsonValue> }> = [
   { name: 'setValue', params: { address: '', value: null } },
@@ -26,6 +38,8 @@ function paramsText(value: unknown): string {
 
 interface ActionRowProps {
   action: ActionRef
+  document: FormDocument
+  kit: Kit
   index: number
   count: number
   onChange: (next: ActionRef) => void
@@ -35,16 +49,30 @@ interface ActionRowProps {
 
 function ActionRow({
   action,
+  document,
+  kit,
   index,
   count,
   onChange,
   onMove,
   onRemove,
 }: ActionRowProps): ReactNode {
+  const id = useId()
   const [params, setParams] = useState(() => paramsText(action.params))
   const [error, setError] = useState('')
+  const stored = paramsText(action.params)
+  const [seen, setSeen] = useState(stored)
+  if (seen !== stored) {
+    setSeen(stored)
+    setParams(stored)
+    setError('')
+  }
 
   const commit = (): void => {
+    if (params === stored) {
+      setError('')
+      return
+    }
     try {
       const parsed: unknown = JSON.parse(params)
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -61,7 +89,9 @@ function ActionRow({
   return (
     <li className="fs-action">
       <div className="fs-action__head">
-        <code>{action.type === 'builtin' ? action.name : `code:${action.name}`}</code>
+        <strong>
+          {action.type === 'builtin' ? (LABELS[action.name] ?? action.name) : action.name}
+        </strong>
         <span>
           <button
             type="button"
@@ -84,21 +114,31 @@ function ActionRow({
           </button>
         </span>
       </div>
-      <label>
-        Parameters
-        <textarea
-          className="fs-code__area"
-          rows={4}
-          value={params}
-          aria-invalid={error ? true : undefined}
-          onChange={(event) => {
-            setParams(event.target.value)
-            setError('')
-          }}
-          onBlur={commit}
-        />
-      </label>
-      {error && <p className="fs-languages__error">{error}</p>}
+      <ActionFields action={action} document={document} kit={kit} onChange={onChange} />
+      <details open={action.type === 'code'}>
+        <summary>Advanced parameters</summary>
+        <label>
+          Parameters
+          <textarea
+            aria-label="Parameters"
+            className="fs-code__area"
+            rows={4}
+            value={params}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? id + '-error' : undefined}
+            onChange={(event) => {
+              setParams(event.target.value)
+              setError('')
+            }}
+            onBlur={commit}
+          />
+        </label>
+        {error && (
+          <p id={id + '-error'} className="fs-languages__error" role="alert">
+            {error}
+          </p>
+        )}
+      </details>
     </li>
   )
 }
@@ -146,7 +186,8 @@ export function Actions({ api, kit }: ActionsProps): ReactNode {
   return (
     <div className="fs-actions">
       <p className="fs-rules__note">
-        Built-ins run in core. Code actions run only through the host&apos;s sandboxed evaluator.
+        Choose what happens on each event. The host application applies the actions. Code actions
+        require a host-provided sandbox.
       </p>
       {supported.map((event) => {
         const refs = node.events?.[event] ?? []
@@ -159,8 +200,10 @@ export function Actions({ api, kit }: ActionsProps): ReactNode {
               <ol className="fs-actions__list">
                 {refs.map((ref, index) => (
                   <ActionRow
-                    key={`${ref.type}:${ref.name}:${index}:${paramsText(ref.params)}`}
+                    key={`${node.key}:${event}:${ref.type}:${ref.name}:${index}`}
                     action={ref}
+                    document={api.document}
+                    kit={kit}
                     index={index}
                     count={refs.length}
                     onChange={(next) =>
@@ -197,7 +240,7 @@ export function Actions({ api, kit }: ActionsProps): ReactNode {
                 <optgroup label="Built-ins">
                   {BUILTINS.map((item) => (
                     <option key={item.name} value={`builtin:${item.name}`}>
-                      {item.name}
+                      {LABELS[item.name] ?? item.name}
                     </option>
                   ))}
                 </optgroup>

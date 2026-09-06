@@ -86,3 +86,27 @@ test('spacing and borders expand existing shorthand, preserve other CSS, and res
   await expect(raw).toHaveValue(/--brandColor: blue/)
   await expect(field).toHaveCSS('letter-spacing', '2px')
 })
+
+test('unfinished numeric spacing edits preserve the committed size and remain repairable', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.locator('[data-fs-key="email"] input').click()
+  await page.getByRole('tab', { name: 'Style', exact: true }).click()
+  const panel = page.getByRole('tabpanel', { name: 'Style', exact: true })
+  await panel.getByText('Spacing', { exact: true }).click()
+  const size = panel.getByLabel('Inside top', { exact: true })
+  await size.fill('24')
+  await size.press('Enter')
+  const field = page.locator('[data-fs-key="email"]')
+  await expect(field).toHaveCSS('padding-top', '24px')
+  await size.fill('')
+  await size.pressSequentially('1e')
+  await size.press('Tab')
+  await expect(size).toHaveAttribute('aria-invalid', 'true')
+  await expect(field).toHaveCSS('padding-top', '24px')
+  await size.fill('12')
+  await size.press('Enter')
+  await expect(field).toHaveCSS('padding-top', '12px')
+  await expect(size).not.toHaveAttribute('aria-invalid', 'true')
+})
