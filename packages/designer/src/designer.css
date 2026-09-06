@@ -971,11 +971,47 @@
  */
 
 .fs-canvas__frame {
+  position: relative;
   margin-inline: auto;
 
   font-family: initial;
   font-size: initial;
   color: initial;
+}
+
+.fs-canvas__page-guide {
+  position: absolute;
+  inset: 0 0 auto;
+  border: 1px dashed var(--fs-control-border);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fs-fixed-canvas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-basis: 100%;
+  color: var(--fs-text-muted);
+}
+
+:where(.fs-fixed-canvas) label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:where(.fs-fixed-canvas) input {
+  width: 90px;
+}
+
+:where(.fs-fixed-canvas) select {
+  width: auto;
+}
+
+.fs-canvas__frame[data-fs-viewport='fixed'] {
+  background: var(--fs-bg-panel);
 }
 
 .fs-canvas__frame[data-fs-viewport='tablet'],

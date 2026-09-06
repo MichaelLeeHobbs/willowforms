@@ -163,6 +163,12 @@ quick flick from the palette followed by an immediate release was silently dropp
 
 Escape abandons a drag. The release that follows is not treated as a click.
 
+## Fixed canvas sizes
+
+The viewport controls include **Fixed size** alongside Desktop, Tablet, and Mobile. Letter, Legal, A4, and A3 presets offer portrait and landscape orientations; Custom accepts width and height from 100 to 10,000 CSS pixels. Paper dimensions use 96 CSS pixels per inch, rounded to whole pixels. A visible page outline fixes the width and indicates the intended height. Content beyond that outline remains visible and editable; this is a layout guide, not pagination, clipping, printer margins, or print output.
+
+The selected size is an authoring view preference, retained while switching viewport modes in the mounted designer. It does not change the document, answers, or undo history. The simulated CSS device follows the fixed width using the existing mobile/tablet/desktop breakpoints; selecting a device in Style returns to that device's viewport. Actual printing and persistent print settings remain future work.
+
 ## Preview
 
 **Status: built.** Toggles the canvas between authoring and using the form. In preview the kit's
