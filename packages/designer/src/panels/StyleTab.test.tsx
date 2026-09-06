@@ -121,6 +121,7 @@ function setup(node: ComponentNode, selectKey: string = node.key): Harness {
       if (!row) throw new Error('no tree row')
       await user.click(row)
       await user.click(screen.getByRole('tab', { name: 'Style' }))
+      await user.click(screen.getByText('Advanced CSS'))
     },
   }
 }

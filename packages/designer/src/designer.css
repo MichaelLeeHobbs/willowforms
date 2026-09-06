@@ -1265,6 +1265,10 @@
 
 .fs-selection__toolbar button {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   padding: 3px;
   border: 0;
   border-radius: var(--fs-radius-sm);
@@ -1544,6 +1548,86 @@
 
 .fs-style__heading:first-child {
   margin-block-start: 0;
+}
+
+.fs-style-tools {
+  display: grid;
+  gap: 12px;
+}
+
+.fs-style-tools__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fs-style-tools__group legend {
+  margin-block-end: 6px;
+  padding: 0;
+}
+
+.fs-style-tools__buttons,
+.fs-style-tools__sides {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fs-style-tools__buttons button {
+  min-height: 30px;
+  padding: 4px;
+}
+
+.fs-style-tools__buttons button[aria-pressed='true'] {
+  border-color: var(--fs-primary);
+  color: var(--fs-primary-text);
+  background: var(--fs-primary);
+}
+
+.fs-style-tools__sides {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fs-style-tools__field {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.fs-style-tools__length {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  gap: 4px;
+}
+
+.fs-style-tools__length input,
+.fs-style-tools__length select {
+  width: 100%;
+  min-width: 0;
+}
+
+.fs-style-tools__hint {
+  margin: 0;
+  color: var(--fs-text-muted);
+  font-size: 11px;
+}
+
+.fs-style-tools__section {
+  margin-block-start: 4px;
+  border-block-start: 1px solid var(--fs-border);
+}
+
+.fs-style-tools__section summary {
+  padding-block: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.fs-style-tools__section > .fs-style-tools__field,
+.fs-style-tools__section > .fs-style-tools__group {
+  margin-block-end: 10px;
 }
 
 /*
