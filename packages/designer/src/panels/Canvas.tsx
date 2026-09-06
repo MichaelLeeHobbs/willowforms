@@ -64,6 +64,7 @@ export interface CanvasProps {
    * someone had open.
    */
   viewport: Viewport
+  fixedSize?: { width: number; height: number }
   /** Language tag the canvas renders in. Omitted means the document's default. */
   language?: string
 }
@@ -131,6 +132,7 @@ export function Canvas({
   rendererKit,
   drag,
   viewport,
+  fixedSize,
   language,
   preview,
   onPreview,
@@ -175,7 +177,7 @@ export function Canvas({
   const hoverKey = hover.key
   const selectedRow = clicked.key === api.selectedKey ? clicked.row : undefined
 
-  const frameWidth = FRAME_WIDTH[viewport]
+  const frameWidth = fixedSize?.width ?? FRAME_WIDTH[viewport]
 
   /*
    * Omitted for the root, which has no siblings to sit among and cannot be
@@ -561,9 +563,20 @@ export function Canvas({
          */}
         <div
           className="fs-canvas__frame"
-          data-fs-viewport={viewport}
-          style={frameWidth === undefined ? undefined : { width: frameWidth }}
+          data-fs-viewport={fixedSize ? 'fixed' : viewport}
+          style={
+            frameWidth === undefined
+              ? undefined
+              : { width: frameWidth, minHeight: fixedSize?.height }
+          }
         >
+          {fixedSize && (
+            <div
+              className="fs-canvas__page-guide"
+              aria-hidden="true"
+              style={{ height: fixedSize.height }}
+            />
+          )}
           {form}
         </div>
 

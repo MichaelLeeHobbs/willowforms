@@ -17,6 +17,13 @@ import type { RendererKit } from '@formsmith/renderer'
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
 import { Icon } from './Icon.js'
+import {
+  DEFAULT_FIXED_SIZE,
+  FixedCanvasControls,
+  deviceAtWidth,
+  fixedDimensions,
+} from './FixedCanvas.js'
+import type { FixedCanvasSize } from './FixedCanvas.js'
 import { ResponsivePanel, useNarrowShell } from './ResponsivePanel.js'
 import { Canvas, canvasSwallowsFocus } from './panels/Canvas.js'
 import type { Viewport } from './panels/Canvas.js'
@@ -153,6 +160,9 @@ export function Designer({
    * them last looked at it on a phone.
    */
   const [viewport, setViewport] = useState<Viewport>('desktop')
+  const [fixed, setFixed] = useState(false)
+  const [fixedSize, setFixedSize] = useState(DEFAULT_FIXED_SIZE)
+  const dimensions = fixedDimensions(fixedSize)
   const [uncontrolledTheme, setUncontrolledTheme] = useState<DesignerTheme>('system')
   const theme = controlledTheme ?? uncontrolledTheme
   const chooseTheme = useCallback(
@@ -261,14 +271,16 @@ export function Designer({
       <Toolbar
         api={api}
         onOpenJson={() => setJsonOpen(true)}
-        viewport={viewport}
+        viewport={fixed ? 'fixed' : viewport}
+        fixedSize={fixedSize}
+        onFixedSize={(next) => {
+          setFixedSize(next)
+          setStyleDevice(deviceAtWidth(fixedDimensions(next).width))
+        }}
         onViewport={(next) => {
-          setViewport(next)
-          // The Style tab edits the breakpoint the canvas is showing, so
-          // choosing a device in the toolbar moves what a style rule applies
-          // to. Otherwise an author sizes the canvas to a phone and edits the
-          // desktop rule.
-          setStyleDevice(next)
+          setFixed(next === 'fixed')
+          if (next !== 'fixed') setViewport(next)
+          setStyleDevice(next === 'fixed' ? deviceAtWidth(dimensions.width) : next)
         }}
         theme={theme}
         onTheme={chooseTheme}
@@ -342,7 +354,8 @@ export function Designer({
             kit={kit}
             rendererKit={rendererKit}
             drag={drag}
-            viewport={viewport}
+            viewport={fixed ? deviceAtWidth(dimensions.width) : viewport}
+            {...(fixed ? { fixedSize: dimensions } : {})}
             preview={preview}
             onPreview={setPreview}
             {...(activeLanguage ? { language: activeLanguage } : {})}
@@ -364,7 +377,10 @@ export function Designer({
               // `any` is the base layer rather than a device, so choosing it
               // leaves the canvas where it is; a device moves the canvas too,
               // because a rule for a width you cannot see is written blind.
-              if (next !== 'any') setViewport(next)
+              if (next !== 'any') {
+                setViewport(next)
+                setFixed(false)
+              }
               setStyleDevice(next)
             }}
           />
@@ -455,10 +471,11 @@ function PaneHandle({
  * to rather than a device anyone can look at. It is deliberately not offered
  * here. See [06-inspector.md](../../../docs/spec/06-inspector.md).
  */
-const VIEWPORTS: { id: Viewport; label: string; icon: IconName }[] = [
+const VIEWPORTS: { id: Viewport | 'fixed'; label: string; icon: IconName }[] = [
   { id: 'desktop', label: 'Desktop', icon: 'screen' },
   { id: 'tablet', label: 'Tablet', icon: 'tablet' },
   { id: 'mobile', label: 'Mobile', icon: 'mobile' },
+  { id: 'fixed', label: 'Fixed size', icon: 'file' },
 ]
 
 function Toolbar({
@@ -467,6 +484,8 @@ function Toolbar({
   onSave,
   viewport,
   onViewport,
+  fixedSize,
+  onFixedSize,
   theme,
   onTheme,
   language,
@@ -475,8 +494,10 @@ function Toolbar({
   api: DesignerApi
   onOpenJson: () => void
   onSave?: () => void
-  viewport: Viewport
-  onViewport: (next: Viewport) => void
+  viewport: Viewport | 'fixed'
+  onViewport: (next: Viewport | 'fixed') => void
+  fixedSize: FixedCanvasSize
+  onFixedSize: (size: FixedCanvasSize) => void
   theme: DesignerTheme
   onTheme: (next: DesignerTheme) => void
   language: string | undefined
@@ -590,6 +611,7 @@ function Toolbar({
           ))}
         </div>
       </div>
+      {viewport === 'fixed' && <FixedCanvasControls size={fixedSize} onChange={onFixedSize} />}
     </header>
   )
 }
