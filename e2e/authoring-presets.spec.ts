@@ -94,6 +94,11 @@ test('adding a preset from the phone drawer reveals the inserted layout and undo
   await page.goto('/?example=contact-request')
   await page.getByRole('button', { name: 'Components and structure', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Components and structure', exact: true })
+  const layouts = drawer.getByRole('button', { name: 'Starting layouts', exact: true })
+  await expect(layouts).toHaveAttribute('aria-expanded', 'false')
+  await expect(drawer.getByRole('button', { name: 'Statistics row', exact: true })).toBeHidden()
+  await layouts.click()
+  await expect(layouts).toHaveAttribute('aria-expanded', 'true')
   await drawer.getByRole('button', { name: 'Statistics row', exact: true }).click()
   await expect(drawer).toBeHidden()
   const statistics = page

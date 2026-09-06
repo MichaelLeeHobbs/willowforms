@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { EXAMPLES } from './examples/index.js'
+import { ExamplePreview } from './ExamplePreview.js'
 
 export function ExampleGallery({
   activeId,
@@ -53,10 +54,9 @@ export function ExampleGallery({
         <div className="pg-gallery__shell">
           <header className="pg-gallery__header">
             <div>
-              <p className="pg-eyebrow">Made with Formsmith</p>
               <h2 id="pg-gallery-title">Find your starting point.</h2>
               <p id="pg-gallery-description">
-                Explore real forms, try them in Preview, and make them your own.
+                Choose a form to explore, customize, and try in Preview.
               </p>
             </div>
             <button
@@ -126,35 +126,11 @@ export function ExampleGallery({
                 }
                 aria-labelledby={'pg-example-' + example.id}
               >
+                <ExamplePreview document={example.document} />
                 <div className="pg-example__top">
                   <span className="pg-eyebrow">{example.category}</span>
                   {activeId === example.id && <span className="pg-example__current">Open now</span>}
                 </div>
-                {example.category === 'Adventure' && (
-                  <svg
-                    className="pg-example__die"
-                    viewBox="0 0 100 110"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M50 4 94 29v52L50 106 6 81V29Zm0 0L25 70l69-41M6 29l69 41L50 4M6 81l19-11 25 36 25-36 19 11M25 70h50"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                    <text
-                      x="50"
-                      y="58"
-                      textAnchor="middle"
-                      fill="currentColor"
-                      stroke="none"
-                      fontSize="23"
-                      fontFamily="Georgia, serif"
-                    >
-                      20
-                    </text>
-                  </svg>
-                )}
                 <h3 id={'pg-example-' + example.id}>{example.title}</h3>
                 <p>{example.description}</p>
                 <ul className="pg-example__features" aria-label="Highlights">
@@ -167,7 +143,7 @@ export function ExampleGallery({
                   onClick={() => choose(example.id)}
                   aria-label={'Open ' + example.title}
                 >
-                  Open example <span aria-hidden="true">→</span>
+                  Open example
                 </button>
               </article>
             ))}
