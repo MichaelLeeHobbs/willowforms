@@ -141,6 +141,8 @@ statement from having forgotten.
 | `Button`      | Built  | no        | `text`, `variant`, `disabled`                                 |
 | `ButtonGroup` | Built  | no        | `orientation`                                                 |
 
+Both reference kits accept each other's Button variant names: `solid`/`contained`, `outline`/`outlined`, and `plain`/`text` retain their filled, outlined, or text-only emphasis when switching kits. Unknown variants fall back to filled.
+
 `TextArea` exists separately rather than as `TextField` with `multiline`, because the two have different
 properties (`rows` versus nothing) and a palette entry that changes shape based on a checkbox is harder
 to find than two entries. `TextField.multiline` stays for documents that already use it.

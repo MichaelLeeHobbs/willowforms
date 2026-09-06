@@ -78,7 +78,12 @@ export const SAMPLE_DOCUMENT: FormDocument = {
         props: { label: prop('Send me occasional product updates') },
         schema: { type: 'boolean', validations: [] },
       },
-      { key: 'submit', type: 'Button', props: { text: prop('Send') } },
+      {
+        key: 'submit',
+        type: 'Button',
+        props: { text: prop('Send') },
+        events: { onClick: [{ type: 'builtin', name: 'emit', params: { event: 'submit' } }] },
+      },
     ],
   },
   actions: {},

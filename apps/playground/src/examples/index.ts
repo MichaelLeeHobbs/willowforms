@@ -44,9 +44,9 @@ export const EXAMPLES: ExampleForm[] = [
     id: eventRegistration.id,
     title: 'Event registration',
     description:
-      'Welcome attendees, collect guest details, and adapt questions for online or in-person attendance.',
+      'A community conference with an image banner, guest details, and online or in-person attendance.',
     category: 'Community',
-    features: ['Conditional sections', 'Repeaters'],
+    features: ['Background images', 'Conditional sections', 'Repeaters'],
     document: eventRegistration,
   },
   {

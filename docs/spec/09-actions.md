@@ -97,6 +97,14 @@ evaluator failures, and invalid evaluator output without throwing through the fo
 
 ## Authoring
 
+### Submission and Preview
+
+Hosts can give buttons application meanings with the built-in `emit` action, for example `{ type: 'builtin', name: 'emit', params: { event: 'submit' } }` on `onClick`. The renderer delivers this through `onEffects`; it does not submit an HTML form, validate automatically, or make a network request. Event names such as `submit`, `saveDraft`, and `cancel` are host conventions. The host frontend validates, projects the submitted data, calls its API, and handles pending, success, and failure states. The backend validates again using its trusted form definition and context. See the typechecked [submission example](../../examples/usage.tsx).
+
+Designer Preview supplies a limited demonstration handler. A `validate` effect checks every declared `context.step` value, regardless of the optional host-specific scope; `emit` with event `submit` performs the same check and reports a simulated submission only when valid. Invalid answers reveal errors and select the first page containing errors. Neither operation sends or saves data. Other emitted event names and `announce` messages are displayed; other effects are reported as requiring a host handler and are not applied. Action errors are reported visibly. This is Preview policy, not a change to the renderer or core effect contract.
+
+### Inspector
+
 The component inspector's Actions tab lists only events declared by the selected kit component. Each
 event has an ordered list with add, remove, and move controls.
 

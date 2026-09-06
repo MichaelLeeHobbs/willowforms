@@ -5,7 +5,15 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from 'react'
-import type { Device, FormContext, FormData, FormErrors, JsonValue, Kit } from '@formsmith/core'
+import type {
+  Device,
+  Effect,
+  FormContext,
+  FormData,
+  FormErrors,
+  JsonValue,
+  Kit,
+} from '@formsmith/core'
 import {
   applyChange,
   addressOf,
@@ -36,6 +44,7 @@ import {
 import type { Candidate, Origin } from '../geometry.js'
 import type { DesignerApi } from '../store.js'
 import { SelectionLayer } from './SelectionLayer.js'
+import { PreviewData } from './PreviewData.js'
 
 /** Shared, so an unvalidated canvas does not allocate a new object per render. */
 const NO_ERRORS: FormErrors = Object.freeze({})
@@ -163,6 +172,7 @@ export function Canvas({
   }, [api.document.defaultLanguage, api.document.translations, language])
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
+  const [actionNote, setActionNote] = useState('')
   /** Fields the user has changed. A field validates while typing only after it is touched. */
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [hover, setHover] = useState<{ key: string | undefined; row: string | undefined }>({
@@ -258,8 +268,51 @@ export function Canvas({
   }, [preview, validated, api.document.root, data, touched, context, messages])
 
   const onChange = useCallback((address: string, value: JsonValue) => {
+    setActionNote('')
     setData((d) => applyChange(d, address, value))
     setTouched((t) => (t.has(address) ? t : new Set(t).add(address)))
+  }, [])
+
+  const onEffects = useCallback(
+    (effects: Effect[]) => {
+      if (!preview) return
+      const notes: string[] = []
+      const submitting = effects.some(
+        (effect) => effect.kind === 'emit' && effect.event === 'submit',
+      )
+      if (submitting || effects.some((effect) => effect.kind === 'validate')) {
+        const scopes = steps.length ? steps.map((value) => ({ step: value })) : [context]
+        const results = scopes.map((scope) =>
+          validateForm(api.document.root, data, { context: scope, messages }),
+        )
+        const count = new Set(results.flatMap((result) => Object.keys(result))).size
+        setValidated(true)
+        if (count) {
+          const first = results.findIndex((result) => Object.keys(result).length > 0)
+          if (steps.length) setStep(steps[first])
+          notes.push(`Check ${count} ${count === 1 ? 'field' : 'fields'} before submitting.`)
+        } else {
+          notes.push(
+            submitting
+              ? 'Form is valid. Submission simulated; no data was sent.'
+              : 'All answers are valid.',
+          )
+        }
+      }
+      for (const effect of effects) {
+        if (effect.kind === 'announce') notes.push(effect.message)
+        else if (effect.kind === 'emit' && effect.event !== 'submit')
+          notes.push(`Event “${effect.event}” requested. Preview only; no data was sent.`)
+        else if (effect.kind !== 'emit' && effect.kind !== 'validate')
+          notes.push(`Action “${effect.kind}” requires a host handler; Preview did not apply it.`)
+      }
+      setActionNote(notes.join(' '))
+    },
+    [preview, steps, context, api.document.root, data, messages],
+  )
+
+  const onActionError = useCallback((message: string) => {
+    setActionNote('Action could not run: ' + message)
   }, [])
 
   const { select } = api
@@ -433,9 +486,8 @@ export function Canvas({
             }
           : {})}
         onChange={onChange}
+        {...(preview ? { onEffects, onActionError } : {})}
         {...(language ? { language } : {})}
-        // `Viewport` has no empty member, so the conditional this used to carry
-        // could not be false. `language` really is optional and keeps its.
         device={viewport}
       />
     ),
@@ -449,6 +501,8 @@ export function Canvas({
       preview,
       current,
       onChange,
+      onEffects,
+      onActionError,
       language,
       viewport,
     ],
@@ -464,6 +518,7 @@ export function Canvas({
             onPreview(!preview)
             setDiagnostics(false)
             setValidated(false)
+            setActionNote('')
             setHover({ key: undefined, row: undefined })
           }}
           aria-pressed={preview}
@@ -490,6 +545,7 @@ export function Canvas({
 
         {preview && (
           <>
+            <PreviewData data={data} />
             <button type="button" onClick={() => setValidated(true)}>
               Validate
             </button>
@@ -499,6 +555,7 @@ export function Canvas({
                 setData({})
                 setTouched(new Set())
                 setValidated(false)
+                setActionNote('')
               }}
             >
               Clear data
@@ -514,6 +571,12 @@ export function Canvas({
           </>
         )}
       </div>
+
+      {preview && (
+        <div className="fs-canvas__notice" role="status">
+          {actionNote}
+        </div>
+      )}
 
       {editing && api.document.root.children?.length === 0 && (
         <div className="fs-canvas__empty">

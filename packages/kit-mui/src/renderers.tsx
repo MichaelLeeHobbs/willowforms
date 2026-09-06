@@ -491,7 +491,12 @@ function SelectNode({
 
 function ButtonNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const variant = str(props['variant'], 'contained')
-  const safe = variant === 'outlined' || variant === 'text' ? variant : 'contained'
+  const safe =
+    variant === 'outlined' || variant === 'outline'
+      ? 'outlined'
+      : variant === 'text' || variant === 'plain'
+        ? 'text'
+        : 'contained'
   return (
     <Button
       {...nodeProps}
