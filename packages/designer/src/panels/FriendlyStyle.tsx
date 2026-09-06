@@ -3,6 +3,19 @@ import type { ReactNode } from 'react'
 import { parseDeclarations, printDeclarations, safeDeclarations } from '@formsmith/core'
 
 const SIDES = ['top', 'right', 'bottom', 'left'] as const
+const FONTS = [
+  ['Default font', ''],
+  ['System UI', 'system-ui, sans-serif'],
+  ['Sans serif', 'sans-serif'],
+  ['Serif', 'serif'],
+  ['Monospace', 'ui-monospace, monospace'],
+  ['Arial', 'Arial, sans-serif'],
+  ['Verdana', 'Verdana, sans-serif'],
+  ['Trebuchet MS', '"Trebuchet MS", sans-serif'],
+  ['Georgia', 'Georgia, serif'],
+  ['Cambria', 'Cambria, Georgia, serif'],
+  ['Times New Roman', '"Times New Roman", serif'],
+] as const
 
 export function FriendlyStyle({
   text,
@@ -46,7 +59,7 @@ export function FriendlyStyle({
       </fieldset>
       <fieldset className="fs-style-tools__group">
         <legend>Text formatting</legend>
-        <div className="fs-style-tools__buttons">
+        <div className="fs-style-tools__buttons fs-style-tools__buttons--format">
           {(
             [
               [
@@ -64,10 +77,17 @@ export function FriendlyStyle({
                 'none',
                 read('text-decoration-line').includes('underline'),
               ],
+              [
+                'Strikethrough',
+                'text-decoration-line',
+                'line-through',
+                'none',
+                read('text-decoration-line').includes('line-through'),
+              ],
             ] as const
           ).map(([label, name, on, off, active]) => (
             <button
-              key={name}
+              key={label}
               type="button"
               aria-pressed={active}
               onClick={() => {
@@ -75,12 +95,12 @@ export function FriendlyStyle({
                   name === 'text-decoration-line'
                     ? read(name)
                         .split(/\s+/)
-                        .filter((v) => v && v !== 'none' && v !== 'underline')
+                        .filter((v) => v && v !== 'none' && v !== on)
                     : []
                 write({
                   [name]:
                     name === 'text-decoration-line'
-                      ? [...other, ...(active ? [] : ['underline'])].join(' ') || 'none'
+                      ? [...other, ...(active ? [] : [on])].join(' ') || 'none'
                       : active
                         ? off
                         : on,
@@ -92,6 +112,29 @@ export function FriendlyStyle({
           ))}
         </div>
       </fieldset>
+      <label className="fs-style-tools__field">
+        Font family
+        <select
+          aria-label="Font family"
+          value={read('font-family')}
+          onChange={(e) => write({ 'font-family': e.target.value })}
+        >
+          {read('font-family') && !FONTS.some(([, value]) => value === read('font-family')) && (
+            <option value={read('font-family')}>Custom — {read('font-family')}</option>
+          )}
+          {FONTS.map(([label, value]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Length
+        label="Text size"
+        value={read('font-size')}
+        onChange={(value) => write({ 'font-size': value })}
+        percent
+      />
       <Color
         label="Text color"
         value={read('color')}
