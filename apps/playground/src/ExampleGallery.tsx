@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { EXAMPLES } from './examples/index.js'
 import { ExamplePreview } from './ExamplePreview.js'
@@ -6,21 +6,13 @@ import { ExamplePreview } from './ExamplePreview.js'
 export function ExampleGallery({
   activeId,
   onChoose,
-  onReset,
 }: {
   activeId: string
   onChoose: (id: string) => void
-  onReset: () => void
 }): ReactNode {
   const dialog = useRef<HTMLDialogElement>(null)
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All examples')
-  const [confirmReset, setConfirmReset] = useState(false)
-  const cancelReset = useRef<HTMLButtonElement>(null)
-  const resetButton = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (confirmReset) cancelReset.current?.focus()
-  }, [confirmReset])
   const matches = EXAMPLES.filter(
     (example) =>
       (category === 'All examples' || example.category === category) &&
@@ -49,7 +41,6 @@ export function ExampleGallery({
         className="pg-gallery"
         aria-labelledby="pg-gallery-title"
         aria-describedby="pg-gallery-description"
-        onClose={() => setConfirmReset(false)}
       >
         <div className="pg-gallery__shell">
           <header className="pg-gallery__header">
@@ -90,33 +81,6 @@ export function ExampleGallery({
           <div className="pg-gallery__results" role="status">
             {matches.length} {matches.length === 1 ? 'example' : 'examples'}
           </div>
-          {confirmReset && (
-            <div className="pg-gallery__reset">
-              <p role="alert">
-                Reset this example to its original design? Your edits to this example will be
-                replaced.
-              </p>
-              <button
-                ref={cancelReset}
-                type="button"
-                onClick={() => {
-                  setConfirmReset(false)
-                  resetButton.current?.focus()
-                }}
-              >
-                Cancel reset
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onReset()
-                  dialog.current?.close()
-                }}
-              >
-                Reset design
-              </button>
-            </div>
-          )}
           <div className="pg-gallery__grid">
             {matches.map((example) => (
               <article
@@ -168,11 +132,6 @@ export function ExampleGallery({
               Each example keeps its own design edits in this browser. Preview answers are
               temporary.
             </p>
-            {activeId && (
-              <button ref={resetButton} type="button" onClick={() => setConfirmReset(true)}>
-                Reset this example
-              </button>
-            )}
             <button type="button" onClick={() => choose('')}>
               Back to your draft
             </button>

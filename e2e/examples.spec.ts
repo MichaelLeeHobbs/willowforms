@@ -4,6 +4,8 @@ import { EXAMPLES } from '../apps/playground/src/examples/index.js'
 
 test('browses examples without losing the original draft or edited examples', async ({ page }) => {
   await page.goto('/')
+  const reset = page.getByRole('button', { name: 'Reset example', exact: true })
+  await expect(reset).toHaveCount(0)
   await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByRole('textbox', { name: 'Form name' }).fill('My original draft')
   await page.getByRole('button', { name: /^Examples/ }).click()
@@ -29,14 +31,22 @@ test('browses examples without losing the original draft or edited examples', as
   await page.getByLabel('Kit', { exact: true }).selectOption('html')
   await page.getByRole('tab', { name: 'Settings' }).click()
   await expect(page.getByRole('textbox', { name: 'Form name' })).toHaveValue('My feedback form')
-  await page.getByRole('button', { name: /^Examples/ }).click()
-  await gallery.getByRole('button', { name: 'Reset this example' }).click()
-  await expect(gallery.getByRole('button', { name: 'Cancel reset' })).toBeFocused()
-  await gallery.getByRole('button', { name: 'Cancel reset' }).click()
-  await expect(gallery.getByRole('button', { name: 'Reset this example' })).toBeFocused()
-  await expect(gallery).toBeVisible()
-  await gallery.getByRole('button', { name: 'Reset this example' }).click()
-  await gallery.getByRole('button', { name: 'Reset design' }).click()
+  await expect(reset).toBeInViewport()
+  await reset.click()
+  const confirmation = page.getByRole('dialog', { name: 'Reset this example?' })
+  await expect(gallery).not.toBeVisible()
+  await expect(confirmation.getByRole('button', { name: 'Cancel reset' })).toBeFocused()
+  await confirmation.getByRole('button', { name: 'Cancel reset' }).click()
+  await expect(reset).toBeFocused()
+  await expect(page.getByRole('textbox', { name: 'Form name' })).toHaveValue('My feedback form')
+  await reset.click()
+  await page.keyboard.press('Escape')
+  await expect(confirmation).not.toBeVisible()
+  await expect(reset).toBeFocused()
+  await reset.click()
+  await confirmation.getByRole('button', { name: 'Reset design' }).click()
+  await expect(reset).toBeFocused()
+  await page.reload()
   await page.getByRole('tab', { name: 'Settings' }).click()
   await expect(page.getByRole('textbox', { name: 'Form name' })).toHaveValue('Tell us how we did')
 })
@@ -62,7 +72,9 @@ test('keeps edits in memory when storage is unavailable and examples are switche
 })
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`${theme} gallery passes the browser accessibility audit`, async ({ page }) => {
+  test(`${theme} gallery and header reset pass the browser accessibility audit`, async ({
+    page,
+  }) => {
     await page.goto('/')
     await page.getByLabel('Designer theme').selectOption(theme)
     await page.getByRole('button', { name: /^Examples/ }).click()
@@ -77,6 +89,28 @@ for (const theme of ['light', 'dark'] as const) {
       }))
     })
     expect(violations).toEqual([])
+    await page
+      .getByRole('dialog', { name: 'Find your starting point.' })
+      .getByRole('button', { name: 'Open Contact request' })
+      .click()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
+    const reset = page.getByRole('button', { name: 'Reset example', exact: true })
+    await expect(reset).toBeInViewport()
+    await reset.click()
+    const confirmation = page.getByRole('dialog', { name: 'Reset this example?' })
+    await expect(confirmation.getByRole('button', { name: 'Reset design' })).toBeInViewport()
+    expect(
+      await confirmation.evaluate((element) => element.scrollWidth - element.clientWidth),
+    ).toBe(0)
+    const resetViolations = await confirmation.evaluate(async (element) =>
+      (
+        await (window as typeof window & { axe: typeof axe }).axe.run(element, {
+          runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+        })
+      ).violations.map(({ id }) => id),
+    )
+    expect(resetViolations).toEqual([])
   })
 }
 

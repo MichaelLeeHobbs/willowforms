@@ -21,7 +21,7 @@ The following links use the default development port. On another deployment, kee
 
 ## Drafts and preview
 
-Each example saves its design edits separately in this browser. **Back to your draft** restores the playground document you were editing before opening an example. A direct link selects an example and restores its local design draft if one exists. **Reset this example** asks before replacing that example's edits with the original design.
+Each example saves its design edits separately in this browser. **Back to your draft** restores the playground document you were editing before opening an example. A direct link selects an example and restores its local design draft if one exists. **Reset example** sits beside **Examples** in the header while an example is active, in both editing and Preview. It asks before replacing that example's edits and preview answers with the latest bundled design. Cancel or Escape preserves your work.
 
 Preview answers are temporary. Switching examples or kits, resetting an example, or reloading the page discards them; **Back to editing** retains them in the current designer session. The gallery does not submit responses to a backend. Export JSON to keep a form design independently of browser storage. If storage is unavailable, edits remain available while switching examples in the current session, and the playground explains that local saving is unavailable.
 
@@ -37,6 +37,6 @@ Its Grid and Box layouts, inline field labels, ruled sections, Cambria headings,
 
 For paper-oriented forms, choose **Fixed size** beside Desktop, Tablet, and Mobile. Letter, Legal, A4, and A3 presets support portrait and landscape, with custom pixel dimensions available. These are authoring guides; content can extend past the page boundary. Printing, pagination, and PDF output are future work. The desktop character sheet does not automatically shrink to fit a paper preset.
 
-If you have opened an older version, choose **Examples → Reset this example → Reset design** to load the updated design. Export any edits you want to retain first. Preview hides authoring panels automatically; use **Diagnostics** when you want to inspect answers and errors.
+If you have opened an older version, choose **Reset example → Reset design** in the header to load the updated design. Export any edits you want to retain first. Preview hides authoring panels automatically; use **Diagnostics** when you want to inspect answers and errors.
 
 The example includes attribution to the [System Reference Document 5.2.1](https://www.dndbeyond.com/srd), available under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). That attribution is part of the form document and remains in exported designs.
