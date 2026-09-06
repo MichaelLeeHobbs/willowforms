@@ -94,6 +94,8 @@ uses it.
 `Screen` is the root and is never in the palette. `Grid` is specified as intrinsic columns rather than a
 twelve-column system: a form author thinks "two side by side", not "six of twelve".
 
+All seven layout components also expose `density` on the Style tab: `inherit`, `comfortable`, or `compact`. The Settings tab offers the root's choice as **Form density** when the kit supports it. The nearest explicit choice applies to descendants, including repeated rows; a nested group can override it. Missing, inherit, or unsupported values preserve the inherited choice, and a form with no choice preserves host defaults. Each renderer instance starts its own density context. Compact mode reduces control sizes and uses 12px fallback gaps; explicit authored gaps retain their pixel values. It does not hide labels, helper text, errors, or focus indicators. This is an additive version-1 node property, not a new document setting or migration.
+
 With `fillWidth: true`, Grid fills its parent, treats `columns` as a maximum count, and wraps when columns would be narrower than `minColumnWidth`. A parent narrower than that minimum still fits one column. Both kits use the same geometry. New palette grids default to this mode; existing documents with `fillWidth` missing or false retain the previous width cap, `columns * (minColumnWidth + gap)`. This additive compatibility choice does not migrate saved layouts. In fill mode, column count is rounded down and bounded to at least one, minimum width to at least 1px, and gap to at least zero; non-finite inputs use the normal defaults.
 
 `Repeater` is the one structurally interesting component here, and it is built. It renders its children

@@ -225,6 +225,40 @@
   color: var(--fsh-danger);
 }
 
+.fsh-field[data-fs-density='compact'] {
+  gap: 2px;
+}
+
+.fsh-field[data-fs-density='compact'] > .fsh-input {
+  padding: 6px 10px;
+  font-size: 14px;
+  min-height: 36px;
+}
+
+.fsh-field[data-fs-density='compact'] > .fsh-field__label {
+  font-size: 13px;
+}
+
+.fsh-field[data-fs-density='compact'] > .fsh-field__message {
+  font-size: 12px;
+}
+
+.fsh-field--inline[data-fs-density='compact'] {
+  min-height: 32px;
+}
+
+.fsh-field[data-fs-density='compact'] > .fsh-checkbox {
+  width: 24px;
+  height: 24px;
+}
+
+.fsh-button[data-fs-density='compact'],
+[data-fs-density='compact'] > .fsh-button {
+  padding: 6px 12px;
+  font-size: 14px;
+  min-height: 32px;
+}
+
 .fsh-checkbox {
   width: 18px;
   height: 18px;

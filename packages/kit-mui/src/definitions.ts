@@ -36,6 +36,20 @@ const disabled: PropSchema = {
   section: 'advanced',
 }
 
+const density: PropSchema = {
+  name: 'density',
+  label: 'Density',
+  editor: 'select',
+  section: 'style',
+  computable: false,
+  options: [
+    { label: 'Inherit', value: 'inherit' },
+    { label: 'Comfortable', value: 'comfortable' },
+    { label: 'Compact', value: 'compact' },
+  ],
+  hint: 'Inherited by child controls. Explicit gaps keep their authored size.',
+}
+
 export const muiKit: Kit = {
   id: 'mui',
   label: 'Material UI',
@@ -47,8 +61,9 @@ export const muiKit: Kit = {
       group: 'layout',
       container: true,
       root: true,
-      defaultProps: { maxWidth: 640, gap: 16 },
+      defaultProps: { density: 'inherit', maxWidth: 640, gap: 16 },
       props: [
+        density,
         { name: 'maxWidth', label: 'Max width', editor: 'number', section: 'style' },
         { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
       ],
@@ -60,8 +75,9 @@ export const muiKit: Kit = {
       icon: 'stack',
       group: 'layout',
       container: true,
-      defaultProps: { direction: 'column', gap: 16 },
+      defaultProps: { density: 'inherit', direction: 'column', gap: 16 },
       props: [
+        density,
         {
           name: 'direction',
           label: 'Direction',
@@ -200,9 +216,16 @@ export const muiKit: Kit = {
       icon: 'grid',
       group: 'layout',
       container: true,
-      defaultProps: { columns: 2, gap: 16, minColumnWidth: 200, fillWidth: false },
+      defaultProps: {
+        density: 'inherit',
+        columns: 2,
+        gap: 16,
+        minColumnWidth: 200,
+        fillWidth: false,
+      },
       initialProps: { fillWidth: true },
       props: [
+        density,
         { name: 'fillWidth', label: 'Fill width', editor: 'boolean', section: 'style' },
         { name: 'columns', label: 'Columns', editor: 'number', section: 'style' },
         { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
@@ -241,8 +264,8 @@ export const muiKit: Kit = {
       // spacing scale ... 16 here would be 128px", which stopped being true when
       // `renderers.tsx` moved gaps to pixels and left every default eight times
       // too tight.
-      defaultProps: { gap: 16 },
-      props: [{ name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      defaultProps: { density: 'inherit', gap: 16 },
+      props: [density, { name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
       events: [],
     },
     {
@@ -263,8 +286,13 @@ export const muiKit: Kit = {
        */
       dataBound: true,
       dataType: 'array',
-      defaultProps: { label: 'Items', helperText: '', gap: 16 },
-      props: [label, helperText, { name: 'gap', label: 'Gap', editor: 'number', section: 'style' }],
+      defaultProps: { density: 'inherit', label: 'Items', helperText: '', gap: 16 },
+      props: [
+        density,
+        label,
+        helperText,
+        { name: 'gap', label: 'Gap', editor: 'number', section: 'style' },
+      ],
       events: [],
     },
     {
@@ -273,8 +301,9 @@ export const muiKit: Kit = {
       icon: 'box',
       group: 'layout',
       container: true,
-      defaultProps: { padding: 16, background: '', radius: 0 },
+      defaultProps: { density: 'inherit', padding: 16, background: '', radius: 0 },
       props: [
+        density,
         { name: 'padding', label: 'Padding', editor: 'number', section: 'style' },
         {
           name: 'background',
@@ -293,8 +322,9 @@ export const muiKit: Kit = {
       icon: 'card',
       group: 'layout',
       container: true,
-      defaultProps: { title: '', subtitle: '', variant: 'outlined' },
+      defaultProps: { density: 'inherit', title: '', subtitle: '', variant: 'outlined' },
       props: [
+        density,
         { name: 'title', label: 'Title', editor: 'string', localizable: true },
         { name: 'subtitle', label: 'Subtitle', editor: 'string', localizable: true },
         {
