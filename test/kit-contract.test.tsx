@@ -173,6 +173,12 @@ function BranchingSteps({ renderers }: { renderers: RendererKit }): ReactElement
     props: {},
     children: [
       {
+        key: 'introduction',
+        type: 'Text',
+        props: { text: prop('Introduction to the first page') },
+        renderWhen: stepWhen('step_one'),
+      },
+      {
         key: 'step_one',
         type: 'Step',
         props: { gap: prop(8) },
@@ -209,6 +215,12 @@ function BranchingSteps({ renderers }: { renderers: RendererKit }): ReactElement
         props: { gap: prop(8) },
         renderWhen: stepWhen('step_three'),
         children: [{ key: 'third_copy', type: 'Text', props: { text: prop('Third step') } }],
+      },
+      {
+        key: 'closing_note',
+        type: 'Text',
+        props: { text: prop('Closing note on the last page') },
+        renderWhen: stepWhen('step_three'),
       },
     ],
   }
@@ -2224,7 +2236,7 @@ describe.each(KITS)('$name editable repeaters', ({ kit, renderers }) => {
 })
 
 describe.each(KITS)('$name controlled step navigation', ({ kit, renderers }) => {
-  it('moves through reachable branches and reports position without a false total', () => {
+  it('counts shared page content once and navigates through reachable branches', () => {
     if (!requires(kit, 'Step') || !requires(kit, 'Text')) return
 
     render(<BranchingSteps renderers={renderers} />)

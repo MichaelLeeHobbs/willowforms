@@ -375,11 +375,7 @@ get made here. See `docs/decisions.md`.
 
 ### Controlled navigation
 
-Advancing a step is navigation, so the host still owns the current value in `context` and receives each
-destination through `FormRenderer.navigation.onNavigate`. When that controlled prop is supplied, both
-kits draw Back and Next controls. The renderer discovers step nodes from their own context conditions,
-evaluates each candidate against current data to skip inactive branches, and reports a one-based position
-without claiming a total that can change as answers change.
+Advancing a step is navigation, so the host still owns the current value in `context` and receives each destination through `FormRenderer.navigation.onNavigate`. When that controlled prop is supplied, both kits draw Back and Next controls. The renderer discovers step nodes from their own context conditions, evaluates each candidate against current data to skip inactive branches, and reports a one-based position without claiming a total that can change as answers change. Nodes sharing the same destination value belong to one page: conditional introductory text and other shared content do not add positions or make Back/Next return to the current page. All navigation controls on that page receive the same position and adjacent destinations.
 
 The `Step` palette entry is built. Both kits ship one, and it is the first use of `defaultRenderWhen` on
 `ComponentDef` — a visibility rule a freshly dropped instance starts with, generated from the node's own
