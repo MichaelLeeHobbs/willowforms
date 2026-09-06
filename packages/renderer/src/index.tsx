@@ -793,21 +793,24 @@ function navigationFor(
     }
   })
 
+  const destinations: JsonValue[] = []
+  for (const { value } of entries) {
+    if (!destinations.some((destination) => same(destination, value))) destinations.push(value)
+  }
   const current = readPath(context, path)
-  const active = entries.findIndex((entry) => same(entry.value, current))
+  const active = destinations.findIndex((value) => same(value, current))
   if (active < 0) return NO_NAVIGATION
 
-  const result = new Map<string, NodeNavigation>()
-  entries.forEach((entry, index) => {
-    const previous = entries[index - 1]
-    const following = entries[index + 1]
-    result.set(entry.key, {
-      position: index + 1,
-      ...(previous ? { back: () => onNavigate(previous.value) } : {}),
-      ...(following ? { next: () => onNavigate(following.value) } : {}),
-    })
-  })
-  return result
+  const previous = destinations[active - 1]
+  const following = destinations[active + 1]
+  const navigation: NodeNavigation = {
+    position: active + 1,
+    ...(previous !== undefined ? { back: () => onNavigate(previous) } : {}),
+    ...(following !== undefined ? { next: () => onNavigate(following) } : {}),
+  }
+  return new Map(
+    entries.filter(({ value }) => same(value, current)).map(({ key }) => [key, navigation]),
+  )
 }
 
 export interface FormRendererProps {

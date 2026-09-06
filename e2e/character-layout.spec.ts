@@ -13,6 +13,8 @@ for (const kit of ['mui', 'html']) {
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const form = page.locator('[data-fs-key="root"]')
     const step = page.getByRole('combobox', { name: 'Step', exact: true })
+    await expect(form.getByText('Step 1', { exact: true })).toBeVisible()
+    await expect(form.getByRole('button', { name: 'Back', exact: true })).toBeDisabled()
     await form.getByRole('button', { name: 'Add Class', exact: true }).click()
     const identity = (await form.locator('[data-fs-key="identityCard"]').boundingBox())!
     const classes = (await form.locator('[data-fs-key="classesSection"]').boundingBox())!
@@ -65,6 +67,9 @@ for (const kit of ['mui', 'html']) {
     const pages = await step.locator('option').allTextContents()
     for (const title of pages) {
       await step.selectOption({ label: title })
+      await expect(
+        form.getByText(`Step ${String(pages.indexOf(title) + 1)}`, { exact: true }),
+      ).toBeVisible()
       if (title === '6 · Spellcasting') {
         await form.getByRole('checkbox', { name: 'This character uses spells' }).check()
         const slots = await Promise.all(
