@@ -221,6 +221,21 @@
   display: none;
 }
 
+.fsh-field--label-inline {
+  display: grid;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.fsh-field--label-inline > .fsh-field__label {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.fsh-field--label-inline > .fsh-field__message {
+  grid-column: 1 / -1;
+}
+
 .fsh-field__message.is-error {
   color: var(--fsh-danger);
 }

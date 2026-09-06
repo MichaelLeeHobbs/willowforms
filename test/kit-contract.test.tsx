@@ -353,7 +353,7 @@ const made = (def: ComponentDef, root: ComponentNode): ComponentNode => {
  * Named rather than inferred from the editor, because `columns`, `index` and
  * `maxLength` are numbers too and none of them is a length.
  */
-const LENGTHS = ['gap', 'padding', 'radius', 'maxWidth', 'width', 'minColumnWidth']
+const LENGTHS = ['gap', 'padding', 'radius', 'maxWidth', 'width', 'minColumnWidth', 'inputWidth']
 
 describe('the two kits in this repository agree', () => {
   const html = new Map(htmlKit.components.map((c) => [c.type, c]))
@@ -1481,12 +1481,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     width: 'width',
   }
 
-  /*
-   * `minColumnWidth` feeds `repeat(auto-fill, minmax(Npx, 1fr))`, so its pixels
-   * land inside `grid-template-columns` rather than in a property that reads
-   * back as `Npx`. Excluded with a reason rather than silently absent.
-   */
-  const NOT_A_PROPERTY = new Set(['minColumnWidth'])
+  // Grid tracks contain these lengths; browser geometry tests cover their rendered widths.
+  const NOT_A_PROPERTY = new Set(['minColumnWidth', 'inputWidth'])
 
   const declaredLengths = kit.components.flatMap((def) =>
     def.props
