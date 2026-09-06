@@ -902,13 +902,13 @@ describe('a press that is not the primary button', () => {
  * would report is a browser question; what it observed is answerable here.
  */
 describe('the selection layer and the elements it watches', () => {
-  it('observes the shell, surface, and form root as soon as it mounts', () => {
+  it('observes the shell, surface, form root, and resizable panes as soon as it mounts', () => {
     const before = observerCount()
     setup()
     const after = observerCount()
 
-    expect(after.made - before.made, 'observers built on mount').toBe(2)
-    expect(after.observing - before.observing, 'elements watched on mount').toBe(3)
+    expect(after.made - before.made, 'observers built on mount').toBe(4)
+    expect(after.observing - before.observing, 'elements watched on mount').toBe(7)
   })
 
   it('does not rebuild the observer while the pointer sweeps across components', async () => {
@@ -936,7 +936,7 @@ describe('the selection layer and the elements it watches', () => {
     view.unmount()
     const after = observerCount()
 
-    expect(after.disconnects - before.disconnects, 'observers disconnected').toBe(2)
+    expect(after.disconnects - before.disconnects, 'observers disconnected').toBe(4)
     // Back where it started. A residue here is an observer still holding an
     // element after the component that made it is gone, which is the leak these
     // counters exist to show.

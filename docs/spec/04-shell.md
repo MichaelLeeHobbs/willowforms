@@ -24,7 +24,13 @@ Three panes under a toolbar. **Status: built.** The diagram describes the curren
 
 The left pane has Components, Tree, and Settings tabs. The inspector has Properties, Style, Actions, and Rules tabs. Toolbar controls wrap when space is limited, long form names truncate, and scrolling stays within the designer's panes and canvas.
 
-Both side panes are `--fs-panel-width` (288px) and fixed. The canvas takes what is left.
+Both side panes start at `--fs-panel-width` (288px). Each desktop pane can be resized independently between 240px and 560px using the divider beside the canvas. The canvas retains at least 320px; panels temporarily shrink when necessary without overwriting the user's preferred widths. Narrow layouts continue to use drawers.
+
+### Resizable panes
+
+Widths are browser view preferences, stored under `formsmith.designer.panel-widths.v1` in local storage and shared across forms and kits on the same origin. They never enter form JSON or document undo history. Invalid preferences are ignored, and unavailable storage leaves resizing functional for the session. Drag completion and keyboard changes save the preference; canceled drags do not.
+
+The dividers are focusable vertical separators with names, panel references, and current/minimum/maximum widths announced in pixels. Left/Right moves the divider by 10px, or 40px with Shift. Home/End selects the available minimum/maximum. Escape cancels an active drag without clearing the selected component. Enter or double-click restores the host's default width for that panel. The existing collapse buttons remain separate; collapse and Preview preserve saved widths, and hidden panels have no resize handle.
 
 The full-screen demo keeps overflow inside the panes and canvas rather than scrolling the document. A
 pane grip is 15px including its one-pixel divider, so its 14px glyph fits inside the border box instead

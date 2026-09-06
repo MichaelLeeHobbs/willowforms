@@ -104,6 +104,7 @@
 .fs-panel :focus-visible,
 .fs-canvas__bar :focus-visible,
 .fs-pane-handle:focus-visible,
+.fs-panel-resize:focus-visible,
 .fs-selection__toolbar button:focus-visible {
   outline: 2px solid var(--fs-primary);
   outline-offset: 2px;
@@ -158,10 +159,37 @@
   flex-direction: column;
   gap: 16px;
   width: var(--fs-panel-width);
-  flex: 0 0 var(--fs-panel-width);
+  flex: 0 1 var(--fs-panel-width);
   padding: 12px;
   overflow-y: auto;
   background: var(--fs-bg-panel);
+}
+
+.fs-body[data-fs-desktop-editing] > .fs-panel {
+  min-width: 240px;
+  max-width: 560px;
+}
+
+.fs-body[data-fs-desktop-editing] > .fs-canvas {
+  min-width: 320px;
+}
+
+.fs-panel-resize {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  background: var(--fs-bg-panel);
+  border-inline: 1px solid var(--fs-border);
+}
+
+.fs-panel-resize:hover,
+.fs-panel-resize:focus-visible {
+  background: var(--fs-primary);
+}
+
+.fs-panel-resize:focus-visible {
+  outline-offset: -2px;
 }
 
 .fs-panel[hidden],
