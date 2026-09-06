@@ -19,7 +19,7 @@ for (const kit of ['mui', 'html']) {
     ).toBeInViewport()
     await expect(step).toBeFocused()
     await expect.poll(() => surface.evaluate((element) => element.scrollTop)).toBe(0)
-    const strength = form.getByRole('spinbutton', { name: 'Strength score', exact: true })
+    const strength = form.getByRole('spinbutton', { name: 'STR score', exact: true })
     await strength.fill('16')
     await expect(strength).toBeFocused()
     await expect(strength).toHaveValue('16')

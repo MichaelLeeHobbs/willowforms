@@ -1,20 +1,6 @@
-import type { ComponentNode } from '@formsmith/core'
-import {
-  check,
-  choices,
-  date,
-  form,
-  grid,
-  node,
-  notes,
-  number,
-  repeat,
-  required,
-  section,
-  step,
-  text,
-  when,
-} from './builders.js'
+import { prop } from '@formsmith/core'
+import { check, choices, date, form, node, number, required, text, when } from './builders.js'
+import { grid, notes, repeat, section, step, styled } from './character-layout.js'
 
 const ABILITIES = [
   ['Strength', ['Athletics']],
@@ -26,35 +12,10 @@ const ABILITIES = [
 ] as const
 const keyOf = (label: string): string => label.replaceAll(' ', '')
 
-function ability(name: string, skills: readonly string[]): ComponentNode {
-  const key = name.toLowerCase()
-  return section(key + 'Card', name, [
-    grid(key + 'Numbers', [
-      number(key + 'Score', name + ' score', 1, 30),
-      number(key + 'Modifier', name + ' modifier', -5, 10),
-    ]),
-    grid(key + 'Save', [
-      number(key + 'SaveBonus', name + ' save bonus', -5),
-      check(key + 'SaveProficiency', 'Proficient in ' + name.toLowerCase() + ' saves'),
-    ]),
-    ...skills.map((skill) =>
-      grid(keyOf(skill) + 'Skill', [
-        number(keyOf(skill) + 'Bonus', skill + ' bonus', -5),
-        choices(keyOf(skill) + 'Training', skill + ' training', [
-          'None',
-          'Proficient',
-          'Expertise',
-          'Other',
-        ]),
-      ]),
-    ),
-  ])
-}
-
 export const characterSheet = form(
   'dnd-character-sheet',
   'D&D character sheet',
-  'Your adventurer, from first impression to the last spell slot. Use the pages to record your character and keep your own totals up to date; bonuses and rules are not calculated automatically.',
+  'A record of your character, their abilities, and the adventures ahead.',
   [
     step('identity', '1 · Identity and origins', [
       section('identityCard', 'The adventurer', [
@@ -117,13 +78,70 @@ export const characterSheet = form(
       ),
     ]),
     step('abilities', '2 · Abilities, saves, and skills', [
-      node('Text', 'abilityInstructions', {
-        text: 'Record final bonuses, including proficiency, expertise, and other adjustments. A training selection records proficiency without recalculating the bonus.',
-      }),
       grid(
         'abilityCards',
-        ABILITIES.map(([name, skills]) => ability(name, skills)),
+        ABILITIES.map(([name]) => {
+          const key = name.toLowerCase()
+          const short = name.slice(0, 3).toUpperCase()
+          return styled(
+            node('Stack', key + 'Card', { gap: 8 }, [
+              styled(
+                node('Heading', key + 'Title', { text: name, level: 'h3' }),
+                'font-family:Georgia,serif;font-size:16px;font-weight:600;',
+              ),
+              number(key + 'Score', short + ' score', 1, 30),
+              number(key + 'Modifier', short + ' modifier', -5, 10),
+            ]),
+            'padding:14px 12px 4px; border:1px solid var(--sheet-line); border-top:3px solid var(--sheet-accent); border-radius:4px; background:var(--sheet-panel);',
+          )
+        }),
+        6,
+        160,
       ),
+      section('savingThrows', 'Saving throws', [
+        grid(
+          'saveFields',
+          ABILITIES.map(([name]) => {
+            const key = name.toLowerCase()
+            const short = name.slice(0, 3).toUpperCase()
+            return node('Stack', key + 'Save', { gap: 0 }, [
+              number(key + 'SaveBonus', short + ' save bonus', -5),
+              check(key + 'SaveProficiency', short + ' proficient'),
+            ])
+          }),
+          6,
+          160,
+        ),
+      ]),
+      section('skills', 'Skills', [
+        node('Text', 'abilityInstructions', {
+          text: 'Record your final bonuses. Training is a reference; modifiers are entered manually.',
+          variant: 'small',
+        }),
+        grid(
+          'skillRows',
+          ABILITIES.flatMap(([, skills]) => skills)
+            .sort()
+            .map((skill) =>
+              grid(
+                keyOf(skill) + 'Skill',
+                [
+                  number(keyOf(skill) + 'Bonus', skill + ' bonus', -5),
+                  choices(keyOf(skill) + 'Training', skill + ' training', [
+                    'None',
+                    'Proficient',
+                    'Expertise',
+                    'Other',
+                  ]),
+                ],
+                2,
+                180,
+              ),
+            ),
+          2,
+          380,
+        ),
+      ]),
       section('awareness', 'Awareness and proficiencies', [
         grid(
           'passiveScores',
@@ -273,7 +291,8 @@ export const characterSheet = form(
           ['Copper', 'Silver', 'Electrum', 'Gold', 'Platinum'].map((coin) =>
             number(coin.toLowerCase(), coin + ' pieces'),
           ),
-          3,
+          5,
+          160,
         ),
       ]),
       repeat(
@@ -472,8 +491,14 @@ export const characterSheet = form(
     }),
   ],
 )
-characterSheet.root.children![0]!.css = {
-  any:
-    characterSheet.root.children![0]!.css!.any +
-    ' font-family: Georgia, serif; letter-spacing: -0.03em;',
-}
+characterSheet.root.props = { maxWidth: prop(1080), gap: prop(16) }
+styled(
+  characterSheet.root,
+  '--sheet-line:color-mix(in srgb,currentColor 22%,transparent); --sheet-accent:#9e7851; --sheet-panel:color-mix(in srgb,currentColor 3%,transparent); padding:24px; border-top:4px solid var(--sheet-accent); overflow-wrap:anywhere;',
+)
+styled(
+  characterSheet.root.children![0]!,
+  'font-family:Georgia,serif;font-size:17px;font-weight:600;letter-spacing:0.04em;',
+)
+characterSheet.root.children![1]!.renderWhen = characterSheet.root.children![2]!.renderWhen!
+styled(characterSheet.root.children![1]!, 'font-size:14px;')
