@@ -30,6 +30,7 @@ for (const kit of ['mui', 'html']) {
     await expect(form.getByRole('heading', { name: '1 · Identity and origins' })).toBeInViewport()
     await expect(step).toBeFocused()
     await form.getByRole('button', { name: 'Add Class', exact: true }).click()
+    await next.scrollIntoViewIfNeeded()
     expect(await surface.evaluate((element) => element.scrollTop)).toBeGreaterThan(100)
     await step.selectOption({ label: '3 · Combat and conditions' })
     await expect(form.getByRole('heading', { name: '3 · Combat and conditions' })).toBeInViewport()
