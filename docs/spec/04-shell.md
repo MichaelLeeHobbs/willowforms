@@ -111,6 +111,12 @@ The form sits in a frame the designer owns and the kit cannot see. Hit-testing i
 neither is invisible to both. That is a claim about geometry, so it is checked in a browser rather than
 here: `e2e/viewport.spec.ts` selects and drags at 390px wide.
 
+## Narrow layouts and Preview
+
+Below 960px of shell width, authoring panels use modal drawers opened by the **Components and structure** and **Component properties** buttons. They leave the canvas width available when closed. Each drawer has a close button, traps keyboard focus, closes with Escape, and restores focus to its opener. Adding a palette component closes the drawer so the result is visible; on narrow layouts palette insertion uses its click/keyboard action, while the Tree retains keyboard rearrangement. Desktop collapsed-panel preferences are independent of drawer state. Crossing the breakpoint remounts panel-local tab state.
+
+Preview hides the authoring panels and their openers at every width without changing desktop collapse preferences. Returning to editing restores those preferences and leaves focus on the Preview toggle. Preview disables shell document-editing shortcuts. Diagnostics are optional rather than taking space from the form by default.
+
 ## Toolbar
 
 **Status: built.** Every control in the table is, and the two notes under it are about how they behave

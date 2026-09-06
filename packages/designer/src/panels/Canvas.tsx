@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent,
@@ -51,6 +51,8 @@ const NO_ERRORS: FormErrors = Object.freeze({})
 export type Viewport = Exclude<Device, 'any'>
 
 export interface CanvasProps {
+  preview: boolean
+  onPreview: (preview: boolean) => void
   api: DesignerApi
   kit: Kit
   rendererKit: RendererKit
@@ -130,8 +132,11 @@ export function Canvas({
   drag,
   viewport,
   language,
+  preview,
+  onPreview,
 }: CanvasProps): ReactNode {
-  const [preview, setPreview] = useState(false)
+  const diagnosticsId = useId()
+  const [diagnostics, setDiagnostics] = useState(false)
 
   const steps = useMemo(() => contextValues(api.document.root, 'step'), [api.document.root])
   const [step, setStep] = useState<JsonValue | undefined>(undefined)
@@ -453,7 +458,8 @@ export function Canvas({
         <button
           type="button"
           onClick={() => {
-            setPreview((p) => !p)
+            onPreview(!preview)
+            setDiagnostics(false)
             setValidated(false)
             setHover({ key: undefined, row: undefined })
           }}
@@ -493,6 +499,14 @@ export function Canvas({
               }}
             >
               Clear data
+            </button>
+            <button
+              type="button"
+              aria-expanded={diagnostics}
+              aria-controls={diagnosticsId}
+              onClick={() => setDiagnostics((shown) => !shown)}
+            >
+              Diagnostics
             </button>
           </>
         )}
@@ -578,20 +592,9 @@ export function Canvas({
         )}
       </div>
 
-      {/*
-       * `tabIndex` on the dumps, because `designer.css` caps them at 180px and
-       * scrolls. A scrollable box that nothing can focus is unreachable by
-       * keyboard: a pointer user could read a long form's data, and a keyboard
-       * user got the first few lines and no way to reach the rest.
-       *
-       * Named as well as focusable. A tab stop that announces nothing is its own
-       * problem, and `aria-label` is what turns the stop into "Data, group".
-       * axe's `scrollable-region-focusable` is one of three rules
-       * `test/a11y.test.tsx` disables for want of a layout engine, so this is
-       * asserted directly in `Canvas.test.tsx` instead of waited for.
-       */}
+      {/* Named tab stops let keyboard users scroll long diagnostics. */}
       {preview && (
-        <div className="fs-canvas__data">
+        <div id={diagnosticsId} className="fs-canvas__data" hidden={!diagnostics}>
           <section>
             <h2 className="fs-panel__heading">Data</h2>
             <pre tabIndex={0} role="group" aria-label="Data">

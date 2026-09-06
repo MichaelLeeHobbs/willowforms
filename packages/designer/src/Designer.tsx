@@ -17,6 +17,7 @@ import type { RendererKit } from '@formsmith/renderer'
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
 import { Icon } from './Icon.js'
+import { ResponsivePanel, useNarrowShell } from './ResponsivePanel.js'
 import { Canvas, canvasSwallowsFocus } from './panels/Canvas.js'
 import type { Viewport } from './panels/Canvas.js'
 import { DocumentDialog } from './panels/DocumentDialog.js'
@@ -26,15 +27,7 @@ import { useDesigner } from './store.js'
 import type { DesignerApi } from './store.js'
 
 export interface DesignerProps {
-  /** Starting document. The designer owns it from here; use onChange to observe. */
-  /**
-   * The document to start from, read once at mount.
-   *
-   * The designer owns it afterwards: passing a different one has no effect,
-   * deliberately, because replacing the content under an author's hands throws
-   * away their undo stack with no way to get it back. To load another form,
-   * remount with a different React `key`.
-   */
+  /** Read once at mount. To load another form, remount with a different React key. */
   initialDocument: FormDocument
   /** Palette metadata. */
   kit: Kit
@@ -82,14 +75,6 @@ export function Designer({
   onThemeChange,
 }: DesignerProps): ReactNode {
   const idBase = useId()
-  /*
-   * `initialDocument` is read once, at mount, and the name says so: the designer
-   * owns the document after that, because a builder whose content can be
-   * replaced underneath an edit has no undo stack worth the name. A host that
-   * wants to load a different form remounts with a new `key`, which is the
-   * React idiom for exactly this and what the playground does when it switches
-   * kits. Documented on the prop as well.
-   */
   const api = useDesigner(initialDocument)
 
   const emit = useRef(onChange)
@@ -102,6 +87,9 @@ export function Designer({
   }, [api.document])
 
   const shellRef = useRef<HTMLDivElement>(null)
+  const narrow = useNarrowShell(shellRef)
+  const [preview, setPreview] = useState(false)
+  const [drawer, setDrawer] = useState<'left' | 'right' | undefined>()
 
   const [jsonOpen, setJsonOpen] = useState(false)
 
@@ -266,6 +254,7 @@ export function Designer({
         shellRef.current?.focus({ preventScroll: true })
       }}
       className="fs-shell"
+      data-fs-preview={preview || undefined}
       data-testid="formsmith-designer"
       {...(theme === 'system' ? {} : { 'data-fs-theme': theme })}
     >
@@ -287,19 +276,42 @@ export function Designer({
         onLanguage={setLanguage}
         {...(onSave ? { onSave: () => onSave(api.document) } : {})}
       />
+      {narrow && !preview && (
+        <nav className="fs-mobile-panels" aria-label="Authoring panels">
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls={idBase + '-left'}
+            onClick={() => setDrawer('left')}
+          >
+            Components and structure
+          </button>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls={idBase + '-right'}
+            onClick={() => setDrawer('right')}
+          >
+            Component properties
+          </button>
+        </nav>
+      )}
       <div className="fs-body">
-        <PaneHandle
-          side="left"
-          controls={idBase + '-left'}
-          collapsed={collapsed.left}
-          onToggle={() => toggle('left')}
-        />
+        {!preview && !narrow && (
+          <PaneHandle
+            side="left"
+            controls={idBase + '-left'}
+            collapsed={collapsed.left}
+            onToggle={() => toggle('left')}
+          />
+        )}
 
-        <aside
+        <ResponsivePanel
           id={idBase + '-left'}
-          className="fs-panel fs-panel--left"
-          aria-label="Components and structure"
-          hidden={collapsed.left}
+          side="left"
+          narrow={narrow}
+          onClose={() => setDrawer(undefined)}
+          hidden={preview || (narrow ? drawer !== 'left' : collapsed.left)}
         >
           <LeftPane
             api={api}
@@ -307,11 +319,16 @@ export function Designer({
             drag={drag}
             announce={announce}
             onAdd={(def) => {
-              if (api.addComponent(def, api.selectedKey)) announce(def.label + ' added.')
+              if (api.addComponent(def, api.selectedKey)) {
+                announce(def.label + ' added.')
+                setDrawer(undefined)
+              }
             }}
-            onDragStart={(def, event) => drag.begin({ kind: 'new', def }, event)}
+            onDragStart={(def, event) => {
+              if (!narrow) drag.begin({ kind: 'new', def }, event)
+            }}
           />
-        </aside>
+        </ResponsivePanel>
 
         <main className="fs-canvas" aria-label="Form canvas">
           <Canvas
@@ -320,15 +337,18 @@ export function Designer({
             rendererKit={rendererKit}
             drag={drag}
             viewport={viewport}
+            preview={preview}
+            onPreview={setPreview}
             {...(activeLanguage ? { language: activeLanguage } : {})}
           />
         </main>
 
-        <aside
+        <ResponsivePanel
           id={idBase + '-right'}
-          className="fs-panel fs-panel--right"
-          aria-label="Component properties"
-          hidden={collapsed.right}
+          side="right"
+          narrow={narrow}
+          onClose={() => setDrawer(undefined)}
+          hidden={preview || (narrow ? drawer !== 'right' : collapsed.right)}
         >
           <Inspector
             api={api}
@@ -342,14 +362,16 @@ export function Designer({
               setStyleDevice(next)
             }}
           />
-        </aside>
+        </ResponsivePanel>
 
-        <PaneHandle
-          side="right"
-          controls={idBase + '-right'}
-          collapsed={collapsed.right}
-          onToggle={() => toggle('right')}
-        />
+        {!preview && !narrow && (
+          <PaneHandle
+            side="right"
+            controls={idBase + '-right'}
+            collapsed={collapsed.right}
+            onToggle={() => toggle('right')}
+          />
+        )}
       </div>
 
       <div className="fs-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
@@ -608,7 +630,7 @@ function useKeyboardShortcuts(
       if (typing) return
 
       if (target?.closest('dialog[open]')) return
-      if (target?.closest('.fs-canvas__surface.is-preview')) return
+      if (target?.closest('.fs-shell[data-fs-preview="true"]')) return
 
       if (!target) return
 
