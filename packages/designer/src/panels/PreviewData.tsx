@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { FormData } from '@formsmith/core'
+import type { FormData } from '@willowforms/core'
 
 export function PreviewData({ data }: { data: FormData }): ReactNode {
   const id = useId()

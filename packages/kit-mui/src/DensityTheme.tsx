@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { ThemeProvider, useTheme } from '@mui/material/styles'
-import type { FormDensity } from '@formsmith/renderer'
+import type { FormDensity } from '@willowforms/renderer'
 
 function defaults<T extends { defaultProps?: object | undefined }>(
   base: T | undefined,

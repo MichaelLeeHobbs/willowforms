@@ -3,7 +3,7 @@
 **Status: built.** The rule engine, type enforcement, localized messages, cross-field comparisons, and
 the complete Rules tab are implemented and share one runtime between browser and server.
 
-Validation lives in `@formsmith/core`, which imports no React and runs in Node. That is not a
+Validation lives in `@willowforms/core`, which imports no React and runs in Node. That is not a
 convenience: it means a form's rules are authored once and enforced in both places, rather than
 reimplemented on the server and left to drift.
 
@@ -125,7 +125,7 @@ Three of these degrade towards failing rather than passing, and they are the one
   alternatives are safe to evaluate. Backreferences, lookarounds, and unsupported or malformed syntax
   are refused and shown by `patternProblem` in the Rules tab.
 - Pattern matching remains unanchored and the accepted subset exports directly to JSON Schema. A host
-  that evaluates exported schemas must choose a validator with appropriate resource limits; FormSmith
+  that evaluates exported schemas must choose a validator with appropriate resource limits; WillowForms
   controls only its own validation engine.
 
 - A **rule key the engine does not recognise fails with `UNREADABLE_RULE`.** This is the one place a rule
@@ -251,7 +251,7 @@ only purpose is to prove that a form's rules are one rule set, run in both place
 A form with no steps validates once, and this is the whole of it:
 
 ```ts
-import { missingContext, submittedData, validateForm } from '@formsmith/core'
+import { missingContext, submittedData, validateForm } from '@willowforms/core'
 
 const context = { user: { role: session.role } }
 
@@ -284,7 +284,7 @@ start.
 A multi-step form validates **once per scope**, and the scopes come out of the document:
 
 ```ts
-import { contextValues, missingContext, submittedAcross, validateAcross } from '@formsmith/core'
+import { contextValues, missingContext, submittedAcross, validateAcross } from '@willowforms/core'
 
 const steps = contextValues(document.root, 'step').filter(
   (step): step is string => typeof step === 'string',

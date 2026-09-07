@@ -11,11 +11,11 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@formsmith/core": "workspace:*",
-    "@formsmith/designer": "workspace:*",
-    "@formsmith/kit-html": "workspace:*",
-    "@formsmith/kit-mui": "workspace:*",
-    "@formsmith/renderer": "workspace:*",
+    "@willowforms/core": "workspace:*",
+    "@willowforms/designer": "workspace:*",
+    "@willowforms/kit-html": "workspace:*",
+    "@willowforms/kit-mui": "workspace:*",
+    "@willowforms/renderer": "workspace:*",
     "@mui/material": "^7.3.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

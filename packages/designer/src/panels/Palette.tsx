@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import type { ComponentDef, Kit, PaletteGroup } from '@formsmith/core'
-import { groupKit } from '@formsmith/core'
+import type { ComponentDef, Kit, PaletteGroup } from '@willowforms/core'
+import { groupKit } from '@willowforms/core'
 
 import { Icon } from '../Icon.js'
 import { availablePresets } from '../presets.js'

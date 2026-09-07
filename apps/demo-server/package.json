@@ -3,15 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Minimal persistence for the demo. Deliberately tiny: FormSmith is a frontend library.",
+  "description": "Minimal persistence for the demo. Deliberately tiny: WillowForms is a frontend library.",
   "scripts": {
-    "predev": "pnpm --filter @formsmith/core build",
+    "predev": "pnpm --filter @willowforms/core build",
     "dev": "node --experimental-strip-types --watch src/index.ts",
-    "prestart": "pnpm --filter @formsmith/core build",
+    "prestart": "pnpm --filter @willowforms/core build",
     "start": "node --experimental-strip-types src/index.ts"
   },
   "dependencies": {
-    "@formsmith/core": "workspace:*",
+    "@willowforms/core": "workspace:*",
     "@hono/node-server": "^2.1.1",
     "hono": "^4.13.5"
   },

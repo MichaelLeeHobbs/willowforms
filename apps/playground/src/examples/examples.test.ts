@@ -6,9 +6,9 @@ import {
   flatten,
   loadDocument,
   validateForm,
-} from '@formsmith/core'
-import { htmlKit } from '@formsmith/kit-html'
-import { muiKit } from '@formsmith/kit-mui'
+} from '@willowforms/core'
+import { htmlKit } from '@willowforms/kit-html'
+import { muiKit } from '@willowforms/kit-mui'
 import { EXAMPLES } from './index.js'
 
 describe('playground example documents', () => {

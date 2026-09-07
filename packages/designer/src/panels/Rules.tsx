@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { FieldSchema, ValidationKey, ValidationRule } from '@formsmith/core'
-import { DEFAULT_MESSAGES, keyScopesFor, patternProblem } from '@formsmith/core'
+import type { FieldSchema, ValidationKey, ValidationRule } from '@willowforms/core'
+import { DEFAULT_MESSAGES, keyScopesFor, patternProblem } from '@willowforms/core'
 
 import { languagesOf } from '../language.js'
 import type { DesignerApi } from '../store.js'

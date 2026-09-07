@@ -9,10 +9,10 @@
 
 import { useId, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
-import { findLanguage, languageTag } from '@formsmith/core'
+import { findLanguage, languageTag } from '@willowforms/core'
 import { languagesOf } from './language.js'
-import type { Device, FormDocument, IconName, Kit } from '@formsmith/core'
-import type { RendererKit } from '@formsmith/renderer'
+import type { Device, FormDocument, IconName, Kit } from '@willowforms/core'
+import type { RendererKit } from '@willowforms/renderer'
 
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
@@ -46,7 +46,7 @@ export interface DesignerProps {
    * Save the current document. The toolbar shows a Save button only when this
    * is passed.
    *
-   * FormSmith does not persist, so a Save button that appeared unconditionally
+   * WillowForms does not persist, so a Save button that appeared unconditionally
    * would promise something the designer cannot deliver. Its absence is the
    * honest default: `onChange` already emits every version, and many hosts save
    * from that.
@@ -267,7 +267,7 @@ export function Designer({
       }}
       className="fs-shell"
       data-fs-preview={preview || undefined}
-      data-testid="formsmith-designer"
+      data-testid="willowforms-designer"
       {...(theme === 'system' ? {} : { 'data-fs-theme': theme })}
     >
       <Toolbar

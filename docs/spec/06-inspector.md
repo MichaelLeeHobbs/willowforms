@@ -216,7 +216,7 @@ available without one.
 **Status: built.** See [08-validation.md](08-validation.md) for semantics.
 
 The field's data type and its validate-while-typing flag sit above a list of rules. That flag writes
-`FieldSchema.autoValidate`, which is a hint to whoever owns the form's data, since FormSmith never does.
+`FieldSchema.autoValidate`, which is a hint to whoever owns the form's data, since WillowForms never does.
 The canvas preview reads it: a field that asked for it shows its error once the user has touched it,
 rather than waiting for Validate. It was written by this checkbox and read by nothing at all until
 recently, which made it a setting that did nothing. Each rule gets the
@@ -260,6 +260,6 @@ tests depend on how fast the machine runs them.
 
 ### Image sources and decorative backgrounds
 
-Image sources have a URL field and preview, a local file picker that embeds PNG, JPEG, WebP, or GIF up to 2 MiB per image, and Remove image. Invalid sources and failed previews show an actionable error. Embedded data stays inside the document; FormSmith does not upload assets or manage storage. SVG is supported through linked image URLs, never injected markup or embedded SVG. Hosts supply accessible asset URLs and an appropriate image CSP.
+Image sources have a URL field and preview, a local file picker that embeds PNG, JPEG, WebP, or GIF up to 2 MiB per image, and Remove image. Invalid sources and failed previews show an actionable error. Embedded data stays inside the document; WillowForms does not upload assets or manage storage. SVG is supported through linked image URLs, never injected markup or embedded SVG. Hosts supply accessible asset URLs and an appropriate image CSP.
 
 Layout containers, including the root Screen, expose Background image, Image fit (Cover, Contain, Tile), Image position, and Readability overlay (None, Light, Dark) in a Background image disclosure in Style. These are ordinary version-1 properties and support the normal property binding modes and undo; they apply across devices. Backgrounds are decorative and affect only the container�s own element. Meaningful artwork uses an Image component with alternative text. Dedicated image properties permit image fetching through a shared image-source allowlist; raw CSS continues to reject URL functions.

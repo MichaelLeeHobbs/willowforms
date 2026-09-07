@@ -145,7 +145,7 @@ const CASES: Case[] = [
   {
     what: 'the designer depending on a specific kit',
     path: fixture('designer', 'designer_kit', 'ts'),
-    code: "import { muiKit } from '@formsmith/kit-mui'\nexport const k = muiKit\n",
+    code: "import { muiKit } from '@willowforms/kit-mui'\nexport const k = muiKit\n",
     rule: 'no-restricted-imports',
   },
   {
@@ -167,7 +167,7 @@ const CASES: Case[] = [
   {
     what: 'the designer reaching a specific kit through a dynamic import',
     path: fixture('designer', 'designer_dynamic_kit', 'ts'),
-    code: "export const load = (): Promise<unknown> => import('@formsmith/kit-mui')\n",
+    code: "export const load = (): Promise<unknown> => import('@willowforms/kit-mui')\n",
     rule: 'no-restricted-syntax',
   },
   {
@@ -263,15 +263,15 @@ const CASES: Case[] = [
   {
     /*
      * The near miss, which is what says the kit selector is a prefix on the kit
-     * packages and not on the scope. `@formsmith/core` shares five sixths of its
-     * name with `@formsmith/kit-mui` and is the package the designer is built
+     * packages and not on the scope. `@willowforms/core` shares five sixths of its
+     * name with `@willowforms/kit-mui` and is the package the designer is built
      * on; a selector one character too loose would refuse the designer's own
      * dependency, which is a failure nobody would call a false positive because
      * the build would simply stop.
      */
     what: 'the designer dynamically importing the core it is built on',
     path: fixture('designer', 'designer_dynamic_core', 'ts'),
-    code: "export const load = (): Promise<unknown> => import('@formsmith/core')\n",
+    code: "export const load = (): Promise<unknown> => import('@willowforms/core')\n",
     rule: null,
   },
 ]

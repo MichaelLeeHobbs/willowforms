@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import { parseDeclarations, printDeclarations, safeDeclarations } from '@formsmith/core'
+import { parseDeclarations, printDeclarations, safeDeclarations } from '@willowforms/core'
 
 const SIDES = ['top', 'right', 'bottom', 'left'] as const
 const FONTS = [

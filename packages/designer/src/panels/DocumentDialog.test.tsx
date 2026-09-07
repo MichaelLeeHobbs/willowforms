@@ -15,8 +15,8 @@ import { act, createEvent, fireEvent, render, screen, within } from '@testing-li
 import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import type { FormDocument, JsonSchema, Kit } from '@formsmith/core'
-import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
+import type { FormDocument, JsonSchema, Kit } from '@willowforms/core'
+import type { NodeRendererProps, RendererKit } from '@willowforms/renderer'
 
 import { Designer } from '../Designer.js'
 

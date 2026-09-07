@@ -28,7 +28,7 @@ Items 3–6 below have since been approved and reflected in the specification: s
 
 [Interchange](spec/10-interchange.md#format-scope) previously described JSON Schema import as an obvious inverse and proposed an archive containing a document, translations, and schema. Schema import serves developers starting from an API contract more directly than users creating questions. Translations already live inside the document, and the schema is derived from it, so the proposed bundle had no demonstrated transport gap.
 
-**Decision applied:** support simple import/export of a versioned FormSmith JSON document. Schema import and archives are outside scope. Keep the existing lossy schema projection as an optional developer utility and document-version migrations as a reliability obligation when a new version is introduced. Shared-subform composition remains uncommitted in [the document model](spec/01-document-model.md#one-form-per-document).
+**Decision applied:** support simple import/export of a versioned WillowForms JSON document. Schema import and archives are outside scope. Keep the existing lossy schema projection as an optional developer utility and document-version migrations as a reliability obligation when a new version is introduced. Shared-subform composition remains uncommitted in [the document model](spec/01-document-model.md#one-form-per-document).
 
 ## 4. Catalogue growth can drift into page building
 
@@ -52,7 +52,7 @@ The [catalogue](spec/03-components.md#the-catalogue) already includes Breadcrumb
 
 The accessibility audit is the approved next verification priority. Dropping a second keyboard selection system does not remove the need for equivalent authoring operations, clear focus, browser checks, and real screen-reader verification. See the [ordinary-property acceptance requirements](spec/02-kit-contract.md#accessibility-from-ordinary-properties).
 
-**Attachment decision implemented:** the standard kits no longer include file inputs. Legacy definitions remain loadable, and schema export no longer infers base64 encoding. The [replacement path](COMPATIBILITY.md#pre-beta-corrections) preserves documents and requires a host component; a filename is never converted into a durable attachment reference by relabeling it. FormSmith owns no upload, storage, or viewing service.
+**Attachment decision implemented:** the standard kits no longer include file inputs. Legacy definitions remain loadable, and schema export no longer infers base64 encoding. The [replacement path](COMPATIBILITY.md#pre-beta-corrections) preserves documents and requires a host component; a filename is never converted into a durable attachment reference by relabeling it. WillowForms owns no upload, storage, or viewing service.
 
 Several passages describe old implementation states as current: [conditions](spec/01-document-model.md#conditions) say conditional authoring needs JavaScript; [component events](spec/03-components.md#events) say nothing dispatches them; and [the API](spec/12-api.md#four-core-functions-a-host-has-to-call) describes `contextValues` as reading repeated-row context rather than enumerating comparison values. These are documentation defects, not reasons to expand the product. The interchange edit now correctly identifies the implemented loader. Historical explanations should be reduced to the current contract in separate focused edits.
 

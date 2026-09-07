@@ -1,12 +1,12 @@
-# FormSmith
+# WillowForms
 
 An MIT-licensed visual form designer and runtime renderer for React.
 
 ## Mission
 
-FormSmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
+WillowForms enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
 
-The host application owns storage, permissions, distribution, and business workflows. FormSmith provides the form authoring and completion experience. The [product principles](docs/spec/README.md#product-principles) guide what belongs in the library.
+The host application owns storage, permissions, distribution, and business workflows. WillowForms provides the form authoring and completion experience. The [product principles](docs/spec/README.md#product-principles) guide what belongs in the library.
 
 > Status: initial beta candidate. Authoring, validation, repeaters, step navigation, and host-dispatched actions are implemented. Nothing is published to npm and no release has been cut. See the [beta review](docs/BETA_REVIEW.md) for verified workflows, deferred features, and release gates.
 
@@ -23,13 +23,13 @@ Every good form builder splits the same way: the runtime is open source, the vis
 | SurveyJS         | `survey-core` — MIT              | `survey-creator-core` — commercial                                                  |
 | Vueform          | `@vueform/vueform` — MIT         | Vueform Builder — commercial                                                        |
 | OpnForm, HeyForm | AGPL-3.0                         | AGPL-3.0                                                                            |
-| **FormSmith**    | **MIT**                          | **MIT**                                                                             |
+| **WillowForms**  | **MIT**                          | **MIT**                                                                             |
 
 `@formio/js` is the one honest exception and ships an MIT builder, but it is a 2018-era architecture
-carrying `moment`, `dragula`, and jQuery-shaped patterns. FormSmith is the modern take.
+carrying `moment`, `dragula`, and jQuery-shaped patterns. WillowForms is the modern take.
 
 The AGPL projects are genuinely open, and if AGPL suits you they are further along than this one is.
-FormSmith exists for everyone who cannot take a copyleft dependency and refuses to pay four figures a
+WillowForms exists for everyone who cannot take a copyleft dependency and refuses to pay four figures a
 year for a drag-and-drop panel.
 
 ## What works
@@ -62,18 +62,18 @@ Undo and redo cover all of it.
 
 ## Packages
 
-| Package               | What it is                                                                                          |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| `@formsmith/core`     | Document model, kit contract, tree operations, validation, JSON Schema export. No UI, runs in Node. |
-| `@formsmith/renderer` | Runtime renderer. Embed a form without shipping the designer.                                       |
-| `@formsmith/designer` | The visual builder. No UI-library dependency; chrome is plain CSS custom properties.                |
-| `@formsmith/kit-mui`  | Material UI kit. The reference implementation of the kit contract.                                  |
-| `@formsmith/kit-html` | Dependency-free HTML kit. Copy it to build your own.                                                |
+| Package                 | What it is                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `@willowforms/core`     | Document model, kit contract, tree operations, validation, JSON Schema export. No UI, runs in Node. |
+| `@willowforms/renderer` | Runtime renderer. Embed a form without shipping the designer.                                       |
+| `@willowforms/designer` | The visual builder. No UI-library dependency; chrome is plain CSS custom properties.                |
+| `@willowforms/kit-mui`  | Material UI kit. The reference implementation of the kit contract.                                  |
+| `@willowforms/kit-html` | Dependency-free HTML kit. Copy it to build your own.                                                |
 
 Two apps, neither published: `apps/playground` (Vite demo) and `apps/demo-server` (a deliberately tiny
 Hono server so the demo can persist a document and prove server-side validation shares one rule set).
 
-Custom and community components use the [kit interface](docs/spec/02-kit-contract.md#community-component-packages): a package supplies authoring metadata and a React renderer, and the host adds them to its kit. Service-dependent features such as attachments belong to these host-configured extensions. FormSmith does not install plugins from form documents or provide file storage. The standard kits contain no file input; [compatibility notes](docs/COMPATIBILITY.md#pre-beta-corrections) explain how hosts can replace legacy file fields.
+Custom and community components use the [kit interface](docs/spec/02-kit-contract.md#community-component-packages): a package supplies authoring metadata and a React renderer, and the host adds them to its kit. Service-dependent features such as attachments belong to these host-configured extensions. WillowForms does not install plugins from form documents or provide file storage. The standard kits contain no file input; [compatibility notes](docs/COMPATIBILITY.md#pre-beta-corrections) explain how hosts can replace legacy file fields.
 
 ## Quick start
 
@@ -93,9 +93,9 @@ The snippets below are maintained as typechecked consumer code in
 [examples/usage.tsx](examples/usage.tsx).
 
 ```tsx
-import { Designer } from '@formsmith/designer'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
-import '@formsmith/designer/styles.css'
+import { Designer } from '@willowforms/designer'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
+import '@willowforms/designer/styles.css'
 
 ;<Designer
   initialDocument={doc}
@@ -108,8 +108,8 @@ import '@formsmith/designer/styles.css'
 Runtime only, no designer:
 
 ```tsx
-import { FormRenderer } from '@formsmith/renderer'
-import { applyChange, validateForm } from '@formsmith/core'
+import { FormRenderer } from '@willowforms/renderer'
+import { applyChange, validateForm } from '@willowforms/core'
 
 const errors = validateForm(doc.root, data)
 ;<FormRenderer
@@ -126,7 +126,7 @@ implementation to keep in sync.
 
 ## Submitting a form
 
-A button raises an event for the host frontend through `FormRenderer.onEffects`. The host validates the answers, calls its backend, and displays success or failure. FormSmith does not choose an endpoint or store responses. Configure a Button in **Actions → On click → Emit event**, with event name `submit`; its document contains:
+A button raises an event for the host frontend through `FormRenderer.onEffects`. The host validates the answers, calls its backend, and displays success or failure. WillowForms does not choose an endpoint or store responses. Configure a Button in **Actions → On click → Emit event**, with event name `submit`; its document contains:
 
 ```ts
 events: {
@@ -148,7 +148,7 @@ check rather than a promise.
 **The designer stays MIT.** No open-core split, no "enterprise" directory. The moment the designer goes
 behind a license, this project has become the thing it was built to replace.
 
-**Kits are pluggable, and that is demonstrated.** Adding `@formsmith/kit-html` changed nothing in core,
+**Kits are pluggable, and that is demonstrated.** Adding `@willowforms/kit-html` changed nothing in core,
 the renderer, or the designer. It touched build configuration, the playground, and one bug in the other
 kit that the new contract test exposed.
 `test/kit-contract.test.tsx` runs the contract against every kit in the repo, so a third one is added to

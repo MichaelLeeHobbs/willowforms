@@ -252,9 +252,9 @@ export default tseslint.config(
             {
               group: REACT,
               message:
-                'Invariant 1: @formsmith/core runs in Node. Server-side validation depends on it staying React-free.',
+                'Invariant 1: @willowforms/core runs in Node. Server-side validation depends on it staying React-free.',
             },
-            ...noComponentLibrary('Invariant 1: @formsmith/core imports no component library.'),
+            ...noComponentLibrary('Invariant 1: @willowforms/core imports no component library.'),
           ],
         },
       ],
@@ -269,16 +269,16 @@ export default tseslint.config(
         {
           selector: dynamicImportOf(REACT),
           message:
-            'Invariant 1: @formsmith/core runs in Node. A dynamic import of React is still an import.',
+            'Invariant 1: @willowforms/core runs in Node. A dynamic import of React is still an import.',
         },
         {
           selector: dynamicImportOf(COMPONENT_LIBRARIES),
           message:
-            'Invariant 1: @formsmith/core imports no component library, dynamically or otherwise.',
+            'Invariant 1: @willowforms/core imports no component library, dynamically or otherwise.',
         },
         {
           selector: OPAQUE_DYNAMIC_IMPORT,
-          message: OPAQUE_MESSAGE(1, '@formsmith/core'),
+          message: OPAQUE_MESSAGE(1, '@willowforms/core'),
         },
       ],
     },
@@ -297,10 +297,10 @@ export default tseslint.config(
         {
           patterns: [
             ...noComponentLibrary(
-              'Invariant 2: @formsmith/designer consumes ComponentDef metadata only. Importing a component library here leaks the kit abstraction.',
+              'Invariant 2: @willowforms/designer consumes ComponentDef metadata only. Importing a component library here leaks the kit abstraction.',
             ),
             {
-              group: ['@formsmith/kit-*'],
+              group: ['@willowforms/kit-*'],
               message: KIT_MESSAGE,
             },
           ],
@@ -311,15 +311,15 @@ export default tseslint.config(
         {
           selector: dynamicImportOf(COMPONENT_LIBRARIES),
           message:
-            'Invariant 2: @formsmith/designer consumes ComponentDef metadata only. A dynamic import of a component library leaks the kit abstraction just as a static one does.',
+            'Invariant 2: @willowforms/designer consumes ComponentDef metadata only. A dynamic import of a component library leaks the kit abstraction just as a static one does.',
         },
         {
-          selector: dynamicImportUnder('@formsmith/kit-'),
+          selector: dynamicImportUnder('@willowforms/kit-'),
           message: KIT_MESSAGE,
         },
         {
           selector: OPAQUE_DYNAMIC_IMPORT,
-          message: OPAQUE_MESSAGE(2, '@formsmith/designer'),
+          message: OPAQUE_MESSAGE(2, '@willowforms/designer'),
         },
       ],
     },

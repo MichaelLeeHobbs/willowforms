@@ -26,10 +26,10 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { beforeAll, describe, expect, it } from 'vitest'
-import type { FormDocument } from '@formsmith/core'
-import { Designer } from '@formsmith/designer'
-import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+import type { FormDocument } from '@willowforms/core'
+import { Designer } from '@willowforms/designer'
+import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
 /** Rules that need a layout engine, which jsdom does not have. */
 const NEEDS_LAYOUT = ['color-contrast', 'target-size', 'scrollable-region-focusable']

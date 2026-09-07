@@ -23,7 +23,7 @@ for (const kit of ['html', 'mui']) {
       },
     ]
     await page.addInitScript(
-      (text) => localStorage.setItem('formsmith.playground.document', text),
+      (text) => localStorage.setItem('willowforms.playground.document', text),
       JSON.stringify(doc),
     )
     await page.goto('/')
@@ -36,7 +36,7 @@ for (const kit of ['html', 'mui']) {
     const saved = (): Promise<JsonValue> =>
       page.evaluate(() => {
         const doc = JSON.parse(
-          localStorage.getItem('formsmith.playground.document')!,
+          localStorage.getItem('willowforms.playground.document')!,
         ) as FormDocument
         const options = doc.root.children![0]!.props['options']!
         return options.kind === 'static' ? options.value : null

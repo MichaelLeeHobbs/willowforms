@@ -4,8 +4,8 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from 'react'
-import type { ComponentNode, Kit } from '@formsmith/core'
-import { flatten, indexKit } from '@formsmith/core'
+import type { ComponentNode, Kit } from '@willowforms/core'
+import { flatten, indexKit } from '@willowforms/core'
 
 import { resolveTreeDrop } from '../dnd.js'
 import type { TreeDropTarget, TreeRow } from '../dnd.js'

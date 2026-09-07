@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render } from '@testing-library/react'
 import { expect, it } from 'vitest'
-import { createDocument, prop } from '@formsmith/core'
+import { createDocument, prop } from '@willowforms/core'
 import type { ReactNode } from 'react'
 import { FormRenderer } from './index.js'
 import type { NodeRendererProps } from './index.js'

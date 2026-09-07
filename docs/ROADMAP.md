@@ -28,7 +28,7 @@ documentation agree.
 
 The [product principles](spec/README.md#product-principles) govern additions. Richer expression tooling and direct canvas keyboard selection are removed from product scope. Generic HTML attribute passthrough is replaced by specific accessibility requirements expressed through ordinary properties; existing expressions and keyboard authoring remain supported.
 
-Further approved boundaries keep import/export to versioned FormSmith JSON, retain the existing schema projection as an optional developer utility, and exclude schema import and archives. Catalogue additions need concrete form tasks; tooltips remain an uncommitted idea. Step state belongs to the host without prescribing a router, and third-party kit obligations are separate from reference-kit presentation choices.
+Further approved boundaries keep import/export to versioned WillowForms JSON, retain the existing schema projection as an optional developer utility, and exclude schema import and archives. Catalogue additions need concrete form tasks; tooltips remain an uncommitted idea. Step state belongs to the host without prescribing a router, and third-party kit obligations are separate from reference-kit presentation choices.
 
 Attachments belong to host-configured custom or community components, using ordinary package dependencies and the existing kit interface. There is no plugin marketplace, dynamic loader, or upload backend commitment.
 

@@ -7,11 +7,11 @@ This is the one decision everything else hangs off, and the one that cannot be r
 A kit has two halves that live in different packages:
 
 ```
-metadata half  ->  Kit          from @formsmith/core      pure data, no React
-rendering half ->  RendererKit  from @formsmith/renderer   React components
+metadata half  ->  Kit          from @willowforms/core      pure data, no React
+rendering half ->  RendererKit  from @willowforms/renderer   React components
 ```
 
-`@formsmith/kit-mui` exports both (`muiKit`, `muiRendererKit`), but the designer only ever imports the
+`@willowforms/kit-mui` exports both (`muiKit`, `muiRendererKit`), but the designer only ever imports the
 metadata half. It builds the palette from `ComponentDef[]` and the properties panel from `PropSchema[]`.
 It never imports a component library.
 
@@ -32,19 +32,19 @@ selector for free.
 
 Three things fall out of that:
 
-- **Adding a kit is a new package.** `@formsmith/kit-shadcn` implements the same two exports. No change
+- **Adding a kit is a new package.** `@willowforms/kit-shadcn` implements the same two exports. No change
   to core, renderer, or designer.
-- **Core runs in Node.** No React import anywhere in `@formsmith/core`, so the same validation runs on a
-  server. `apps/demo-server` exists to prove that, not because FormSmith needs a backend.
+- **Core runs in Node.** No React import anywhere in `@willowforms/core`, so the same validation runs on a
+  server. `apps/demo-server` exists to prove that, not because WillowForms needs a backend.
 - **Runtime ships without the designer.** Most consumers embed a form and never embed a builder. They
-  pay for `@formsmith/renderer` plus their kit, and nothing else.
+  pay for `@willowforms/renderer` plus their kit, and nothing else.
 
 The counter-argument was to hardcode MUI and move faster. Rejected because the designer would then be
 written against concrete components, and every one of those call sites becomes a rewrite the day a
 second kit is wanted. The abstraction is not speculative: the competitor this project studied ships
 three kits, and the registry is where its extensibility lives.
 
-`@formsmith/kit-html` is the evidence rather than the argument. Adding it changed nothing in `core`,
+`@willowforms/kit-html` is the evidence rather than the argument. Adding it changed nothing in `core`,
 `renderer` or `designer`. It did touch build configuration -- a project reference, a source alias, a
 stylesheet copy, the lockfile -- along with the playground, which had to offer the choice, and one bug in
 the other kit that the new contract test exposed. "Four files, all build plumbing" is a figure an earlier

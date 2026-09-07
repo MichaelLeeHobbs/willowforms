@@ -8,23 +8,23 @@ import { fileURLToPath } from 'node:url'
  * Shared by vitest and the playground's vite config so the two cannot drift.
  *
  * These are anchored regexes rather than bare prefixes: a plain string alias for
- * `@formsmith/designer` also rewrites `@formsmith/designer/styles.css`, which
+ * `@willowforms/designer` also rewrites `@willowforms/designer/styles.css`, which
  * resolves to a path inside index.ts and fails at build time.
  */
 const at = (p: string): string => fileURLToPath(new URL(p, import.meta.url))
 
-export const formsmithAliases = [
+export const willowformsAliases = [
   {
-    find: '@formsmith/designer/styles.css',
+    find: '@willowforms/designer/styles.css',
     replacement: at('./packages/designer/src/designer.css'),
   },
-  { find: /^@formsmith\/core$/, replacement: at('./packages/core/src/index.ts') },
-  { find: /^@formsmith\/renderer$/, replacement: at('./packages/renderer/src/index.tsx') },
-  { find: /^@formsmith\/kit-mui$/, replacement: at('./packages/kit-mui/src/index.ts') },
+  { find: /^@willowforms\/core$/, replacement: at('./packages/core/src/index.ts') },
+  { find: /^@willowforms\/renderer$/, replacement: at('./packages/renderer/src/index.tsx') },
+  { find: /^@willowforms\/kit-mui$/, replacement: at('./packages/kit-mui/src/index.ts') },
   {
-    find: '@formsmith/kit-html/styles.css',
+    find: '@willowforms/kit-html/styles.css',
     replacement: at('./packages/kit-html/src/kit-html.css'),
   },
-  { find: /^@formsmith\/kit-html$/, replacement: at('./packages/kit-html/src/index.ts') },
-  { find: /^@formsmith\/designer$/, replacement: at('./packages/designer/src/index.ts') },
+  { find: /^@willowforms\/kit-html$/, replacement: at('./packages/kit-html/src/index.ts') },
+  { find: /^@willowforms\/designer$/, replacement: at('./packages/designer/src/index.ts') },
 ]

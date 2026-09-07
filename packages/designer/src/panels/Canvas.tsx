@@ -13,7 +13,7 @@ import type {
   FormErrors,
   JsonValue,
   Kit,
-} from '@formsmith/core'
+} from '@willowforms/core'
 import {
   applyChange,
   addressOf,
@@ -27,9 +27,9 @@ import {
   jsonToString,
   same,
   validateForm,
-} from '@formsmith/core'
-import { FormRenderer } from '@formsmith/renderer'
-import type { RendererKit } from '@formsmith/renderer'
+} from '@willowforms/core'
+import { FormRenderer } from '@willowforms/renderer'
+import type { RendererKit } from '@willowforms/renderer'
 
 import { resolveDrop } from '../dnd.js'
 import type { DropTarget } from '../dnd.js'

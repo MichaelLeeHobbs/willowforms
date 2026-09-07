@@ -28,7 +28,7 @@ Both side panes start at `--fs-panel-width` (288px). Each desktop pane can be re
 
 ### Resizable panes
 
-Widths are browser view preferences, stored under `formsmith.designer.panel-widths.v1` in local storage and shared across forms and kits on the same origin. They never enter form JSON or document undo history. Invalid preferences are ignored, and unavailable storage leaves resizing functional for the session. Drag completion and keyboard changes save the preference; canceled drags do not.
+Widths are browser view preferences, stored under `willowforms.designer.panel-widths.v1` in local storage and shared across forms and kits on the same origin. They never enter form JSON or document undo history. Invalid preferences are ignored, and unavailable storage leaves resizing functional for the session. Drag completion and keyboard changes save the preference; canceled drags do not.
 
 The dividers are focusable vertical separators with names, panel references, and current/minimum/maximum widths announced in pixels. Left/Right moves the divider by 10px, or 40px with Shift. Home/End selects the available minimum/maximum. Escape cancels an active drag without clearing the selected component. Enter or double-click restores the host's default width for that panel. The existing collapse buttons remain separate; collapse and Preview preserve saved widths, and hidden panels have no resize handle.
 
@@ -148,7 +148,7 @@ kind of status a reader cannot act on.
 | Language    | Built  | Which language the canvas renders in; hidden below two languages |
 | Theme       | Built  | System / light / dark for the designer chrome                    |
 
-**Save needs care.** FormSmith does not persist, so a Save button that appears unconditionally promises
+**Save needs care.** WillowForms does not persist, so a Save button that appears unconditionally promises
 something the designer cannot deliver. It renders only when the host passes `onSave`, and its absence is
 the honest default: `onChange` already emits every version, and many hosts save from that.
 

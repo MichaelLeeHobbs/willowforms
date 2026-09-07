@@ -1,20 +1,20 @@
-# @formsmith/renderer
+# @willowforms/renderer
 
-The runtime renderer for [FormSmith](https://github.com/MichaelLeeHobbs/formsmith) documents.
+The runtime renderer for [WillowForms](https://github.com/MichaelLeeHobbs/willowforms) documents.
 
 Ships independently of the designer, because most consumers embed a form and never embed a builder.
 It walks a document and resolves property bindings; it knows nothing about which component library draws
 the result.
 
 ```bash
-npm install @formsmith/renderer @formsmith/core @formsmith/kit-mui
+npm install @willowforms/renderer @willowforms/core @willowforms/kit-mui
 ```
 
 ```tsx
-import { FormRenderer } from '@formsmith/renderer'
-import { muiRendererKit } from '@formsmith/kit-mui'
-import { applyChange } from '@formsmith/core'
-import type { FormData, FormDocument, FormErrors } from '@formsmith/core'
+import { FormRenderer } from '@willowforms/renderer'
+import { muiRendererKit } from '@willowforms/kit-mui'
+import { applyChange } from '@willowforms/core'
+import type { FormData, FormDocument, FormErrors } from '@willowforms/core'
 
 declare const form: FormDocument
 declare const data: FormData
@@ -37,8 +37,8 @@ export const view = (
 A renderer receives resolved props and must spread `nodeProps` onto its outermost DOM element:
 
 ```tsx
-import { jsonToString } from '@formsmith/core'
-import type { NodeRendererProps } from '@formsmith/renderer'
+import { jsonToString } from '@willowforms/core'
+import type { NodeRendererProps } from '@willowforms/renderer'
 
 export function TextFieldNode({ nodeProps, value, onChange }: NodeRendererProps) {
   return (

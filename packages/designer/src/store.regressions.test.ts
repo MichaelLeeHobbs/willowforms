@@ -11,14 +11,14 @@
 
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { ComponentDef, FormDocument, Language } from '@formsmith/core'
+import type { ComponentDef, FormDocument, Language } from '@willowforms/core'
 import {
   collectKeys as collect,
   emptyRoot,
   findNode,
   prop,
   validateDocument,
-} from '@formsmith/core'
+} from '@willowforms/core'
 
 import { historyOps, useDesigner } from './store.js'
 

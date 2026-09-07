@@ -5,11 +5,11 @@
  * inside the package. Every one of them was wrong in a way a reader would hit on
  * their first paste:
  *
- * - `@formsmith/renderer`'s example wrote `{ ...data, [key]: value }`, which is
+ * - `@willowforms/renderer`'s example wrote `{ ...data, [key]: value }`, which is
  *   the anti-pattern `applyChange`'s own doc comment warns against by name.
  *   Inside a repeater the address is `addresses[1].line1`, so that spread
  *   creates a literal property with that name and every row answer is lost.
- * - the designer and renderer examples imported `@formsmith/kit-mui` from an
+ * - the designer and renderer examples imported `@willowforms/kit-mui` from an
  *   install line that did not include it, and could not: the lint config forbids
  *   those packages from depending on a kit, so the transitive install a reader
  *   would rely on does not exist.
@@ -34,15 +34,15 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { htmlKit } from '@formsmith/kit-html'
-import { muiKit } from '@formsmith/kit-mui'
+import { htmlKit } from '@willowforms/kit-html'
+import { muiKit } from '@willowforms/kit-mui'
 
 const root = new URL('../', import.meta.url)
 const at = (path: string): string => fileURLToPath(new URL(path, root))
 const read = (path: string): string => readFileSync(at(path), 'utf8')
 
 interface Readme {
-  /** The package name, e.g. `@formsmith/core`. */
+  /** The package name, e.g. `@willowforms/core`. */
   name: string
   path: string
   text: string
@@ -106,7 +106,7 @@ describe('every published README', () => {
     // The control for the discovery above. An empty list would make every rule
     // below pass over nothing.
     expect(READMES.length).toBeGreaterThan(3)
-    expect(READMES.map((entry) => entry.name)).toContain('@formsmith/core')
+    expect(READMES.map((entry) => entry.name)).toContain('@willowforms/core')
   })
 
   it.each(READMES.map((entry) => [entry.name, entry] as const))(
@@ -144,7 +144,7 @@ describe('every published README', () => {
     '%s imports only subpaths the package publishes',
     (_name, entry) => {
       /*
-       * The half a typecheck against sources cannot see. `@formsmith/kit-html/styles.css`
+       * The half a typecheck against sources cannot see. `@willowforms/kit-html/styles.css`
        * resolves for a consumer only if the `exports` map says so, and a README
        * naming a subpath nobody publishes is a paste that fails at install time
        * rather than at compile time.
@@ -153,9 +153,9 @@ describe('every published README', () => {
 
       for (const block of blocks(entry.text)) {
         for (const specifier of importsIn(block.code)) {
-          if (!specifier.startsWith('@formsmith/')) continue
+          if (!specifier.startsWith('@willowforms/')) continue
           const pkg = packageOf(specifier)
-          const dir = pkg.slice('@formsmith/'.length)
+          const dir = pkg.slice('@willowforms/'.length)
           const manifest = JSON.parse(read('packages/' + dir + '/package.json')) as {
             exports?: Record<string, unknown>
           }
@@ -216,8 +216,8 @@ describe('an example that writes an answer', () => {
  */
 describe('what a kit README claims it ships', () => {
   it.each([
-    ['@formsmith/kit-mui', 'packages/kit-mui/README.md', muiKit.components.length],
-    ['@formsmith/kit-html', 'packages/kit-html/README.md', htmlKit.components.length],
+    ['@willowforms/kit-mui', 'packages/kit-mui/README.md', muiKit.components.length],
+    ['@willowforms/kit-html', 'packages/kit-html/README.md', htmlKit.components.length],
   ])('%s states the number of components it has', (_name, path, count) => {
     const stated = [...read(path).matchAll(/(\d+) component types/g)].map((match) =>
       Number(match[1]),
@@ -235,7 +235,7 @@ describe('what a kit README claims it ships', () => {
  * blocks are independent files anyway.
  */
 describe('the examples in every published README', () => {
-  const workspace = mkdtempSync(join(tmpdir(), 'formsmith-readme-'))
+  const workspace = mkdtempSync(join(tmpdir(), 'willowforms-readme-'))
 
   afterAll(() => {
     rmSync(workspace, { recursive: true, force: true })
@@ -246,7 +246,8 @@ describe('the examples in every published README', () => {
 
     for (const entry of READMES) {
       blocks(entry.text).forEach((block, index) => {
-        const name = entry.name.replace('@formsmith/', '') + '-' + String(index) + '.' + block.lang
+        const name =
+          entry.name.replace('@willowforms/', '') + '-' + String(index) + '.' + block.lang
         writeFileSync(join(workspace, name), block.code, 'utf8')
         files.push(name)
       })
@@ -259,11 +260,11 @@ describe('the examples in every published README', () => {
     writeFileSync(join(workspace, 'css.d.ts'), "declare module '*.css'\n", 'utf8')
 
     const paths: Record<string, string[]> = {
-      '@formsmith/core': [at('packages/core/src/index.ts')],
-      '@formsmith/renderer': [at('packages/renderer/src/index.tsx')],
-      '@formsmith/designer': [at('packages/designer/src/index.ts')],
-      '@formsmith/kit-mui': [at('packages/kit-mui/src/index.ts')],
-      '@formsmith/kit-html': [at('packages/kit-html/src/index.ts')],
+      '@willowforms/core': [at('packages/core/src/index.ts')],
+      '@willowforms/renderer': [at('packages/renderer/src/index.tsx')],
+      '@willowforms/designer': [at('packages/designer/src/index.ts')],
+      '@willowforms/kit-mui': [at('packages/kit-mui/src/index.ts')],
+      '@willowforms/kit-html': [at('packages/kit-html/src/index.ts')],
     }
 
     writeFileSync(

@@ -1,4 +1,4 @@
-import { prop } from '@formsmith/core'
+import { prop } from '@willowforms/core'
 import {
   check,
   choices,

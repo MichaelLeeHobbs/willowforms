@@ -102,7 +102,7 @@ test('CSS that would escape the component is not applied', async ({ designer }) 
 
   /*
    * And the stylesheet is on the page at all. `display` is not `none` on a page
-   * with no formsmith styles either, so on its own that assertion holds for a
+   * with no willowforms styles either, so on its own that assertion holds for a
    * build that never emitted a rule -- it carries weight only next to something
    * that says the mechanism works. The earlier tests in this file set real
    * padding, so a `[data-fs-key]` rule is there to find.

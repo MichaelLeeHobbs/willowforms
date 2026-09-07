@@ -14,8 +14,8 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { jsonToString } from '@formsmith/core'
-import type { Condition, JsonValue, Operand } from '@formsmith/core'
+import { jsonToString } from '@willowforms/core'
+import type { Condition, JsonValue, Operand } from '@willowforms/core'
 
 /** Every operator, grouped by the shape of editor it needs. */
 const COMPARISONS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'] as const

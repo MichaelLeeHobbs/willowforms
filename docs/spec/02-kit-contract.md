@@ -2,18 +2,18 @@
 
 **Status: partial.** Both kits and the existing contract suites are built. The ordinary-property accessibility requirements below need a complete cross-kit audit before this contract can claim full coverage. The existing enforcement tables distinguish current checks from that remaining work.
 
-A kit is what makes FormSmith render as Material UI, as plain HTML, or as your own design system. It is
+A kit is what makes WillowForms render as Material UI, as plain HTML, or as your own design system. It is
 the one seam that cannot be retrofitted, so it is specified before anything that depends on it.
 
 ## Two halves, two packages
 
 ```
-metadata half  ->  Kit          from @formsmith/core      pure data, no React
-rendering half ->  RendererKit  from @formsmith/renderer   React components
+metadata half  ->  Kit          from @willowforms/core      pure data, no React
+rendering half ->  RendererKit  from @willowforms/renderer   React components
 ```
 
-A kit package exports both. `@formsmith/kit-mui` exports `muiKit` and `muiRendererKit`;
-`@formsmith/kit-html` exports `htmlKit` and `htmlRendererKit`.
+A kit package exports both. `@willowforms/kit-mui` exports `muiKit` and `muiRendererKit`;
+`@willowforms/kit-html` exports `htmlKit` and `htmlRendererKit`.
 
 The split is the whole design. **The designer only ever imports the metadata half.** It builds the
 palette from `ComponentDef[]` and the properties panel from `PropSchema[]`, and it never imports a
@@ -22,10 +22,10 @@ component library. A lint rule fails CI if anyone imports one of the named libra
 Three things follow:
 
 - **Adding a kit is a new package.** No change to core, the renderer, or the designer. That is the
-  claim, and the commit adding `@formsmith/kit-html` holds it: nothing under those three packages
+  claim, and the commit adding `@willowforms/kit-html` holds it: nothing under those three packages
   changed. It did change build configuration, the playground that demonstrates switching kits, and one
-  bug in `@formsmith/kit-mui` that the new contract test exposed.
-- **Core runs in Node.** No React anywhere in `@formsmith/core`, so the same validation runs on a server.
+  bug in `@willowforms/kit-mui` that the new contract test exposed.
+- **Core runs in Node.** No React anywhere in `@willowforms/core`, so the same validation runs on a server.
 - **The runtime ships without the designer.** Most consumers embed a form and never embed a builder.
 
 ## The one obligation
@@ -159,7 +159,7 @@ The same reference-kit suite drives these fixtures outside the per-kit block. Co
 
 Two of those found real bugs the day they first ran. The error-display rule caught an MUI checkbox that
 had never destructured `error`, so a required checkbox failed a submit while displaying nothing. The two
-accessibility rules caught `@formsmith/kit-mui` failing both: no renderer in it set `role="alert"`, and
+accessibility rules caught `@willowforms/kit-mui` failing both: no renderer in it set `role="alert"`, and
 its checkbox built the message element only once there was an error. Those two obligations had been
 written down here, as things a kit must do, for as long as this file has existed. Nothing ran them.
 
@@ -169,7 +169,7 @@ written down here, as things a kit must do, for as long as this file has existed
 all mean the same thing in every kit: `gap: 16` is sixteen pixels, wherever the document is rendered.
 
 This had never been decided, and the contract's one obligation is that a document authored against one
-kit renders against the other. `@formsmith/kit-html` read `gap` as pixels; `@formsmith/kit-mui` passed it
+kit renders against the other. `@willowforms/kit-html` read `gap` as pixels; `@willowforms/kit-mui` passed it
 to MUI's `gap` prop, which is a multiple of `theme.spacing` and defaults to 8 -- so an authored `gap: 2`
 was 16px in one kit and 2px in the other. `kit-mui`'s own `Grid` used pixels, so that kit disagreed with
 itself as well. Neither kit was wrong, because nothing had said.
@@ -177,7 +177,7 @@ itself as well. Neither kit was wrong, because nothing had said.
 A kit built on a design system with its own spacing scale converts at its edge, the way `kit-mui` does
 now. That is the kit's job precisely because the scale is the kit's, and the document belongs to nobody.
 
-**What changed:** `@formsmith/kit-mui` reflows. A document that authored `gap: 2` against it rendered
+**What changed:** `@willowforms/kit-mui` reflows. A document that authored `gap: 2` against it rendered
 16px and now renders 2px. An authored value moves onto the meaning `kit-html`, `Grid`, `padding`,
 `radius`, `maxWidth` and `width` already had.
 
@@ -225,7 +225,7 @@ A kit must:
 The description has to point at an element that is always in the DOM, so an error appearing later is
 picked up rather than referring to a node that was not there when the description was read.
 
-`@formsmith/kit-html` is the reference implementation of all six and is deliberately dependency-free, so
+`@willowforms/kit-html` is the reference implementation of all six and is deliberately dependency-free, so
 it can be read and copied without also reading a component library.
 
 **The Enforced column is checked.** `test/docs.test.ts` reads this table and asserts that every attribute
@@ -244,7 +244,7 @@ indicator surviving both need a browser, and they are named in
 Copy `packages/kit-html`. It is semantic elements and a stylesheet, about 2,000 lines across renderers,
 definitions and CSS, with no dependencies beyond React.
 
-1. Export a `Kit` from `@formsmith/core` and a `RendererKit` from `@formsmith/renderer`, sharing an `id`.
+1. Export a `Kit` from `@willowforms/core` and a `RendererKit` from `@willowforms/renderer`, sharing an `id`.
 2. Spread `nodeProps` in every renderer.
 3. Verify the universal integration and accessibility obligations using fixtures for your kit's components. Reuse the relevant cases from `test/kit-contract.test.tsx`; its reference-catalogue and icon expectations are specific to the shipped kits.
 

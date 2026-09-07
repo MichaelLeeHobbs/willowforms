@@ -15,16 +15,16 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import type { ComponentNode, FormDocument } from '@formsmith/core'
+import type { ComponentNode, FormDocument } from '@willowforms/core'
 
 /*
  * Before the import, and by dynamic import for that reason: `index.ts` reads
  * this at module scope, and a static import would be hoisted above the
  * assignment and write into the checkout.
  */
-const directory = await mkdtemp(join(tmpdir(), 'formsmith-demo-'))
+const directory = await mkdtemp(join(tmpdir(), 'willowforms-demo-'))
 const store = join(directory, 'forms.json')
-process.env['FORMSMITH_DEMO_STORE'] = store
+process.env['WILLOWFORMS_DEMO_STORE'] = store
 
 /*
  * One required field and one the body answers, both at the top level. No

@@ -1,6 +1,6 @@
-# FormSmith specification
+# WillowForms specification
 
-FormSmith enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
+WillowForms enables applications to let users create and update forms on demand, and lets other users complete those forms through a clear, accessible experience. It makes everyday form building straightforward, produces reliable results, and fits naturally into the application's existing design and workflows.
 
 ## Product principles
 
@@ -87,7 +87,7 @@ Used precisely throughout, and worth pinning before the first file uses all of t
 
 Two sources, and they are not the same kind of thing.
 
-The [prior-art study](../prior-art/README.md) is research input. Another builder's catalogue, property count, or advanced tooling does not establish a FormSmith requirement. Features are justified by the product principles and concrete author or respondent tasks. The study's exact property names, interface copy, and measured visual details are not a specification to reproduce.
+The [prior-art study](../prior-art/README.md) is research input. Another builder's catalogue, property count, or advanced tooling does not establish a WillowForms requirement. Features are justified by the product principles and concrete author or respondent tasks. The study's exact property names, interface copy, and measured visual details are not a specification to reproduce.
 
 Naming them is deliberate. An earlier draft called FormEngine "the studied product" throughout while
 `docs/ARCHITECTURE.md` and `packages/core/src/types.ts` named it outright, so the euphemism protected
@@ -102,7 +102,7 @@ serious form builder arrives at, and converging on them is not copying, it is ge
 Where our property set matches theirs, that is usually why.
 
 The narrow rule is about expression, not ideas: no verbatim interface copy, no measured pixel metrics, no
-palette taken wholesale. FormSmith has its own tokens and writes its own strings.
+palette taken wholesale. WillowForms has its own tokens and writes its own strings.
 
 The **decisions** are ours, and this document is where they are written down, including the places where
 we look at what they do and choose differently.

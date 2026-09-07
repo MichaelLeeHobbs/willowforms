@@ -6,9 +6,9 @@
  * The kit contract, as an executable spec.
  *
  * Every rule here is run against every kit in the repo. That is the point of
- * having a second one: until `@formsmith/kit-html` existed, "adding a kit is a
+ * having a second one: until `@willowforms/kit-html` existed, "adding a kit is a
  * new package, not a rewrite" was a claim in a design document, and the contract
- * it rests on was whatever `@formsmith/kit-mui` happened to do.
+ * it rests on was whatever `@willowforms/kit-mui` happened to do.
  *
  * A third kit should be added to KITS below and nothing else. If it passes, it
  * works in the designer; if it fails, the message says which obligation it
@@ -18,9 +18,9 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps, ReactElement } from 'react'
 import { useState } from 'react'
-import { applyChange, prop } from '@formsmith/core'
+import { applyChange, prop } from '@willowforms/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IconName } from '@formsmith/core'
+import type { IconName } from '@willowforms/core'
 import type {
   ComponentDef,
   ComponentNode,
@@ -29,17 +29,17 @@ import type {
   JsonValue,
   Kit,
   PropValue,
-} from '@formsmith/core'
-import { emptyRoot, groupKit, indexKit, instantiate } from '@formsmith/core'
-import { FormRenderer } from '@formsmith/renderer'
-import type { RendererKit } from '@formsmith/renderer'
-import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+} from '@willowforms/core'
+import { emptyRoot, groupKit, indexKit, instantiate } from '@willowforms/core'
+import { FormRenderer } from '@willowforms/renderer'
+import type { RendererKit } from '@willowforms/renderer'
+import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 import { Icon } from '../packages/designer/src/Icon.js'
 
 const KITS: { name: string; kit: Kit; renderers: RendererKit }[] = [
-  { name: '@formsmith/kit-mui', kit: muiKit, renderers: muiRendererKit },
-  { name: '@formsmith/kit-html', kit: htmlKit, renderers: htmlRendererKit },
+  { name: '@willowforms/kit-mui', kit: muiKit, renderers: muiRendererKit },
+  { name: '@willowforms/kit-html', kit: htmlKit, renderers: htmlRendererKit },
 ]
 
 /**
@@ -404,8 +404,8 @@ describe('the two kits in this repository agree', () => {
     (type) => {
       const a = html.get(type)
       const b = mui.get(type)
-      expect(a, type + ' is missing from @formsmith/kit-html').toBeDefined()
-      expect(b, type + ' is missing from @formsmith/kit-mui').toBeDefined()
+      expect(a, type + ' is missing from @willowforms/kit-html').toBeDefined()
+      expect(b, type + ' is missing from @willowforms/kit-mui').toBeDefined()
       if (!a || !b) return
 
       // Everything a form author sees or a document stores. Not defaultProps
@@ -1412,8 +1412,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
    *
    * The contract says a document authored against one kit renders against the
    * other, and it never said what a number means. So `gap` was CSS pixels in
-   * `@formsmith/kit-html` and multiples of `theme.spacing` in
-   * `@formsmith/kit-mui` -- eight times apart for the same document -- and pixels
+   * `@willowforms/kit-html` and multiples of `theme.spacing` in
+   * `@willowforms/kit-mui` -- eight times apart for the same document -- and pixels
    * again on `kit-mui`'s own `Grid`, so that kit disagreed with itself as well.
    * Neither kit was wrong, because nothing had decided.
    *
@@ -1794,7 +1794,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
 
     /*
      * The two rules below were written down as kit obligations long before
-     * anything ran them, and @formsmith/kit-mui had never satisfied either.
+     * anything ran them, and @willowforms/kit-mui had never satisfied either.
      * A contract nothing executes is a wish.
      */
 

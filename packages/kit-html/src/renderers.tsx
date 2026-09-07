@@ -30,14 +30,14 @@ import {
   safeImageSource,
   backgroundImageStyle,
   safeStyleValue,
-} from '@formsmith/core'
-import type { JsonValue } from '@formsmith/core'
+} from '@willowforms/core'
+import type { JsonValue } from '@willowforms/core'
 import type {
   NodeEventHandlers,
   NodeRenderer,
   NodeRendererProps,
   RendererKit,
-} from '@formsmith/renderer'
+} from '@willowforms/renderer'
 
 type Level = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 

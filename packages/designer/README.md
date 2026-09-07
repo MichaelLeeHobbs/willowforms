@@ -1,19 +1,19 @@
-# @formsmith/designer
+# @willowforms/designer
 
 The visual form designer. MIT licensed, which is the entire point.
 
 Every comparable product opens its runtime and paywalls the builder.
-[FormSmith](https://github.com/MichaelLeeHobbs/formsmith) opens both.
+[WillowForms](https://github.com/MichaelLeeHobbs/willowforms) opens both.
 
 ```bash
-npm install @formsmith/designer @formsmith/core @formsmith/renderer @formsmith/kit-mui
+npm install @willowforms/designer @willowforms/core @willowforms/renderer @willowforms/kit-mui
 ```
 
 ```tsx
-import { Designer } from '@formsmith/designer'
-import '@formsmith/designer/styles.css'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
-import type { FormDocument } from '@formsmith/core'
+import { Designer } from '@willowforms/designer'
+import '@willowforms/designer/styles.css'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
+import type { FormDocument } from '@willowforms/core'
 
 declare const saved: FormDocument
 declare const store: (next: FormDocument) => void
@@ -64,8 +64,8 @@ Light is the base. Dark is a token swap under both `prefers-color-scheme` and an
 apply the same mode to the renderer kit's own theme provider:
 
 ```tsx
-import { Designer } from '@formsmith/designer'
-import type { DesignerProps, DesignerTheme } from '@formsmith/designer'
+import { Designer } from '@willowforms/designer'
+import type { DesignerProps, DesignerTheme } from '@willowforms/designer'
 
 declare const mode: DesignerTheme
 declare const setMode: (mode: DesignerTheme) => void

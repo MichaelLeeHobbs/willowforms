@@ -12,7 +12,7 @@ for (const kit of ['html', 'mui']) {
       }),
     )
     await page.addInitScript(
-      (document) => localStorage.setItem('formsmith.playground.document', document),
+      (document) => localStorage.setItem('willowforms.playground.document', document),
       JSON.stringify(document),
     )
     await page.goto('/')

@@ -22,11 +22,11 @@
     "checkJs": false,
     "baseUrl": ".",
     "paths": {
-      "@formsmith/core": ["./packages/core/src/index.ts"],
-      "@formsmith/renderer": ["./packages/renderer/src/index.tsx"],
-      "@formsmith/kit-mui": ["./packages/kit-mui/src/index.ts"],
-      "@formsmith/kit-html": ["./packages/kit-html/src/index.ts"],
-      "@formsmith/designer": ["./packages/designer/src/index.ts"]
+      "@willowforms/core": ["./packages/core/src/index.ts"],
+      "@willowforms/renderer": ["./packages/renderer/src/index.tsx"],
+      "@willowforms/kit-mui": ["./packages/kit-mui/src/index.ts"],
+      "@willowforms/kit-html": ["./packages/kit-html/src/index.ts"],
+      "@willowforms/designer": ["./packages/designer/src/index.ts"]
     }
   },
   "include": [

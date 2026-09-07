@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config'
 
-import { formsmithAliases } from './aliases.js'
+import { willowformsAliases } from './aliases.js'
 
 export default defineConfig({
-  resolve: { alias: formsmithAliases },
+  resolve: { alias: willowformsAliases },
   // The root tsconfig is a project-reference stub with no compilerOptions, so
   // esbuild finds no `jsx` setting for files outside packages/ and falls back to
   // the classic transform. Stating it here covers every directory.

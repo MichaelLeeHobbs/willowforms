@@ -1,5 +1,5 @@
-import type { ComponentNode } from '@formsmith/core'
-import { prop } from '@formsmith/core'
+import type { ComponentNode } from '@willowforms/core'
+import { prop } from '@willowforms/core'
 import { check, choices, node, number, required, text } from './builders.js'
 import { grid, notes, repeat, section, step, styled } from './character-layout.js'
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { JsonValue } from '@formsmith/core'
-import { jsonToString, optionEntry, optionValue } from '@formsmith/core'
+import type { JsonValue } from '@willowforms/core'
+import { jsonToString, optionEntry, optionValue } from '@willowforms/core'
 
 export function OptionsEditor({
   id,

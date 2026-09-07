@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 type Side = 'left' | 'right'
 type Widths = Partial<Record<Side, number>>
-const STORAGE_KEY = 'formsmith.designer.panel-widths.v1'
+const STORAGE_KEY = 'willowforms.designer.panel-widths.v1'
 const MIN_WIDTH = 240
 const MAX_WIDTH = 560
 const CANVAS_MIN = 320

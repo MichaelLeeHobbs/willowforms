@@ -17,7 +17,7 @@
  * lives in `dnd.ts` and touches nothing, so it can be tested without a browser.
  */
 
-import type { ComponentNode } from '@formsmith/core'
+import type { ComponentNode } from '@willowforms/core'
 
 export interface Rect {
   top: number

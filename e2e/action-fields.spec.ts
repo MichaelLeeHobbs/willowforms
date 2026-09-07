@@ -4,7 +4,7 @@ import axe from 'axe-core'
 import { createDocument, prop } from '../packages/core/src/index.js'
 import type { FormDocument } from '../packages/core/src/index.js'
 
-const key = 'formsmith.playground.document'
+const key = 'willowforms.playground.document'
 const read = (
   page: Page,
 ): Promise<{ type: string; name: string; params?: Record<string, unknown> }[]> =>

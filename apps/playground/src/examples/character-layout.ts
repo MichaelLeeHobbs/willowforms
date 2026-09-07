@@ -1,5 +1,5 @@
-import type { ComponentNode } from '@formsmith/core'
-import { prop } from '@formsmith/core'
+import type { ComponentNode } from '@willowforms/core'
+import { prop } from '@willowforms/core'
 import { node, notes as baseNotes, repeat as baseRepeat, step as baseStep } from './builders.js'
 
 const RECORD_TITLES: Record<string, string> = {

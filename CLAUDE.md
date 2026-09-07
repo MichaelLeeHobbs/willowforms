@@ -1,6 +1,6 @@
-# FormSmith — MIT visual form designer for React
+# WillowForms — MIT visual form designer for React
 
-FormSmith is an open-source drag-and-drop form designer. The designer and renderer are both MIT.
+WillowForms is an open-source drag-and-drop form designer. The designer and renderer are both MIT.
 
 ## Read first
 
@@ -24,8 +24,8 @@ apps/demo-server    demonstration server, port 5181
 
 ## Invariants
 
-1. `@formsmith/core` imports no React or component library.
-2. `@formsmith/designer` imports no component library.
+1. `@willowforms/core` imports no React or component library.
+2. `@willowforms/designer` imports no component library.
 3. Designer CSS styles only designer markup and never reaches into kit components.
 4. Tree operations are immutable and preserve structural sharing.
 5. Only the `required` rule fails on an empty value.

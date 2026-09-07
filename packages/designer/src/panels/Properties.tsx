@@ -9,8 +9,8 @@ import type {
   Language,
   PropSchema,
   PropValue,
-} from '@formsmith/core'
-import { dataKeyOf, indexKit, jsonToString, keyScopesFor, optionValue } from '@formsmith/core'
+} from '@willowforms/core'
+import { dataKeyOf, indexKit, jsonToString, keyScopesFor, optionValue } from '@willowforms/core'
 
 import { ImageSource } from './ImageSource.js'
 import { OptionsEditor } from './OptionsEditor.js'

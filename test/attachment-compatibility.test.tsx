@@ -3,11 +3,11 @@
 import { fireEvent, render, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { expect, it, vi } from 'vitest'
-import { createDocument, loadDocument, prop, submittedData } from '@formsmith/core'
-import { FormRenderer } from '@formsmith/renderer'
-import type { NodeRendererProps } from '@formsmith/renderer'
-import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+import { createDocument, loadDocument, prop, submittedData } from '@willowforms/core'
+import { FormRenderer } from '@willowforms/renderer'
+import type { NodeRendererProps } from '@willowforms/renderer'
+import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
 function Attachment({ nodeProps, value, onChange }: NodeRendererProps): ReactNode {
   return (

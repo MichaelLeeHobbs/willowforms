@@ -1,7 +1,7 @@
 {
-  "name": "@formsmith/kit-html",
+  "name": "@willowforms/kit-html",
   "version": "0.0.0",
-  "description": "Dependency-free HTML kit for FormSmith. Semantic elements and a stylesheet you can override.",
+  "description": "Dependency-free HTML kit for WillowForms. Semantic elements and a stylesheet you can override.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,8 +19,8 @@
     "clean": "rimraf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@formsmith/core": "workspace:*",
-    "@formsmith/renderer": "workspace:*"
+    "@willowforms/core": "workspace:*",
+    "@willowforms/renderer": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
@@ -42,13 +42,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MichaelLeeHobbs/formsmith.git",
+    "url": "git+https://github.com/MichaelLeeHobbs/willowforms.git",
     "directory": "packages/kit-html"
   },
   "bugs": {
-    "url": "https://github.com/MichaelLeeHobbs/formsmith/issues"
+    "url": "https://github.com/MichaelLeeHobbs/willowforms/issues"
   },
-  "homepage": "https://github.com/MichaelLeeHobbs/formsmith/tree/main/packages/kit-html#readme",
+  "homepage": "https://github.com/MichaelLeeHobbs/willowforms/tree/main/packages/kit-html#readme",
   "author": "Michael Hobbs",
   "publishConfig": {
     "access": "public"

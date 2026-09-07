@@ -1,4 +1,4 @@
-import { prop } from '@formsmith/core'
+import { prop } from '@willowforms/core'
 import { check, choices, date, form, node, number, required, text, when } from './builders.js'
 import { folioStep, grid, notes, repeat, section, step, styled, wide } from './character-layout.js'
 import { ABILITIES, playSheet } from './character-play.js'

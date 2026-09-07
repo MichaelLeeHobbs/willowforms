@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { MAX_EMBEDDED_IMAGE_BYTES, safeImageSource } from '@formsmith/core'
+import { MAX_EMBEDDED_IMAGE_BYTES, safeImageSource } from '@willowforms/core'
 
 export function ImageSource({
   id,

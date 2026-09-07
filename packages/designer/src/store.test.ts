@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { createDocument } from '@formsmith/core'
-import type { FormDocument } from '@formsmith/core'
+import { createDocument } from '@willowforms/core'
+import type { FormDocument } from '@willowforms/core'
 
 import { historyOps, MAX_HISTORY } from './store.js'
 

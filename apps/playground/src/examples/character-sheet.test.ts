@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { contextValues, flatten, validateForm } from '@formsmith/core'
+import { contextValues, flatten, validateForm } from '@willowforms/core'
 import { characterSheet } from './character-sheet.js'
 
 it('keeps the play sheet together with five supporting pages', () => {

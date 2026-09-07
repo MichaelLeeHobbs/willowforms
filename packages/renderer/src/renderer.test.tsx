@@ -17,8 +17,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { expectConsoleError } from '../../../test/console-errors.js'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormContext, FormData, FormDocument, PropValue } from '@formsmith/core'
-import { MAX_ROWS, applyChange } from '@formsmith/core'
+import type {
+  ComponentNode,
+  FormContext,
+  FormData,
+  FormDocument,
+  PropValue,
+} from '@willowforms/core'
+import { MAX_ROWS, applyChange } from '@willowforms/core'
 
 import { FormRenderer, resolveProp } from './index.js'
 import type { NodeRendererProps, RendererKit } from './index.js'

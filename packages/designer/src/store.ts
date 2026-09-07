@@ -2,7 +2,7 @@
  * Designer state: the document, the selection, and the undo stack.
  *
  * History is a past/present/future triple over whole documents. Snapshots are
- * cheap because every tree operation in @formsmith/core is immutable and shares
+ * cheap because every tree operation in @willowforms/core is immutable and shares
  * structure with the previous version, so an edit deep in the tree allocates
  * only its own ancestors. The stack is capped; an unbounded undo history is a
  * memory leak that only shows up in long authoring sessions.
@@ -20,7 +20,7 @@ import type {
   Kit,
   Language,
   PropValue,
-} from '@formsmith/core'
+} from '@willowforms/core'
 
 import { buildPreset } from './presets.js'
 import type { PresetId } from './presets.js'
@@ -44,7 +44,7 @@ import {
   flatten,
   walk,
   isRowScope,
-} from '@formsmith/core'
+} from '@willowforms/core'
 
 export const MAX_HISTORY = 100
 
@@ -371,7 +371,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     const problems = validateDocument(mountedWith.current)
     if (problems.length === 0) return
     console.warn(
-      'FormSmith: this document does not validate. ' +
+      'WillowForms: this document does not validate. ' +
         problems.map((problem) => problem.message).join(' '),
     )
   }, [])

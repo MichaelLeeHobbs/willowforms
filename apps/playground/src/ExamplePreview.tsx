@@ -1,5 +1,5 @@
-import { flatten } from '@formsmith/core'
-import type { FormDocument } from '@formsmith/core'
+import { flatten } from '@willowforms/core'
+import type { FormDocument } from '@willowforms/core'
 import type { ReactNode } from 'react'
 
 export function ExamplePreview({ document }: { document: FormDocument }): ReactNode {

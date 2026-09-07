@@ -1,7 +1,7 @@
 {
-  "name": "@formsmith/kit-mui",
+  "name": "@willowforms/kit-mui",
   "version": "0.0.0",
-  "description": "Material UI component kit for FormSmith. The reference implementation of the kit contract.",
+  "description": "Material UI component kit for WillowForms. The reference implementation of the kit contract.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,8 +26,8 @@
     "clean": "rimraf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@formsmith/core": "workspace:*",
-    "@formsmith/renderer": "workspace:*"
+    "@willowforms/core": "workspace:*",
+    "@willowforms/renderer": "workspace:*"
   },
   "peerDependencies": {
     "@mui/material": "^6.0.0 || ^7.0.0",
@@ -48,13 +48,13 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MichaelLeeHobbs/formsmith.git",
+    "url": "git+https://github.com/MichaelLeeHobbs/willowforms.git",
     "directory": "packages/kit-mui"
   },
   "bugs": {
-    "url": "https://github.com/MichaelLeeHobbs/formsmith/issues"
+    "url": "https://github.com/MichaelLeeHobbs/willowforms/issues"
   },
-  "homepage": "https://github.com/MichaelLeeHobbs/formsmith/tree/main/packages/kit-mui#readme",
+  "homepage": "https://github.com/MichaelLeeHobbs/willowforms/tree/main/packages/kit-mui#readme",
   "author": "Michael Hobbs",
   "publishConfig": {
     "access": "public"

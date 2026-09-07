@@ -2,16 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import CssBaseline from '@mui/material/CssBaseline'
 import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles'
-import { loadDocument as parseDocument } from '@formsmith/core'
-import type { FormDocument, Kit } from '@formsmith/core'
-import { Designer } from '@formsmith/designer'
-import type { DesignerTheme } from '@formsmith/designer'
-import type { RendererKit } from '@formsmith/renderer'
-import { htmlKit } from '@formsmith/kit-html'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+import { loadDocument as parseDocument } from '@willowforms/core'
+import type { FormDocument, Kit } from '@willowforms/core'
+import { Designer } from '@willowforms/designer'
+import type { DesignerTheme } from '@willowforms/designer'
+import type { RendererKit } from '@willowforms/renderer'
+import { htmlKit } from '@willowforms/kit-html'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
-import '@formsmith/designer/styles.css'
-import '@formsmith/kit-html/styles.css'
+import '@willowforms/designer/styles.css'
+import '@willowforms/kit-html/styles.css'
 import './playground.css'
 import { SAMPLE_DOCUMENT } from './sample.js'
 import { EXAMPLES } from './examples/index.js'
@@ -20,9 +20,9 @@ import { ResetExample } from './ResetExample.js'
 import { characterTheme } from './character-theme.js'
 import { playgroundHtmlRendererKit } from './html-theme.js'
 
-const STORAGE_KEY = 'formsmith.playground.document'
+const STORAGE_KEY = 'willowforms.playground.document'
 
-const KIT_KEY = 'formsmith.playground.kit'
+const KIT_KEY = 'willowforms.playground.kit'
 
 const KITS: Record<string, { label: string; kit: Kit; renderers: RendererKit }> = {
   mui: { label: 'Material UI', kit: muiKit, renderers: muiRendererKit },
@@ -164,13 +164,13 @@ export function App(): ReactNode {
             <svg className="pg-brand__mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
               <rect x="1" y="1" width="26" height="26" rx="7" fill="currentColor" />
               <path
-                d="M8 8h12M8 14h8M8 20h4"
+                d="m7 8 3 12 4-8 4 8 3-12"
                 stroke="var(--pg-surface)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
               />
             </svg>
-            FormSmith <span className="pg-beta">Beta</span>
+            WillowForms <span className="pg-beta">Beta</span>
           </strong>
           <ExampleGallery activeId={session.id} onChoose={chooseExample} />
           {session.id && <ResetExample onReset={resetExample} />}

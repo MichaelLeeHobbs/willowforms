@@ -1,6 +1,6 @@
 import { useColorScheme } from '@mui/material/styles'
-import { htmlRendererKit } from '@formsmith/kit-html'
-import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
+import { htmlRendererKit } from '@willowforms/kit-html'
+import type { NodeRendererProps, RendererKit } from '@willowforms/renderer'
 import type { ReactNode } from 'react'
 
 const Screen = htmlRendererKit.renderers['Screen']!

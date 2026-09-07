@@ -1,5 +1,5 @@
 {
-  "name": "formsmith",
+  "name": "willowforms",
   "private": true,
   "type": "module",
   "description": "An MIT-licensed visual form designer. The designer, not just the renderer.",
@@ -56,10 +56,10 @@
   "packageManager": "pnpm@10.33.4",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MichaelLeeHobbs/formsmith.git"
+    "url": "git+https://github.com/MichaelLeeHobbs/willowforms.git"
   },
   "bugs": {
-    "url": "https://github.com/MichaelLeeHobbs/formsmith/issues"
+    "url": "https://github.com/MichaelLeeHobbs/willowforms/issues"
   },
-  "homepage": "https://github.com/MichaelLeeHobbs/formsmith#readme"
+  "homepage": "https://github.com/MichaelLeeHobbs/willowforms#readme"
 }

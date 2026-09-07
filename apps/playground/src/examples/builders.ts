@@ -1,6 +1,6 @@
-import { createDocument, emptyRoot, instantiate, prop } from '@formsmith/core'
-import type { ComponentNode, FormDocument, JsonValue, ValidationRule } from '@formsmith/core'
-import { htmlKit } from '@formsmith/kit-html'
+import { createDocument, emptyRoot, instantiate, prop } from '@willowforms/core'
+import type { ComponentNode, FormDocument, JsonValue, ValidationRule } from '@willowforms/core'
+import { htmlKit } from '@willowforms/kit-html'
 
 export function node(
   type: string,

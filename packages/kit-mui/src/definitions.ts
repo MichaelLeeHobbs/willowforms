@@ -1,4 +1,4 @@
-import { backgroundImageProps, backgroundImageDefaults } from '@formsmith/core'
+import { backgroundImageProps, backgroundImageDefaults } from '@willowforms/core'
 /**
  * Palette metadata for the Material UI kit.
  *
@@ -12,7 +12,7 @@ import { backgroundImageProps, backgroundImageDefaults } from '@formsmith/core'
  * imports, not a document it stores.
  */
 
-import type { Kit, PropSchema } from '@formsmith/core'
+import type { Kit, PropSchema } from '@willowforms/core'
 
 /** Every user-facing string is localizable; that is the whole reason it is a prop. */
 const label: PropSchema = {

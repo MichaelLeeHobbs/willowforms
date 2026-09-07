@@ -101,7 +101,7 @@ describe('the README package table', () => {
     withFileTypes: true,
   })
     .filter((entry) => entry.isDirectory())
-    .map((entry) => '@formsmith/' + entry.name)
+    .map((entry) => '@willowforms/' + entry.name)
 
   it('finds the packages to check', () => {
     expect(published.length).toBeGreaterThan(3)
@@ -113,8 +113,8 @@ describe('the README package table', () => {
   })
 
   it('names no package that does not exist', () => {
-    const mentioned = [...readme.matchAll(/@formsmith\/([a-z-]+)/g)].map(
-      (m) => '@formsmith/' + m[1],
+    const mentioned = [...readme.matchAll(/@willowforms\/([a-z-]+)/g)].map(
+      (m) => '@willowforms/' + m[1],
     )
     const ghosts = [...new Set(mentioned)].filter((name) => !published.includes(name))
     expect(ghosts).toEqual([])
@@ -1171,7 +1171,7 @@ describe('the server parity section and the server it cites', () => {
     if (cached) return cached
     const source = read('apps/demo-server/src/index.ts')
     const names = new Set<string>()
-    for (const block of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@formsmith\/core'/g)) {
+    for (const block of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@willowforms\/core'/g)) {
       for (const name of (block[1] ?? '').split(',')) {
         const trimmed = name.replace(/^type\s+/, '').trim()
         if (trimmed) names.add(trimmed)

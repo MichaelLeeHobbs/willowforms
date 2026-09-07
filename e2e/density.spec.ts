@@ -32,8 +32,8 @@ for (const kit of ['html', 'mui']) {
     ]
     await page.addInitScript(
       ({ json, kitId }) => {
-        localStorage.setItem('formsmith.playground.document', json)
-        localStorage.setItem('formsmith.playground.kit', kitId)
+        localStorage.setItem('willowforms.playground.document', json)
+        localStorage.setItem('willowforms.playground.kit', kitId)
       },
       { json: JSON.stringify(document), kitId: kit },
     )

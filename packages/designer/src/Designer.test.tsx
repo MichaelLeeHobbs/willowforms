@@ -15,8 +15,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormDocument, Kit, Language } from '@formsmith/core'
-import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
+import type { ComponentNode, FormDocument, Kit, Language } from '@willowforms/core'
+import type { NodeRendererProps, RendererKit } from '@willowforms/renderer'
 
 import { Designer } from './Designer.js'
 import type { DesignerProps } from './Designer.js'
@@ -315,7 +315,7 @@ describe('emitting the document to the host', () => {
 
 describe('the Save button', () => {
   it('is absent when the host passes no onSave', () => {
-    // FormSmith does not persist. A Save button it cannot honour is worse
+    // WillowForms does not persist. A Save button it cannot honour is worse
     // than no button at all.
     setup()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()

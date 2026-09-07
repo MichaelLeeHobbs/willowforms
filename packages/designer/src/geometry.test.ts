@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { ComponentNode } from '@formsmith/core'
+import type { ComponentNode } from '@willowforms/core'
 
 import {
   keyFromEventTarget,
