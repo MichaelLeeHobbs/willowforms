@@ -13,6 +13,7 @@ import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 import '@willowforms/designer/styles.css'
 import '@willowforms/kit-html/styles.css'
 import './playground.css'
+import './palettes.css'
 import { SAMPLE_DOCUMENT } from './sample.js'
 import { EXAMPLES } from './examples/index.js'
 import { ExampleGallery } from './ExampleGallery.js'
@@ -23,6 +24,22 @@ import { playgroundHtmlRendererKit } from './html-theme.js'
 const STORAGE_KEY = 'willowforms.playground.document'
 
 const KIT_KEY = 'willowforms.playground.kit'
+const PALETTE_KEY = 'willowforms.playground.palette'
+const PALETTES = {
+  willow: 'Willow',
+  shade: 'Willow shade',
+  desert: 'Desert Willow — AZT Bi-Color',
+}
+
+function loadPalette(): string {
+  try {
+    const saved = localStorage.getItem(PALETTE_KEY)
+    if (saved && Object.hasOwn(PALETTES, saved)) return saved
+  } catch {
+    // The selector still works when browser storage is unavailable.
+  }
+  return 'willow'
+}
 
 const KITS: Record<string, { label: string; kit: Kit; renderers: RendererKit }> = {
   mui: { label: 'Material UI', kit: muiKit, renderers: muiRendererKit },
@@ -92,6 +109,7 @@ export function App(): ReactNode {
   const [saveError, setSaveError] = useState(session.error)
   const [kitId, setKitId] = useState<string>(loadKit)
   const [themeMode, setThemeMode] = useState<DesignerTheme>('system')
+  const [palette, setPalette] = useState(loadPalette)
   const [resetCount, setResetCount] = useState(0)
 
   const latest = useRef(initial)
@@ -158,7 +176,7 @@ export function App(): ReactNode {
     <ThemeProvider theme={session.document.id === 'dnd-character-sheet' ? characterTheme : theme}>
       <ThemeModeSync mode={themeMode} />
       <CssBaseline />
-      <div className="pg-app" data-pg-theme={themeMode}>
+      <div className="pg-app" data-pg-theme={themeMode} data-pg-palette={palette}>
         <div className="pg-kit-switch">
           <strong className="pg-brand">
             <svg className="pg-brand__mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
@@ -180,6 +198,28 @@ export function App(): ReactNode {
               {Object.entries(KITS).map(([id, entry]) => (
                 <option key={id} value={id}>
                   {entry.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="pg-kit-switch__control">
+            <label htmlFor="pg-palette">Palette</label>
+            <select
+              id="pg-palette"
+              value={palette}
+              onChange={(event) => {
+                const next = event.target.value
+                setPalette(next)
+                try {
+                  localStorage.setItem(PALETTE_KEY, next)
+                } catch {
+                  // Keep the current choice for this session.
+                }
+              }}
+            >
+              {Object.entries(PALETTES).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
                 </option>
               ))}
             </select>

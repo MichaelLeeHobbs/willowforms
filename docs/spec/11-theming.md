@@ -38,6 +38,8 @@ The HTML kit styles its own controls using that attribute. The MUI kit applies a
 
 ## Designer tokens
 
+The playground's Palette selector offers Willow, Willow shade, and Desert Willow — AZT Bi-Color independently of the Light/Dark/System mode. Willow shade lowers light-mode surface brightness with sage-gray backgrounds; Desert Willow uses muted sand and burgundy in light mode and plum and pale pink in dark mode. The palette choice is saved locally and remains usable when storage is unavailable. These host-owned presets demonstrate overriding the public designer tokens without changing example documents or kit styling.
+
 The default WillowForms chrome uses Daylight (chalk surfaces, green-gray wells, and willow-green actions) and Night grove (forest surfaces and soft sage actions). Seed-gold drop indicators distinguish placement from selection. The demo header and gallery share this direction. Typography uses a local Segoe UI/system sans-serif stack, with monospace reserved for code. These palettes apply only to the designer and demo chrome; example documents, rendered form typography, and kit palettes remain independent.
 
 Every value is a custom property on `.fs-shell`, so a host restyles by overriding tokens rather than

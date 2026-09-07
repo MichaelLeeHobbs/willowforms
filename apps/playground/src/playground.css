@@ -63,6 +63,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pg-kit-switch__note {
@@ -72,6 +74,7 @@
 }
 
 .pg-kit-switch select {
+  min-width: 0;
   padding: 7px 10px;
   font: inherit;
   color: inherit;
