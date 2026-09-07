@@ -1,16 +1,21 @@
 /* Host-overridable chrome tokens. Kit surfaces and typography remain independent. */
 
 .fs-shell {
-  --fs-bg-app: #f2f5ef;
-  --fs-bg-panel: #fbfcf8;
-  --fs-bg-well: #e9eee5;
-  --fs-border: #d3dccf;
+  --fs-bg-app: #e4e6e5;
+  --fs-bg-panel: #eceeed;
+  --fs-bg-well: #e2e5e3;
+  --fs-bg-field: #f5f6f5;
+  --fs-bg-hover: #dce1dd;
+  --fs-bg-selected: #d4e4dc;
+  --fs-text-selected: #244c39;
+  --fs-primary-hover: #284e3c;
+  --fs-border: #cdd2cf;
 
-  --fs-control-border: #778373;
-  --fs-text: #243b30;
-  --fs-text-muted: #56665a;
+  --fs-control-border: #737e77;
+  --fs-text: #28312d;
+  --fs-text-muted: #58635c;
   --fs-primary: #34634d;
-  --fs-primary-text: #fbfcf8;
+  --fs-primary-text: #ffffff;
   --fs-accent: #856526;
   --fs-danger: #b3261e;
   --fs-radius: 8px;
@@ -19,9 +24,9 @@
 
   --fs-radius-sm: calc(var(--fs-radius) / 2);
   --fs-panel-width: 288px;
-  --fs-scrollbar-thumb: #778373;
+  --fs-scrollbar-thumb: #737e77;
   --fs-font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --fs-font-size: 13px;
+  --fs-font-size: 14px;
 
   --fs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -43,6 +48,11 @@
     --fs-bg-app: #18231f;
     --fs-bg-panel: #202e27;
     --fs-bg-well: #131d18;
+    --fs-bg-field: #18231f;
+    --fs-bg-hover: #2b3c32;
+    --fs-bg-selected: #354b3e;
+    --fs-text-selected: #c8e3ce;
+    --fs-primary-hover: #afd3b5;
     --fs-border: #3b4d40;
     --fs-control-border: #7f917f;
     --fs-text: #e6eee2;
@@ -61,6 +71,11 @@
   --fs-bg-app: #18231f;
   --fs-bg-panel: #202e27;
   --fs-bg-well: #131d18;
+  --fs-bg-field: #18231f;
+  --fs-bg-hover: #2b3c32;
+  --fs-bg-selected: #354b3e;
+  --fs-text-selected: #c8e3ce;
+  --fs-primary-hover: #afd3b5;
   --fs-border: #3b4d40;
   --fs-control-border: #7f917f;
   --fs-text: #e6eee2;
@@ -224,10 +239,10 @@
 }
 
 .fs-panel__heading {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--fs-text-muted);
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fs-text);
 }
 
 .fs-empty {
@@ -235,20 +250,14 @@
   color: var(--fs-text-muted);
 }
 
-/*
- * Chrome control styling is scoped to the chrome regions, never to .fs-shell.
- * The canvas hosts the kit's own components, and a bare `.fs-shell input` rule
- * reaches straight into them: it overrode MUI's input padding and broke the
- * notched outline so every label sat on top of its border. The canvas surface
- * must inherit nothing from here.
- */
+/* Scope control rules to chrome regions to preserve kit styling. */
 
 :where(.fs-toolbar, .fs-panel, .fs-canvas__bar, .fs-mobile-panels) button {
   font: inherit;
   color: inherit;
   padding: 7px 12px;
   background: var(--fs-bg-panel);
-  border: 1px solid var(--fs-control-border);
+  border: 1px solid var(--fs-border);
   border-radius: var(--fs-radius);
   cursor: pointer;
 }
@@ -259,7 +268,7 @@
 }
 
 :where(.fs-toolbar, .fs-panel, .fs-canvas__bar, .fs-mobile-panels) button:hover:not(:disabled) {
-  background: var(--fs-bg-well);
+  background: var(--fs-bg-hover);
 }
 
 :where(.fs-toolbar, .fs-panel, .fs-canvas__bar) button:disabled {
@@ -277,8 +286,8 @@
   font: inherit;
   color: inherit;
   width: 100%;
-  padding: 5px 8px;
-  background: var(--fs-bg-app);
+  padding: 7px 10px;
+  background: var(--fs-bg-field);
   border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
 }
@@ -395,12 +404,17 @@
 }
 
 .fs-tree__row:hover {
-  background: var(--fs-bg-well);
+  background: var(--fs-bg-hover);
 }
 
 .fs-tree__row.is-selected {
-  background: var(--fs-primary);
-  color: var(--fs-primary-text);
+  background: var(--fs-bg-selected);
+  color: var(--fs-text-selected);
+  box-shadow: inset 3px 0 var(--fs-primary);
+}
+
+.fs-tree__row:focus-visible {
+  outline-offset: -2px;
 }
 
 .fs-tree__key {
@@ -414,7 +428,7 @@
 
 /* Preserve AA contrast for the secondary label on a selected row. */
 .fs-tree__row.is-selected .fs-tree__type {
-  opacity: 0.9;
+  opacity: 1;
 }
 
 .fs-tree__remove {
@@ -466,7 +480,7 @@
 }
 
 .fs-canvas__preview[aria-pressed='false']:hover {
-  background: var(--fs-primary);
+  background: var(--fs-primary-hover);
 }
 
 /*
@@ -657,13 +671,17 @@
 
 .fs-dialog__actions button:hover,
 .fs-dialog__file:hover {
-  background: var(--fs-bg-well);
+  background: var(--fs-bg-hover);
 }
 
 .fs-dialog__actions button.is-primary {
   color: var(--fs-primary-text);
   background: var(--fs-primary);
   border-color: var(--fs-primary);
+}
+
+.fs-dialog__actions button.is-primary:hover {
+  background: var(--fs-primary-hover);
 }
 
 .fs-dialog__note {
@@ -1075,7 +1093,7 @@
 
 .fs-pane-handle:hover {
   color: var(--fs-text);
-  background: var(--fs-bg-well);
+  background: var(--fs-bg-hover);
 }
 
 .fs-pane-handle__glyph {
@@ -1125,8 +1143,9 @@
 }
 
 .fs-toolbar__toggle.is-active {
-  color: var(--fs-primary-text);
-  background: var(--fs-primary);
+  color: var(--fs-text-selected);
+  background: var(--fs-bg-selected);
+  box-shadow: inset 0 0 0 1px var(--fs-primary);
 }
 
 /*
@@ -1272,7 +1291,7 @@
 
 .fs-selection__toolbar button:hover {
   color: var(--fs-text);
-  background: var(--fs-bg-well);
+  background: var(--fs-bg-hover);
 }
 
 .fs-selection__toolbar button.is-danger:hover {
@@ -1533,11 +1552,9 @@
 /* The Style tab. */
 .fs-style__heading {
   margin: 12px 0 8px;
-  color: var(--fs-text-muted);
-  font-size: 11px;
+  color: var(--fs-text);
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .fs-style__heading:first-child {
@@ -1579,8 +1596,8 @@
 
 .fs-style-tools__buttons button[aria-pressed='true'] {
   border-color: var(--fs-primary);
-  color: var(--fs-primary-text);
-  background: var(--fs-primary);
+  color: var(--fs-text-selected);
+  background: var(--fs-bg-selected);
 }
 
 .fs-style-tools__sides {

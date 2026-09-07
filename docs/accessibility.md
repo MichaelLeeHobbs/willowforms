@@ -45,12 +45,12 @@ measured value in each palette:
 
 | Palette         | Lowest ratio | Pair                                     |
 | --------------- | ------------ | ---------------------------------------- |
-| Designer, light | 3.38:1       | control border on the well, needs 3:1    |
+| Designer, light | 3.32:1       | control border on the well, needs 3:1    |
 | Designer, dark  | 4.22:1       | control border on the panel, needs 3:1   |
 | HTML kit, light | 4.24:1       | warning stripe on the surface, needs 3:1 |
 | HTML kit, dark  | 4.15:1       | field border on the field, needs 3:1     |
 
-Each row is the lowest pair the suite asserts in that palette. The designer rows measure control boundaries, which require 3:1. Designer muted text on the light well measures 5.18:1; primary button labels measure 6.71:1 light and 8.53:1 dark, against a 4.5:1 text requirement.
+Each row is the lowest pair the suite asserts in that palette. The designer rows measure control boundaries, which require 3:1. Designer muted text on the light well measures 4.93:1; primary button labels measure 6.91:1 light and 8.53:1 dark, against a 4.5:1 text requirement.
 
 `test/contrast.test.ts` records every measured pair and compares the minimum in each palette against this table, so changes to the theme cannot silently invalidate the reported minima.
 

@@ -29,7 +29,7 @@ for (const kit of ['html', 'mui']) {
         })
       const before = await formStyle()
 
-      for (const id of ['shade', 'desert']) {
+      for (const id of ['willow', 'desert']) {
         await palette.selectOption(id)
         const tokens = await shell.evaluate((element) => {
           const css = getComputedStyle(element)
@@ -38,6 +38,11 @@ for (const kit of ['html', 'mui']) {
               'bg-app',
               'bg-panel',
               'bg-well',
+              'bg-field',
+              'bg-hover',
+              'bg-selected',
+              'text-selected',
+              'primary-hover',
               'text',
               'text-muted',
               'primary',
@@ -54,15 +59,14 @@ for (const kit of ['html', 'mui']) {
           expect(value, name).toMatch(/^#[a-f0-9]{6}$/i)
           return value ?? ''
         }
-        expect(token('bg-panel')).toBe(
-          id === 'shade' ? (dark ? '#202e27' : '#e0e5db') : dark ? '#362b33' : '#e9ddd2',
-        )
-        if (!dark && id === 'shade') {
+        expect(token('bg-panel')).toBe(dark ? '#202e27' : '#eceeed')
+        expect(token('bg-panel')).toBe(original)
+        if (!dark) {
           expect(luminance(parseHex(token('bg-panel')))).toBeLessThan(
-            luminance(parseHex(original)) * 0.85,
+            luminance(parseHex('#fbfcf8')) * 0.9,
           )
         }
-        for (const bg of ['bg-app', 'bg-panel', 'bg-well']) {
+        for (const bg of ['bg-app', 'bg-panel', 'bg-well', 'bg-field']) {
           for (const fg of ['text', 'text-muted', 'danger']) {
             expect(contrast(token(fg), token(bg)), `${id}: ${fg} on ${bg}`).toBeGreaterThanOrEqual(
               4.5,
@@ -75,6 +79,8 @@ for (const kit of ['html', 'mui']) {
           }
         }
         expect(contrast(token('primary-text'), token('primary'))).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(token('primary-text'), token('primary-hover'))).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(token('text-selected'), token('bg-selected'))).toBeGreaterThanOrEqual(4.5)
         expect(await formStyle()).toEqual(before)
         await expect(form.getByRole('textbox', { name: 'First name', exact: true })).toHaveValue(
           'Willow tester',
@@ -97,7 +103,7 @@ test('invalid stored palettes fall back and blocked storage still allows switchi
   page,
 }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('willowforms.playground.palette', 'missing-palette')
+    localStorage.setItem('willowforms.playground.palette', 'shade')
     Storage.prototype.setItem = () => {
       throw new Error('Storage unavailable')
     }
@@ -106,9 +112,9 @@ test('invalid stored palettes fall back and blocked storage still allows switchi
   const palette = page.getByLabel('Palette', { exact: true })
   await expect(palette).toHaveValue('willow')
   await page.getByLabel('Designer theme').selectOption('light')
-  await palette.selectOption('shade')
-  await expect(page.getByTestId('willowforms-designer')).toHaveCSS('--fs-bg-panel', '#e0e5db')
-  await expect(palette).toHaveValue('shade')
+  await palette.selectOption('desert')
+  await expect(page.getByTestId('willowforms-designer')).toHaveCSS('--fs-primary', '#873c62')
+  await expect(palette).toHaveValue('desert')
 })
 
 test('new palettes keep header controls and the gallery accessible on a narrow screen', async ({
@@ -117,7 +123,7 @@ test('new palettes keep header controls and the gallery accessible on a narrow s
   await page.setViewportSize({ width: 320, height: 800 })
   await page.goto('/')
   await page.addScriptTag({ content: axe.source })
-  for (const id of ['shade', 'desert']) {
+  for (const id of ['willow', 'desert']) {
     await page.getByLabel('Palette', { exact: true }).selectOption(id)
     for (const mode of ['light', 'dark']) {
       await page.getByLabel('Designer theme').selectOption(mode)
@@ -142,6 +148,46 @@ test('new palettes keep header controls and the gallery accessible on a narrow s
       )
       expect(galleryViolations).toEqual([])
       await page.getByRole('button', { name: 'Close examples' }).click()
+    }
+  }
+})
+
+test('editing chrome distinguishes fields, selection, hover, and focus in both palettes', async ({
+  page,
+}) => {
+  await page.goto('/?example=contact-request')
+  await page.locator('[data-fs-key="firstName"]').click()
+  await page.getByRole('tab', { name: 'Tree', exact: true }).click()
+  const inspector = page.getByRole('complementary', { name: 'Component properties' })
+  const field = inspector.getByRole('textbox', { name: 'Key', exact: true })
+  const row = page.locator('.fs-tree__row.is-selected')
+  const preview = page.getByRole('button', { name: 'Preview', exact: true })
+  await page.addScriptTag({ content: axe.source })
+  for (const palette of ['willow', 'desert']) {
+    await page.getByLabel('Palette', { exact: true }).selectOption(palette)
+    for (const mode of ['light', 'dark']) {
+      await page.getByLabel('Designer theme').selectOption(mode)
+      await expect(field).toHaveCSS(
+        'background-color',
+        mode === 'light' ? 'rgb(245, 246, 245)' : 'rgb(24, 35, 31)',
+      )
+      await field.hover()
+      const selected = await row.evaluate((element) => getComputedStyle(element).backgroundColor)
+      const normal = await preview.evaluate((element) => getComputedStyle(element).backgroundColor)
+      expect(selected).not.toBe(normal)
+      await preview.hover()
+      await expect(preview).not.toHaveCSS('background-color', normal)
+      await field.focus()
+      await expect(field).toHaveCSS('outline-style', 'solid')
+      await expect(field).toHaveCSS('outline-width', '2px')
+      const violations = await page.evaluate(async () =>
+        (
+          await axe.run('.fs-panel', {
+            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+          })
+        ).violations.map(({ id }) => id),
+      )
+      expect(violations).toEqual([])
     }
   }
 })
