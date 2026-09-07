@@ -1,33 +1,26 @@
-/*
- * Designer chrome.
- *
- * Every value is a custom property on .fs-shell, so a host app restyles the
- * builder by overriding tokens rather than fighting specificity. Light is the
- * base; dark is a token swap under prefers-color-scheme and an explicit
- * [data-fs-theme] override, so a host that manages its own theme can force it.
- */
+/* Host-overridable chrome tokens. Kit surfaces and typography remain independent. */
 
 .fs-shell {
-  --fs-bg-app: #f5f6f8;
-  --fs-bg-panel: #ffffff;
-  --fs-bg-well: #eef0f3;
-  --fs-border: #d7dbe0;
+  --fs-bg-app: #f2f5ef;
+  --fs-bg-panel: #fbfcf8;
+  --fs-bg-well: #e9eee5;
+  --fs-border: #d3dccf;
 
-  --fs-control-border: #7c838d;
-  --fs-text: #1c1f23;
-  --fs-text-muted: #5b6470;
-  --fs-primary: #0b6fa4;
-  --fs-primary-text: #ffffff;
-  --fs-accent: #b5179e;
+  --fs-control-border: #778373;
+  --fs-text: #243b30;
+  --fs-text-muted: #56665a;
+  --fs-primary: #34634d;
+  --fs-primary-text: #fbfcf8;
+  --fs-accent: #856526;
   --fs-danger: #b3261e;
-  --fs-radius: 6px;
+  --fs-radius: 8px;
 
   color-scheme: light;
 
   --fs-radius-sm: calc(var(--fs-radius) / 2);
   --fs-panel-width: 288px;
-  --fs-scrollbar-thumb: #7c838d;
-  --fs-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --fs-scrollbar-thumb: #778373;
+  --fs-font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --fs-font-size: 13px;
 
   --fs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -47,36 +40,36 @@
 @media (prefers-color-scheme: dark) {
   /* `:where()`, for the reason the HTML kit's own dark block gives. */
   .fs-shell:where(:not([data-fs-theme='light'])) {
-    --fs-bg-app: #1b1d21;
-    --fs-bg-panel: #24272c;
-    --fs-bg-well: #15171a;
-    --fs-border: #3a3f46;
-    --fs-control-border: #767e8a;
-    --fs-text: #e9ebf0;
-    --fs-text-muted: #a4a9b3;
-    --fs-primary: #2f9fd8;
-    --fs-primary-text: #0b1116;
-    --fs-accent: #e879d6;
-    --fs-danger: #f2705f;
+    --fs-bg-app: #18231f;
+    --fs-bg-panel: #202e27;
+    --fs-bg-well: #131d18;
+    --fs-border: #3b4d40;
+    --fs-control-border: #7f917f;
+    --fs-text: #e6eee2;
+    --fs-text-muted: #b0bfb0;
+    --fs-primary: #9bc7a2;
+    --fs-primary-text: #18231f;
+    --fs-accent: #d2ba80;
+    --fs-danger: #ff9685;
     color-scheme: dark;
-    --fs-scrollbar-thumb: #767e8a;
+    --fs-scrollbar-thumb: #7f917f;
   }
 }
 
 .fs-shell[data-fs-theme='dark'] {
   color-scheme: dark;
-  --fs-bg-app: #1b1d21;
-  --fs-bg-panel: #24272c;
-  --fs-bg-well: #15171a;
-  --fs-border: #3a3f46;
-  --fs-control-border: #767e8a;
-  --fs-text: #e9ebf0;
-  --fs-text-muted: #a4a9b3;
-  --fs-primary: #2f9fd8;
-  --fs-primary-text: #0b1116;
-  --fs-accent: #e879d6;
-  --fs-scrollbar-thumb: #767e8a;
-  --fs-danger: #f2705f;
+  --fs-bg-app: #18231f;
+  --fs-bg-panel: #202e27;
+  --fs-bg-well: #131d18;
+  --fs-border: #3b4d40;
+  --fs-control-border: #7f917f;
+  --fs-text: #e6eee2;
+  --fs-text-muted: #b0bfb0;
+  --fs-primary: #9bc7a2;
+  --fs-primary-text: #18231f;
+  --fs-accent: #d2ba80;
+  --fs-scrollbar-thumb: #7f917f;
+  --fs-danger: #ff9685;
 }
 
 .fs-visually-hidden {
@@ -419,15 +412,7 @@
   opacity: 0.75;
 }
 
-/*
- * Less faded on the row that is selected.
- *
- * The type label is 12px, so AA asks 4.5:1 of it. Against the panel at 0.75 it
- * is 7.25:1 and fine; on a selected row the background is `--fs-primary` and the
- * text is `--fs-primary-text`, and the same 0.75 lands at 3.82:1 light. 0.9
- * clears it in both palettes -- 4.79:1 light and 5.66:1 dark -- and still reads
- * as secondary to the key beside it.
- */
+/* Preserve AA contrast for the secondary label on a selected row. */
 .fs-tree__row.is-selected .fs-tree__type {
   opacity: 0.9;
 }
