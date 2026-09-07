@@ -24,7 +24,7 @@ for (const kit of ['html', 'mui']) {
       children: [],
     })
     await page.addInitScript(
-      (text) => localStorage.setItem('formsmith.playground.document', text),
+      (text) => localStorage.setItem('willowforms.playground.document', text),
       JSON.stringify(doc),
     )
     await page.route('**/background-test.svg', (route) =>

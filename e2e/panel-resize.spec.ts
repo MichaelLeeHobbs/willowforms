@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import axe from 'axe-core'
 
-const key = 'formsmith.designer.panel-widths.v1'
+const key = 'willowforms.designer.panel-widths.v1'
 const leftName = 'Resize Components and structure'
 const rightName = 'Resize Component properties'
 const width = async (panel: Locator): Promise<number> => (await panel.boundingBox())!.width
@@ -22,7 +22,7 @@ test('both panel widths persist across reload, kits, preview, collapse, and smal
   const left = page.locator('aside.fs-panel--left')
   const right = page.locator('aside.fs-panel--right')
   await expect(left).toHaveCSS('width', '288px')
-  const before = await page.evaluate(() => localStorage.getItem('formsmith.playground.document'))
+  const before = await page.evaluate(() => localStorage.getItem('willowforms.playground.document'))
   expect(before).not.toBeNull()
   await drag(page, page.getByRole('separator', { name: leftName }), 92)
   await page.mouse.up()
@@ -30,7 +30,7 @@ test('both panel widths persist across reload, kits, preview, collapse, and smal
   await drag(page, page.getByRole('separator', { name: rightName }), -132)
   await page.mouse.up()
   await expect(right).toHaveCSS('width', '420px')
-  expect(await page.evaluate(() => localStorage.getItem('formsmith.playground.document'))).toBe(
+  expect(await page.evaluate(() => localStorage.getItem('willowforms.playground.document'))).toBe(
     before,
   )
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled()

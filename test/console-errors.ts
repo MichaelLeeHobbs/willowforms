@@ -19,7 +19,7 @@ interface Gate {
   installed: boolean
 }
 
-const gate: Gate = ((globalThis as { formsmithConsoleGate?: Gate }).formsmithConsoleGate ??= {
+const gate: Gate = ((globalThis as { willowformsConsoleGate?: Gate }).willowformsConsoleGate ??= {
   expected: [],
   seen: [],
   installed: false,

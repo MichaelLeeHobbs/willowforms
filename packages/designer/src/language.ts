@@ -1,4 +1,4 @@
-import type { FormDocument, Language } from '@formsmith/core'
+import type { FormDocument, Language } from '@willowforms/core'
 
 /**
  * Whether a stored entry is a language this designer can draw.

@@ -5,7 +5,7 @@
 /**
  * Canvas selection.
  *
- * The kit here is a deliberately minimal fake rather than @formsmith/kit-mui.
+ * The kit here is a deliberately minimal fake rather than @willowforms/kit-mui.
  * The designer must never depend on a component library, and a test that
  * reached for MUI would quietly make it do so. A fake also proves the point the
  * kit seam is meant to prove: selection works against any kit that honours the
@@ -21,8 +21,8 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import type { ComponentNode, FormDocument, Kit, PropValue } from '@formsmith/core'
-import type { NodeRendererProps, RendererKit } from '@formsmith/renderer'
+import type { ComponentNode, FormDocument, Kit, PropValue } from '@willowforms/core'
+import type { NodeRendererProps, RendererKit } from '@willowforms/renderer'
 
 import { observerCount } from '../../../../test/setup.js'
 import { Designer } from '../Designer.js'

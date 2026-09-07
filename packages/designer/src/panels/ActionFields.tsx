@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
-import { dataKeyOf, flatten, indexKit, isRowScope } from '@formsmith/core'
+import { dataKeyOf, flatten, indexKit, isRowScope } from '@willowforms/core'
 import type {
   ActionRef,
   ComponentNode,
@@ -8,7 +8,7 @@ import type {
   JsonValue,
   Kit,
   PropOption,
-} from '@formsmith/core'
+} from '@willowforms/core'
 
 interface Target {
   address: string

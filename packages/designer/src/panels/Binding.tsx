@@ -15,10 +15,10 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { languageTag } from '@formsmith/core'
-import type { Language, PropSchema, PropValue } from '@formsmith/core'
+import { languageTag } from '@willowforms/core'
+import type { Language, PropSchema, PropValue } from '@willowforms/core'
 
-import { unreadableTag } from '@formsmith/core'
+import { unreadableTag } from '@willowforms/core'
 
 import { emptyCondition } from './ConditionEditor.js'
 

@@ -36,7 +36,7 @@ import type { ReactNode } from 'react'
 import { muiKit } from './definitions.js'
 import { DensityTheme } from './DensityTheme.js'
 
-import type { JsonValue } from '@formsmith/core'
+import type { JsonValue } from '@willowforms/core'
 import {
   isRequired,
   itemLimits,
@@ -47,13 +47,13 @@ import {
   safeImageSource,
   backgroundImageStyle,
   safeStyleValue,
-} from '@formsmith/core'
+} from '@willowforms/core'
 import type {
   NodeEventHandlers,
   NodeRenderer,
   NodeRendererProps,
   RendererKit,
-} from '@formsmith/renderer'
+} from '@willowforms/renderer'
 
 type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 

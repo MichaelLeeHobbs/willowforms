@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import type { ComponentDef, Kit } from '@formsmith/core'
+import type { ComponentDef, Kit } from '@willowforms/core'
 
 import type { DragController } from '../drag.js'
 import type { DesignerApi } from '../store.js'

@@ -1,18 +1,18 @@
-# @formsmith/core
+# @willowforms/core
 
 The document model, tree operations, and validation engine behind
-[FormSmith](https://github.com/MichaelLeeHobbs/formsmith).
+[WillowForms](https://github.com/MichaelLeeHobbs/willowforms).
 
 No React, no component library. That is deliberate: the same validation runs in the browser during
 preview and in Node on a server, so a form's rules are written once and cannot drift between the two.
 
 ```bash
-npm install @formsmith/core
+npm install @willowforms/core
 ```
 
 ```ts
-import { validateForm } from '@formsmith/core'
-import type { FormData, FormDocument } from '@formsmith/core'
+import { validateForm } from '@willowforms/core'
+import type { FormData, FormDocument } from '@willowforms/core'
 
 declare const form: FormDocument
 declare const answers: FormData

@@ -41,7 +41,7 @@ import {
   unreadableTag,
   valueOf,
   walk,
-} from '@formsmith/core'
+} from '@willowforms/core'
 import type {
   ActionEvaluator,
   ComponentNode,
@@ -58,7 +58,7 @@ import type {
   EventName,
   JsonValue,
   PropValue,
-} from '@formsmith/core'
+} from '@willowforms/core'
 
 export type FormDensity = 'comfortable' | 'compact'
 
@@ -134,7 +134,7 @@ export interface NodeAttributes {
 
 export type NodeRenderer = ComponentType<NodeRendererProps>
 
-/** The rendering half of a kit. Its metadata half is a `Kit` from @formsmith/core. */
+/** The rendering half of a kit. Its metadata half is a `Kit` from @willowforms/core. */
 export interface RendererKit {
   id: string
   renderers: Record<string, NodeRenderer>
@@ -215,7 +215,7 @@ function signatureOf(node: ComponentNode): string {
 
 function useRenderContext(): RenderContext {
   const ctx = useContext(Ctx)
-  if (!ctx) throw new Error('FormSmith renderer components must be used inside <FormRenderer>.')
+  if (!ctx) throw new Error('WillowForms renderer components must be used inside <FormRenderer>.')
   return ctx
 }
 
@@ -876,7 +876,7 @@ export interface FormRendererProps {
    * parameter is named `address` rather than `key` because the old name is an
    * invitation to write `{ ...data, [key]: value }`, which then creates a
    * property called `addresses[1].line1` and silently drops every answer in the
-   * repeater. Write it with `applyChange` from `@formsmith/core`.
+   * repeater. Write it with `applyChange` from `@willowforms/core`.
    */
   onChange: (address: string, value: JsonValue) => void
 }

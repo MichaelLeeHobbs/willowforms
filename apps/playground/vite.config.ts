@@ -1,12 +1,12 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-import { formsmithAliases } from '../../aliases.js'
+import { willowformsAliases } from '../../aliases.js'
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
   // Distribution smoke builds resolve workspace packages through package exports.
-  ...(mode === 'dist' ? {} : { resolve: { alias: formsmithAliases } }),
+  ...(mode === 'dist' ? {} : { resolve: { alias: willowformsAliases } }),
   /*
    * `strictPort`, so `pnpm dev` fails loudly on a busy port rather than
    * quietly starting on 5181 — where the end-to-end suite, which asks for 5180,

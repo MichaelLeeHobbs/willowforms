@@ -3,11 +3,11 @@
 import { fireEvent, render, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { createDocument, prop } from '@formsmith/core'
-import type { ComponentNode, ValidationRule } from '@formsmith/core'
-import { FormRenderer } from '@formsmith/renderer'
-import { htmlRendererKit } from '@formsmith/kit-html'
-import { muiRendererKit } from '@formsmith/kit-mui'
+import { createDocument, prop } from '@willowforms/core'
+import type { ComponentNode, ValidationRule } from '@willowforms/core'
+import { FormRenderer } from '@willowforms/renderer'
+import { htmlRendererKit } from '@willowforms/kit-html'
+import { muiRendererKit } from '@willowforms/kit-mui'
 
 function repeater(validations: ValidationRule[]): ComponentNode {
   return {

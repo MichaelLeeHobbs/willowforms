@@ -13,7 +13,7 @@ not to this page fails the build.
 
 This list records the built-in catalogue. File inputs belong to host-configured community or custom components as described below. A kit is free to offer a different catalogue; matching component types and value contracts make documents portable between compatible kits.
 
-Catalogue growth requires a concrete task for a form author or respondent. Existing components remain supported until an explicit removal lands; their presence does not commit FormSmith to matching a general UI library. Application navigation and surrounding page layout belong to the host.
+Catalogue growth requires a concrete task for a form author or respondent. Existing components remain supported until an explicit removal lands; their presence does not commit WillowForms to matching a general UI library. Application navigation and surrounding page layout belong to the host.
 
 ## How components are specified
 
@@ -48,7 +48,7 @@ not by existing in the underlying component's API.**
 
 Forwarding a component library's whole prop list into the panel is the easy path and the wrong one: a
 date picker built that way offers upwards of thirty properties, and a form author hunting for `label`
-reads past all of them. A FormSmith date picker is specified with five. A kit that wants the rest can add
+reads past all of them. A WillowForms date picker is specified with five. A kit that wants the rest can add
 them without changing anything here.
 
 Convergence with other builders on the properties that _are_ included is expected. A field has a label, a
@@ -151,11 +151,11 @@ to find than two entries. `TextField.multiline` stays for documents that already
 
 **Status: built.** File inputs are outside the standard catalogue. Legacy `FileUpload` nodes remain loadable and display the missing-component fallback until the host supplies a replacement renderer. Documents and answers are not silently rewritten. The [compatibility notes](../COMPATIBILITY.md#pre-beta-corrections) describe the replacement path.
 
-A host that needs attachments installs or provides a custom component through the [existing kit interface](02-kit-contract.md#community-component-packages). A component can present a picker, progress, retry, removal, and an existing-attachment view using a service supplied by the host. Those behaviors belong to that extension, not to a required FormSmith upload subsystem.
+A host that needs attachments installs or provides a custom component through the [existing kit interface](02-kit-contract.md#community-component-packages). A component can present a picker, progress, retry, removal, and an existing-attachment view using a service supplied by the host. Those behaviors belong to that extension, not to a required WillowForms upload subsystem.
 
 A typical integration sends selected bytes to the host's service and reports a durable attachment ID as its JSON answer after success. When the form is reopened, the component uses that ID to ask the host for authorized metadata, download, or preview access. A filename alone is not proof of an uploaded file, and a browser `File` object is not a persisted form answer.
 
-The host decides where and how bytes are stored, how access is authorized, which file types and sizes are accepted, and how incomplete uploads and deletions are handled. FormSmith defines no storage provider, upload endpoint, binary encoding, attachment database schema, or file-viewing service. Custom attachment components still satisfy the kit's accessibility and value-reporting obligations.
+The host decides where and how bytes are stored, how access is authorized, which file types and sizes are accepted, and how incomplete uploads and deletions are handled. WillowForms defines no storage provider, upload endpoint, binary encoding, attachment database schema, or file-viewing service. Custom attachment components still satisfy the kit's accessibility and value-reporting obligations.
 
 ### Selection
 
@@ -343,7 +343,7 @@ path that was never missing.
 
 ### Where the current step lives
 
-The current step is host-supplied context, separate from submitted answers. A host may keep it in local state, its existing router, or another application state owner. URL state is an option for deep links and browser navigation, not a library requirement. FormSmith reports navigation intent and does not provide a router. See [12-api.md](12-api.md#state-that-is-not-an-answer).
+The current step is host-supplied context, separate from submitted answers. A host may keep it in local state, its existing router, or another application state owner. URL state is an option for deep links and browser navigation, not a library requirement. WillowForms reports navigation intent and does not provide a router. See [12-api.md](12-api.md#state-that-is-not-an-answer).
 
 ### Branching needs no new vocabulary
 

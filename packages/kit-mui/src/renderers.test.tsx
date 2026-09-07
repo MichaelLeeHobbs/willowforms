@@ -21,9 +21,9 @@
 import { fireEvent, render } from '@testing-library/react'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import { describe, expect, it } from 'vitest'
-import type { ComponentNode, FormDocument } from '@formsmith/core'
-import { prop } from '@formsmith/core'
-import { FormRenderer } from '@formsmith/renderer'
+import type { ComponentNode, FormDocument } from '@willowforms/core'
+import { prop } from '@willowforms/core'
+import { FormRenderer } from '@willowforms/renderer'
 
 import { muiRendererKit } from './renderers.js'
 

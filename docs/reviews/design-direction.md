@@ -1,13 +1,13 @@
-# FormSmith visual direction
+# WillowForms visual direction
 
-FormSmith is a working tool for composing and consuming forms. The interface should make the authored document the main object, distinguish editing tools from form controls, and help people recognize useful examples before opening them.
+WillowForms is a working tool for composing and consuming forms. The interface should make the authored document the main object, distinguish editing tools from form controls, and help people recognize useful examples before opening them.
 
 ## Workbench
 
 Retain the accessible palette: ink `#1c1f23`, paper `#ffffff`, canvas `#f5f6f8`, secondary text `#5b6470`, action blue `#0b6fa4`, and control outline `#7c838d`. Use the existing system UI type stack for compact, familiar controls; give document titles stronger weight and more room. Use a small geometric form mark for the brand. Align labels and tools to the left; center the document within its available canvas.
 
 ```text
-FormSmith                         Examples / Kit / Save status
+WillowForms                         Examples / Kit / Save status
 Document title                    History / JSON / Appearance
 Components | Tree | Settings      Preview           Properties
 Quiet tools                       Form canvas      Field settings

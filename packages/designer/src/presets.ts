@@ -1,5 +1,5 @@
-import { indexKit, instantiate, prop, walk } from '@formsmith/core'
-import type { ComponentDef, ComponentNode, IconName, JsonValue, Kit } from '@formsmith/core'
+import { indexKit, instantiate, prop, walk } from '@willowforms/core'
+import type { ComponentDef, ComponentNode, IconName, JsonValue, Kit } from '@willowforms/core'
 
 export type PresetId = 'section' | 'statistics' | 'entry'
 

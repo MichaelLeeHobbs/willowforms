@@ -1,9 +1,16 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { collectKeys, createDocument, findNode, flatten, loadDocument, prop } from '@formsmith/core'
-import { htmlKit } from '@formsmith/kit-html'
-import { muiKit } from '@formsmith/kit-mui'
+import {
+  collectKeys,
+  createDocument,
+  findNode,
+  flatten,
+  loadDocument,
+  prop,
+} from '@willowforms/core'
+import { htmlKit } from '@willowforms/kit-html'
+import { muiKit } from '@willowforms/kit-mui'
 import { useDesigner } from '../packages/designer/src/store.js'
 import { availablePresets } from '../packages/designer/src/presets.js'
 

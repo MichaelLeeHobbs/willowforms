@@ -7,8 +7,8 @@ import {
   readDeclaration,
   safeDeclarations,
   setDeclaration,
-} from '@formsmith/core'
-import type { Device, Kit } from '@formsmith/core'
+} from '@willowforms/core'
+import type { Device, Kit } from '@willowforms/core'
 
 import type { DesignerApi } from '../store.js'
 import { PropRows } from './Properties.js'

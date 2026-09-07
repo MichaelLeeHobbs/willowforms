@@ -11,7 +11,7 @@
  * clicked through.
  */
 
-import type { FlatNode } from '@formsmith/core'
+import type { FlatNode } from '@willowforms/core'
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
 

@@ -16,8 +16,8 @@ every form it produces.
 | Designer chrome | `--fs-`  | `.fs-shell`   | The host embedding the builder    |
 | HTML kit        | `--fsh-` | `.fsh-screen` | The host, or the form's own brand |
 
-A kit brings its own theming or inherits its component library's. `@formsmith/kit-mui` has no tokens of
-its own because MUI's `ThemeProvider` already owns that; `@formsmith/kit-html` has a full set because
+A kit brings its own theming or inherits its component library's. `@willowforms/kit-mui` has no tokens of
+its own because MUI's `ThemeProvider` already owns that; `@willowforms/kit-html` has a full set because
 nothing else does.
 
 That ownership boundary does not make the toolbar a dead end. `Designer` accepts a controlled `theme`
@@ -143,7 +143,7 @@ declare, so neither can quietly grow a `background`.
 
 **Status: built.** Option 1 below, as recommended.
 
-`IconName` in `@formsmith/core` is a closed union of 30 names. `packages/designer/src/Icon.tsx` draws
+`IconName` in `@willowforms/core` is a closed union of 30 names. `packages/designer/src/Icon.tsx` draws
 each one as an inline 24x24 stroke glyph on `currentColor`, and a kit picks names from the list. The
 palette renders them beside the label, decoratively: the label already says the same word, so naming the
 glyph would have a screen reader read every entry twice.
@@ -152,8 +152,8 @@ Three things fall out of the vocabulary being a union rather than a string:
 
 - A kit's typo is a compile error rather than a blank square.
 - `Record<IconName, ReactNode>` makes adding a name to core fail to compile until it is drawn.
-- Two kits cannot invent two names for the same idea. Before this existed, `@formsmith/kit-mui` carried
-  `view-column` and `text-field` while `@formsmith/kit-html` carried nothing, and no palette rendered
+- Two kits cannot invent two names for the same idea. Before this existed, `@willowforms/kit-mui` carried
+  `view-column` and `text-field` while `@willowforms/kit-html` carried nothing, and no palette rendered
   either. That is the failure the closed set prevents.
 
 The constraint that forced it: **the designer cannot import an icon library**, because it imports no
@@ -167,7 +167,7 @@ The `icon` property editor named in [06-inspector.md](06-inspector.md#property-e
 the vocabulary as a select with the glyph drawn beside it, so a kit property whose value is an icon name
 is authored rather than typed.
 
-`Icon` and `IconProps` are exported from `@formsmith/designer` for hosts that need to draw the shared
+`Icon` and `IconProps` are exported from `@willowforms/designer` for hosts that need to draw the shared
 vocabulary outside the built-in palette.
 
 ## What is not themeable

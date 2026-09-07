@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { createDocument, findNode, validateForm } from '@formsmith/core'
-import type { ComponentNode, PropValue } from '@formsmith/core'
+import { createDocument, findNode, validateForm } from '@willowforms/core'
+import type { ComponentNode, PropValue } from '@willowforms/core'
 import { useDesigner } from './store.js'
 
 function reference(dataKey: string, scope: 'form' | 'row' = 'form'): PropValue {

@@ -131,7 +131,7 @@ function compiledPattern(pattern: string): RE2JS | undefined {
 /**
  * Explain why a pattern cannot be evaluated by the bounded matcher.
  *
- * FormSmith pattern rules use RE2 syntax. Backreferences, lookarounds, and other
+ * WillowForms pattern rules use RE2 syntax. Backreferences, lookarounds, and other
  * constructs without a linear-time implementation are intentionally unsupported.
  */
 export function patternProblem(pattern: string): string | undefined {
@@ -578,7 +578,7 @@ export function autoValidateKeys(root: ComponentNode): Set<string> {
  * medical and legal forms that is a correctness problem rather than a tidiness
  * one.
  *
- * FormSmith cannot clear it unilaterally, because the host owns `data` and
+ * WillowForms cannot clear it unilaterally, because the host owns `data` and
  * hiding is often temporary — an accordion closing must not destroy what
  * someone typed. So this is a projection the host applies when it submits,
  * rather than something done to the value as it is held.

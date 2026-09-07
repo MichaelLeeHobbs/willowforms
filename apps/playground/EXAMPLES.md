@@ -1,6 +1,6 @@
 # Demo examples
 
-Run `pnpm dev` and open the **Examples** gallery in the playground. Search by topic or feature, or filter by category. Every example is a normal FormSmith document: edit its layout and properties, inspect or export its JSON, and try it in **Preview** with either the Material UI or Plain HTML kit.
+Run `pnpm dev` and open the **Examples** gallery in the playground. Search by topic or feature, or filter by category. Every example is a normal WillowForms document: edit its layout and properties, inspect or export its JSON, and try it in **Preview** with either the Material UI or Plain HTML kit.
 
 For your own layouts, try **Starting layouts** in the Components tab. Each preset inserts ordinary editable controls. New Grids fill their available width; change **Fill width** in Style when needed. Choose **Form density** in Settings, or override density for an individual group in Style. Preview hides the authoring panels; **Diagnostics** reveals the current answers and errors.
 

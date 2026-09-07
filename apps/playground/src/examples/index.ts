@@ -1,4 +1,4 @@
-import type { FormDocument } from '@formsmith/core'
+import type { FormDocument } from '@willowforms/core'
 import { SAMPLE_DOCUMENT } from '../sample.js'
 import { characterSheet } from './character-sheet.js'
 import {

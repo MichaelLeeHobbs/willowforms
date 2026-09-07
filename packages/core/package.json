@@ -1,7 +1,7 @@
 {
-  "name": "@formsmith/core",
+  "name": "@willowforms/core",
   "version": "0.0.0",
-  "description": "Document model, kit registry contract, and tree operations for FormSmith. No UI dependencies.",
+  "description": "Document model, kit registry contract, and tree operations for WillowForms. No UI dependencies.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -38,13 +38,13 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MichaelLeeHobbs/formsmith.git",
+    "url": "git+https://github.com/MichaelLeeHobbs/willowforms.git",
     "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/MichaelLeeHobbs/formsmith/issues"
+    "url": "https://github.com/MichaelLeeHobbs/willowforms/issues"
   },
-  "homepage": "https://github.com/MichaelLeeHobbs/formsmith/tree/main/packages/core#readme",
+  "homepage": "https://github.com/MichaelLeeHobbs/willowforms/tree/main/packages/core#readme",
   "author": "Michael Hobbs",
   "publishConfig": {
     "access": "public"

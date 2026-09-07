@@ -1,5 +1,5 @@
 /**
- * The FormSmith document model.
+ * The WillowForms document model.
  *
  * A form is a recursive tree of {@link ComponentNode}. The tree is the source of
  * truth; JSON Schema is an export format, not the storage format, because JSON

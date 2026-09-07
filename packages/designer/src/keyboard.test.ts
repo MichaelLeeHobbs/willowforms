@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ComponentNode } from '@formsmith/core'
-import { flatten } from '@formsmith/core'
+import type { ComponentNode } from '@willowforms/core'
+import { flatten } from '@willowforms/core'
 
 import { describeMove, focusTarget, moveTarget } from './keyboard.js'
 

@@ -1,14 +1,14 @@
 # Import, export, and persistence
 
-**Status: built.** Versioned FormSmith JSON import/export, the document-loading boundary, and the host save contract are implemented. An existing JSON Schema projection remains a limited developer utility. The document format is currently version `1`; migrations are added only when an actual version change needs one.
+**Status: built.** Versioned WillowForms JSON import/export, the document-loading boundary, and the host save contract are implemented. An existing JSON Schema projection remains a limited developer utility. The document format is currently version `1`; migrations are added only when an actual version change needs one.
 
 ## Simple import and export
 
-The supported interchange format is one FormSmith JSON document. It contains the component tree, settings, actions, languages, and translations. An author can export it as a file and import it later; importing validates the document before replacing the current form. The host continues to own storage and distribution.
+The supported interchange format is one WillowForms JSON document. It contains the component tree, settings, actions, languages, and translations. An author can export it as a file and import it later; importing validates the document before replacing the current form. The host continues to own storage and distribution.
 
 The document's `version` and the core `loadDocument` boundary handle format compatibility. Package versions follow the [compatibility policy](../COMPATIBILITY.md). There is no separate archive format, conversion framework, or synchronization protocol.
 
-## FormSmith does not persist
+## WillowForms does not persist
 
 **Status: built**, and it is a decision, not a gap.
 
@@ -27,7 +27,7 @@ one; without it there is no button, because a Save the designer cannot honour is
 [04-shell.md](04-shell.md#toolbar) and [12-api.md](12-api.md).
 
 `apps/demo-server` exists to demonstrate the other half — that `validateForm` is the same function on a
-server — and not to suggest FormSmith needs a backend.
+server — and not to suggest WillowForms needs a backend.
 
 ## The JSON dialog
 
@@ -131,6 +131,6 @@ An unguarded required boolean exports with `const: true` as well as membership i
 
 ## Format scope
 
-JSON Schema import, schema-generated form scaffolds, and form archives are outside product scope. The existing lossy JSON Schema export is an optional developer projection, not the saved document format or a replacement for FormSmith validation. Its existence does not commit the library to an inverse importer or additional conversion formats.
+JSON Schema import, schema-generated form scaffolds, and form archives are outside product scope. The existing lossy JSON Schema export is an optional developer projection, not the saved document format or a replacement for WillowForms validation. Its existence does not commit the library to an inverse importer or additional conversion formats.
 
 Core already owns `loadDocument` and its version boundary. A new document format version requires the migration and compatibility treatment described in [01-document-model.md](01-document-model.md#versioning-and-migration). With only version `1`, the migration registry is empty; the library does not need a second version or extra migration machinery in anticipation of one.

@@ -1,5 +1,5 @@
-import { backgroundImageProps, backgroundImageDefaults } from '@formsmith/core'
-import type { Kit, PropSchema } from '@formsmith/core'
+import { backgroundImageProps, backgroundImageDefaults } from '@willowforms/core'
+import type { Kit, PropSchema } from '@willowforms/core'
 
 const label: PropSchema = {
   name: 'label',

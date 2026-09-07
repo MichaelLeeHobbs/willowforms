@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { indexKit } from '@formsmith/core'
-import type { ActionRef, EventName, FormDocument, JsonValue, Kit } from '@formsmith/core'
+import { indexKit } from '@willowforms/core'
+import type { ActionRef, EventName, FormDocument, JsonValue, Kit } from '@willowforms/core'
 
 import type { DesignerApi } from '../store.js'
 import { ActionFields } from './ActionFields.js'

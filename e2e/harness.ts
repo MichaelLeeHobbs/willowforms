@@ -10,7 +10,7 @@ import { expect, test as base } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
 /** Where the playground persists its draft. Exported so a test can plant one. */
-export const STORAGE_KEY = 'formsmith.playground.document'
+export const STORAGE_KEY = 'willowforms.playground.document'
 
 export interface Designer {
   page: Page

@@ -1,7 +1,7 @@
 /**
  * Demo persistence.
  *
- * FormSmith is a frontend library; this exists to show that the same document and
+ * WillowForms is a frontend library; this exists to show that the same document and
  * the same validation rules work on a server -- `validateDocument` on a request
  * body, `validateAcross` over a wizard's steps, `submittedData` before anything
  * is stored, and a host context the browser cannot forge.
@@ -20,7 +20,7 @@ import { pathToFileURL } from 'node:url'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import type { FormContext, FormData, FormDocument, StructuralError } from '@formsmith/core'
+import type { FormContext, FormData, FormDocument, StructuralError } from '@willowforms/core'
 import {
   MAX_CONDITION_DEPTH,
   contextValues,
@@ -29,7 +29,7 @@ import {
   submittedAcross,
   validateAcross,
   validateDocument,
-} from '@formsmith/core'
+} from '@willowforms/core'
 
 /*
  * Where the forms live, overridable so this file can be exercised.
@@ -37,9 +37,9 @@ import {
  * A demo with one hard-coded path is a demo no test can touch without writing
  * into the checkout, and the alternative -- a test that re-implements the route
  * it is checking -- is the shape this whole remediation run exists to remove.
- * `FORMSMITH_DEMO_STORE` takes a filesystem path; nothing sets it in normal use.
+ * `WILLOWFORMS_DEMO_STORE` takes a filesystem path; nothing sets it in normal use.
  */
-const storePath = process.env['FORMSMITH_DEMO_STORE']
+const storePath = process.env['WILLOWFORMS_DEMO_STORE']
 const STORE = storePath ? pathToFileURL(storePath) : new URL('../forms.json', import.meta.url)
 /*
  * A port, or a refusal to start.
@@ -744,7 +744,7 @@ const SHUTDOWN_GRACE = 5000
 export const stopper =
   (server: { close: (done: () => void) => void }, exit: () => void) =>
   (signal: string): void => {
-    console.log('FormSmith demo server stopping on ' + signal)
+    console.log('WillowForms demo server stopping on ' + signal)
     server.close(exit)
 
     // Unrefed, so a connection that will not close cannot itself hang the exit,
@@ -769,7 +769,7 @@ if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
    * happened to be on — a coffee shop, a conference, a client's office.
    */
   const server = serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' })
-  console.log('FormSmith demo server on http://localhost:' + String(PORT))
+  console.log('WillowForms demo server on http://localhost:' + String(PORT))
 
   const stop = stopper(server, () => process.exit(0))
 

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { fireEvent, render, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { createDocument, prop } from '@formsmith/core'
-import type { ComponentNode } from '@formsmith/core'
-import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
+import { createDocument, prop } from '@willowforms/core'
+import type { ComponentNode } from '@willowforms/core'
+import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
 import { Designer } from '../packages/designer/src/Designer.js'
 
 function open(children: ComponentNode[]): ReturnType<typeof render> {

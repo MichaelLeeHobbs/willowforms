@@ -29,8 +29,8 @@ interface Counts {
 }
 
 const counts: Counts = ((
-  globalThis as { formsmithObserverCounts?: Counts }
-).formsmithObserverCounts ??= { made: 0, observing: 0, disconnects: 0 })
+  globalThis as { willowformsObserverCounts?: Counts }
+).willowformsObserverCounts ??= { made: 0, observing: 0, disconnects: 0 })
 
 /** What the `ResizeObserver` stub has seen. A test asserting a leak reads this. */
 export const observerCount = (): Counts => ({ ...counts })

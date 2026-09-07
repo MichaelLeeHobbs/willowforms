@@ -10,10 +10,10 @@
  * see the first test below, which reads it back off `kit.components`. The two kits reach the page by different routes, so
  * the obligation is one sentence with two sinks:
  *
- * - `@formsmith/kit-mui` puts the value in `sx`, which emotion concatenates
+ * - `@willowforms/kit-mui` puts the value in `sx`, which emotion concatenates
  *   into stylesheet text. A `}` there ends the class block and everything after
  *   it is a new top-level rule against the whole page.
- * - `@formsmith/kit-html` puts it in a React `style` object. On the client CSSOM
+ * - `@willowforms/kit-html` puts it in a React `style` object. On the client CSSOM
  *   drops a malformed value, which is why this kit was reported safe. It is not:
  *   React's server renderer does no CSS validation at all and writes the string
  *   into the attribute verbatim, and MUI's dominant deployment is Next.js.
@@ -35,12 +35,12 @@ import type { ReactElement } from 'react'
 import { render } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { ComponentNode, FormDocument } from '@formsmith/core'
-import { prop } from '@formsmith/core'
-import { FormRenderer } from '@formsmith/renderer'
-import type { RendererKit } from '@formsmith/renderer'
-import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+import type { ComponentNode, FormDocument } from '@willowforms/core'
+import { prop } from '@willowforms/core'
+import { FormRenderer } from '@willowforms/renderer'
+import type { RendererKit } from '@willowforms/renderer'
+import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
 /** The payload from the report, which emitted a second top-level rule. */
 const INJECTION = 'red}html{display:none}.x{'
@@ -179,8 +179,8 @@ function freeStyleValues(kit: {
 
 describe('a document CSS value cannot author a rule', () => {
   it('has one free-text style value per kit, which is the one the rest of this file uses', () => {
-    expect(freeStyleValues(muiKit), '@formsmith/kit-mui').toEqual(['Box.background'])
-    expect(freeStyleValues(htmlKit), '@formsmith/kit-html').toEqual(['Box.background'])
+    expect(freeStyleValues(muiKit), '@willowforms/kit-mui').toEqual(['Box.background'])
+    expect(freeStyleValues(htmlKit), '@willowforms/kit-html').toEqual(['Box.background'])
   })
 
   it.each([muiKit, htmlKit])(
@@ -207,7 +207,7 @@ describe('a document CSS value cannot author a rule', () => {
     for (const tag of Array.from(document.querySelectorAll('style'))) tag.remove()
   })
 
-  describe('@formsmith/kit-mui', () => {
+  describe('@willowforms/kit-mui', () => {
     it('emits one rule for a Box, not two', () => {
       const rules = emittedRules(INJECTION, 2)
       expect(rules.map((rule) => rule.selector)).not.toContain('html')
@@ -234,7 +234,7 @@ describe('a document CSS value cannot author a rule', () => {
     })
   })
 
-  describe('@formsmith/kit-html', () => {
+  describe('@willowforms/kit-html', () => {
     it('server-renders one declaration list, not a rule of its own', () => {
       const style = serverStyleAttribute(htmlRendererKit, INJECTION)
       expect(style).not.toMatch(/[{}<@]/)

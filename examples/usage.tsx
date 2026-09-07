@@ -1,18 +1,18 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { FormDocument, FormData, FormErrors, JsonValue } from '@formsmith/core'
+import type { FormDocument, FormData, FormErrors, JsonValue } from '@willowforms/core'
 import {
   applyChange,
   contextValues,
   submittedAcross,
   validateAcross,
   validateForm,
-} from '@formsmith/core'
-import { Designer } from '@formsmith/designer'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
-import { FormRenderer } from '@formsmith/renderer'
+} from '@willowforms/core'
+import { Designer } from '@willowforms/designer'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
+import { FormRenderer } from '@willowforms/renderer'
 
-import '@formsmith/designer/styles.css'
+import '@willowforms/designer/styles.css'
 
 export function DesignerExample({
   document,

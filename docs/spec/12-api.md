@@ -12,16 +12,16 @@ in the project as the only undocumented one.
 
 ## Three packages, three audiences
 
-| Package               | Installed by                      | Brings                      |
-| --------------------- | --------------------------------- | --------------------------- |
-| `@formsmith/core`     | anyone, including a server        | types, tree ops, validation |
-| `@formsmith/renderer` | anyone rendering a form           | `FormRenderer`, kit types   |
-| `@formsmith/designer` | only a host embedding the builder | `Designer`                  |
+| Package                 | Installed by                      | Brings                      |
+| ----------------------- | --------------------------------- | --------------------------- |
+| `@willowforms/core`     | anyone, including a server        | types, tree ops, validation |
+| `@willowforms/renderer` | anyone rendering a form           | `FormRenderer`, kit types   |
+| `@willowforms/designer` | only a host embedding the builder | `Designer`                  |
 
 A kit package brings its own two halves and depends on the first two. Most consumers never install the
 designer, which is the point of the split.
 
-`@formsmith/designer` also exports `DesignerProps`, `DesignerTheme`, `useDesigner`, `DesignerApi`,
+`@willowforms/designer` also exports `DesignerProps`, `DesignerTheme`, `useDesigner`, `DesignerApi`,
 `RenameResult` and `MAX_HISTORY`. `DesignerProps` is the type of the props table below, and listing
 everything except the type of the thing being documented has an obvious cost: a TypeScript host writing
 a wrapper component has to redeclare it.
@@ -39,8 +39,8 @@ The hook's `addPreset(id, kit, parentKey?)` inserts one of the built-in authorin
 **Status: built.**
 
 ```tsx
-import { Designer } from '@formsmith/designer'
-import '@formsmith/designer/styles.css'
+import { Designer } from '@willowforms/designer'
+import '@willowforms/designer/styles.css'
 ```
 
 | Prop              | Type                               | Required | Meaning                                 |
@@ -63,7 +63,7 @@ order. See [11-theming.md](11-theming.md).
 The playground uses the pair to keep MUI fields aligned with the designer in editing and preview modes.
 
 `onSave` is what makes the toolbar show a Save button, and its absence is why there is no button by
-default: FormSmith does not persist, and one it cannot honour is worse than none. See
+default: WillowForms does not persist, and one it cannot honour is worse than none. See
 [04-shell.md](04-shell.md#toolbar).
 
 ## Rendering a form
@@ -72,7 +72,7 @@ default: FormSmith does not persist, and one it cannot honour is worse than none
 filling in a form.
 
 ```tsx
-import { FormRenderer } from '@formsmith/renderer'
+import { FormRenderer } from '@willowforms/renderer'
 ```
 
 | Prop             | Type                                          | Required | Meaning                                                         |
@@ -103,7 +103,7 @@ nonce the page's policy names.
 receives the previous or next reachable context value. The renderer evaluates branches from the current
 answers and the kits display position without a potentially false total.
 
-The host may hold the current step in local state or its existing router. FormSmith provides neither routing nor a branching workflow engine. The built-in display remains position-only; a host may show a known total for a fixed linear form.
+The host may hold the current step in local state or its existing router. WillowForms provides neither routing nor a branching workflow engine. The built-in display remains position-only; a host may show a known total for a fixed linear form.
 
 ### The host owns the data
 
@@ -130,7 +130,7 @@ it came from, outermost first: `addresses[1].line1`.
 
 Repeated-row coordinates use answer names. A change address ends in the field's **data key**, while an error address ends in its **component key**. A `street` component with `dataKey: 'line1'`, inside an `addressList` repeater with `dataKey: 'addresses'`, reports changes at `addresses[1].line1` and reads errors at `addresses[1].street`. Two components may share an answer and fail for different reasons. `validateForm` and `FormRenderer` use the same error-address convention.
 
-Use `applyChange` from `@formsmith/core` to write one. Spreading the address into an object literal,
+Use `applyChange` from `@willowforms/core` to write one. Spreading the address into an object literal,
 `{ ...d, [address]: value }`, is the mistake this shape invites: it creates a property whose name is
 the literal text `addresses[1].line1` rather than updating the row, and the form then looks like it is
 discarding every keystroke inside a repeater. `applyChange` also refuses a reserved name and returns
@@ -167,7 +167,7 @@ The host decides whether to honour it, and `autoValidateKeys(root)` names the fi
 ### Four core functions a host has to call
 
 **Status: built.** This file opens by saying none of the other twelve said what a consumer imports, and
-then omitted these four. All are exported from `@formsmith/core` and all four are used by the reference
+then omitted these four. All are exported from `@willowforms/core` and all four are used by the reference
 server.
 
 ```ts
@@ -240,7 +240,7 @@ So the split is not "important" against "transient". It is: can a value be hande
 ```
 
 A dot path, because a host's context already is nested and making every host flatten `{ user: { role } }`
-into `{ 'user.role': … }` is work FormSmith would be creating rather than doing. Every step is an
+into `{ 'user.role': … }` is work WillowForms would be creating rather than doing. Every step is an
 own-property read that must land on a plain object, so `constructor.prototype` reads as missing and a
 path cannot walk into a string's `length`. A key containing a dot is unreachable, which is a stated limit
 rather than an escape syntax, because an escape syntax is a parser and a parser is a thing with its own

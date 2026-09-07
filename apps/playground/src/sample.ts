@@ -1,5 +1,5 @@
-import type { FormDocument } from '@formsmith/core'
-import { prop } from '@formsmith/core'
+import type { FormDocument } from '@willowforms/core'
+import { prop } from '@willowforms/core'
 
 export const SAMPLE_DOCUMENT: FormDocument = {
   version: '1',

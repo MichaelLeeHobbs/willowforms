@@ -89,12 +89,12 @@ importers:
 
   apps/demo-server:
     dependencies:
-      '@formsmith/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.5)
+      '@willowforms/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       hono:
         specifier: ^4.13.5
         version: 4.13.5
@@ -107,24 +107,24 @@ importers:
       '@emotion/styled':
         specifier: ^11.14.0
         version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8)
-      '@formsmith/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@formsmith/designer':
-        specifier: workspace:*
-        version: link:../../packages/designer
-      '@formsmith/kit-html':
-        specifier: workspace:*
-        version: link:../../packages/kit-html
-      '@formsmith/kit-mui':
-        specifier: workspace:*
-        version: link:../../packages/kit-mui
-      '@formsmith/renderer':
-        specifier: workspace:*
-        version: link:../../packages/renderer
       '@mui/material':
         specifier: ^7.3.11
         version: 7.3.11(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@willowforms/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@willowforms/designer':
+        specifier: workspace:*
+        version: link:../../packages/designer
+      '@willowforms/kit-html':
+        specifier: workspace:*
+        version: link:../../packages/kit-html
+      '@willowforms/kit-mui':
+        specifier: workspace:*
+        version: link:../../packages/kit-mui
+      '@willowforms/renderer':
+        specifier: workspace:*
+        version: link:../../packages/renderer
       react:
         specifier: ^19.0.0
         version: 19.2.8
@@ -147,10 +147,10 @@ importers:
 
   packages/designer:
     dependencies:
-      '@formsmith/core':
+      '@willowforms/core':
         specifier: workspace:*
         version: link:../core
-      '@formsmith/renderer':
+      '@willowforms/renderer':
         specifier: workspace:*
         version: link:../renderer
       react:
@@ -162,10 +162,10 @@ importers:
 
   packages/kit-html:
     dependencies:
-      '@formsmith/core':
+      '@willowforms/core':
         specifier: workspace:*
         version: link:../core
-      '@formsmith/renderer':
+      '@willowforms/renderer':
         specifier: workspace:*
         version: link:../renderer
       react:
@@ -177,10 +177,10 @@ importers:
 
   packages/kit-mui:
     dependencies:
-      '@formsmith/core':
+      '@willowforms/core':
         specifier: workspace:*
         version: link:../core
-      '@formsmith/renderer':
+      '@willowforms/renderer':
         specifier: workspace:*
         version: link:../renderer
       react:
@@ -196,7 +196,7 @@ importers:
 
   packages/renderer:
     dependencies:
-      '@formsmith/core':
+      '@willowforms/core':
         specifier: workspace:*
         version: link:../core
       react:

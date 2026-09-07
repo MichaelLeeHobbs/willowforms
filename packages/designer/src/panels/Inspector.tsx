@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Device, Kit } from '@formsmith/core'
+import type { Device, Kit } from '@willowforms/core'
 
 import type { DesignerApi } from '../store.js'
 import { Properties } from './Properties.js'

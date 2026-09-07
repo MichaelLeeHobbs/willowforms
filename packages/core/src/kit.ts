@@ -4,8 +4,8 @@
  * This is the seam the whole product is built on: the designer knows about
  * ComponentDef metadata and nothing about MUI, shadcn, or any other library.
  * A kit contributes palette entries and property schemas here; it contributes
- * React components in @formsmith/renderer. Keeping the two apart is what lets
- * @formsmith/core run in Node for server-side validation.
+ * React components in @willowforms/renderer. Keeping the two apart is what lets
+ * @willowforms/core run in Node for server-side validation.
  */
 
 import type { EventName, FieldSchema, JsonValue, PropValue } from './types.js'

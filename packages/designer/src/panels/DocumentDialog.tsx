@@ -1,7 +1,7 @@
 import { useId, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { FormDocument } from '@formsmith/core'
-import { loadDocument, toJsonSchema, unexportableRules } from '@formsmith/core'
+import type { FormDocument } from '@willowforms/core'
+import { loadDocument, toJsonSchema, unexportableRules } from '@willowforms/core'
 
 import { Tabs } from './Tabs.js'
 

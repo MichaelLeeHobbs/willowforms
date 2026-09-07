@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import type { ComponentDef } from '@formsmith/core'
+import type { ComponentDef } from '@willowforms/core'
 
 /** Pixels the pointer must travel before a press becomes a drag. */
 const THRESHOLD = 4

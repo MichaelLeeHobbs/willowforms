@@ -45,12 +45,12 @@ These are refinements within the existing product contract. The remaining releas
 
 ## Explicit beta limits
 
-- Attachments belong to host-configured custom or community components. Legacy `FileUpload` nodes remain loadable and show the missing-component fallback until the host supplies a renderer. The [compatibility notes](COMPATIBILITY.md#pre-beta-corrections) describe replacement; FormSmith supplies no upload, storage, or attachment-viewing service.
+- Attachments belong to host-configured custom or community components. Legacy `FileUpload` nodes remain loadable and show the missing-component fallback until the host supplies a renderer. The [compatibility notes](COMPATIBILITY.md#pre-beta-corrections) describe replacement; WillowForms supplies no upload, storage, or attachment-viewing service.
 
 - Desktop authoring is the verified workflow. Mobile and tablet controls simulate the runtime form; they do not promise a phone-sized authoring workspace.
 - The Tree and panels provide keyboard authoring. Direct canvas keyboard selection is outside scope; palette-to-tree dragging remains an uncommitted idea.
 - Generic HTML attribute passthrough and richer expression tooling are outside scope. Ordinary properties supply accessibility intent, with complete cross-kit verification still outstanding. Hosts own sandboxing; the designer preview does not execute arbitrary source or apply host action effects.
-- Versioned FormSmith JSON is the supported import/export format. JSON Schema import and archive bundles are outside product scope; the existing schema projection remains an optional developer utility. A controlled document prop remains outside this beta: a different React key loads another form through the supported mount API. Version migrations will be needed when a second document version exists.
+- Versioned WillowForms JSON is the supported import/export format. JSON Schema import and archive bundles are outside product scope; the existing schema projection remains an optional developer utility. A controlled document prop remains outside this beta: a different React key loads another form through the supported mount API. Version migrations will be needed when a second document version exists.
 - Structured references follow component key renames. Expressions and arbitrary action parameters need manual review; editing a Data key is an explicit payload mapping change and does not automatically rewrite references.
 - JSON Schema remains a lossy export, and `validateForm` is the authoritative validation engine. Conditional logic, cross-field rules, custom code, and shared data-key collisions cannot be represented completely by the export.
 - Chromium is the automated browser gate. Firefox, Safari, assistive-technology testing with real screen readers, and the full declared React/Node compatibility matrix have not been established by this local review.

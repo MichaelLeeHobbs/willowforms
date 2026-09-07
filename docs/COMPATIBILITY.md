@@ -1,13 +1,13 @@
 # Compatibility policy
 
-FormSmith is pre-release software. Until the first published `1.0.0`, public contracts may change, but
+WillowForms is pre-release software. Until the first published `1.0.0`, public contracts may change, but
 changes must be deliberate and documented rather than arriving as incidental refactors.
 
 ## Supported platforms
 
-- Node.js 20 and 22 for `@formsmith/core` and server-side validation.
+- Node.js 20 and 22 for `@willowforms/core` and server-side validation.
 - React 18 and 19 for the renderer, designer, and kits.
-- The current and previous major Material UI releases supported by `@formsmith/kit-mui` peer metadata.
+- The current and previous major Material UI releases supported by `@willowforms/kit-mui` peer metadata.
 - Current evergreen Chromium, Firefox, and Safari for runtime use. Automated browser coverage currently
   gates Chromium; the other engines are compatibility targets, not yet CI gates.
 
@@ -26,6 +26,8 @@ The package manifests are the source of truth for engine and peer ranges. The sp
 behaviour; when either changes, this policy and the relevant contract change together.
 
 ## Pre-beta corrections
+
+The project is now WillowForms. Before the first publication, the package scope changed to `@willowforms/*`; development consumers must update their dependencies and imports together. Browser storage keys, demo environment variables, and test identifiers also use `willowforms`/`WILLOWFORMS`. Development drafts and preferences are not migrated. Document version `1`, component keys, and the `fs-`/`fsh-` CSS and DOM prefixes remain unchanged.
 
 The shipped kits now use their declared `defaultProps` for omitted properties as well as newly created components. Reset therefore agrees with the inspector. Saved forms that omit properties may gain the declared starter text, labels, or presentation defaults; explicitly authored values are preserved. Both kits default headings to H2, and breadcrumbs receive the default region name `Breadcrumb`. Existing headings with an explicit H5 remain H5. This correction changes runtime fallbacks without rewriting documents or advancing the document version.
 

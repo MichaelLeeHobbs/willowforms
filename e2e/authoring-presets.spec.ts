@@ -6,8 +6,8 @@ for (const kit of ['html', 'mui']) {
   test(`${kit} presets are editable, exportable, and usable on a phone`, async ({ page }) => {
     await page.addInitScript(
       ({ json, kitId }) => {
-        localStorage.setItem('formsmith.playground.document', json)
-        localStorage.setItem('formsmith.playground.kit', kitId)
+        localStorage.setItem('willowforms.playground.document', json)
+        localStorage.setItem('willowforms.playground.kit', kitId)
       },
       { json: JSON.stringify(createDocument('Starting layouts', 'startingLayouts')), kitId: kit },
     )

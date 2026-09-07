@@ -13,8 +13,8 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { languagesOf } from '../language.js'
-import { indexKit, keyProblem, languageTag, prop } from '@formsmith/core'
-import type { CodeAction, JsonValue, Kit, Language } from '@formsmith/core'
+import { indexKit, keyProblem, languageTag, prop } from '@willowforms/core'
+import type { CodeAction, JsonValue, Kit, Language } from '@willowforms/core'
 
 import type { DesignerApi } from '../store.js'
 
@@ -356,7 +356,7 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
         Code actions <span className="fs-rules__count">{Object.keys(actions).length}</span>
       </h3>
       <p className="fs-rules__note">
-        FormSmith stores this source but never executes it directly. The host must provide a
+        WillowForms stores this source but never executes it directly. The host must provide a
         sandboxed action evaluator.
       </p>
       {Object.keys(actions).length > 0 && (

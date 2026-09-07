@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
-import type { FormDocument } from '@formsmith/core'
+import type { FormDocument } from '@willowforms/core'
 
 import { Icon } from '../Icon.js'
 import { measureIn, nodeElement } from '../geometry.js'

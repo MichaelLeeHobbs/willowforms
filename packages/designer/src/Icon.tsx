@@ -10,7 +10,7 @@
  * colour of whatever it sits in and needs no token of its own.
  */
 
-import type { IconName } from '@formsmith/core'
+import type { IconName } from '@willowforms/core'
 import type { ReactNode } from 'react'
 
 /**

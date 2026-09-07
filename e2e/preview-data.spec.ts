@@ -54,7 +54,7 @@ for (const kit of ['html', 'mui']) {
       },
     ]
     await page.addInitScript((text) => {
-      localStorage.setItem('formsmith.playground.document', text)
+      localStorage.setItem('willowforms.playground.document', text)
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: { writeText: () => Promise.reject(new Error('denied')) },

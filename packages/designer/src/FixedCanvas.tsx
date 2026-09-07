@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
-import type { Device } from '@formsmith/core'
+import type { Device } from '@willowforms/core'
 
 const PAPER_SIZES = {
   letter: { label: 'Letter (8.5 × 11 in)', width: 816, height: 1056 },

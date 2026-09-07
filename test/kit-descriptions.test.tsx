@@ -3,10 +3,10 @@
 import { render, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { expect, it } from 'vitest'
-import { createDocument, instantiate } from '@formsmith/core'
-import { FormRenderer } from '@formsmith/renderer'
-import { htmlKit, htmlRendererKit } from '@formsmith/kit-html'
-import { muiKit, muiRendererKit } from '@formsmith/kit-mui'
+import { createDocument, instantiate } from '@willowforms/core'
+import { FormRenderer } from '@willowforms/renderer'
+import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
+import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
 for (const [kit, renderer] of [
   [htmlKit, htmlRendererKit],
