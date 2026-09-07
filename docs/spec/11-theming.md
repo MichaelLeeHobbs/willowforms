@@ -38,6 +38,8 @@ The HTML kit styles its own controls using that attribute. The MUI kit applies a
 
 ## Designer tokens
 
+The default WillowForms chrome uses Daylight (chalk surfaces, green-gray wells, and willow-green actions) and Night grove (forest surfaces and soft sage actions). Seed-gold drop indicators distinguish placement from selection. The demo header and gallery share this direction. Typography uses a local Segoe UI/system sans-serif stack, with monospace reserved for code. These palettes apply only to the designer and demo chrome; example documents, rendered form typography, and kit palettes remain independent.
+
 Every value is a custom property on `.fs-shell`, so a host restyles by overriding tokens rather than
 fighting specificity.
 
@@ -108,14 +110,7 @@ explicit value would override the media query with nothing. See [04-shell.md](04
 **Status: built.** `test/contrast.test.ts` reads both stylesheets, folds the dark overrides onto the light
 base, and computes every ratio. A token change that breaks one fails CI.
 
-Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for large text -- which is what the suite applies
-to a heading -- and 3:1 for interface component boundaries and focus
-indicators. The lowest measured value in any palette is 3.35:1 against a 3:1 requirement, and it is a
-user interface component rather than text: the scrollbar thumb on the designer's well background. The
-lowest text pair is 5.25:1 against a 4.5:1 requirement.
-
-Our primary button label is 5.49:1 in light and 6.39:1 in dark. Contrast failures in shipped builders
-are common enough that measuring is the only way to know, which is why this is a test and not a goal.
+Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for large text, and 3:1 for interface component boundaries and focus indicators. The measured palette minima are recorded and checked against [accessibility.md](../accessibility.md#contrast).
 
 Selectors are matched exactly, and the test throws if a palette finds nothing. Substring matching meant
 `.fs-shell` also matched `.fs-shell[data-fs-theme='dark']`, so all 32 assertions ran twice against the

@@ -45,23 +45,14 @@ measured value in each palette:
 
 | Palette         | Lowest ratio | Pair                                     |
 | --------------- | ------------ | ---------------------------------------- |
-| Designer, light | 3.35:1       | scrollbar thumb on the well, needs 3:1   |
-| Designer, dark  | 3.65:1       | scrollbar thumb on the panel, needs 3:1  |
+| Designer, light | 3.38:1       | control border on the well, needs 3:1    |
+| Designer, dark  | 4.22:1       | control border on the panel, needs 3:1   |
 | HTML kit, light | 4.24:1       | warning stripe on the surface, needs 3:1 |
 | HTML kit, dark  | 4.15:1       | field border on the field, needs 3:1     |
 
-Each row is the lowest pair the suite asserts in that palette, and the two designer rows are user
-interface components rather than text, so 3:1 is the floor they have to clear. Body text is well above
-it: the lowest text pair is muted text on the well at 5.25:1 light. Quoting that figure as the minimum,
-which this table used to, made the designer look safer than it is.
+Each row is the lowest pair the suite asserts in that palette. The designer rows measure control boundaries, which require 3:1. Designer muted text on the light well measures 5.18:1; primary button labels measure 6.71:1 light and 8.53:1 dark, against a 4.5:1 text requirement.
 
-These four figures are computed rather than transcribed. `test/contrast.test.ts` records every pair it
-measures and compares the lowest in each palette against this table, so a token change that stays above
-the floor cannot leave the numbers here quietly wrong. The light row for the HTML kit was: it said
-4.83:1, the field border, while the warning stripe sat half a point below it at 4.24:1.
-
-The primary button label, which the prior-art study recorded at 3.03:1 in the product this project
-studied, sits at 5.49:1 light and 6.39:1 dark. See `docs/prior-art`.
+`test/contrast.test.ts` records every measured pair and compares the minimum in each palette against this table, so changes to the theme cannot silently invalidate the reported minima.
 
 ## Keyboard
 
