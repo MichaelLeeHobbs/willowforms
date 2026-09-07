@@ -1,11 +1,12 @@
 /* Playground chrome only. The designer and the kits bring their own styles. */
 .pg-app {
-  --pg-surface: #fbfcf8;
-  --pg-text: #243b30;
-  --pg-muted: #56665a;
-  --pg-border: #d3dccf;
-  --pg-soft: #e9eee5;
+  --pg-surface: #eceeed;
+  --pg-text: #28312d;
+  --pg-muted: #58635c;
+  --pg-border: #cdd2cf;
+  --pg-soft: #e2e5e3;
   --pg-accent: #34634d;
+  --pg-field: #f5f6f5;
   color: var(--pg-text);
   background: var(--pg-surface);
   font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
@@ -24,6 +25,7 @@
     --pg-border: #3b4d40;
     --pg-soft: #18231f;
     --pg-accent: #9bc7a2;
+    --pg-field: #18231f;
     color-scheme: dark;
   }
 }
@@ -35,6 +37,7 @@
   --pg-border: #3b4d40;
   --pg-soft: #18231f;
   --pg-accent: #9bc7a2;
+  --pg-field: #18231f;
   color-scheme: dark;
 }
 
@@ -50,7 +53,7 @@
   flex-wrap: wrap;
   flex-shrink: 0;
   padding: 14px 20px;
-  font-size: 13px;
+  font-size: 14px;
   border-block-end: 1px solid var(--pg-border);
   background: var(--pg-surface);
 }
@@ -78,7 +81,7 @@
   padding: 7px 10px;
   font: inherit;
   color: inherit;
-  background: var(--pg-soft);
+  background: var(--pg-field);
   border: 1px solid var(--pg-muted);
   border-radius: 6px;
 }
@@ -119,7 +122,7 @@
 .pg-reset-button,
 .pg-reset button,
 .pg-gallery button {
-  border: 1px solid var(--pg-muted);
+  border: 1px solid var(--pg-border);
   border-radius: 8px;
   padding: 8px 12px;
   background: var(--pg-surface);

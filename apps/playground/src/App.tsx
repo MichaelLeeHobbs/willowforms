@@ -27,7 +27,6 @@ const KIT_KEY = 'willowforms.playground.kit'
 const PALETTE_KEY = 'willowforms.playground.palette'
 const PALETTES = {
   willow: 'Willow',
-  shade: 'Willow shade',
   desert: 'Desert Willow — AZT Bi-Color',
 }
 

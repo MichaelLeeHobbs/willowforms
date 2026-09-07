@@ -172,6 +172,20 @@ describe.each(
     expect(on('--fs-primary-text', '--fs-primary')).toBeGreaterThanOrEqual(AA_TEXT)
   })
 
+  it.each([
+    ['--fs-text', '--fs-bg-field', AA_TEXT],
+    ['--fs-text-muted', '--fs-bg-field', AA_TEXT],
+    ['--fs-text', '--fs-bg-hover', AA_TEXT],
+    ['--fs-text-muted', '--fs-bg-hover', AA_TEXT],
+    ['--fs-control-border', '--fs-bg-field', AA_LARGE],
+    ['--fs-primary', '--fs-bg-field', AA_LARGE],
+    ['--fs-primary', '--fs-bg-selected', AA_LARGE],
+    ['--fs-text-selected', '--fs-bg-selected', AA_TEXT],
+    ['--fs-primary-text', '--fs-primary-hover', AA_TEXT],
+  ] as const)('state token %s on %s clears its contrast requirement', (fg, bg, minimum) => {
+    expect(on(fg, bg)).toBeGreaterThanOrEqual(minimum)
+  })
+
   it('the danger colour clears AA on both panel surfaces', () => {
     expect(on('--fs-danger', '--fs-bg-panel')).toBeGreaterThanOrEqual(AA_TEXT)
     expect(on('--fs-danger', '--fs-bg-well')).toBeGreaterThanOrEqual(AA_TEXT)

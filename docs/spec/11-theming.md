@@ -38,9 +38,9 @@ The HTML kit styles its own controls using that attribute. The MUI kit applies a
 
 ## Designer tokens
 
-The playground's Palette selector offers Willow, Willow shade, and Desert Willow — AZT Bi-Color independently of the Light/Dark/System mode. Willow shade lowers light-mode surface brightness with sage-gray backgrounds; Desert Willow uses muted sand and burgundy in light mode and plum and pale pink in dark mode. The palette choice is saved locally and remains usable when storage is unavailable. These host-owned presets demonstrate overriding the public designer tokens without changing example documents or kit styling.
+The playground's Palette selector offers Willow and Desert Willow — AZT Bi-Color independently of Light/Dark/System mode. Both palettes share neutral light surfaces and the original Willow forest surfaces in dark mode. Desert Willow changes the action and selection accents to burgundy and pink. Palette choices are saved locally; retired or invalid choices fall back to Willow. These host-owned accents leave example documents and kit styling independent.
 
-The default WillowForms chrome uses Daylight (chalk surfaces, green-gray wells, and willow-green actions) and Night grove (forest surfaces and soft sage actions). Seed-gold drop indicators distinguish placement from selection. The demo header and gallery share this direction. Typography uses a local Segoe UI/system sans-serif stack, with monospace reserved for code. These palettes apply only to the designer and demo chrome; example documents, rendered form typography, and kit palettes remain independent.
+The default WillowForms chrome uses soft neutral-gray workspace and panel surfaces, lighter editable fields, and restrained green accents in light mode. Dark mode retains forest surfaces and sage actions. Hover, selection, editable fields, and primary-button hover have separate tokens. Selected controls use a tinted fill and a contrasting indicator; secondary buttons use quiet borders. Chrome typography uses a 14px local Segoe UI/system sans-serif base, with monospace reserved for code. Example documents, rendered form typography, and kit palettes remain independent.
 
 Every value is a custom property on `.fs-shell`, so a host restyles by overriding tokens rather than
 fighting specificity.
@@ -52,25 +52,29 @@ fighting specificity.
 }
 ```
 
-| Token                         | Used for                                            |
-| ----------------------------- | --------------------------------------------------- |
-| `--fs-bg-app`                 | The shell behind everything                         |
-| `--fs-bg-panel`               | Panel and toolbar surfaces                          |
-| `--fs-bg-well`                | Inset surfaces: inputs, rule cards, the JSON editor |
-| `--fs-border`                 | Every divider and control outline                   |
-| `--fs-control-border`         | The outline of an editable control, which is darker |
-| `--fs-text`                   | Body text                                           |
-| `--fs-text-muted`             | Hints, secondary labels, type names                 |
-| `--fs-primary`                | Selection frames, focus rings, primary buttons      |
-| `--fs-primary-text`           | Text on `--fs-primary`                              |
-| `--fs-accent`                 | Drop indicators                                     |
-| `--fs-danger`                 | Errors and destructive actions                      |
-| `--fs-radius`                 | Corner radius                                       |
-| `--fs-radius-sm`              | Half of it, for chrome drawn over the form          |
-| `--fs-panel-width`            | Side pane width                                     |
-| `--fs-scrollbar-thumb`        | Scrollbar thumb; the track is transparent           |
-| `--fs-font`, `--fs-font-size` | Type                                                |
-| `--fs-font-mono`              | The JSON editor, the raw CSS box, the code editor   |
+| Token                                    | Used for                                            |
+| ---------------------------------------- | --------------------------------------------------- |
+| `--fs-bg-app`                            | The shell behind everything                         |
+| `--fs-bg-panel`                          | Panel and toolbar surfaces                          |
+| `--fs-bg-well`                           | Inset surfaces: rule cards and the JSON editor      |
+| `--fs-bg-field`                          | Editable field surfaces                             |
+| `--fs-bg-hover`                          | Neutral hover surfaces                              |
+| `--fs-bg-selected`, `--fs-text-selected` | Selected control fill and text                      |
+| `--fs-primary-hover`                     | Primary action hover fill                           |
+| `--fs-border`                            | Every divider and control outline                   |
+| `--fs-control-border`                    | The outline of an editable control, which is darker |
+| `--fs-text`                              | Body text                                           |
+| `--fs-text-muted`                        | Hints, secondary labels, type names                 |
+| `--fs-primary`                           | Selection frames, focus rings, primary buttons      |
+| `--fs-primary-text`                      | Text on `--fs-primary`                              |
+| `--fs-accent`                            | Drop indicators                                     |
+| `--fs-danger`                            | Errors and destructive actions                      |
+| `--fs-radius`                            | Corner radius                                       |
+| `--fs-radius-sm`                         | Half of it, for chrome drawn over the form          |
+| `--fs-panel-width`                       | Side pane width                                     |
+| `--fs-scrollbar-thumb`                   | Scrollbar thumb; the track is transparent           |
+| `--fs-font`, `--fs-font-size`            | Type                                                |
+| `--fs-font-mono`                         | The JSON editor, the raw CSS box, the code editor   |
 
 `--fs-radius-sm` derives from `--fs-radius` rather than standing on its own, so overriding the one
 squares off the selection frame, the selection toolbar's buttons and the rule count badge along with
