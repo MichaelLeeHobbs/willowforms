@@ -124,6 +124,11 @@ Three of these degrade towards failing rather than passing, and they are the one
 - **Patterns use the RE2 language and a linear-time engine.** Nested repetition and overlapping
   alternatives are safe to evaluate. Backreferences, lookarounds, and unsupported or malformed syntax
   are refused and shown by `patternProblem` in the Rules tab.
+- **A pattern whose compiled program exceeds 512 instructions is refused** the same way. Counted repeats
+  expand the program, so `^(a|b){999}$` is refused while `^[\p{L} ]{1,200}$` runs; a length rule
+  bounds long values instead. Matching cost per character grows with program size, so this limit and
+  the input limit bound the work each submitted value can cause. Compiled patterns are cached, so a
+  repeater pays compilation once rather than once per row.
 - Pattern matching remains unanchored and the accepted subset exports directly to JSON Schema. A host
   that evaluates exported schemas must choose a validator with appropriate resource limits; WillowForms
   controls only its own validation engine.

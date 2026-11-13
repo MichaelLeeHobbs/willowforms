@@ -1810,7 +1810,30 @@ describe('patternProblem', () => {
       expect(check({ key: 'pattern', value: pattern }, 'a')).toBe(DEFAULT_MESSAGES.pattern)
     }
   })
+
+  /*
+   * Short source, large program: each counted repeat expands into a copy of its
+   * body. The value matches, so a refusal cannot be mistaken for a mismatch.
+   */
+  it('refuses a pattern whose compiled program is too large, and rule evaluation agrees', () => {
+    const pattern = '^(a|b){999}$'
+    const matching = 'a'.repeat(999)
+
+    expect(pattern.length).toBeLessThan(1_024)
+    expect(patternProblem(pattern)).toMatch(/too complex/)
+    expect(check({ key: 'pattern', value: pattern }, matching)).toBe(DEFAULT_MESSAGES.pattern)
+  })
+
+  it.each([
+    ['^(a|b){100}$', 'a'.repeat(100)],
+    [String.raw`^[\p{L} ]{1,200}$`, 'José Núñez'],
+    [String.raw`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$`, '2026-11-13T09:30Z'],
+  ])('still runs realistic counted pattern %s', (pattern, matching) => {
+    expect(patternProblem(pattern)).toBeUndefined()
+    expect(check({ key: 'pattern', value: pattern }, matching)).toBeUndefined()
+  })
 })
+
 /**
  * The cap on how much work a request body can ask for.
  *
