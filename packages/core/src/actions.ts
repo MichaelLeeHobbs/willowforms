@@ -30,13 +30,31 @@ export type ActionRunResult =
 const object = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
+/** Most JSON values one action parameter or effect payload may contain. */
+const ACTION_VALUE_LIMIT = 10_000
+
+export type JsonShape = 'json' | 'not-json' | 'too-large'
+
+/** Classify a value as plain JSON within `limit` values, without recursion. */
+export function jsonShape(value: unknown, limit: number): JsonShape {
+  try {
+    return walkJson(value, limit)
+  } catch {
+    return 'not-json'
+  }
+}
+
 function jsonValue(value: unknown): value is JsonValue {
+  return walkJson(value, ACTION_VALUE_LIMIT) === 'json'
+}
+
+function walkJson(value: unknown, limit: number): JsonShape {
   const pending: unknown[] = [value]
   const seen = new WeakSet<object>()
   let visited = 0
 
   while (pending.length > 0) {
-    if (++visited > 10_000) return false
+    if (++visited > limit) return 'too-large'
     const current = pending.pop()
     if (
       current === null ||
@@ -46,7 +64,7 @@ function jsonValue(value: unknown): value is JsonValue {
     ) {
       continue
     }
-    if (!current || typeof current !== 'object' || seen.has(current)) return false
+    if (!current || typeof current !== 'object' || seen.has(current)) return 'not-json'
     seen.add(current)
     if (Array.isArray(current)) {
       for (const item of current as unknown[]) pending.push(item)
@@ -54,7 +72,7 @@ function jsonValue(value: unknown): value is JsonValue {
       for (const item of Object.values(current as Record<string, unknown>)) pending.push(item)
     }
   }
-  return true
+  return 'json'
 }
 
 export function isJsonValue(value: unknown): value is JsonValue {

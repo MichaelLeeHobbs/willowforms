@@ -53,7 +53,9 @@ and returns a discriminated success or error result. Version `'1'` is currently 
 so the migration registry is empty until version `'2'` is introduced.
 
 The loader accepts JSON values only and bounds its traversal, so functions, cyclic graphs, non-finite
-numbers, and documents beyond the traversal budget are rejected before normalization is trusted.
+numbers, and documents beyond the traversal budget are rejected before normalization is trusted. The
+budget is 1,000,000 JSON values, and exceeding it reports its own error rather than a malformed-value
+one; a default text field is about 19 values.
 
 **Core owns migrations.** `loadDocument(unknown)` takes arbitrary JSON and returns either a document at
 the current version or the list of reasons it cannot be one. Every host would otherwise reimplement the
