@@ -49,6 +49,21 @@ describe('loadDocument', () => {
     expect(result.errors[0]?.message).toContain('this library writes version "1"')
   })
 
+  it('refuses a document over the value limit and says why', () => {
+    const input = {
+      ...createDocument('Contact', 'contact'),
+      settings: { padding: new Array<number>(1_000_000).fill(0) },
+    }
+
+    const result = loadDocument(input)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors.map((error) => error.message)).toEqual([
+      'A form document cannot contain more than 1,000,000 JSON values.',
+    ])
+  })
+
   it('rejects values that cannot cross a JSON boundary', () => {
     const document = createDocument('Contact', 'contact')
     const cyclic: Record<string, unknown> = { ...document }

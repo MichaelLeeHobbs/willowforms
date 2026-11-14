@@ -18,7 +18,9 @@
 - Server code validates the document, validates submitted value types and rules, checks required context,
   and stores only `submittedData` or `submittedAcross` output.
 - Pattern validation must use an engine with bounded execution. JavaScript regular-expression heuristics
-  are not a security boundary.
+  are not a security boundary. Core bounds pattern source length, compiled program size, and input
+  length, so validation work is linear in submitted text with a capped constant. Hosts must still cap
+  request body size.
 
 ## Out of scope
 

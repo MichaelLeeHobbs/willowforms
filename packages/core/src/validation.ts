@@ -117,36 +117,69 @@ const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
 /** Maximum pattern and input sizes accepted by the validation engine. */
 const PATTERN_SOURCE_LIMIT = 1024
 const PATTERN_INPUT_LIMIT = 4096
+/*
+ * Matching is linear in the input, but the cost per character grows with the
+ * compiled program. Counted repeats expand it: `(a|b){999}` is ten characters of
+ * source and about 3,000 instructions. This limit bounds the work one submitted
+ * character can cause.
+ */
+const PATTERN_PROGRAM_LIMIT = 512
+/* Compilation is far costlier than a short match, and a repeater applies one rule to every row. */
+const PATTERN_CACHE_LIMIT = 256
 
-function compiledPattern(pattern: string): RE2JS | undefined {
-  if (pattern.length > PATTERN_SOURCE_LIMIT) return undefined
+type CompiledPattern = { regex: RE2JS } | { problem: string }
 
-  try {
-    return RE2JS.compile(pattern)
-  } catch {
-    return undefined
+const compiledPatterns = new Map<string, CompiledPattern>()
+
+function compilePattern(pattern: string): CompiledPattern {
+  if (pattern.length > PATTERN_SOURCE_LIMIT) {
+    return {
+      problem: `A pattern cannot be longer than ${String(PATTERN_SOURCE_LIMIT)} characters.`,
+    }
   }
+  let regex: RE2JS
+  try {
+    regex = RE2JS.compile(pattern)
+  } catch {
+    return { problem: 'This pattern is invalid or uses syntax unsupported by the bounded matcher.' }
+  }
+  if (regex.programSize() > PATTERN_PROGRAM_LIMIT) {
+    return {
+      problem:
+        'This pattern is too complex to check safely. Use fewer or smaller repeat counts, and a length rule for long values.',
+    }
+  }
+  return { regex }
+}
+
+function compiledPattern(pattern: string): CompiledPattern {
+  const cached = compiledPatterns.get(pattern)
+  if (cached) return cached
+  const result = compilePattern(pattern)
+  if (compiledPatterns.size >= PATTERN_CACHE_LIMIT) {
+    const oldest = compiledPatterns.keys().next()
+    if (!oldest.done) compiledPatterns.delete(oldest.value)
+  }
+  compiledPatterns.set(pattern, result)
+  return result
 }
 
 /**
  * Explain why a pattern cannot be evaluated by the bounded matcher.
  *
  * WillowForms pattern rules use RE2 syntax. Backreferences, lookarounds, and other
- * constructs without a linear-time implementation are intentionally unsupported.
+ * constructs without a linear-time implementation are intentionally unsupported,
+ * as are patterns whose compiled program exceeds the complexity limit.
  */
 export function patternProblem(pattern: string): string | undefined {
-  if (pattern.length > PATTERN_SOURCE_LIMIT) {
-    return `A pattern cannot be longer than ${String(PATTERN_SOURCE_LIMIT)} characters.`
-  }
-  if (!compiledPattern(pattern)) {
-    return 'This pattern is invalid or uses syntax unsupported by the bounded matcher.'
-  }
-  return undefined
+  const compiled = compiledPattern(pattern)
+  return 'problem' in compiled ? compiled.problem : undefined
 }
 
 function matchesPattern(pattern: string, value: string): boolean {
   if (value.length > PATTERN_INPUT_LIMIT) return false
-  return compiledPattern(pattern)?.test(value) ?? false
+  const compiled = compiledPattern(pattern)
+  return 'regex' in compiled && compiled.regex.test(value)
 }
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

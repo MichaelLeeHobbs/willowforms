@@ -1,9 +1,15 @@
 import type { FormDocument } from './types.js'
-import { isJsonValue } from './actions.js'
+import { jsonShape } from './actions.js'
 import { validateDocument } from './tree.js'
 import type { StructuralError } from './tree.js'
 
 export const CURRENT_DOCUMENT_VERSION: FormDocument['version'] = '1'
+
+/*
+ * Bounds the work loading an in-memory value can cause. A default text field is
+ * about 19 values, so this admits tens of thousands of components.
+ */
+const DOCUMENT_VALUE_LIMIT = 1_000_000
 
 export type DocumentLoadResult =
   { ok: true; document: FormDocument } | { ok: false; errors: StructuralError[] }
@@ -57,7 +63,19 @@ function normalize(value: unknown): unknown {
 export function loadDocument(value: unknown): DocumentLoadResult {
   try {
     const candidate = normalize(migrate(value))
-    if (!isJsonValue(candidate)) {
+    const shape = jsonShape(candidate, DOCUMENT_VALUE_LIMIT)
+    if (shape === 'too-large') {
+      return {
+        ok: false,
+        errors: [
+          {
+            code: 'malformed',
+            message: `A form document cannot contain more than ${DOCUMENT_VALUE_LIMIT.toLocaleString('en-US')} JSON values.`,
+          },
+        ],
+      }
+    }
+    if (shape !== 'json') {
       return {
         ok: false,
         errors: [{ code: 'malformed', message: 'A form document must contain only JSON values.' }],
@@ -65,7 +83,7 @@ export function loadDocument(value: unknown): DocumentLoadResult {
     }
     const errors = validateDocument(candidate)
     if (errors.length > 0) return { ok: false, errors }
-    return { ok: true, document: candidate as unknown as FormDocument }
+    return { ok: true, document: candidate as FormDocument }
   } catch {
     return {
       ok: false,

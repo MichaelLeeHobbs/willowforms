@@ -449,4 +449,18 @@
     padding: 12px 20px;
     gap: 10px;
   }
+
+  /* On a phone the header shares the height with the form, so Kit and Palette share a row. */
+  .pg-kit-switch {
+    padding: 10px 16px;
+    gap: 8px 12px;
+  }
+
+  .pg-kit-switch__control {
+    flex: 1 1 140px;
+  }
+
+  .pg-kit-switch__control select {
+    flex: 1;
+  }
 }
