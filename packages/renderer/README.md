@@ -51,6 +51,8 @@ export function TextFieldNode({ nodeProps, value, onChange }: NodeRendererProps)
 value that is an object renders as `[object Object]` straight into the input, which is a form the user
 cannot correct by typing.
 
+For the other props, the package exports the readers both in-repo kits use: `str`, `num`, `bool`, `requiredProps` and `changed`. `str(props['label'], 'Field')` renders a number as its text and falls back on an empty or missing value; `num` falls back on `NaN` and `Infinity`.
+
 That puts `data-fs-key`, `data-fs-type` and `data-fs-scope` in the output. The scope is what keeps two
 forms on one page apart, `02-kit-contract.md` calls it load-bearing, and `test/kit-contract.test.tsx`
 enforces it per kit. The designer's canvas selection is built on it,

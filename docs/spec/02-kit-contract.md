@@ -248,6 +248,8 @@ definitions and CSS, with no dependencies beyond React.
 2. Spread `nodeProps` in every renderer.
 3. Verify the universal integration and accessibility obligations using fixtures for your kit's components. Reuse the relevant cases from `test/kit-contract.test.tsx`; its reference-catalogue and icon expectations are specific to the shipped kits.
 
+`@willowforms/renderer` exports the prop readers both shipped kits use: `str` (display text with a fallback), `num` (a finite number with a fallback), `bool` (only `true` is on), `requiredProps` (`aria-required` for a required field) and `changed` (report a value to `onChange`, then to the node's `onChange` event). Using them gives a third kit the same answer for a malformed prop as the shipped ones.
+
 Matching another kit's component `type` strings is optional. This repository does it so a document
 authored against one kit renders against the other, and the playground can switch between them at
 runtime on the same document. Nothing in the contract requires it; a kit with entirely its own component

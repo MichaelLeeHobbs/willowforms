@@ -12,27 +12,16 @@
 
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import { languagesOf } from '../language.js'
+import { languagesOf, nameOf } from '../language.js'
 import { indexKit, keyProblem, languageTag, prop } from '@willowforms/core'
 import type { CodeAction, JsonValue, Kit, Language } from '@willowforms/core'
 
 import type { DesignerApi } from '../store.js'
+import { paramsText } from './text.js'
 
 export interface FormSettingsProps {
   api: DesignerApi
   kit?: Kit
-}
-
-function nameOf(language: { name?: unknown }): string {
-  return typeof language.name === 'string' ? language.name.trim() : ''
-}
-
-function paramsText(value: unknown): string {
-  try {
-    return JSON.stringify(value ?? {}, null, 2) ?? '{}'
-  } catch {
-    return '{}'
-  }
 }
 
 function CodeActionEditor({

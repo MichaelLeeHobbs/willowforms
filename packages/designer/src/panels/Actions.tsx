@@ -5,6 +5,7 @@ import type { ActionRef, EventName, FormDocument, JsonValue, Kit } from '@willow
 
 import type { DesignerApi } from '../store.js'
 import { ActionFields } from './ActionFields.js'
+import { paramsText } from './text.js'
 
 const LABELS: Record<string, string> = {
   setValue: 'Set field value',
@@ -27,14 +28,6 @@ const BUILTINS: ReadonlyArray<{ name: string; params: Record<string, JsonValue> 
   { name: 'emit', params: { event: '' } },
   { name: 'halt', params: {} },
 ]
-
-function paramsText(value: unknown): string {
-  try {
-    return JSON.stringify(value ?? {}, null, 2) ?? '{}'
-  } catch {
-    return '{}'
-  }
-}
 
 interface ActionRowProps {
   action: ActionRef

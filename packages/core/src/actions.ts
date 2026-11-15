@@ -7,6 +7,7 @@ import type {
   FormData,
   JsonValue,
 } from './types.js'
+import { isRecord } from './guards.js'
 
 export interface ActionInvocation {
   event: EventName
@@ -26,9 +27,6 @@ export type ActionEvaluator = (
 
 export type ActionRunResult =
   { ok: true; effects: Effect[] } | { ok: false; error: string; action?: string }
-
-const object = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
 /** Most JSON values one action parameter or effect payload may contain. */
 const ACTION_VALUE_LIMIT = 10_000
@@ -99,7 +97,7 @@ export const BUILTIN_ACTION_NAMES = [
 ] as const
 
 function effectOf(value: unknown): Effect | undefined {
-  if (!object(value) || typeof value['kind'] !== 'string') return undefined
+  if (!isRecord(value) || typeof value['kind'] !== 'string') return undefined
 
   switch (value['kind']) {
     case 'setValue':
@@ -168,7 +166,7 @@ export function runActions(
     if (!ref || typeof ref !== 'object' || typeof ref.name !== 'string') {
       return { ok: false, error: 'Unreadable action reference.' }
     }
-    if (ref.params !== undefined && (!object(ref.params) || !isJsonValue(ref.params))) {
+    if (ref.params !== undefined && (!isRecord(ref.params) || !isJsonValue(ref.params))) {
       return { ok: false, error: 'Unreadable action parameters.', action: ref.name }
     }
 
@@ -192,7 +190,7 @@ export function runActions(
     if (
       !action ||
       typeof action.body !== 'string' ||
-      !object(action.params) ||
+      !isRecord(action.params) ||
       !isJsonValue(action.params)
     ) {
       return { ok: false, error: 'Unreadable code action.', action: ref.name }

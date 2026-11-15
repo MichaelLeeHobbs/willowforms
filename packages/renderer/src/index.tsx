@@ -60,6 +60,8 @@ import type {
   PropValue,
 } from '@willowforms/core'
 
+export { bool, changed, num, requiredProps, str } from './kit-props.js'
+
 export type FormDensity = 'comfortable' | 'compact'
 
 export interface NodeRendererProps {

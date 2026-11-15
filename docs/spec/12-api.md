@@ -12,11 +12,11 @@ in the project as the only undocumented one.
 
 ## Three packages, three audiences
 
-| Package                 | Installed by                      | Brings                      |
-| ----------------------- | --------------------------------- | --------------------------- |
-| `@willowforms/core`     | anyone, including a server        | types, tree ops, validation |
-| `@willowforms/renderer` | anyone rendering a form           | `FormRenderer`, kit types   |
-| `@willowforms/designer` | only a host embedding the builder | `Designer`                  |
+| Package                 | Installed by                      | Brings                                  |
+| ----------------------- | --------------------------------- | --------------------------------------- |
+| `@willowforms/core`     | anyone, including a server        | types, tree ops, validation             |
+| `@willowforms/renderer` | anyone rendering a form           | `FormRenderer`, kit types, prop helpers |
+| `@willowforms/designer` | only a host embedding the builder | `Designer`                              |
 
 A kit package brings its own two halves and depends on the first two. Most consumers never install the
 designer, which is the point of the split.
