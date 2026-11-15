@@ -99,6 +99,27 @@ describe('generateKey', () => {
     // The claim underneath: whatever it mints, the gate accepts it.
     expect(keyProblem(key)).toBeUndefined()
   })
+
+  /*
+   * A base that fits `MAX_KEY_LENGTH` on its own can overflow once a number is
+   * appended. The 127-character case takes suffixes 2 to 9 as well, so the
+   * number it needs is two digits wide.
+   */
+  it.each<[string, number, number[]]>([
+    ['a 128-character base', MAX_KEY_LENGTH, []],
+    ['a 127-character base needing two digits', MAX_KEY_LENGTH - 1, [2, 3, 4, 5, 6, 7, 8, 9]],
+  ])('numbers %s within MAX_KEY_LENGTH', (_label, length, suffixes) => {
+    const base = 'a'.repeat(length)
+    const root = container('root', [leaf(base), ...suffixes.map((n) => leaf(base + String(n)))])
+    const type = 'A' + 'a'.repeat(length - 1)
+
+    const key = generateKey(root, type)
+
+    expect(key.length).toBeLessThanOrEqual(MAX_KEY_LENGTH)
+    expect(keyProblem(key)).toBeUndefined()
+    expect(collectKeys(root)).not.toContain(key)
+    expect(key.startsWith('a')).toBe(true)
+  })
 })
 
 describe('mutations: what they return, and what they leave alone', () => {
@@ -2258,12 +2279,9 @@ describe('the lookup and mutation family on a document nothing gated', () => {
 
   it('trims a copied key that would exceed the length bound', () => {
     /*
-     * The over-length path had no test. `generateKey` is bounded by
-     * `MAX_KEY_LENGTH` through `keyProblem`, and `copyKey` minted whatever it
-     * liked -- so duplicating a component with a 128-character key produced a
-     * 129-character key, which this same package's `validateDocument` then
-     * reports as `invalid-key`. A mint that produces a document the gate
-     * refuses is not a mint. Raised in review on PR #43.
+     * Duplicating a component with a 128-character key appends a number, so the
+     * copy has to come out trimmed or `validateDocument` reports it as
+     * `invalid-key`.
      */
     const long = 'a'.repeat(MAX_KEY_LENGTH)
     const root: ComponentNode = {
