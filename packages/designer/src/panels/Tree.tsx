@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -14,6 +14,7 @@ import { originOf } from '../geometry.js'
 import type { Origin } from '../geometry.js'
 import { describeMove, focusTarget, moveTarget } from '../keyboard.js'
 import type { Direction } from '../keyboard.js'
+import { useDragSnapshot } from '../snapshot.js'
 
 export interface TreeProps {
   root: ComponentNode
@@ -59,7 +60,6 @@ export function Tree({
   drag,
 }: TreeProps): ReactNode {
   const listRef = useRef<HTMLUListElement>(null)
-  const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
   const { state: dragState, begin, registerZone, consumeClick } = drag
 
@@ -69,6 +69,9 @@ export function Tree({
    * Only ever called from an event handler, never from an effect or from render.
    * That is what keeps the drop indicator below derivable during render as a
    * pure function of state.
+   *
+   * Rows are measured as a flat list in document order for `resolveTreeDrop`,
+   * unlike the canvas, which measures nested drop containers with `measureTree`.
    */
   const measureNow = useCallback(
     (dragId: number): Snapshot | undefined => {
@@ -111,13 +114,7 @@ export function Tree({
     [kit, root],
   )
 
-  const takeSnapshot = useCallback(
-    (dragId: number) => {
-      const next = measureNow(dragId)
-      if (next) setSnapshot(next)
-    },
-    [measureNow],
-  )
+  const { snapshot, takeSnapshot } = useDragSnapshot(measureNow)
 
   const onRowPointerDown = useCallback(
     (node: ComponentNode, event: ReactPointerEvent) => {
