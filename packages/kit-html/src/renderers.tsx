@@ -32,61 +32,13 @@ import {
   safeStyleValue,
 } from '@willowforms/core'
 import type { JsonValue } from '@willowforms/core'
-import type {
-  NodeEventHandlers,
-  NodeRenderer,
-  NodeRendererProps,
-  RendererKit,
-} from '@willowforms/renderer'
+import { bool, changed, num, requiredProps, str } from '@willowforms/renderer'
+import type { NodeRenderer, NodeRendererProps, RendererKit } from '@willowforms/renderer'
 
 type Level = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
-const str = (v: unknown, fallback = ''): string => {
-  /*
-   * A non-string that is still text renders as its text, not as the fallback.
-   *
-   * This read `typeof v === 'string' && v ? v : fallback`, which collapses "not
-   * a string" and "the empty string" into one answer -- so a label, text,
-   * helper or placeholder arriving as a number showed the fallback instead of
-   * itself. A `computed` binding is evaluated by the host at render time, so a
-   * number genuinely arrives: `label: { kind: 'computed', expression: 'year' }`
-   * drew nothing.
-   *
-   * `jsonToString` is the project's one answer to "what does this value look
-   * like", which both kits already use for a field's value. An empty result
-   * still falls back, because an empty label is a label nobody wrote.
-   */
-  const text = typeof v === 'string' ? v : jsonToString(v as JsonValue | undefined)
-  return text === '' ? fallback : text
-}
-
 const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
   allowed.includes(v as T) ? (v as T) : fallback
-
-// ARIA exposes required state without enabling a second, browser-owned validator.
-const requiredProps = (required: boolean): { 'aria-required'?: true } =>
-  required ? { 'aria-required': true } : {}
-const bool = (v: unknown): boolean => v === true
-/*
- * A finite number, or the fallback.
- *
- * `typeof NaN` is `'number'`, and a document can hold one: `JSON.parse('{"a":1e999}')`
- * gives `Infinity`, and an expression can return either. It reached
- * `aria-valuenow="NaN"` and an inline width of `NaN%`, which browsers drop --
- * so an indeterminate progress bar painted itself full and told a screen
- * reader a number that is not one.
- */
-const num = (v: unknown, fallback: number): number =>
-  typeof v === 'number' && Number.isFinite(v) ? v : fallback
-
-const changed = (
-  onChange: (value: JsonValue) => void,
-  events: NodeEventHandlers | undefined,
-  value: JsonValue,
-): void => {
-  onChange(value)
-  events?.onChange?.(value)
-}
 
 function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   return (
