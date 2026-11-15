@@ -43,6 +43,10 @@ export function FixedCanvasControls({
 }): ReactNode {
   const id = useId()
   const dimensions = fixedDimensions(size)
+  /**
+   * Accepts sizes from 100 to 10000 pixels, rounded to whole pixels, and puts
+   * the last valid size back in the field instead of showing an error.
+   */
   const commit = (axis: 'width' | 'height', input: HTMLInputElement): void => {
     const value = input.valueAsNumber
     const valid = Number.isFinite(value) && value >= 100 && value <= 10000

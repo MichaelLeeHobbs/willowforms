@@ -711,6 +711,46 @@ describe('a drop into the second row of a repeater', () => {
     expect(resolveDrop(flat, 20, 30)?.index).toBe(0)
     expect(resolveDrop(flat, 380, 30)?.index).toBe(2)
   })
+
+  /*
+   * The extent the bar runs across. Children in the parent's own row use the
+   * parent's rectangle; children in a repeater row the parent is not in use the
+   * rectangle those children cover. An empty container never draws a bar, so
+   * that case is the empty outline asserted under `resolveDrop`.
+   */
+  describe('the span of the bar', () => {
+    it("spans the parent for one child in the parent's row", () => {
+      const single = column().filter((c) => c.key === 'root' || c.key === 'a')
+      // Below a's midpoint (30), so the bar sits past a, which ends at 50.
+      expect(resolveDrop(single, 200, 40)?.indicator).toEqual({
+        top: 49,
+        left: 0,
+        width: 400,
+        height: 2,
+      })
+    })
+
+    it('spans only the child for one child in a repeater row', () => {
+      const single = twoRows().filter((c) => c.key !== 'town')
+      // Row 1's street runs from left 10, 180 wide, and ends at 150.
+      expect(resolveDrop(single, 100, 130)?.indicator).toEqual({
+        top: 149,
+        left: 10,
+        width: 180,
+        height: 2,
+      })
+    })
+
+    it('spans the union of several children in a repeater row', () => {
+      // Row 1 is a row of two fields from top 110, 40 tall; the bar sits before street.
+      expect(resolveDrop(twoRows(), 20, 130)?.indicator).toEqual({
+        top: 110,
+        left: 9,
+        width: 2,
+        height: 40,
+      })
+    })
+  })
 })
 
 describe('a wrapping container, which both shipped kits have', () => {
