@@ -12,9 +12,7 @@ export interface DragSnapshot<T> {
  * render as a pure function of state. `measureNow` reads the DOM and is only
  * called from event handlers, never from render or an effect body.
  */
-export function useDragSnapshot<T>(
-  measureNow: (dragId: number) => T | undefined,
-): DragSnapshot<T> {
+export function useDragSnapshot<T>(measureNow: (dragId: number) => T | undefined): DragSnapshot<T> {
   const [snapshot, setSnapshot] = useState<T | undefined>(undefined)
 
   const takeSnapshot = useCallback(
