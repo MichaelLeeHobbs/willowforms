@@ -101,7 +101,7 @@ export function App(): ReactNode {
   const [session, setSession] = useState(() => loadDraft(initialExample()))
   const [initial, setInitial] = useState(session.document)
   const [saveError, setSaveError] = useState(session.error)
-  const [kitId, setKitId] = useState(() => loadChoice(KIT_KEY, KITS, 'mui'))
+  const [kitId, setKitId] = useState<string>(() => loadChoice(KIT_KEY, KITS, 'mui'))
   const [themeMode, setThemeMode] = useState<DesignerTheme>('system')
   const [palette, setPalette] = useState<string>(() => loadChoice(PALETTE_KEY, PALETTES, 'willow'))
   const [resetCount, setResetCount] = useState(0)
