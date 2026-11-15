@@ -44,3 +44,14 @@ export function isLanguage(language: unknown): language is Language {
 export function languagesOf(document: FormDocument): Language[] {
   return Array.isArray(document.languages) ? document.languages.filter(isLanguage) : []
 }
+
+/**
+ * A language's name, trimmed, or the empty string.
+ *
+ * A `Language` can arrive from a pasted document, so `name` can be absent or
+ * not a string, and a nameless language is a state this product supports
+ * rather than a broken one. Callers fall back to the language's tag.
+ */
+export function nameOf(language: { name?: unknown }): string {
+  return typeof language.name === 'string' ? language.name.trim() : ''
+}

@@ -20,6 +20,7 @@ import type { Language, PropSchema, PropValue } from '@willowforms/core'
 
 import { unreadableTag } from '@willowforms/core'
 
+import { nameOf } from '../language.js'
 import { emptyCondition } from './ConditionEditor.js'
 
 export type BindingKind = PropValue['kind']
@@ -280,18 +281,6 @@ function TranslationKeyField({
   )
 }
 
-/**
- * A language's name, or the empty string.
- *
- * The same shape `FormSettings.tsx` uses and for the same reason: a `Language`
- * arrives from a pasted document, so `name` can be absent or not a string, and
- * a nameless language is a state this product supports rather than a broken
- * one.
- */
-function nameOf(language: { name?: unknown }): string {
-  return typeof language.name === 'string' ? language.name.trim() : ''
-}
-
 export function TranslationEditor({
   id,
   value,
@@ -358,17 +347,8 @@ export function TranslationEditor({
               <div className="fs-binding__language-head">
                 {/*
                   The tag when the language has no name, so the field always has
-                  an accessible name.
-
-                  This rendered `language.name` raw. `FormSettings.tsx:85`
-                  writes `name: name.trim()` with an explicit comment that a
-                  nameless language is a supported state, and has a `nameOf`
-                  helper for exactly this shape -- which this file did not use.
-                  So a language with an empty name produced a text input with no
-                  accessible name at all, and `docs/accessibility.md:17` lists
-                  "Every form control in the shell has a label" as a
-                  build-failing check. It passed because no fixture exercises a
-                  nameless language.
+                  an accessible name: `docs/accessibility.md` makes "Every form
+                  control in the shell has a label" a build-failing check.
 
                   The tag rather than a placeholder: it is what the author sees
                   in the language list beside it for the same case, so the two
