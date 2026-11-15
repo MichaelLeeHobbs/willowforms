@@ -16,7 +16,7 @@
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
 import { keyProblem } from './keys.js'
-import { MAX_TREE_DEPTH, dataKeyOf, isRowScope, validationsOf } from './tree.js'
+import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, isRowScope, validationsOf } from './tree.js'
 import type { ComponentNode, Condition, FormData, JsonValue } from './types.js'
 
 /**
@@ -158,6 +158,31 @@ export interface KeyScopes {
 }
 
 /**
+ * The data keys one row of this repeater holds, not counting the list itself.
+ *
+ * A nested repeater's own data key is counted, because the inner list is an
+ * answer in this row; what is inside it is one row further down and is not.
+ * Depth is counted from the repeater, and a node more than `MAX_TREE_DEPTH`
+ * levels below it is not counted, the nested repeater's own key included.
+ * `keyScopesFor` (the picker) and `rowScopeProblems` (validation) both read
+ * this, so a key the picker offers as a row answer is one validation accepts.
+ */
+function rowKeysOf(repeater: ComponentNode): Set<string> {
+  const names = new Set<string>()
+  const gather = (node: ComponentNode, isRepeater: boolean, depth: number): void => {
+    if (depth > MAX_TREE_DEPTH) return
+    if (!isRepeater) {
+      if (node.schema) names.add(dataKeyOf(node))
+      // Its children are answers in *its* rows, not in this one.
+      if (isRowScope(node)) return
+    }
+    for (const child of childNodesOf(node)) gather(child, false, depth + 1)
+  }
+  gather(repeater, true, 0)
+  return names
+}
+
+/**
  * What a condition authored on this node is allowed to name, by scope.
  *
  * The picker's half of the answer to the quiet failure below. That one reports
@@ -171,25 +196,6 @@ export interface KeyScopes {
  * row further down and no ref from here can name it.
  */
 export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
-  const kids = (node: ComponentNode): ComponentNode[] =>
-    Array.isArray(node?.children) ? node.children : []
-
-  /** The answers one row of this repeater holds, not counting the list itself. */
-  const rowKeysOf = (repeater: ComponentNode): string[] => {
-    const names: string[] = []
-    const gather = (node: ComponentNode, isRepeater: boolean, depth: number): void => {
-      if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
-      if (!isRepeater) {
-        if (node.schema) names.push(dataKeyOf(node))
-        // Its children are answers in *its* rows, not in this one.
-        if (isRowScope(node)) return
-      }
-      for (const child of kids(node)) gather(child, false, depth + 1)
-    }
-    gather(repeater, true, 0)
-    return names
-  }
-
   const form: string[] = []
   let row: string[] | undefined
 
@@ -204,11 +210,11 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
 
     if (!matched && node.key === nodeKey) {
       matched = true
-      if (enclosing) row = rowKeysOf(enclosing)
+      if (enclosing) row = [...rowKeysOf(enclosing)]
     }
     // The innermost repeater wins, which is what `scope: 'row'` names.
     const deeper = isRowScope(node) ? node : enclosing
-    for (const child of kids(node)) visit(child, deeper, depth + 1)
+    for (const child of childNodesOf(node)) visit(child, deeper, depth + 1)
   }
   visit(root, undefined, 0)
 
@@ -232,54 +238,18 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
  * genuinely does not hold is indistinguishable from this — so it takes the same
  * boot-time answer `missingContext` takes. Unlike context, this one is decidable
  * from the tree alone, so `validateDocument` reports it rather than a host.
+ *
+ * Total, like everything reachable from `validateDocument`: this walks a
+ * document that has not been checked yet, so `children` can be a number and
+ * `props` can be a string. Anything unreadable contributes nothing rather than
+ * throwing, and the structural checks report the malformed shape.
  */
-// `MAX_TREE_DEPTH` is imported, not re-declared -- see the import block. The
-// docblock that used to sit here belonged to the local constant and documented
-// nothing once that went.
-
 export function rowScopeProblems(root: ComponentNode): { key: string; problem: string }[] {
   const problems: { key: string; problem: string }[] = []
 
   /*
-   * Total, like everything reachable from `validateDocument`: this walks a
-   * document that has not been checked yet, so `children` can be a number and
-   * `props` can be a string. Anything unreadable contributes nothing rather
-   * than throwing, and the checks above report the malformed shape.
-   */
-  const kids = (node: ComponentNode): ComponentNode[] =>
-    Array.isArray(node?.children) ? node.children : []
-
-  const rowKeys = (node: ComponentNode): Set<string> => {
-    const names = new Set<string>()
-    const gather = (inner: ComponentNode, depth: number): void => {
-      if (depth > MAX_TREE_DEPTH) return
-      if (inner !== node && inner?.schema) names.add(dataKeyOf(inner))
-      /*
-       * A nested repeater's own row is a different scope, so its contents are
-       * not this row's keys. This descended through them, crediting an outer row
-       * with names that live one row further down -- so a `scope: 'row'` ref
-       * naming an inner field read as correct from the outer row, where it reads
-       * nothing.
-       *
-       * The repeater node itself is counted, because the *list* is an answer the
-       * outer row holds. Only its contents belong to the row below.
-       */
-      for (const child of kids(inner)) {
-        if (isRowScope(child)) {
-          if (child.schema) names.add(dataKeyOf(child))
-          continue
-        }
-        gather(child, depth + 1)
-      }
-    }
-    gather(node, 0)
-    return names
-  }
-
-  /*
-   * Only the form-level answers. Which keys a given row holds is `rowKeys`'s
-   * question and it is asked per repeater, so a set of every key inside any
-   * repeater was collected here and read by nothing.
+   * Only the form-level answers. Which keys a given row holds is `rowKeysOf`'s
+   * question, asked per repeater.
    */
   const formKeys = new Set<string>()
 
@@ -289,7 +259,7 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
       formKeys.add(dataKeyOf(node))
     }
     const deeper = repeating || isRowScope(node)
-    for (const child of kids(node)) mark(child, deeper, depth + 1)
+    for (const child of childNodesOf(node)) mark(child, deeper, depth + 1)
   }
   mark(root, false, 0)
 
@@ -456,8 +426,8 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
       }
     }
 
-    const scope = isRowScope(node) ? rowKeys(node) : enclosing
-    for (const child of kids(node)) visit(child, scope, depth + 1)
+    const scope = isRowScope(node) ? rowKeysOf(node) : enclosing
+    for (const child of childNodesOf(node)) visit(child, scope, depth + 1)
   }
   visit(root, undefined)
 
