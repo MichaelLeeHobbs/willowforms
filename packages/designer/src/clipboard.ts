@@ -19,7 +19,7 @@ export async function copyText(text: string): Promise<CopyOutcome> {
     typeof navigator === 'undefined' ? undefined : navigator.clipboard
   if (typeof clipboard?.writeText !== 'function') return 'unavailable'
   try {
-    // Inside the try so a synchronous throw is a refusal too, not a rejection.
+    // Inside the try so a rejection and a synchronous throw both report `refused`.
     await clipboard.writeText(text)
     return 'copied'
   } catch {
