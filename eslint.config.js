@@ -91,6 +91,35 @@ const OPAQUE_MESSAGE = (invariant, who) =>
 const KIT_MESSAGE =
   'Invariant 2: the designer must not depend on a specific kit. Take a Kit and a RendererKit as props instead.'
 
+/** A function or variable declared under one of these names. */
+const declares = (names) =>
+  `:matches(FunctionDeclaration, VariableDeclarator)[id.name=/^(${names.join('|')})$/]`
+
+/**
+ * Shared helpers that had private copies, refused where a copy would be redeclared.
+ *
+ * Each has exactly one definition, which carries an `eslint-disable-next-line`
+ * naming this rule, so a second definition is the only thing that reports.
+ * `docs/reinvention-ledger.md` records how the copies were resolved.
+ *
+ * This joins the `no-restricted-syntax` list of every block it applies to,
+ * rather than living in a block of its own: a later flat-config block replaces
+ * an earlier block's options for the same rule, so a standalone block would
+ * silently drop the invariant selectors for core and the designer.
+ */
+const SHARED_HELPERS = {
+  selector: declares(['isRecord', 'paramsText', 'nameOf']),
+  message:
+    'Import the shared helper instead of redeclaring it: isRecord from core src/guards.ts (core-internal), paramsText from designer src/panels/text.ts, nameOf from designer src/language.ts.',
+}
+
+/** The kit prop readers, which `@willowforms/renderer` exports for every kit. */
+const KIT_PROP_HELPERS = {
+  selector: declares(['str', 'num', 'bool', 'changed', 'requiredProps']),
+  message:
+    'Kit prop helpers (str, num, bool, changed, requiredProps) are exported from @willowforms/renderer. Import them instead of redeclaring.',
+}
+
 /**
  * The hooks preset, with every rule at error severity.
  *
@@ -280,6 +309,7 @@ export default tseslint.config(
           selector: OPAQUE_DYNAMIC_IMPORT,
           message: OPAQUE_MESSAGE(1, '@willowforms/core'),
         },
+        SHARED_HELPERS,
       ],
     },
   },
@@ -321,8 +351,19 @@ export default tseslint.config(
           selector: OPAQUE_DYNAMIC_IMPORT,
           message: OPAQUE_MESSAGE(2, '@willowforms/designer'),
         },
+        SHARED_HELPERS,
       ],
     },
+  },
+
+  // The shared-helper guard for code that carries no invariant selectors of its own.
+  {
+    files: ['packages/renderer/src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': ['error', SHARED_HELPERS] },
+  },
+  {
+    files: ['packages/kit-*/src/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': ['error', SHARED_HELPERS, KIT_PROP_HELPERS] },
   },
 
   // Build scripts report to stdout; that is their only output channel.
