@@ -18,6 +18,10 @@ const inline = (field: ComponentNode, width = 56): ComponentNode => {
   return field
 }
 
+/**
+ * A Box laid out with fixed CSS grid tracks, for strips whose column proportions a Grid column
+ * count cannot express.
+ */
 const columns = (key: string, tracks: string, children: ComponentNode[]): ComponentNode =>
   styled(
     node('Box', key, { padding: 0 }, children),

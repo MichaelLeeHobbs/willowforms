@@ -344,23 +344,15 @@ function indexInParent(filtered: Candidate[], slot: number): number {
   return before.index + 1
 }
 
-/** The insertion bar: a thin rect on the boundary between two children. */
-
+/**
+ * The extent the insertion bar runs across: the parent's rectangle, unless the
+ * children sit in a different repeater row from the parent, in which case the
+ * rectangle those children occupy.
+ */
 function spanOf(parent: Candidate, children: Candidate[]): Rect {
   const first = children[0]
   if (!first || first.row === parent.row) return parent.rect
-
-  let top = Infinity
-  let bottom = -Infinity
-  let left = Infinity
-  let right = -Infinity
-  for (const child of children) {
-    top = Math.min(top, child.rect.top)
-    bottom = Math.max(bottom, child.rect.top + child.rect.height)
-    left = Math.min(left, child.rect.left)
-    right = Math.max(right, child.rect.left + child.rect.width)
-  }
-  return { top, left, width: right - left, height: bottom - top }
+  return boxOf(children) ?? parent.rect
 }
 
 /**
@@ -387,6 +379,7 @@ function boxOf(children: Candidate[]): Rect | undefined {
   return { top, left, width: right - left, height: bottom - top }
 }
 
+/** The insertion bar: a thin rect on the boundary between two children. */
 function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Axis): Rect {
   const last = children[children.length - 1]
   const at = children[slot]

@@ -52,6 +52,7 @@ export function languagesOf(document: FormDocument): Language[] {
  * not a string, and a nameless language is a state this product supports
  * rather than a broken one. Callers fall back to the language's tag.
  */
+// eslint-disable-next-line no-restricted-syntax -- the one definition; the rule refuses copies.
 export function nameOf(language: { name?: unknown }): string {
   return typeof language.name === 'string' ? language.name.trim() : ''
 }

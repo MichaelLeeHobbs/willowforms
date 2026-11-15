@@ -41,6 +41,10 @@ const OP_LABELS: Record<Condition['op'], string> = {
   not: 'not',
 }
 
+/**
+ * A literal comparison operand, which is a different type from the static
+ * property binding that core's `prop` builds.
+ */
 const literal = (value: JsonValue): Operand => ({ kind: 'literal', value })
 
 /** Every operator, in the order the picker lists them. */

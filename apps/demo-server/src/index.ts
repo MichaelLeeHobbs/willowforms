@@ -165,12 +165,23 @@ async function withStore<T>(
 }
 
 /**
- * One document out of the store, read as an own property.
+ * One entry of `languages`, checked against what `Language` declares.
  *
- * `store[id]` is a prototype-chain lookup, so `GET /api/forms/constructor`
- * passed the not-found guard and answered 200 with a function's worth of
- * nothing — and the submit route then reached `flatten(undefined)` and 500ed.
+ * `dialect` is optional and the other three are not. `bidi` is a union of two
+ * strings rather than any string, because it becomes the `dir` attribute.
  */
+function isLanguageShape(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+
+  const language = value as Record<string, unknown>
+  return (
+    typeof language['code'] === 'string' &&
+    typeof language['name'] === 'string' &&
+    (language['bidi'] === 'ltr' || language['bidi'] === 'rtl') &&
+    (language['dialect'] === undefined || typeof language['dialect'] === 'string')
+  )
+}
+
 /**
  * Whether a value out of the store is a document this server will act on.
  *
@@ -209,24 +220,6 @@ async function withStore<T>(
  * `validateDocument`'s question, and every write goes through it. This is the
  * guard for a file somebody edited behind the server's back.
  */
-/**
- * One entry of `languages`, checked against what `Language` declares.
- *
- * `dialect` is optional and the other three are not. `bidi` is a union of two
- * strings rather than any string, because it becomes the `dir` attribute.
- */
-function isLanguageShape(value: unknown): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-
-  const language = value as Record<string, unknown>
-  return (
-    typeof language['code'] === 'string' &&
-    typeof language['name'] === 'string' &&
-    (language['bidi'] === 'ltr' || language['bidi'] === 'rtl') &&
-    (language['dialect'] === undefined || typeof language['dialect'] === 'string')
-  )
-}
-
 function storageFaults(doc: unknown): StructuralError[] {
   const faults: StructuralError[] = []
   const fault = (message: string): void => {
@@ -285,6 +278,12 @@ function isStoredDocument(doc: unknown): doc is FormDocument {
   return storageFaults(doc).length === 0
 }
 
+/**
+ * One document out of the store, read as an own property.
+ *
+ * `store[id]` is a prototype-chain lookup, so an id such as `constructor` would
+ * find an inherited function rather than miss.
+ */
 function held(store: Store, id: string): FormDocument | undefined {
   if (!Object.hasOwn(store, id)) return undefined
 

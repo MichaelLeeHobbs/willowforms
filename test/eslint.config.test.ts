@@ -236,6 +236,65 @@ const CASES: Case[] = [
       '}\n',
     rule: 'react-hooks/exhaustive-deps',
   },
+  /*
+   * Shared helpers that used to have private copies. The core and designer
+   * cases also hold the merge in place: the helper selector joins those blocks'
+   * invariant lists, and the dynamic-import cases above still have to report.
+   */
+  {
+    what: 'a kit redeclaring a prop helper the renderer exports',
+    path: fixture('kit-html', 'kit_str_copy', 'ts'),
+    code: 'export const str = (v: unknown): string => String(v)\n',
+    rule: 'no-restricted-syntax',
+    says: '@willowforms/renderer',
+  },
+  {
+    what: 'core redeclaring the plain-object guard',
+    path: fixture('core', 'core_is_record_copy', 'ts'),
+    code:
+      'export function isRecord(v: unknown): boolean {\n' +
+      "  return typeof v === 'object' && v !== null && !Array.isArray(v)\n" +
+      '}\n',
+    rule: 'no-restricted-syntax',
+    says: 'src/guards.ts',
+  },
+  {
+    what: 'the designer redeclaring a panel text helper',
+    path: fixture('designer', 'designer_name_of_copy', 'ts'),
+    code: 'export const nameOf = (v: { name?: unknown }): string => String(v.name)\n',
+    rule: 'no-restricted-syntax',
+    says: 'nameOf from designer',
+  },
+  {
+    what: 'the renderer redeclaring a shared helper',
+    path: fixture('renderer', 'renderer_params_copy', 'ts'),
+    code: 'export const paramsText = (v: unknown): string => JSON.stringify(v)\n',
+    rule: 'no-restricted-syntax',
+  },
+  {
+    what: 'a kit exporting a prop helper copy as a function',
+    path: fixture('kit-mui', 'kit_num_copy', 'ts'),
+    code: 'export function num(v: unknown): number {\n  return Number(v)\n}\n',
+    rule: 'no-restricted-syntax',
+    says: '@willowforms/renderer',
+  },
+  {
+    what: 'a kit using a prop helper name for a local variable',
+    path: fixture('kit-html', 'kit_local_changed', 'ts'),
+    code:
+      'export function count(values: number[]): boolean {\n' +
+      '  let changed = false\n' +
+      '  for (const value of values) if (value > 0) changed = true\n' +
+      '  return changed\n' +
+      '}\n',
+    rule: null,
+  },
+  {
+    what: 'a kit importing a prop helper from the renderer',
+    path: fixture('kit-html', 'kit_str_import', 'ts'),
+    code: "import { str } from '@willowforms/renderer'\nexport const label = str('x', 'y')\n",
+    rule: null,
+  },
   {
     /*
      * The control, and it is not decoration. Every assertion above is "this

@@ -42,6 +42,7 @@ import {
   toLocal,
 } from '../geometry.js'
 import type { Candidate, Origin } from '../geometry.js'
+import { useDragSnapshot } from '../snapshot.js'
 import type { DesignerApi } from '../store.js'
 import { SelectionLayer } from './SelectionLayer.js'
 import { PreviewData } from './PreviewData.js'
@@ -234,9 +235,6 @@ export function Canvas({
     stepSelectRef.current?.focus({ preventScroll: true })
   }, [current, preview])
 
-  // Refresh on scrolling and resizing; pointer movement alone reuses the measurement.
-  const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
-
   const errors = useMemo(() => {
     if (!preview) return NO_ERRORS
 
@@ -336,14 +334,9 @@ export function Canvas({
     [api.document.root, kit],
   )
 
-  const takeSnapshot = useCallback(
-    (dragId: number) => {
-      const next = measureNow(dragId)
-      if (next) setSnapshot(next)
-    },
-    [measureNow],
-  )
+  const { snapshot, takeSnapshot, clearSnapshot } = useDragSnapshot(measureNow)
 
+  // Refresh on scrolling and resizing; pointer movement alone reuses the measurement.
   const dragId = dragState?.id
   useEffect(() => {
     if (dragId === undefined || preview) return
@@ -457,11 +450,11 @@ export function Canvas({
       const [x, y] = toLocal(snap.origin, clientX, clientY)
       const resolved = resolveDrop(snap.candidates, x, y, draggedKey)
 
-      setSnapshot(undefined)
+      clearSnapshot()
 
       return resolved ? { parentKey: resolved.parentKey, index: resolved.index } : undefined
     },
-    [measureNow, preview],
+    [clearSnapshot, measureNow, preview],
   )
 
   useEffect(() => registerZone('canvas', resolveRelease), [registerZone, resolveRelease])

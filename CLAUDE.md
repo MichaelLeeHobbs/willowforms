@@ -69,3 +69,13 @@ through package exports and are verified independently.
   failures, and security payloads belong in Git history, tests, or the threat model.
 - This is a public MIT repository. Do not include proprietary material, credentials, or private customer
   data.
+
+## Shared helpers
+
+Search for an existing helper by what it does before writing one. These each had private copies. `eslint.config.js` refuses a function or variable declared under one of these names outside its home (the kit helpers at a kit's module scope only). It cannot see a copy under another name, and `docs/reinvention-ledger.md` records how every copy was resolved.
+
+- `isRecord` (core `src/guards.ts`, internal): true for non-null, non-array objects.
+- `jsonToString` (`@willowforms/core`): display text of a JSON value; `''` for null, undefined, objects and arrays.
+- `childNodesOf` (core `src/tree.ts`): a node's children that are objects.
+- `str`, `num`, `bool`, `changed`, `requiredProps` (`@willowforms/renderer`): kit prop readers.
+- `paramsText` (designer `src/panels/text.ts`), `nameOf` (designer `src/language.ts`), `copyText` (designer `src/clipboard.ts`): designer-internal.

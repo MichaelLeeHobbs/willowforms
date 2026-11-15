@@ -200,11 +200,7 @@ function isMissing(value: JsonValue | undefined): boolean {
 }
 
 function lengthOf(value: JsonValue | undefined): number {
-  return Array.isArray(value) ? value.length : asString(value).length
-}
-
-function asString(value: JsonValue | undefined): string {
-  return jsonToString(value)
+  return Array.isArray(value) ? value.length : jsonToString(value).length
 }
 
 function asNumber(value: JsonValue | undefined): number {
@@ -390,9 +386,9 @@ export function applyRule(
        * satisfied.
        */
       if (typeof rule.value !== 'string') return fail()
-      return matchesPattern(rule.value, asString(value)) ? undefined : fail()
+      return matchesPattern(rule.value, jsonToString(value)) ? undefined : fail()
     case 'email':
-      return EMAIL.test(asString(value)) ? undefined : fail()
+      return EMAIL.test(jsonToString(value)) ? undefined : fail()
     case 'url':
       /*
        * `safeHref`, not `URL.canParse`. That one answers yes to any well-formed
@@ -402,9 +398,9 @@ export function applyRule(
        * an author their field holds a link and then accepting one that runs
        * code is the two halves of this project disagreeing.
        */
-      return isUrl(asString(value)) ? undefined : fail()
+      return isUrl(jsonToString(value)) ? undefined : fail()
     case 'uuid':
-      return UUID.test(asString(value)) ? undefined : fail()
+      return UUID.test(jsonToString(value)) ? undefined : fail()
     case 'custom':
       if (!options.evaluate) return undefined
       /*

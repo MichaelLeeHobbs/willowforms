@@ -100,6 +100,10 @@ export interface FlatNode {
  * This is the order the structure panel draws and the order keyboard navigation
  * moves through, so both read it from here rather than each walking the tree and
  * disagreeing about what "the next row" means.
+ *
+ * It walks the tree itself rather than through `walk`, because each entry needs
+ * its index among its parent's children and its depth, and `walk` passes
+ * neither to its callback.
  */
 export function flatten(root: ComponentNode): FlatNode[] {
   const out: FlatNode[] = []
@@ -110,10 +114,8 @@ export function flatten(root: ComponentNode): FlatNode[] {
     depth: number,
   ): void => {
     /*
-     * Total and bounded, like `walk` above, and it was neither -- despite that
-     * function's comment calling it "the walk every other module borrows".
-     * `flatten` is not designer-only: `validation.ts`'s `autoValidateKeys`
-     * walks the public tree with it.
+     * Total and bounded, like `walk`: `validation.ts`'s `autoValidateKeys` walks
+     * the public tree with it, so it is not designer-only.
      */
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     out.push({ node, parentKey, index, depth })
@@ -152,49 +154,29 @@ export function generateKey(root: ComponentNode, type: string): string {
 }
 
 /**
- * The first key starting from `base` that nothing has taken.
+ * The first key starting from `base` that nothing has taken, held to
+ * `MAX_KEY_LENGTH`: `base` itself when free, otherwise `base` numbered from 2.
  *
- * Shared, so the two callers cannot drift on how a numbered key is formed. What
- * they differ on is the base, and deliberately: a new component has only its
- * type to be named after, while a copy has the original's name, which is worth
- * far more. Duplicating `emailAddress` should not produce `textField7`.
+ * `copyKey` does not call this, because a copy continues the original key's
+ * number rather than starting at 2. Both number through `numberedKey`.
  */
 function freeKey(taken: Set<string>, base: string): string {
   if (!taken.has(base)) return base
-  let n = 2
-  while (taken.has(base + String(n))) n += 1
-  return base + String(n)
+  return numberedKey(taken, base, 2)
 }
 
-/** A key's name with any trailing number removed, so `website2` copies to `website3`. */
-function baseOf(key: string): string {
-  return key.replace(/\d+$/, '') || key
-}
-
-function copyKey(taken: Set<string>, key: string): string {
-  const base = baseOf(key)
-  const digits = /(\d+)$/.exec(key)?.[1]
-  const from = digits === undefined ? 2 : Number(digits) + 1
-
-  if (base === key && !taken.has(base)) return base
-
+/**
+ * `base` followed by the first number from `from` that nothing has taken, held
+ * to `MAX_KEY_LENGTH` so `validateDocument` accepts the result.
+ *
+ * When the number does not fit, the base is shortened rather than the key
+ * refused, because a new key has to be named something and the digits are what
+ * make it unique.
+ */
+function numberedKey(taken: Set<string>, base: string, from: number): string {
   let n = from
   while (taken.has(base + String(n))) n += 1
   const minted = base + String(n)
-
-  /*
-   * Bounded the way `generateKey` is bounded.
-   *
-   * `generateKey` goes through `keyProblem`, which refuses anything over
-   * `MAX_KEY_LENGTH`; this one minted whatever it liked, so duplicating a
-   * component with a 128-character key produced a 129-character key -- a
-   * document this same package's `validateDocument` then reports as
-   * `invalid-key`. A mint that produces a document the gate refuses is not a
-   * mint.
-   *
-   * Trimmed from the base rather than refused, because a duplicate has to be
-   * named something and the digits are what make it unique.
-   */
   if (minted.length <= MAX_KEY_LENGTH) return minted
 
   const suffix = String(n)
@@ -207,6 +189,26 @@ function copyKey(taken: Set<string>, key: string): string {
     trimmed = base.slice(0, Math.max(1, MAX_KEY_LENGTH - next.length)) + next
   }
   return trimmed
+}
+
+/** A key's name with any trailing number removed, so `website2` copies to `website3`. */
+function baseOf(key: string): string {
+  return key.replace(/\d+$/, '') || key
+}
+
+/**
+ * The key for a copy of `key`. The copy keeps the original's name rather than
+ * its type, so duplicating `emailAddress` does not produce `textField7`, and it
+ * continues the original's number, so `website2` copies to `website3`.
+ */
+function copyKey(taken: Set<string>, key: string): string {
+  const base = baseOf(key)
+  const digits = /(\d+)$/.exec(key)?.[1]
+  const from = digits === undefined ? 2 : Number(digits) + 1
+
+  if (base === key && !taken.has(base)) return base
+
+  return numberedKey(taken, base, from)
 }
 
 /**

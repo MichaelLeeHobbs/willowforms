@@ -38,6 +38,10 @@ export function Tabs<Id extends string>({
   const base = useId()
   const strip = useRef<HTMLDivElement>(null)
 
+  /**
+   * Each tab and its panel get distinct ids from one base so the active tab's
+   * `aria-controls` and the panel's `aria-labelledby` can point at each other.
+   */
   const tabId = (id: Id): string => base + '-tab-' + id
   const panelId = (id: Id): string => base + '-panel-' + id
 

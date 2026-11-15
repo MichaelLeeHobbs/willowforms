@@ -30,14 +30,19 @@ const PALETTES = {
   desert: 'Desert Willow — AZT Bi-Color',
 }
 
-function loadPalette(): string {
+/** Read a saved selector choice, accepting it only when it names an own entry of `registry`. */
+export function loadChoice<K extends string>(
+  key: string,
+  registry: Record<K, unknown>,
+  fallback: K,
+): K {
   try {
-    const saved = localStorage.getItem(PALETTE_KEY)
-    if (saved && Object.hasOwn(PALETTES, saved)) return saved
+    const saved = localStorage.getItem(key)
+    if (saved !== null && Object.hasOwn(registry, saved)) return saved as K
   } catch {
-    // The selector still works when browser storage is unavailable.
+    // Private-mode browsers throw on read as well as on write; the selector still works.
   }
-  return 'willow'
+  return fallback
 }
 
 const KITS: Record<string, { label: string; kit: Kit; renderers: RendererKit }> = {
@@ -92,23 +97,13 @@ function ThemeModeSync({ mode }: { mode: DesignerTheme }): null {
   return null
 }
 
-function loadKit(): string {
-  try {
-    const saved = localStorage.getItem(KIT_KEY)
-    return saved !== null && Object.hasOwn(KITS, saved) ? saved : 'mui'
-  } catch {
-    // Private-mode browsers throw on read as well as on write.
-    return 'mui'
-  }
-}
-
 export function App(): ReactNode {
   const [session, setSession] = useState(() => loadDraft(initialExample()))
   const [initial, setInitial] = useState(session.document)
   const [saveError, setSaveError] = useState(session.error)
-  const [kitId, setKitId] = useState<string>(loadKit)
+  const [kitId, setKitId] = useState<string>(() => loadChoice(KIT_KEY, KITS, 'mui'))
   const [themeMode, setThemeMode] = useState<DesignerTheme>('system')
-  const [palette, setPalette] = useState(loadPalette)
+  const [palette, setPalette] = useState<string>(() => loadChoice(PALETTE_KEY, PALETTES, 'willow'))
   const [resetCount, setResetCount] = useState(0)
 
   const latest = useRef(initial)
