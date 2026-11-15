@@ -30,7 +30,7 @@ export function PreviewData({ data }: { data: FormData }): ReactNode {
     setNote(
       (outcome === 'unavailable'
         ? 'This browser offers no clipboard here.'
-        : 'Clipboard access is unavailable because the browser refused it.') +
+        : 'The browser refused clipboard access.') +
         ' The JSON is selected; copy it with your keyboard or browser menu.',
     )
   }
