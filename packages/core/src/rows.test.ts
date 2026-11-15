@@ -21,7 +21,7 @@ import {
   validateForm,
 } from './validation.js'
 import { createDocument } from './factory.js'
-import { findNode, validateDocument } from './tree.js'
+import { MAX_TREE_DEPTH, findNode, validateDocument } from './tree.js'
 import type { ComponentNode, FormData, FormDocument, JsonValue } from './types.js'
 
 describe('the row coordinate', () => {
@@ -1104,6 +1104,100 @@ describe('keyScopesFor on a document nobody gated', () => {
     }
 
     expect(() => keyScopesFor(deep, 'leaf')).not.toThrow()
+  })
+})
+
+describe('the picker and validation agree on what a row holds at the depth bound', () => {
+  /*
+   * `keyScopesFor` feeds the field picker and `rowScopeProblems` feeds
+   * `validateDocument`. Both ask which data keys one row of a repeater holds,
+   * so a key the picker offers as a row answer must be one validation accepts
+   * as a row answer, and the reverse. The case that separates two walks is a
+   * nested repeater sitting exactly at the bound, counted from the outer
+   * repeater: its own data key is a row answer only while it is within
+   * `MAX_TREE_DEPTH` levels of the repeater.
+   *
+   * The form also holds `inner` (a distinct node with the same data key), so a
+   * `scope: 'row'` ref to it is reported exactly when the row does not hold it.
+   */
+  const doc = (levels: number): FormDocument => {
+    let below: ComponentNode = {
+      key: 'innerList',
+      dataKey: 'inner',
+      type: 'Repeater',
+      props: {},
+      schema: { type: 'array', validations: [] },
+      children: [
+        {
+          key: 'innerField',
+          type: 'Field',
+          props: {},
+          schema: { type: 'string', validations: [] },
+        },
+      ],
+    }
+    // `levels` containers between the outer repeater and the nested one, so the
+    // nested repeater sits `levels + 1` below the outer repeater.
+    for (let i = 0; i < levels; i += 1) {
+      below = { key: 'stack' + String(i), type: 'Stack', props: {}, children: [below] }
+    }
+    return {
+      ...createDocument('Deep rows', 'deep-rows'),
+      root: {
+        key: 'root',
+        type: 'Screen',
+        props: {},
+        children: [
+          {
+            key: 'innerMirror',
+            dataKey: 'inner',
+            type: 'Field',
+            props: {},
+            schema: { type: 'string', validations: [] },
+          },
+          {
+            key: 'outerList',
+            dataKey: 'outer',
+            type: 'Repeater',
+            props: {},
+            schema: { type: 'array', validations: [] },
+            children: [
+              {
+                key: 'probe',
+                type: 'Field',
+                props: {},
+                schema: { type: 'string', validations: [] },
+                renderWhen: {
+                  kind: 'condition',
+                  condition: {
+                    op: 'truthy',
+                    value: { kind: 'ref', dataKey: 'inner', scope: 'row' },
+                  },
+                },
+              },
+              below,
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  const reportedForProbe = (document: FormDocument): boolean =>
+    validateDocument(document).some((e) => e.code === 'row-scope' && e.key === 'probe')
+
+  it('offers and accepts the nested list one level inside the bound', () => {
+    const inside = doc(MAX_TREE_DEPTH - 1)
+
+    expect(keyScopesFor(inside.root, 'probe').row).toContain('inner')
+    expect(reportedForProbe(inside)).toBe(false)
+  })
+
+  it('neither offers nor accepts the nested list one level past the bound', () => {
+    const past = doc(MAX_TREE_DEPTH)
+
+    expect(keyScopesFor(past.root, 'probe').row).not.toContain('inner')
+    expect(reportedForProbe(past)).toBe(true)
   })
 })
 
