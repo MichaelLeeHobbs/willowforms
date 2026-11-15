@@ -72,7 +72,7 @@ through package exports and are verified independently.
 
 ## Shared helpers
 
-Search for an existing helper by what it does before writing one. These each had private copies. `eslint.config.js` refuses a redeclaration of the named ones, and `docs/reinvention-ledger.md` records how every copy was resolved.
+Search for an existing helper by what it does before writing one. These each had private copies. `eslint.config.js` refuses a function or variable declared under one of these names outside its home (the kit helpers at a kit's module scope only). It cannot see a copy under another name, and `docs/reinvention-ledger.md` records how every copy was resolved.
 
 - `isRecord` (core `src/guards.ts`, internal): true for non-null, non-array objects.
 - `jsonToString` (`@willowforms/core`): display text of a JSON value; `''` for null, undefined, objects and arrays.

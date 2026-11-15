@@ -113,9 +113,17 @@ const SHARED_HELPERS = {
     'Import the shared helper instead of redeclaring it: isRecord from core src/guards.ts (core-internal), paramsText from designer src/panels/text.ts, nameOf from designer src/language.ts.',
 }
 
-/** The kit prop readers, which `@willowforms/renderer` exports for every kit. */
+/**
+ * The kit prop readers, which `@willowforms/renderer` exports for every kit.
+ *
+ * Module scope only: the names are generic enough that a local `let changed`
+ * inside a renderer is not a copy of anything.
+ */
+const KIT_PROP_NAME = '[id.name=/^(str|num|bool|changed|requiredProps)$/]'
 const KIT_PROP_HELPERS = {
-  selector: declares(['str', 'num', 'bool', 'changed', 'requiredProps']),
+  selector:
+    `:matches(Program, ExportNamedDeclaration) > FunctionDeclaration${KIT_PROP_NAME}, ` +
+    `:matches(Program, ExportNamedDeclaration) > VariableDeclaration > VariableDeclarator${KIT_PROP_NAME}`,
   message:
     'Kit prop helpers (str, num, bool, changed, requiredProps) are exported from @willowforms/renderer. Import them instead of redeclaring.',
 }

@@ -272,6 +272,24 @@ const CASES: Case[] = [
     rule: 'no-restricted-syntax',
   },
   {
+    what: 'a kit exporting a prop helper copy as a function',
+    path: fixture('kit-mui', 'kit_num_copy', 'ts'),
+    code: 'export function num(v: unknown): number {\n  return Number(v)\n}\n',
+    rule: 'no-restricted-syntax',
+    says: '@willowforms/renderer',
+  },
+  {
+    what: 'a kit using a prop helper name for a local variable',
+    path: fixture('kit-html', 'kit_local_changed', 'ts'),
+    code:
+      'export function count(values: number[]): boolean {\n' +
+      '  let changed = false\n' +
+      '  for (const value of values) if (value > 0) changed = true\n' +
+      '  return changed\n' +
+      '}\n',
+    rule: null,
+  },
+  {
     what: 'a kit importing a prop helper from the renderer',
     path: fixture('kit-html', 'kit_str_import', 'ts'),
     code: "import { str } from '@willowforms/renderer'\nexport const label = str('x', 'y')\n",
