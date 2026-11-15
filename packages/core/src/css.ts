@@ -118,6 +118,8 @@ const FETCHING = /(url|image-set|element|cross-fade)\s*\(/i
  */
 export function safeStyleValue(value: string | undefined): string | undefined {
   if (!value) return undefined
+  // A host evaluator can hand back any type; a non-string value is unusable.
+  if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
   if (!trimmed) return undefined
   if (FORBIDDEN_VALUE.test(trimmed) || FETCHING.test(trimmed)) return undefined

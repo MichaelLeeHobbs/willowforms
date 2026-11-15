@@ -437,6 +437,14 @@ describe('safeStyleValue', () => {
     expect(safeStyleValue('')).toBeUndefined()
     expect(safeStyleValue(undefined)).toBeUndefined()
   })
+
+  it.each([
+    ['a number', 5],
+    ['an object', { background: 'red' }],
+    ['true', true],
+  ])('refuses %s rather than throwing, because an evaluator result is untyped', (_what, value) => {
+    expect(safeStyleValue(value as never)).toBeUndefined()
+  })
 })
 
 /**
