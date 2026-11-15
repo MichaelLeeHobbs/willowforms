@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormData } from '@willowforms/core'
 
+import { copyText } from '../clipboard.js'
+
 export function PreviewData({ data }: { data: FormData }): ReactNode {
   const id = useId()
   const dialog = useRef<HTMLDialogElement>(null)
@@ -17,17 +19,20 @@ export function PreviewData({ data }: { data: FormData }): ReactNode {
   }, [open])
 
   const copy = async (): Promise<void> => {
-    try {
-      if (!navigator.clipboard) throw new Error('Clipboard unavailable')
-      await navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+    const outcome = await copyText(JSON.stringify(data, null, 2))
+    if (outcome === 'copied') {
       setNote('Form data copied to the clipboard.')
-    } catch {
-      editor.current?.focus()
-      editor.current?.select()
-      setNote(
-        'Clipboard access is unavailable. The JSON is selected; copy it with your keyboard or browser menu.',
-      )
+      return
     }
+    // Either failure leaves the JSON selected so a keyboard copy is one step.
+    editor.current?.focus()
+    editor.current?.select()
+    setNote(
+      (outcome === 'unavailable'
+        ? 'This browser offers no clipboard here.'
+        : 'The browser refused clipboard access.') +
+        ' The JSON is selected; copy it with your keyboard or browser menu.',
+    )
   }
 
   return (

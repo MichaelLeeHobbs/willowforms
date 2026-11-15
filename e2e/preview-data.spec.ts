@@ -85,7 +85,7 @@ for (const kit of ['html', 'mui']) {
     await expect(output).toHaveAttribute('readonly', '')
     await expect(output).toBeFocused()
     await dialog.getByRole('button', { name: 'Copy JSON', exact: true }).click()
-    await expect(dialog.getByRole('status')).toContainText('Clipboard access is unavailable')
+    await expect(dialog.getByRole('status')).toContainText('The browser refused clipboard access')
     expect(
       await output.evaluate((input) => {
         const field = input as HTMLTextAreaElement
