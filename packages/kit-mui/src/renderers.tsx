@@ -36,7 +36,6 @@ import type { ReactNode } from 'react'
 import { muiKit } from './definitions.js'
 import { DensityTheme } from './DensityTheme.js'
 
-import type { JsonValue } from '@willowforms/core'
 import {
   isRequired,
   itemLimits,
@@ -48,70 +47,14 @@ import {
   backgroundImageStyle,
   safeStyleValue,
 } from '@willowforms/core'
-import type {
-  NodeEventHandlers,
-  NodeRenderer,
-  NodeRendererProps,
-  RendererKit,
-} from '@willowforms/renderer'
+import { bool, changed, num, requiredProps, str } from '@willowforms/renderer'
+import type { NodeRenderer, NodeRendererProps, RendererKit } from '@willowforms/renderer'
 
 type Variant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
-/**
- * A string, or the fallback.
- *
- * `v || fallback`, not a bare type check. An emptied field *is* a string, so
- * every "safe default" here was bypassed by clearing one — which is the most
- * natural way to try to remove a label. A button with no text, an `aria-label`
- * of `''`.
- */
-const str = (v: unknown, fallback = ''): string => {
-  /*
-   * A non-string that is still text renders as its text, not as the fallback.
-   *
-   * This read `typeof v === 'string' && v ? v : fallback`, which collapses "not
-   * a string" and "the empty string" into one answer -- so a label, text,
-   * helper or placeholder arriving as a number showed the fallback instead of
-   * itself. A `computed` binding is evaluated by the host at render time, so a
-   * number genuinely arrives: `label: { kind: 'computed', expression: 'year' }`
-   * drew nothing.
-   *
-   * `jsonToString` is the project's one answer to "what does this value look
-   * like", which both kits already use for a field's value. An empty result
-   * still falls back, because an empty label is a label nobody wrote.
-   */
-  const text = typeof v === 'string' ? v : jsonToString(v as JsonValue | undefined)
-  return text === '' ? fallback : text
-}
-const bool = (v: unknown): boolean => v === true
-/*
- * A finite number, or the fallback.
- *
- * `typeof NaN` is `'number'`, and a document can hold one: `JSON.parse('{"a":1e999}')`
- * gives `Infinity`, and an expression can return either. It reached
- * `aria-valuenow="NaN"` and an inline width of `NaN%`, which browsers drop --
- * so an indeterminate progress bar painted itself full and told a screen
- * reader a number that is not one.
- */
-const num = (v: unknown, fallback: number): number =>
-  typeof v === 'number' && Number.isFinite(v) ? v : fallback
-
 const px = (value: number): string => String(value) + 'px'
 
-const changed = (
-  onChange: (value: JsonValue) => void,
-  events: NodeEventHandlers | undefined,
-  value: JsonValue,
-): void => {
-  onChange(value)
-  events?.onChange?.(value)
-}
-
 const GAP = 16
-
-// ARIA exposes required state without enabling a second, browser-owned validator.
-const requiredProps = (required: boolean): { 'aria-required'?: true } =>
-  required ? { 'aria-required': true } : {}
 
 /*
  * The message a field is described by.
