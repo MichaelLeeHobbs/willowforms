@@ -1,5 +1,6 @@
 import type { FormDocument } from './types.js'
 import { jsonShape } from './actions.js'
+import { isRecord } from './guards.js'
 import { validateDocument } from './tree.js'
 import type { StructuralError } from './tree.js'
 
@@ -24,12 +25,8 @@ type Migration = (document: DocumentRecord) => DocumentRecord
  */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {}
 
-function record(value: unknown): value is DocumentRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function migrate(value: unknown): unknown {
-  if (!record(value)) return value
+  if (!isRecord(value)) return value
 
   let current = value
   const visited = new Set<string>()
@@ -45,7 +42,7 @@ function migrate(value: unknown): unknown {
 }
 
 function normalize(value: unknown): unknown {
-  if (!record(value) || value['version'] !== CURRENT_DOCUMENT_VERSION) return value
+  if (!isRecord(value) || value['version'] !== CURRENT_DOCUMENT_VERSION) return value
 
   return {
     ...value,

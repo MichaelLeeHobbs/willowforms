@@ -7,6 +7,7 @@
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
 import { BUILTIN_ACTION_NAMES } from './actions.js'
+import { isRecord } from './guards.js'
 import { MAX_KEY_LENGTH, keyProblem } from './keys.js'
 import { rowScopeProblems } from './rows.js'
 import type {
@@ -741,9 +742,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
   const malformed = (message: string): void => {
     errors.push({ code: 'malformed', message })
   }
-
-  const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === 'object' && value !== null && !Array.isArray(value)
 
   const candidate: unknown = doc
   if (!isRecord(candidate)) {
