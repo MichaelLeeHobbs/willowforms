@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { FormDocument } from '@willowforms/core'
 import { loadDocument, toJsonSchema, unexportableRules } from '@willowforms/core'
 
+import { copyText } from '../clipboard.js'
 import { Tabs } from './Tabs.js'
 
 // Bound memory use before decoding a file into the editor.
@@ -98,16 +99,12 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   }, [draft, onClose, onReplace])
 
   const copy = useCallback((text: string, what: string) => {
-    // Clipboard access can be denied or unavailable in an embedding host.
-    const clipboard = navigator.clipboard
-    if (!clipboard) {
-      setNote('This browser offers no clipboard here. Select the text and copy it instead.')
-      return
-    }
-    clipboard.writeText(text).then(
-      () => setNote(what + ' copied to the clipboard.'),
-      () => setNote('The browser refused clipboard access. Select the text and copy it instead.'),
-    )
+    void copyText(text).then((outcome) => {
+      if (outcome === 'copied') setNote(what + ' copied to the clipboard.')
+      else if (outcome === 'unavailable')
+        setNote('This browser offers no clipboard here. Select the text and copy it instead.')
+      else setNote('The browser refused clipboard access. Select the text and copy it instead.')
+    })
   }, [])
 
   const download = useCallback((text: string, filename: string) => {
