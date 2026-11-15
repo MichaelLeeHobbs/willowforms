@@ -19,6 +19,10 @@ export function styled(component: ComponentNode, css: string): ComponentNode {
   return component
 }
 
+/**
+ * The character sheet's grid: a tighter gap and narrower minimum column than the shared builder,
+ * and it fills the sheet width.
+ */
 export function grid(
   key: string,
   children: ComponentNode[],
@@ -28,6 +32,10 @@ export function grid(
   return node('Grid', key, { columns, minColumnWidth: minimum, gap: 12, fillWidth: true }, children)
 }
 
+/**
+ * A character-sheet section: a ruled serif heading over a Stack, in place of the shared builder's
+ * outlined Card.
+ */
 export function section(key: string, title: string, children: ComponentNode[]): ComponentNode {
   return styled(
     node('Stack', key, { gap: 12 }, [
