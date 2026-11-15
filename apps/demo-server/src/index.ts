@@ -238,6 +238,7 @@ function storageFaults(doc: unknown): StructuralError[] {
     return faults
   }
 
+  // The demo server only reaches core through its public API, which does not export this guard.
   const object = (value: unknown): boolean =>
     Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
