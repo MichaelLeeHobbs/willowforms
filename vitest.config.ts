@@ -5,9 +5,9 @@ import { willowformsAliases } from './aliases.js'
 export default defineConfig({
   resolve: { alias: willowformsAliases },
   // The root tsconfig is a project-reference stub with no compilerOptions, so
-  // esbuild finds no `jsx` setting for files outside packages/ and falls back to
-  // the classic transform. Stating it here covers every directory.
-  esbuild: { jsx: 'automatic' },
+  // the transform finds no `jsx` setting for files outside packages/. Stating
+  // the runtime here covers every directory.
+  oxc: { jsx: { runtime: 'automatic' } },
   test: {
     include: [
       'packages/*/src/**/*.test.ts',
