@@ -11,6 +11,13 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # Node types track the oldest supported runtime (engines: node >=22), so
+      # code cannot typecheck against an API that Node 22 users do not have.
+      # Raise this major together with the engines floor.
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
