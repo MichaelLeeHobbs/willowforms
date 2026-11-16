@@ -33,7 +33,9 @@ function migrate(value: unknown): unknown {
   while (current['version'] !== CURRENT_DOCUMENT_VERSION) {
     const version = current['version']
     if (typeof version !== 'string' || visited.has(version)) return current
-    const migration = MIGRATIONS[version]
+    // Own keys only: the version is untrusted input, and an inherited name such
+    // as "toString" or "__proto__" must read as an unknown version.
+    const migration = Object.hasOwn(MIGRATIONS, version) ? MIGRATIONS[version] : undefined
     if (!migration) return current
     visited.add(version)
     current = migration(current)
