@@ -67,7 +67,7 @@ same upgrade logic, badly and differently, and a form definition outlives the co
   be migrated is rejected at load, not half-converted.
 - A migration is found by the document's `version` as an own key of the registry. A version that names
   an inherited property, such as `"toString"` or `"__proto__"`, is an unknown version and gets the same
-  error as `'2'` does today.
+  error as any other version that has no migration.
 - An export carries the version it was written against, which is what makes the above possible.
 - `validateDocument` stays separate. Migration answers "what shape is this", validation answers "is this
   shape coherent", and conflating them means a structurally broken document at the current version gets
