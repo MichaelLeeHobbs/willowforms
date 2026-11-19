@@ -49,6 +49,21 @@ describe('loadDocument', () => {
     expect(result.errors[0]?.message).toContain('this library writes version "1"')
   })
 
+  it.each(['toString', 'valueOf', 'hasOwnProperty', 'constructor', '__proto__'])(
+    'rejects version "%s" as an unknown version, not a migration',
+    (version) => {
+      const input = { ...createDocument('Contact', 'contact'), version }
+
+      const result = loadDocument(input)
+
+      expect(result.ok).toBe(false)
+      if (result.ok) return
+      expect(result.errors.map((error) => error.message)).toEqual([
+        `version is ${JSON.stringify(version)}, and this library writes version "1".`,
+      ])
+    },
+  )
+
   it('refuses a document over the value limit and says why', () => {
     const input = {
       ...createDocument('Contact', 'contact'),
