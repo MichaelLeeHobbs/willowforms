@@ -1,8 +1,4 @@
-# Every gate that decides whether a change is safe to merge.
-#
-# One job rather than four parallel ones: the install dominates the runtime here,
-# and splitting would pay for it four times to save a few seconds of checks.
-# Revisit if the test suite grows past a couple of minutes.
+# One job: the install dominates the runtime, so parallel jobs would pay for it repeatedly.
 name: CI
 
 on:
@@ -13,9 +9,7 @@ on:
 # A newer push to the same branch makes the in-flight run irrelevant.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # A newer push to a pull request makes the in-flight run irrelevant. A newer
-  # push to `main` does not: cancelling it leaves the older commit with no
-  # verdict at all, and `main` is the branch whose verdict is the record.
+  # Pull requests only: every `main` commit needs its own verdict.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -96,11 +90,6 @@ jobs:
       - name: Production package smoke
         run: pnpm e2e:dist
 
-      # dist is what consumers actually get, so prove it exists and carries types.
-      #
-      # A script rather than a shell block, because a check written inline here
-      # is a check nobody can run. This one had drifted: its package list named
-      # four of the five, and the one it left out was `kit-html`, which is the
-      # package the second-kit claim rests on.
+      # A script rather than an inline block, so the check can be run locally.
       - name: Check build output
         run: node scripts/check-dist.mjs

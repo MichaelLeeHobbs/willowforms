@@ -1,14 +1,6 @@
 /**
- * Colour contrast, enforced.
- *
- * The study in docs/prior-art records the product this project studied
- * shipping a primary button whose label sat at 3.03:1, failing WCAG AA. Beating
- * that is a stated goal, and a goal nobody measures is a wish, so both
- * stylesheets in this repo are measured here in both themes.
- *
  * Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for large text and for
- * the boundaries of user interface components. Where a pair only needs 3:1 the
- * test says which rule applies and why.
+ * the boundaries of user interface components.
  */
 
 import { readFileSync } from 'node:fs'
@@ -32,24 +24,10 @@ interface Palette {
 }
 
 /**
- * A theme's tokens, with the dark overrides folded onto the light base.
- *
- * The dark blocks only restate what changes, so reading them alone would miss
- * every token they inherit.
- */
-/**
- * Every palette a viewer can actually get.
- *
- * There are three, and only two were measured. A stylesheet here declares the
- * light tokens on the bare scope, overrides them for an explicit dark choice,
- * and overrides them *again* inside `@media (prefers-color-scheme: dark)` for a
- * viewer who has chosen nothing — under a different selector, so the exact-match
- * reader never found it.
- *
- * That third one is the palette most people see. The theme control defaults to
- * `system`, which sets no attribute at all, so a viewer whose OS is dark gets
- * the block nothing was checking. Editing one dark block and not the other left
- * the suite green while the two drifted apart.
+ * Three palettes: light, an explicit dark choice, and the dark block inside
+ * `@media (prefers-color-scheme: dark)` that a viewer on the default `system`
+ * theme gets. The dark blocks only restate what changes, so each is folded onto
+ * the light base.
  */
 function palettes(css: string, base: string, chosenDark: string, systemDark: string): Palette[] {
   const light = tokensFrom(css, base)
@@ -74,12 +52,8 @@ function palettes(css: string, base: string, chosenDark: string, systemDark: str
 }
 
 /**
- * The two dark palettes have to be the same palette.
- *
- * They are two spellings of one decision — "this viewer wants dark" — and
- * nothing but discipline keeps them in step. Measuring both for contrast is not
- * enough: two different dark themes can each clear AA and still be two different
- * dark themes, and only one of them was ever looked at.
+ * Both dark blocks spell one decision. Each clearing AA does not make them the
+ * same palette, so they are compared declaration by declaration.
  */
 function darkBlocks(
   css: string,
@@ -104,20 +78,8 @@ describe("the designer's two dark blocks", () => {
 })
 
 /**
- * Every pair this file measured, recorded as it measures it.
- *
- * `docs/accessibility.md` quotes the lowest ratio in each palette, and nothing
- * checked those figures -- `docs.test.ts` verified that the files the table
- * names exist and stopped there. One row was already wrong: the HTML kit's light
- * row claimed 4.83:1 as the lowest pair the suite asserts, while this file
- * asserts `--fsh-warning` `#b26a00` on `--fsh-surface` `#ffffff`, which is
- * 4.24:1 by the repository's own formula.
- *
- * A written-down measurement of a stylesheet goes stale the first time somebody
- * changes a token in a way that stays above the floor, and the document exists
- * so a reader need not take the claim on trust. So the table is computed from
- * what actually ran rather than transcribed, and the check at the bottom of this
- * file compares.
+ * Every pair this file measured. `docs/accessibility.md` quotes the lowest ratio
+ * in each palette, and the check at the bottom of this file compares the two.
  */
 interface Measured {
   palette: string
@@ -128,7 +90,6 @@ interface Measured {
 
 const MEASURED: Measured[] = []
 
-/** A palette's `on`, recording every pair it is asked about. */
 function measurer(palette: string, tokens: Record<string, string>) {
   return (fg: string, bg: string): number => {
     const foreground = tokens[fg]
@@ -168,7 +129,6 @@ describe.each(
   })
 
   it('primary button text clears AA', () => {
-    // The exact failure the prior-art study recorded, at 3.03:1.
     expect(on('--fs-primary-text', '--fs-primary')).toBeGreaterThanOrEqual(AA_TEXT)
   })
 
@@ -200,14 +160,10 @@ describe.each(
 
   it('the designer own controls have a visible boundary', () => {
     /*
-     * The kit's field borders were measured and the designer's were not, which
-     * is the wrong way round for a builder somebody uses all day. A text field
-     * in a panel is a shade off the panel's own background -- 1.08:1 in light --
-     * so the border is the only thing saying a control is there, and at 1.39:1
-     * it was not saying it. WCAG 1.4.11: a control boundary needs 3:1.
-     *
-     * All three surfaces, because panels, the canvas bar and the preview data
-     * pane each host controls.
+     * A text field is a shade off the panel's own background, so the border is
+     * the only thing saying a control is there. WCAG 1.4.11: a control boundary
+     * needs 3:1. Panels, the canvas bar and the preview data pane all host
+     * controls.
      */
     expect(on('--fs-control-border', '--fs-bg-panel')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fs-control-border', '--fs-bg-app')).toBeGreaterThanOrEqual(AA_LARGE)
@@ -219,12 +175,8 @@ describe.each(
   })
 
   it('the scrollbar thumb is visible on every surface that scrolls', () => {
-    /*
-     * The track is transparent, so the thumb is drawn straight onto the
-     * surface underneath and has to hold up against all three: panes are
-     * bg-panel, the canvas is bg-app, the preview data block is bg-well. A
-     * scrollbar is a user interface component, so 3:1.
-     */
+    // The track is transparent, so the thumb sits on each surface directly. A
+    // scrollbar is a user interface component, so 3:1.
     expect(on('--fs-scrollbar-thumb', '--fs-bg-panel')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fs-scrollbar-thumb', '--fs-bg-app')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fs-scrollbar-thumb', '--fs-bg-well')).toBeGreaterThanOrEqual(AA_LARGE)
@@ -258,13 +210,8 @@ describe.each(
   })
 
   it('the state colours on an alert are distinguishable from the surface', () => {
-    /*
-     * The success and warning stripes were hex literals sitting beside their
-     * rules, so they were outside the token swap -- the same colour in both
-     * themes -- and outside this suite, which reads tokens. A 4px stripe is the
-     * only thing distinguishing one alert from another, which makes it a user
-     * interface component: 3:1.
-     */
+    // The stripe is the only thing distinguishing one alert from another, which
+    // makes it a user interface component: 3:1.
     expect(on('--fsh-success', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fsh-warning', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fsh-danger', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
@@ -273,13 +220,9 @@ describe.each(
   it('the progress track is visible against the surface it sits on', () => {
     /*
      * `--fsh-field` and `--fsh-surface` are the same colour in the light
-     * palette, and the track was filled with the first -- so an empty progress
-     * bar was invisible and a bar at 10% read as a stray dash. WCAG 1.4.11 asks
-     * 3:1 of anything that identifies a component.
-     *
-     * The ring is what carries it, so `--fsh-border` is the pair. Darkening the
-     * track instead would have taken the *fill* against it under 3:1, and the
-     * boundary between fill and track is what conveys the value.
+     * palette, so the ring (`--fsh-border`) carries the track's boundary.
+     * Darkening the track instead would take the fill against it under 3:1.
+     * WCAG 1.4.11 asks 3:1 of anything that identifies a component.
      */
     expect(on('--fsh-border', '--fsh-surface')).toBeGreaterThanOrEqual(AA_LARGE)
     expect(on('--fsh-accent', '--fsh-field')).toBeGreaterThanOrEqual(AA_LARGE)
@@ -316,21 +259,11 @@ describe.each(
 })
 
 /**
- * The instrument, against values that are not ours to choose.
- *
- * Every ratio in this file comes out of twenty lines of arithmetic in
- * `contrast.ts`, and nothing checked the arithmetic. Change a luminance
- * coefficient or the `0.03928` branch and every number here moves together,
- * every threshold is still cleared, and the suite stays green while reporting
- * fiction.
- *
- * So these are fixed points from WCAG 2.2 itself and from the reference values
- * every contrast tool agrees on. They cannot be satisfied by a formula that has
- * drifted.
+ * Fixed points from WCAG 2.2 and published reference values, which a drifted
+ * formula cannot satisfy.
  */
 describe('the contrast instrument', () => {
   it('puts black on white at 21:1 and a colour on itself at 1:1', () => {
-    // The two ends of the scale, which the ratio is defined to produce.
     expect(ratio('#000000', '#ffffff')).toBe(21)
     expect(ratio('#ffffff', '#ffffff')).toBe(1)
     expect(ratio('#7c838d', '#7c838d')).toBe(1)
@@ -347,21 +280,14 @@ describe('the contrast instrument', () => {
     ['#0000ff', '#ffffff', 8.59],
     ['#ff0000', '#ffffff', 4.0],
   ])('rates %s on %s at %s to one', (fg, bg, expected) => {
-    /*
-     * The published reference values. `#767676` on white is the canonical
-     * "smallest grey that passes AA for body text" and every checker in the
-     * world puts it at 4.54; `#949494` on black is its counterpart.
-     */
+    // Published reference values: `#767676` on white is the canonical smallest
+    // grey passing AA for body text, at 4.54; `#949494` on black is its counterpart.
     expect(ratio(fg, bg)).toBe(expected)
   })
 
   it('applies the linear branch below the threshold and the curve above it', () => {
-    /*
-     * The `0.03928` branch, pinned directly. Channel 10 is 10/255 = 0.0392,
-     * just under it, so it stays linear: 0.0392/12.92. Channel 11 is just over
-     * and takes the power curve. A build that dropped the branch would be
-     * wrong here by a hair and nowhere else visibly.
-     */
+    // Channel 10 is 10/255 = 0.0392, just under `0.03928`, so it stays linear;
+    // channel 11 is just over and takes the power curve.
     expect(luminance(parseHex('#0a0a0a'))).toBeCloseTo(10 / 255 / 12.92, 12)
     expect(luminance(parseHex('#0b0b0b'))).toBeCloseTo(
       Math.pow((11 / 255 + 0.055) / 1.055, 2.4),
@@ -370,8 +296,6 @@ describe('the contrast instrument', () => {
   })
 
   it('weights green most and blue least, as the coefficients say', () => {
-    // Pure green is the brightest primary and pure blue the darkest. A
-    // transposed coefficient would swap these and nothing else would notice.
     expect(luminance(parseHex('#00ff00'))).toBeCloseTo(0.7152, 4)
     expect(luminance(parseHex('#ff0000'))).toBeCloseTo(0.2126, 4)
     expect(luminance(parseHex('#0000ff'))).toBeCloseTo(0.0722, 4)
@@ -391,15 +315,6 @@ describe('the contrast instrument', () => {
   })
 })
 
-/**
- * Border tokens the suite deliberately does not measure, each with its reason.
- *
- * A border token nobody measures is how `--fs-control-border` came to exist: the
- * kit's field borders were measured and the designer's were not, and the one
- * carrying the whole "there is a control here" message sat at 1.39:1. The answer
- * is not to measure every border -- some are decoration -- it is that a border
- * left unmeasured has to be a decision somebody wrote down.
- */
 const UNMEASURED_BORDERS: Record<string, string> = {
   '--fs-border':
     'A panel divider is decoration, and WCAG 1.4.11 asks nothing of decoration. ' +
@@ -407,12 +322,8 @@ const UNMEASURED_BORDERS: Record<string, string> = {
 }
 
 describe('the contrast figures the documents quote', () => {
-  /*
-   * Declared last on purpose. These read `MEASURED`, which every block above
-   * fills as it runs, and vitest runs a file's tests in declaration order.
-   */
-
-  /** The lowest ratio recorded in each palette. */
+  // Declared last: these read `MEASURED`, which the blocks above fill, and
+  // vitest runs a file's tests in declaration order.
   const lowest = (): Map<string, Measured> => {
     const best = new Map<string, Measured>()
     for (const entry of MEASURED) {
@@ -423,8 +334,7 @@ describe('the contrast figures the documents quote', () => {
   }
 
   it('measured something in all four palettes', () => {
-    // The control for everything below. An empty recording would make the table
-    // check compare nothing against nothing and pass.
+    // An empty recording would make the table check below pass vacuously.
     expect([...lowest().keys()].sort()).toEqual([
       'Designer, dark',
       'Designer, light',
@@ -435,25 +345,13 @@ describe('the contrast figures the documents quote', () => {
   })
 
   it('quotes the lowest pair this suite actually asserts, in docs/accessibility.md', () => {
-    /*
-     * The table was written by hand and checked for nothing but the existence of
-     * the files it names, and one row was wrong: the HTML kit's light row said
-     * 4.83:1, while the lowest pair asserted in that palette is `--fsh-warning`
-     * on `--fsh-surface` at 4.24:1. Half a point, in the one document written so
-     * a reader need not take accessibility on trust.
-     *
-     * Computed rather than transcribed, so a token change that stays above the
-     * floor cannot silently invalidate the figures. Compared to two decimals,
-     * which is how the table is written.
-     */
+    // Compared to two decimals, which is how the table is written.
     const table = read('../docs/accessibility.md')
     const rows = new Map<string, number>()
     for (const match of table.matchAll(/^\| (Designer|HTML kit), (light|dark) +\| +([\d.]+):1/gm)) {
       rows.set((match[1] ?? '') + ', ' + (match[2] ?? ''), Number(match[3]))
     }
 
-    // The row reader is a guard too: a table somebody reformatted would parse to
-    // nothing and every comparison below would pass vacuously.
     expect([...rows.keys()].sort(), 'the contrast table could not be read').toEqual([
       'Designer, dark',
       'Designer, light',
@@ -484,13 +382,6 @@ describe('the contrast figures the documents quote', () => {
   })
 
   it('measures every border token in designer.css, or says why not', () => {
-    /*
-     * A border is what tells somebody a control is there, and the only reason
-     * `--fs-control-border` exists is that nobody had measured the one doing
-     * that job. A new border token added later would be in exactly that
-     * position, so the list of what is measured is derived from the stylesheet
-     * rather than from memory.
-     */
     const declared = [
       ...new Set(
         [...designerCss.matchAll(/(--fs-[a-z0-9-]*border[a-z0-9-]*)\s*:/g)].map(
@@ -515,17 +406,9 @@ describe('the contrast figures the documents quote', () => {
 })
 
 /**
- * Every colour in both stylesheets is a token this suite can see.
- *
- * `tokensFrom` reads custom properties, so a hex literal written straight into
- * a rule is invisible to every assertion above -- and that is not hypothetical:
- * the HTML kit's success and warning stripes were exactly that, outside the
- * theme swap and outside this suite, until the run that added the assertion
- * fifty lines up. Nothing stopped the next one.
- *
- * Only hex is checked, and deliberately. `color-mix` and `rgb(from ...)` build
- * on tokens, so they stay measurable; a bare `#e8eaed` is the form that leaves
- * no trace to follow.
+ * `tokensFrom` reads custom properties, so a hex literal in a rule is invisible
+ * to every assertion above. Only hex is checked: `color-mix` and `rgb(from ...)`
+ * build on tokens, so they stay measurable.
  */
 describe('no colour is written outside the token blocks', () => {
   const literals = (css: string): string[] => {
@@ -538,7 +421,6 @@ describe('no colour is written outside the token blocks', () => {
         if (at < 0) continue
 
         const name = declaration.slice(0, at).trim()
-        // A token declaration is where a colour is supposed to be written.
         if (name.startsWith('--')) continue
 
         const hex = declaration.slice(at + 1).match(/#[0-9a-fA-F]{3,8}\b/g)
@@ -558,11 +440,6 @@ describe('no colour is written outside the token blocks', () => {
   })
 
   it('finds a literal when there is one', () => {
-    /*
-     * The control, and the reason it is here: a matcher that found nothing
-     * would pass both tests above for the wrong reason, which is the failure
-     * mode this whole run keeps turning up.
-     */
     expect(literals('.fs-dialog__actions button { border-color: #e8eaed }')).toEqual([
       '.fs-dialog__actions button { border-color: #e8eaed }',
     ])

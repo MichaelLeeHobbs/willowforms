@@ -1,12 +1,3 @@
-/**
- * The designer shell.
- *
- * Chrome is plain CSS with custom properties, deliberately. The designer must
- * drop into a host app without dragging in a second component library or
- * fighting the host's theme, so it has no UI-library dependency at all. The only
- * component library in play is whichever kit renders the canvas.
- */
-
 import { useId, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { findLanguage, languageTag } from '@willowforms/core'
@@ -102,12 +93,8 @@ export function Designer({
   const [jsonOpen, setJsonOpen] = useState(false)
 
   /*
-   * A polite live region.
-   *
-   * Selecting, moving, adding, and removing all change the document without
-   * changing what has focus, so a screen reader is told nothing unless the
-   * change is announced. Polite rather than assertive: none of it is urgent
-   * enough to interrupt whatever is being read.
+   * Selecting, moving, adding and removing do not move focus, so a screen reader
+   * hears them only if they are announced. Polite: none of it is urgent.
    */
   const [announcement, setAnnouncement] = useState('')
   const announce = useCallback((message: string) => {
@@ -130,10 +117,8 @@ export function Designer({
   )
 
   /*
-   * Selecting on the canvas moves nothing into focus, so without this the
-   * properties panel quietly changes to describe a different component and a
-   * screen reader is told nothing at all. Tree navigation needs no equivalent:
-   * focus lands on the row, which is read on arrival.
+   * Canvas selection moves no focus, so it is announced. Tree selection needs
+   * no announcement: focus lands on the row.
    */
   const selectFromCanvas = useCallback(
     (key: string | undefined) => {
@@ -147,19 +132,10 @@ export function Designer({
 
   const drag = useDrag(commitDrop)
 
-  /*
-   * Below `useDrag`, because Escape has to know whether a drag is in progress:
-   * the spec says it clears the selection *or* abandons a drag, and both
-   * handlers were running. Still unconditional and still in a fixed order, so
-   * the hook rules hold.
-   */
+  // Below `useDrag`: Escape abandons a drag or clears the selection, not both.
   useKeyboardShortcuts(api, shellRef, announce, drag.state !== undefined)
 
-  /*
-   * A view preference, so it lives here and never in the document. Two people
-   * editing one form must not disagree about what the form is because one of
-   * them last looked at it on a phone.
-   */
+  // View state, never written to the document.
   const [viewport, setViewport] = useState<Viewport>('desktop')
   const [fixed, setFixed] = useState(false)
   const [fixedSize, setFixedSize] = useState(DEFAULT_FIXED_SIZE)
@@ -174,85 +150,44 @@ export function Designer({
     [controlledTheme, onThemeChange],
   )
 
-  /*
-   * Which breakpoint the Style tab edits. It follows the viewport, because
-   * authoring a tablet rule with no way to see a tablet is writing blind, and
-   * it can also be `any`, which is the base layer and not a viewport at all.
-   */
   const [styleDevice, setStyleDevice] = useState<Device>('any')
 
-  /*
-   * Which panes are collapsed. A view preference like the two above, and per
-   * pane rather than one shared flag: hiding the palette to see a wide form and
-   * hiding the inspector to see the tree are different intentions.
-   */
   const [collapsed, setCollapsed] = useState({ left: false, right: false })
   const { widths, resize } = usePanelWidths()
   const toggle = useCallback((side: 'left' | 'right') => {
     setCollapsed((current) => ({ ...current, [side]: !current[side] }))
   }, [])
 
-  /*
-   * Which language the canvas renders in. Undefined means the document's own
-   * default, which is what the renderer already falls back to, so this stays out
-   * of the way until someone picks a language.
-   */
+  // Undefined renders the document's default language.
   const [language, setLanguage] = useState<string | undefined>(undefined)
 
   /*
-   * A language can be removed while the canvas is showing it, which would leave
-   * the canvas rendering every translation as its raw key. Derived rather than
-   * corrected in an effect, so there is no frame where that is on screen.
+   * A removed language would render every translation as its raw key. Derived
+   * rather than corrected in an effect, so no frame shows that.
    */
   const languages = languagesOf(api.document)
-  /*
-   * `findLanguage`, not a fourth inline re-spelling of the tag rule.
-   *
-   * Core exports it for exactly this question and nothing outside its own test
-   * called it, while three places here compared `languageTag(l)` by hand -- and
-   * the whole reason that function exists is that the two spellings of a
-   * language drifted apart once already.
-   */
   const stillThere = language !== undefined && findLanguage(languages, language) !== undefined
   const activeLanguage = stillThere ? language : undefined
 
   /*
-   * And forgotten once it is gone, rather than masked.
-   *
-   * The line above hides a language the document no longer has, which is right
-   * for the frame it is removed in. Holding on to the name is what is wrong: add
-   * the same language back an hour later and the canvas jumps to it, because a
-   * choice nobody remembers making is still sitting in this state.
-   *
-   * Adjusted during render rather than in an effect. React re-runs this
-   * component immediately with the new state and paints once, where an effect
-   * would paint the stale frame first and then correct it -- and the compiler
-   * rule against `setState` in an effect is pointing at exactly that.
+   * Forgotten as well as masked, or re-adding the language later jumps the
+   * canvas back to it. Set during render: an effect would paint the stale frame
+   * first.
    */
   if (language !== undefined && !stillThere) setLanguage(undefined)
 
   return (
     <div
       ref={shellRef}
-      /*
-       * Focusable, so the shortcuts below can be bound here rather than to the
-       * whole page. Not in the tab order — this is a container, not a control.
-       */
+      // Focusable for the shortcuts, but a container, so not in the tab order.
       tabIndex={-1}
       onPointerDown={(event) => {
         const target = event.target
         /*
-         * Anything that takes focus itself keeps it: a click in a text field
-         * must not be stolen by the container it happens to be inside.
-         *
-         * Except on the canvas while editing, where nothing takes focus at all.
-         * The canvas cancels mousedown's default in the capture phase so a click
-         * selects rather than types, and this exemption then fired on the very
-         * elements that had just been prevented from focusing -- so the shell
-         * stayed unfocused, its key handler never ran, and Delete, Ctrl+Z and
-         * Escape did nothing after clicking a field. Two guards, opposite
-         * assumptions about the same click; `canvasSwallowsFocus` is the one
-         * they share.
+         * Leave focus with anything that takes it itself, except canvas
+         * elements, which the canvas stops from focusing while editing. Without
+         * that exception the shell never gets focus and the shortcuts go dead
+         * after a canvas click.
          */
         if (
           target instanceof Element &&
@@ -396,9 +331,8 @@ export function Designer({
             kit={kit}
             device={styleDevice}
             onDevice={(next) => {
-              // `any` is the base layer rather than a device, so choosing it
-              // leaves the canvas where it is; a device moves the canvas too,
-              // because a rule for a width you cannot see is written blind.
+              // `any` is the base layer, not a device, so it leaves the canvas
+              // alone. A device moves the canvas so the author sees that width.
               if (next !== 'any') {
                 setViewport(next)
                 setFixed(false)
@@ -442,13 +376,6 @@ export function Designer({
   )
 }
 
-/**
- * The grip that collapses a pane.
- *
- * It sits outside the pane it controls rather than inside it, because a control
- * inside a collapsed pane is a control nobody can reach. The chevron points the
- * way the pane will move, which is the only thing about it worth learning.
- */
 function PaneHandle({
   side,
   controls,
@@ -456,24 +383,18 @@ function PaneHandle({
   onToggle,
 }: {
   side: 'left' | 'right'
-  /** Id of the pane this opens and closes. */
   controls: string
   collapsed: boolean
   onToggle: () => void
 }): ReactNode {
   const label = side === 'left' ? 'Components and structure' : 'Component properties'
-  // Collapsed points inward, expanded points outward, in both directions.
   const pointsStart = side === 'left' ? collapsed : !collapsed
   return (
     <button
       type="button"
       className={'fs-pane-handle fs-pane-handle--' + side}
       aria-expanded={!collapsed}
-      /*
-       * The pane is `hidden` rather than unmounted, so this always resolves.
-       * Together with aria-expanded it is the disclosure pattern: without it a
-       * screen reader is told something is expanded and not what.
-       */
+      // Resolves while collapsed only because the pane is `hidden`, not unmounted.
       aria-controls={controls}
       aria-label={(collapsed ? 'Show ' : 'Hide ') + label}
       title={(collapsed ? 'Show ' : 'Hide ') + label}
@@ -487,11 +408,8 @@ function PaneHandle({
 }
 
 /**
- * The viewports the canvas can pretend to be.
- *
- * `Device` also has `any`, which is the base layer per-breakpoint CSS falls back
- * to rather than a device anyone can look at. It is deliberately not offered
- * here. See [06-inspector.md](../../../docs/spec/06-inspector.md).
+ * No `any`: it is the base CSS layer, not a viewport. See
+ * [06-inspector.md](../../../docs/spec/06-inspector.md).
  */
 const VIEWPORTS: { id: Viewport | 'fixed'; label: string; icon: IconName }[] = [
   { id: 'desktop', label: 'Desktop', icon: 'screen' },
@@ -541,22 +459,12 @@ function Toolbar({
           JSON
         </button>
 
-        {/*
-         * Only when the host can honour it. A Save button the designer cannot
-         * deliver on is worse than none, and onChange already emits every
-         * version for hosts that save from that.
-         */}
         {onSave && (
           <button type="button" onClick={onSave}>
             Save
           </button>
         )}
 
-        {/*
-         * Selects rather than toggle groups. Both of these are set once and
-         * left, unlike the viewport, and the language list is as long as the
-         * document says it is.
-         */}
         {languages.length > 1 && (
           <div className="fs-toolbar__field">
             <label className="fs-visually-hidden" htmlFor={idBase + '-fs-toolbar-language'}>
@@ -568,16 +476,7 @@ function Toolbar({
               onChange={(e) => onLanguage(e.target.value || undefined)}
             >
               <option value="">Default language</option>
-              {/*
-               * Keyed by position and tag, not by tag.
-               *
-               * Two languages can carry the same tag: nothing dedupes
-               * `languages`, and `validateDocument` checks only that
-               * `defaultLanguage` is present. A document with `en` twice made
-               * React see two children with one key here, which it warns about
-               * and then reconciles by guessing. `FormSettings` already keys
-               * this list the same way; this picker and `Binding`'s did not.
-               */}
+              {/* Keyed by position too: nothing dedupes `languages` by tag. */}
               {languages.map((entry, at) => (
                 <option key={String(at) + ':' + languageTag(entry)} value={languageTag(entry)}>
                   {entry.name}
@@ -595,13 +494,7 @@ function Toolbar({
             id={idBase + '-fs-toolbar-theme'}
             value={theme}
             onChange={(e) => {
-              /*
-               * Checked rather than asserted. `e.target.value` is a DOM string,
-               * and `as Theme` is a promise about markup made by the code that
-               * reads it -- a promise this component keeps today and an
-               * extension's autofill, a userscript or a future option does not
-               * have to.
-               */
+              // Checked, not cast: the value is whatever string the DOM holds.
               const chosen = e.target.value
               if (chosen === 'system' || chosen === 'light' || chosen === 'dark') onTheme(chosen)
             }}
@@ -612,11 +505,6 @@ function Toolbar({
           </select>
         </div>
 
-        {/*
-         * A group of toggles rather than a select: three options that are set
-         * and re-set constantly, where seeing which one is active matters more
-         * than saving the width.
-         */}
         <div className="fs-toolbar__group" role="group" aria-label="Viewport">
           {VIEWPORTS.map((option) => (
             <button
@@ -651,14 +539,7 @@ function useKeyboardShortcuts(
 ): void {
   const { undo, redo, removeComponent, select, selectedKey } = api
 
-  /*
-   * Whether a drag is in progress, readable from the handler without listing it
-   * as a dependency.
-   *
-   * A ref because `onKeyDown` is memoised and re-creating it on every drag state
-   * change would re-register the native listener mid-gesture, which is the
-   * thing the listener's own comment says it is bound to the shell to avoid.
-   */
+  // A ref, so a drag state change does not re-register the listener mid-gesture.
   const dragging = useRef(isDragging)
   useEffect(() => {
     dragging.current = isDragging
@@ -666,12 +547,6 @@ function useKeyboardShortcuts(
 
   const onKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      /*
-       * Narrowed, not asserted. A keydown target is any `EventTarget` -- the
-       * document, the window, a text node from a synthetic event -- and the
-       * cast bought nothing the optional chains below did not already do.
-       */
-
       const target = event.target instanceof Element ? event.target : null
       const editable = event.target instanceof HTMLElement ? event.target : null
       const tag = target?.tagName
@@ -707,8 +582,6 @@ function useKeyboardShortcuts(
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedKey) {
         event.preventDefault()
         removeComponent(selectedKey)
-        // Announced, like every other addition and removal. These two were the
-        // only shell mutations that said nothing, against the shell spec.
         announce(selectedKey + ' removed.')
         return
       }
@@ -724,17 +597,9 @@ function useKeyboardShortcuts(
   )
 
   /*
-   * Bound to the shell, not to `window`.
-   *
-   * On `window` the designer claimed Ctrl+Z, Delete, Backspace and Escape for
-   * the entire host page — a form builder embedded in an admin panel took that
-   * page's undo away from it, and gave it back nothing.
-   *
-   * The shell carries `tabIndex={-1}` and takes focus when a click lands on
-   * something that will not take it itself, so a keystroke after selecting a
-   * component on the canvas still arrives. That is also what makes the
-   * behaviour honest: the shortcuts belong to the designer when the designer
-   * has focus, which is what a person would guess.
+   * Bound to the shell, not `window`, so the host page keeps its own Ctrl+Z,
+   * Delete, Backspace and Escape. The shell takes focus on pointerdown so keys
+   * still arrive after a canvas click.
    */
   useEffect(() => {
     const element = shell.current

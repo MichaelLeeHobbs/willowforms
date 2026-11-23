@@ -50,14 +50,7 @@ import { PreviewData } from './PreviewData.js'
 /** Shared, so an unvalidated canvas does not allocate a new object per render. */
 const NO_ERRORS: FormErrors = Object.freeze({})
 
-/**
- * A device the canvas can pretend to be.
- *
- * `Device` from core also has `any`, which is the base layer per-breakpoint CSS
- * falls back to rather than something anyone can look at. Excluding it here
- * means the viewport control cannot offer it and the Style tab cannot ask the
- * canvas to show it.
- */
+/** Without `any`: that is the base CSS layer, not a device anyone can view. */
 export type Viewport = Exclude<Device, 'any'>
 
 export interface CanvasProps {
@@ -67,12 +60,7 @@ export interface CanvasProps {
   kit: Kit
   rendererKit: RendererKit
   drag: DragController
-  /**
-   * Which device the canvas is pretending to be. A view preference, not part of
-   * the document: two people editing one form must not disagree about what it
-   * is, and nobody wants a form whose stored shape depends on the last window
-   * someone had open.
-   */
+  /** A view preference, never stored in the document. */
   viewport: Viewport
   fixedSize?: { width: number; height: number }
   /** Language tag the canvas renders in. Omitted means the document's default. */
@@ -80,17 +68,11 @@ export interface CanvasProps {
 }
 
 /**
- * How wide the frame is at each viewport.
+ * Desktop has no width: the canvas is the viewport.
  *
- * Desktop has no width because it is not a simulation: the canvas is the
- * viewport, and constraining it would be inventing a device nobody asked for.
- * The other two are the widths the common breakpoints are written against.
- *
- * Not clamped to the canvas. A 768px frame in a 656px canvas would be 656px
- * wide while claiming to be a tablet, which is the one thing a simulation must
- * not do. It overflows and the canvas scrolls instead. Scaling it down with a
- * transform would be worse still: every rectangle the drop arithmetic measures
- * would stop matching the coordinates the pointer arrives in.
+ * Never clamped or scaled to fit; the canvas scrolls instead. A clamped frame
+ * misstates the device, and a transform would make measured rectangles stop
+ * matching pointer coordinates.
  */
 const FRAME_WIDTH: Partial<Record<Viewport, number>> = {
   tablet: 768,
@@ -99,34 +81,16 @@ const FRAME_WIDTH: Partial<Record<Viewport, number>> = {
 
 /** Everything a drag needs to know about the canvas, frozen when it starts. */
 interface Snapshot {
-  /** Which drag this was measured for. A mismatch means it is stale. */
   dragId: number
   candidates: Candidate[]
   origin: Origin
 }
 
-/*
- * The canvas renders the real runtime renderer, not a design-time approximation.
- * What you see is literally what ships, which is the only way a WYSIWYG builder
- * stays honest as the kit evolves.
- *
- * While editing, a click is a selection gesture, so pointer events are swallowed
- * in the capture phase before the kit's components see them. Preview mode hands
- * the form back its own events untouched.
- *
- * (Written as a plain block, not a doc comment: it sat as one directly above
- * `isOwnChrome`'s, so the paragraph about the canvas attached to nothing and
- * `isOwnChrome` appeared to carry a description of the canvas. The `Canvas`
- * component's own summary is at its declaration.)
- */
+// What the canvas renders and which events it swallows: docs/spec/05-canvas.md.
+
 /**
- * A click on the designer's own chrome inside the surface.
- *
- * The canvas cancels pointer events in the capture phase so a click selects a
- * component rather than operating it. That rule is about the kit's components,
- * and the selection toolbar sits inside the surface so it can be positioned
- * against the frame -- without this exemption the canvas swallowed its own
- * toolbar's clicks and the buttons read as dead rather than broken.
+ * The selection toolbar sits inside the surface, so it is exempt from the
+ * capture-phase handlers that make a click select rather than operate.
  */
 const isOwnChrome = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('.fs-selection') !== null
@@ -174,7 +138,6 @@ export function Canvas({
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
   const [actionNote, setActionNote] = useState('')
-  /** Fields the user has changed. A field validates while typing only after it is touched. */
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [hover, setHover] = useState<{ key: string | undefined; row: string | undefined }>({
     key: undefined,
@@ -190,11 +153,6 @@ export function Canvas({
 
   const frameWidth = fixedSize?.width ?? FRAME_WIDTH[viewport]
 
-  /*
-   * Omitted for the root, which has no siblings to sit among and cannot be
-   * removed. Passing handlers that refuse would put three dead buttons on the
-   * frame, which is worse than no toolbar.
-   */
   const selected = api.selectedNode
   const selectedKey = api.selectedKey
 
@@ -214,11 +172,7 @@ export function Canvas({
 
     return {
       onDuplicate: () => duplicateComponent(selectedKey),
-      /*
-       * A fresh component of the same type, not a copy. Duplicate is for "another
-       * one configured like this"; this is for "another one of these", which is
-       * the commoner intent and the one the palette makes you aim for.
-       */
+      // A fresh component of the same type, not a copy: copying is Duplicate's job.
       onAddSibling: () => {
         const def = indexKit(kit).get(selected.type)
         if (def) addComponent(def, parent.key, index + 1)
@@ -241,12 +195,7 @@ export function Canvas({
     const all = validateForm(api.document.root, data, { context, messages })
     if (validated) return all
 
-    /*
-     * Before a submit, only the fields that asked for it. A field validates
-     * while typing when its schema says so and the user has actually touched
-     * it: showing "This field is required" on a field nobody has reached yet
-     * is how a form greets someone with a wall of red.
-     */
+    // Before a submit, only touched `autoValidate` fields: docs/spec/06-inspector.md.
     // Errors use node keys; touched values use data keys in the same row path.
     const eager = autoValidateKeys(api.document.root)
     let shown: FormErrors | undefined
@@ -336,7 +285,7 @@ export function Canvas({
 
   const { snapshot, takeSnapshot, clearSnapshot } = useDragSnapshot(measureNow)
 
-  // Refresh on scrolling and resizing; pointer movement alone reuses the measurement.
+  // Only scroll and resize invalidate the measurement; pointer movement reuses it.
   const dragId = dragState?.id
   useEffect(() => {
     if (dragId === undefined || preview) return
@@ -349,8 +298,6 @@ export function Canvas({
     }
   }, [dragId, preview, takeSnapshot])
 
-  // `isOwnChrome` is defined above the component, so the callbacks below are not
-  // closing over a value their dependency lists do not name.
   const onMouseDownCapture = useCallback((event: MouseEvent) => {
     if (isOwnChrome(event.target)) return
     event.preventDefault()
@@ -360,18 +307,13 @@ export function Canvas({
   const onPointerDownCapture = useCallback(
     (event: ReactPointerEvent) => {
       if (isOwnChrome(event.target)) return
-      /*
-       * The primary button only. It armed a drag for any of them, so a
-       * right-press and a small movement relocated the component under its own
-       * context menu — the menu opens, the component has already moved, and
-       * nothing about the gesture said it would.
-       */
+      // Primary button only: a drifting right-press would move the component
+      // under its own context menu.
       if (event.button !== 0) return
 
       event.preventDefault()
 
       const key = keyFromEventTarget(event.target)
-      // The root is the canvas itself; dragging it has nowhere to go.
       if (!key || key === api.document.root.key) return
       begin({ kind: 'move', key, label: key }, event)
     },
@@ -400,18 +342,13 @@ export function Canvas({
       if (consumeClick()) return
       const key = keyFromEventTarget(event.target)
       select(key)
-      // Which drawn copy was pointed at. Geometry only: the node selected is
-      // the authored one, and there is only ever one of those.
+      // The row only places the frame; the selection is the one authored node.
       setClicked({ key, row: rowFromEventTarget(event.target) })
     },
     [consumeClick, select],
   )
 
-  /*
-   * Derived during render rather than in an effect. The pointer moves many times
-   * a second, and setting state from an effect would render twice for every one
-   * of them: once for the new pointer position, once for the target it implies.
-   */
+  // Derived during render: an effect would render twice for every pointer move.
   const dropTarget = useMemo<DropTarget | undefined>(() => {
     if (!dragState || preview || snapshot?.dragId !== dragState.id) return undefined
 
@@ -421,29 +358,18 @@ export function Canvas({
   }, [dragState, preview, snapshot])
 
   /*
-   * Asked by the controller when the pointer is released, and it measures afresh
-   * rather than trusting the snapshot the indicator is drawn from.
+   * Measures afresh on release: the indicator's snapshot can be one event
+   * behind, and a quick flick would lose the drop.
    *
-   * That snapshot is taken by a React pointer handler, which always runs before
-   * the window listener that records the drag, so it is inherently one event
-   * behind. A quick flick from the palette to the canvas can be released before
-   * any of it has happened, and the drop would be silently lost. Measuring here
-   * costs one layout pass per release and is never stale.
-   *
-   * No bounds check of its own. Whether the point is over the canvas is decided
-   * by `resolveDrop`, which answers nothing when the point is outside every
-   * container -- and the surface's client box is the wrong question anyway: the
-   * canvas scrolls, so a legitimate drop onto the last component of a long form
-   * is released below the visible box while sitting squarely inside the form.
-   * Adding that check broke exactly that drop, which is how it earned this
-   * comment instead of the code.
+   * No bounds check against the surface's client box: the canvas scrolls, so a
+   * valid drop can be released below the visible box. `resolveDrop` already
+   * answers nothing outside every container.
    */
   const resolveRelease = useCallback(
     (clientX: number, clientY: number, draggedKey: string | undefined) => {
       if (preview) return undefined
 
-      // `-1`, a snapshot no drag can be holding: this one is measured for this
-      // release and thrown away, and passing `0` claimed to be drag zero's.
+      // `-1`: an id no drag holds, because this snapshot is used once and discarded.
       const snap = measureNow(-1)
       if (!snap) return undefined
 
@@ -590,18 +516,12 @@ export function Canvas({
               onPointerDownCapture,
               onClickCapture,
               onKeyDownCapture,
-              // Measured on the first move of each drag that reaches the canvas,
-              // including one that started in the palette and never touched it.
-              // Doing this in an event handler rather than an effect is what
-              // keeps render a pure function of state.
+              // Measured on a drag's first move over the canvas, palette drags
+              // included; in a handler, not an effect, so render stays pure.
               onPointerMove: () => {
                 if (dragState && snapshot?.dragId !== dragState.id) takeSnapshot(dragState.id)
               },
-              /*
-               * The row as well as the key. The hover frame measured with no
-               * row, so `nodeElement` fell back to the first match and outlined
-               * row 0 whichever row the pointer was over.
-               */
+              // The row too: without it `nodeElement` outlines a repeater's row 0.
               onPointerOver: (event: ReactPointerEvent) =>
                 setHover({
                   key: keyFromEventTarget(event.target),
@@ -611,12 +531,7 @@ export function Canvas({
             }
           : {})}
       >
-        {/*
-         * The form sits inside a frame the designer owns, never in a wrapper the
-         * kit can see. Hit-testing is `closest('[data-fs-key]')` and the overlay
-         * measures against the surface, so an element carrying neither is
-         * invisible to both.
-         */}
+        {/* Designer-owned and keyless, so hit-testing and the overlay both ignore it. */}
         <div
           className="fs-canvas__frame"
           data-fs-viewport={fixedSize ? 'fixed' : viewport}

@@ -3,17 +3,10 @@
  */
 
 /**
- * Canvas selection.
+ * A minimal fake kit, not kit-mui: the designer must not depend on a component
+ * library. The kit's one obligation is spreading `nodeProps` onto a root element.
  *
- * The kit here is a deliberately minimal fake rather than @willowforms/kit-mui.
- * The designer must never depend on a component library, and a test that
- * reached for MUI would quietly make it do so. A fake also proves the point the
- * kit seam is meant to prove: selection works against any kit that honours the
- * contract, and its one obligation is spreading `nodeProps` onto a root element.
- *
- * Geometry is not asserted anywhere below. jsdom has no layout engine, so every
- * getBoundingClientRect returns zeros; the frame's position and size are a
- * browser check, not a unit-test one.
+ * No geometry here: jsdom returns zero rectangles.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -29,13 +22,7 @@ import { Designer } from '../Designer.js'
 
 const staticProp = (value: string): PropValue => ({ kind: 'static', value })
 
-/*
- * How many times the kit has been asked to draw a component.
- *
- * The only way to see a render that produces identical output. A drag moves the
- * pointer, not the document, so every one of these during a drag is work whose
- * result cannot have changed.
- */
+// Field commits: the only way to see a render whose output did not change.
 let fieldRenders = 0
 
 function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
@@ -43,9 +30,8 @@ function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
 }
 
 function Field({ nodeProps, props, value, error, onChange }: NodeRendererProps): ReactNode {
-  // Counted on commit rather than during render, which is where a component is
-  // allowed to have an effect. It measures the same thing: a subtree React
-  // skips is one this function was never called for, so it never commits.
+  // Counted on commit, since render must stay pure. A subtree React skips
+  // never commits, so this still counts renders.
   useEffect(() => {
     fieldRenders += 1
   })
@@ -61,11 +47,7 @@ function Field({ nodeProps, props, value, error, onChange }: NodeRendererProps):
           onChange={(e) => onChange(e.target.value)}
         />
       </label>
-      {/*
-       * Displaying the error is a kit obligation, so the fixture has to do it
-       * too. It did not, which is why nothing here noticed the canvas computing
-       * errors without the context it hands the renderer.
-       */}
+      {/* Displaying the error is a kit obligation, so the fake does it too. */}
       <span data-testid={nodeProps['data-fs-key'] + '-error'}>{error ?? ''}</span>
     </div>
   )
@@ -96,16 +78,9 @@ const kit: Kit = {
       events: [],
     },
     /*
-     * The root's own type, and it was missing.
-     *
-     * `measureNow` asks the palette index whether a candidate is a container,
-     * so with no `Screen` entry `defs.get('Screen')?.container` was `undefined`
-     * and the canvas had nowhere a drop could land -- under a real layout
-     * engine as much as under jsdom. Every drop test here was therefore passing
-     * for a second reason nobody had noticed, on top of the zero rectangles.
-     *
-     * `root: true` keeps it out of the palette, which is what the kit contract
-     * asks of the component that is already on the canvas.
+     * The root's type. `measureNow` asks the kit whether a candidate is a
+     * container, so without this entry no drop could land. `root: true` keeps it
+     * out of the palette.
      */
     {
       type: 'Screen',
@@ -136,11 +111,8 @@ function makeDocument(): FormDocument {
       ],
     },
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US`, as `createDocument` makes. Without a dialect, a bundle keyed by
+    // tag and one keyed by bare code would be the same string.
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -156,7 +128,6 @@ interface Harness {
   hoverFrame: () => HTMLElement | null
   /** Keys of the root's children, in document order. */
   keys: () => string[]
-  /** How many times the kit has drawn a field since this harness was made. */
   renders: () => number
 }
 
@@ -167,8 +138,6 @@ function setup(): Harness {
     <Designer initialDocument={makeDocument()} kit={kit} rendererKit={rendererKit} />,
   )
 
-  // The structure tree is behind a tab in the left pane. Opened here so every
-  // test starts where it used to, rather than repeating the click in each.
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
   const node = (key: string): HTMLElement => {
     const el = view.container.querySelector<HTMLElement>(`[data-fs-key="${key}"]`)
@@ -221,7 +190,6 @@ describe('canvas selection', () => {
     await user.click(input)
     await user.keyboard('typed')
 
-    // Focus never moved into the canvas, so the keystrokes went nowhere.
     expect(document.activeElement).not.toBe(input)
     expect(input.value).toBe('')
   })
@@ -241,8 +209,6 @@ describe('canvas selection', () => {
   it('selects the nearest ancestor when a kit drops nodeProps', async () => {
     const { user, view, node, frame } = setup()
 
-    // The Silent renderer emits no data-fs-key, so the hit walks past it to the
-    // root. It stays reachable from the tree; it just cannot be picked directly.
     expect(view.container.querySelector('[data-fs-key="quiet"]')).toBeNull()
 
     await user.click(screen.getByText('Quiet'))
@@ -290,27 +256,18 @@ describe('canvas selection', () => {
     await user.keyboard('hello')
 
     expect(input.value).toBe('hello')
-    // No overlay and no selection gesture while previewing.
     expect(frame()).toBeNull()
     expect(view.container.querySelector('.fs-selection')).toBeNull()
   })
 })
 
-/**
- * Drag and drop, as far as jsdom can go.
- *
- * The arithmetic that decides where a drop lands is covered in dnd.test.ts, on
- * measured rectangles jsdom cannot produce. What is worth checking here is the
- * wiring around it: that a press below the threshold is still a click, that one
- * above it is not, and that a drag which lands nowhere changes no document.
- */
+/** Wiring only: drop arithmetic needs real rectangles and is tested in dnd.test.ts. */
 describe('drag and drop wiring', () => {
   it('treats a press without movement as a click, not a drag', async () => {
     const { user, node, frame } = setup()
 
     await user.click(node('second'))
 
-    // Selection happened, so the click was not swallowed by the drag controller.
     expect(frame()).not.toBeNull()
     expect(screen.getByDisplayValue('Second')).toBeTruthy()
   })
@@ -325,29 +282,18 @@ describe('drag and drop wiring', () => {
       { target: from, keys: '[/MouseLeft]', coords: { clientX: 90, clientY: 200 } },
     ])
 
-    // Every rect is zero in jsdom, so no drop resolves and nothing moves. The
-    // point is that the release did not fall through and select instead.
+    // jsdom rectangles are zero, so no drop resolves and nothing moves.
     expect(frame()).toBeNull()
     expect(keys()).toEqual(['first', 'second', 'quiet'])
   })
 
   it('leaves the document alone when a drag lands nowhere', async () => {
     /*
-     * What this can and cannot say.
-     *
-     * jsdom gives every element a zero rectangle, so no point is inside
-     * anything and no drop resolves -- which means an unchanged document is
-     * also what a canvas with its whole release path deleted would produce.
-     * The document assertion alone proves nothing, and used to be all there
-     * was.
-     *
-     * So what is asserted here is the wiring jsdom can see: the drag armed (a
-     * label appeared), and it was let go of afterwards. A palette drag released
-     * off the canvas adding nothing is checked in `e2e/authoring.spec.ts`,
-     * where rectangles are real.
+     * jsdom rectangles are zero, so an unchanged document proves nothing alone;
+     * this asserts the drag armed and was released. The off-canvas release
+     * itself is checked in `e2e/authoring.spec.ts`.
      */
     const { user, view, keys } = setup()
-    // Back to the palette: setup() opens the Tree tab, which most tests want.
     await user.click(screen.getByRole('tab', { name: 'Components' }))
 
     const paletteItem = screen.getByTitle('Add Field, or drag it onto the canvas')
@@ -372,7 +318,6 @@ describe('drag and drop wiring', () => {
   it('still adds from the palette on a plain click', async () => {
     const { user, keys } = setup()
 
-    // Back to the palette: setup() opens the Tree tab, which most tests want.
     await user.click(screen.getByRole('tab', { name: 'Components' }))
     await user.click(screen.getByTitle('Add Field, or drag it onto the canvas'))
 
@@ -392,12 +337,6 @@ describe('drag and drop wiring', () => {
 
     const label = view.container.querySelector<HTMLElement>('.fs-drag-label')
     expect(label?.textContent).toBe('first')
-    /*
-     * And where it is, which the test named "follows the pointer" never asked.
-     * The position is an inline style, which jsdom can read perfectly well, so a
-     * label pinned to the corner for the whole gesture passed a test about it
-     * moving.
-     */
     expect(label?.style.left).toBe('90px')
     expect(label?.style.top).toBe('200px')
 
@@ -427,18 +366,6 @@ describe('drag and drop wiring', () => {
   })
 })
 
-/**
- * The release path.
- *
- * jsdom has no layout, so no drop can actually resolve here and the assertions
- * are about the wiring rather than the geometry. The case worth pinning is a
- * release that arrives immediately after the drag starts: the drop indicator is
- * drawn from a snapshot taken by a React pointer handler, which always runs
- * before the window listener that records the drag and is therefore one event
- * behind. An earlier version published the target from an effect, so a quick
- * release saw nothing and silently dropped the component on the floor. The
- * controller now asks each zone to resolve the release itself, measuring afresh.
- */
 describe('release handling', () => {
   it('does not throw when a release arrives before any indicator is drawn', async () => {
     const { user, node, keys } = setup()
@@ -471,19 +398,6 @@ describe('release handling', () => {
 })
 
 describe('a component a condition hides', () => {
-  /*
-   * Shipped broken. The canvas renders through the same FormRenderer as
-   * preview, with `data` that starts empty, and edit mode swallows pointer
-   * events so a click selects rather than types. Nothing on the canvas can ever
-   * satisfy a condition, so a component with `renderWhen` set was absent from
-   * the DOM entirely: not visible, not selectable there, and skipped by
-   * `measureTree` so nothing could be dropped into it.
-   *
-   * The tests already knew half of this — `keys()` above reads the tree rather
-   * than the canvas because "a node hidden by renderWhen is a row here and no
-   * element there" — written as a caution about testing, without anyone noticing
-   * it described an authoring hole.
-   */
   const conditional = (): FormDocument => {
     const doc = makeDocument()
     doc.root.children![1]!.renderWhen = {
@@ -526,16 +440,9 @@ describe('a component a condition hides', () => {
 
   describe('the preview data and error dumps', () => {
     /*
-     * `designer.css` caps `.fs-canvas__data pre` at 180px and scrolls it, and the
-     * markup carried no `tabIndex`, so a keyboard user reached the first few
-     * lines of a long form's data and had no way to reach the rest. A pointer
-     * user could read all of it.
-     *
-     * axe's `scrollable-region-focusable` is the rule that names this, and
-     * `test/a11y.test.tsx` disables it by name along with two others for want of
-     * a layout engine -- so the enforced suite was configured such that it could
-     * not report this. Asserted directly here instead, which needs no layout: the
-     * attribute is either on the element or it is not.
+     * The dumps scroll (`designer.css`), so they need a tab stop. axe's
+     * `scrollable-region-focusable` is off in `test/a11y.test.tsx` for want of
+     * layout, so the attribute is asserted directly.
      */
     it('are focusable, so a keyboard can scroll them', () => {
       const view = open()
@@ -551,8 +458,6 @@ describe('a component a condition hides', () => {
     })
 
     it('say what they are when focus lands on them', () => {
-      // A tab stop that announces nothing is its own defect: the reader gets
-      // "group" and has to guess which of the two they are in.
       const view = open()
       fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
       fireEvent.click(screen.getByRole('button', { name: 'Diagnostics' }))
@@ -575,11 +480,6 @@ describe('a component a condition hides', () => {
 })
 
 describe('a document with steps', () => {
-  /*
-   * A step is a container shown when `context.step` equals its own name. The
-   * canvas has to supply that context or preview shows an empty form and the
-   * author cannot check their own wizard.
-   */
   const stepped = (): FormDocument => {
     const doc = makeDocument()
     const step = (name: string, child: ComponentNode): ComponentNode => ({
@@ -619,7 +519,6 @@ describe('a document with steps', () => {
   })
 
   it('shows no switcher for a form that declares no steps', () => {
-    // It reads the flow out of the document, so an ordinary form gets nothing.
     render(<Designer initialDocument={makeDocument()} kit={kit} rendererKit={rendererKit} />)
 
     expect(screen.queryByLabelText('Step')).toBeNull()
@@ -640,13 +539,6 @@ describe('a document with steps', () => {
   })
 
   it('validates the step preview is showing, rather than treating it as hidden', async () => {
-    /*
-     * The canvas gives the renderer a context and has to give validateForm the
-     * same one. Without it the renderer draws step one while validateForm calls
-     * it hidden and reports nothing, so Validate on an empty required field
-     * comes back clean. That is the disagreement isVisible exists to prevent,
-     * arriving through an argument list rather than a second code path.
-     */
     const user = userEvent.setup()
     const view = open()
 
@@ -661,8 +553,6 @@ describe('a document with steps', () => {
   })
 
   it('shows every step while editing, so all of them can be arranged', () => {
-    // Editing reveals what a condition hides, so a step the author is not
-    // previewing is still there to drop into.
     const view = open()
 
     expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
@@ -673,21 +563,8 @@ describe('a document with steps', () => {
 })
 
 /**
- * Dragging does not re-render the form under the pointer.
- *
- * The drag controller puts the pointer position in React state, and it has to:
- * the drop indicator follows the pointer, and both the canvas and the tree draw
- * one. So the canvas re-renders on every `pointermove`, at pointer-event
- * frequency, which is fine.
- *
- * What is not fine is what used to happen below it. Nothing stood between the
- * canvas and the form, so every one of those renders walked the whole document
- * — `isVisible` and `resolveProps` for every node, then every kit component —
- * to produce output that cannot have changed, because a pointer position is not
- * an input to any of it.
- *
- * The boundary is element identity: the canvas hands React the same
- * `<FormRenderer>` element it handed it last time, and React skips the subtree.
+ * The canvas re-renders on every pointer move of a drag; the form must not. The
+ * boundary is element identity: the canvas reuses its `<FormRenderer>` element.
  */
 describe('a drag over the canvas', () => {
   it('does not re-render the components under it', async () => {
@@ -699,31 +576,12 @@ describe('a drag over the canvas', () => {
     await user.pointer({ target, keys: '[MouseLeft>]', coords: { clientX: 10, clientY: 10 } })
     const before = renders()
 
-    /*
-     * Past the threshold, then a few moves, which is the shortest real drag.
-     *
-     * `pointerId: 1` on every one, because `user.pointer` above uses that for a
-     * mouse and `fireEvent` defaults to 0 -- so without it this fixture is two
-     * *different* pointers for one physical gesture, which is not a thing a
-     * browser produces. `useDrag` now ignores a move from a pointer that did
-     * not start the drag, which is what makes finger B unable to commit finger
-     * A's drag, and this fixture had to start modelling the identity the
-     * browser fills in.
-     */
+    // `pointerId: 1` is the mouse `user.pointer` pressed (`fireEvent` defaults to
+    // 0), and `useDrag` ignores moves from any other pointer.
     fireEvent.pointerMove(window, { clientX: 40, clientY: 40, pointerId: 1 })
     fireEvent.pointerMove(window, { clientX: 60, clientY: 60, pointerId: 1 })
     fireEvent.pointerMove(window, { clientX: 80, clientY: 80, pointerId: 1 })
 
-    /*
-     * A drag is actually in flight, which was assumed rather than asserted.
-     *
-     * The canvas re-renders during this test only because `useDrag` puts the
-     * pointer position in state. If `begin` ever stopped arming -- the
-     * pointerdown arrives through `onPointerDownCapture`, which has three early
-     * returns -- the canvas would not re-render at all, `renders() === before`
-     * would hold, and this would go green with the memo it exists to defend
-     * deleted.
-     */
     expect(
       view.container.querySelector('.fs-drag-label'),
       'no drag armed, so this counted the renders of a canvas doing nothing',
@@ -735,10 +593,6 @@ describe('a drag over the canvas', () => {
   })
 
   it('still re-renders them when the document changes', async () => {
-    /*
-     * The control. A boundary that never lets anything through would pass the
-     * test above and freeze the canvas, which is the whole product.
-     */
     const { user, renders } = setup()
     const before = renders()
 
@@ -748,9 +602,7 @@ describe('a drag over the canvas', () => {
   })
 
   it('still re-renders them when a canvas prop changes', async () => {
-    // The second control, on the other input. Preview flips `revealHidden`,
-    // which the renderer reads, so a memo that ignored it would draw the wrong
-    // thing rather than merely draw it late.
+    // Preview flips `revealHidden`, which the renderer reads.
     const { user, renders } = setup()
     const before = renders()
 
@@ -762,24 +614,8 @@ describe('a drag over the canvas', () => {
 
 describe('typing into a kit component while arranging the form', () => {
   /*
-   * `onKeyDownCapture` had no coverage in any suite, and the one test that
-   * looks like it does proves something else.
-   *
-   * "does not let a design-mode click reach the kit component" clicks the input
-   * and types -- but `onMouseDownCapture` has already cancelled the default, so
-   * focus never enters the input and `document.activeElement` is the shell, an
-   * *ancestor* of the surface. The keydown therefore never reaches the
-   * surface's capture handler at all, and the empty `input.value` is explained
-   * entirely by focus never arriving. `e2e/canvas.spec.ts` has the same
-   * limitation and `e2e/keyboard.spec.ts` presses Tab without typing.
-   *
-   * Delete `onKeyDownCapture` from the props spread and both suites stay green,
-   * restoring the defect the handler's comment describes: tabbing into the
-   * canvas and typing reaches the kit's `onChange`, seeding preview data with
-   * answers nobody entered.
-   *
-   * Driven by focusing the input directly, which is what Tab does and what a
-   * click cannot.
+   * Focused directly, as Tab would: a click never reaches `onKeyDownCapture`,
+   * because `onMouseDownCapture` cancels the focus the click would give.
    */
   it('does not reach the kit input when focus is already inside it', async () => {
     const { user, node } = setup()
@@ -797,18 +633,8 @@ describe('typing into a kit component while arranging the form', () => {
   })
 
   it('still lets Tab move focus out of the component', async () => {
-    /*
-     * The allowlist, which was untested too -- and it matters because the
-     * handler's comment records that a broader version of it let Ctrl+V, Ctrl+A
-     * and Ctrl+X through to the kit.
-     *
-     * Tab is the one that has to keep working, because it is how a keyboard
-     * user leaves a component at all: swallow it and the canvas is a trap. My
-     * first version asserted Escape instead and was wrong about a different
-     * thing -- the *shell* ignores keys whose target is a text field, so
-     * Escape from inside an input clears nothing whether or not the canvas
-     * passes it on, and the test could not have told the two apart.
-     */
+    // Tab, not Escape: the shell ignores keys from a text field, so Escape could
+    // not tell a passed key from a swallowed one.
     const { user, node } = setup()
 
     const input = node('first').querySelector('input') as HTMLInputElement
@@ -821,8 +647,6 @@ describe('typing into a kit component while arranging the form', () => {
   })
 
   it('hands typing back in preview mode', async () => {
-    // The control, and the reason the handler is conditional: preview is where
-    // the form is meant to collect answers.
     const { user, node } = setup()
 
     await user.click(screen.getByRole('button', { name: 'Preview' }))
@@ -837,19 +661,9 @@ describe('typing into a kit component while arranging the form', () => {
 
 describe('a press that is not the primary button', () => {
   /*
-   * These assert real behaviour and they do NOT yet isolate the guard, which is
-   * said here rather than left for somebody to discover.
-   *
-   * `Canvas.tsx`'s primary-button check is untested while the identical guard in
-   * the tree has a dedicated pair. Replacing it with a no-op leaves both rows
-   * below green, so something else in this environment also stops a right-press
-   * arming a drag and these cannot tell the two apart. What they do pin is the
-   * outcome a user sees -- a right-press moves nothing -- which is worth having
-   * and is not the same as covering the line.
-   *
-   * Recorded in `docs/build-out/found.md`. Isolating it needs the reason a
-   * jsdom right-press does not reach `begin`, which is a question about the
-   * environment rather than about this component.
+   * These pin the outcome, not `Canvas.tsx`'s primary-button guard: with the
+   * guard removed they still pass, because something else in jsdom stops a
+   * right-press arming a drag.
    */
   const order = (view: ReturnType<typeof setup>['view']): (string | null)[] =>
     [...view.container.querySelectorAll('[data-fs-key]')].map((el) =>
@@ -870,8 +684,6 @@ describe('a press that is not the primary button', () => {
   })
 
   it('still arms one on the primary button', () => {
-    // The control. Refusing every press would pass the row above while making
-    // the canvas undraggable.
     const { view, node } = setup()
 
     fireEvent.pointerDown(node('first'), { button: 0, clientX: 10, clientY: 10, pointerId: 1 })
@@ -884,22 +696,8 @@ describe('a press that is not the primary button', () => {
 })
 
 /**
- * The selection layer's `ResizeObserver`, which for a while was never built.
- *
- * `test/setup.ts` stubs the observer and counts what it is asked to do, and
- * until this block nothing read those counters -- an obligation written down
- * with nothing executing it. What it was hiding: the layer is rendered inside
- * the div carrying `surfaceRef`, React attaches host refs children-first, so
- * the layout effect that built the observer read a null ref and returned. Its
- * deps never changed, so it never ran again until the document was first
- * edited. No observer, no scroll listener, no resize listener, and a green
- * suite.
- *
- * Deltas rather than absolutes, because the counters are per process and every
- * jsdom test in this file adds to them.
- *
- * Geometry stays out of it. jsdom has no layout engine, so what the observer
- * would report is a browser question; what it observed is answerable here.
+ * `test/setup.ts` stubs `ResizeObserver` and counts its calls. The counters are
+ * per process, so these assert deltas.
  */
 describe('the selection layer and the elements it watches', () => {
   it('observes the shell, surface, form root, and resizable panes as soon as it mounts', () => {
@@ -915,18 +713,11 @@ describe('the selection layer and the elements it watches', () => {
     const { user, node } = setup()
     const before = observerCount()
 
-    // `quiet` is the fixture that drops `nodeProps`, so it carries no key and
-    // cannot be hovered by one. Back and forth across the two that can.
     await user.hover(node('first'))
     await user.hover(node('second'))
     await user.hover(node('first'))
     await user.click(node('second'))
 
-    /*
-     * The comment above `remeasure` says a hover used to tear the observer down
-     * and build it again, because `remeasure` closed over the hover and so was
-     * a new function on every move. Nothing executed that claim until now.
-     */
     expect(observerCount().made - before.made, 'observers rebuilt by hovering').toBe(0)
   })
 
@@ -937,9 +728,6 @@ describe('the selection layer and the elements it watches', () => {
     const after = observerCount()
 
     expect(after.disconnects - before.disconnects, 'observers disconnected').toBe(4)
-    // Back where it started. A residue here is an observer still holding an
-    // element after the component that made it is gone, which is the leak these
-    // counters exist to show.
     expect(after.observing - before.observing, 'elements still watched after unmount').toBe(0)
   })
 })

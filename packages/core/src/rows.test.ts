@@ -35,19 +35,11 @@ describe('the row coordinate', () => {
   })
 
   it('names the innermost repeater, or nothing at the top level', () => {
-    /*
-     * Exported and untested. It is what `scope: 'row'` means -- the row you are
-     * standing in, not the outermost one -- so a version that answered `path[0]`
-     * would read the wrong row's answers in every nested repeater and nothing
-     * would have said so.
-     */
     expect(innermost(path)).toEqual({ key: 'contacts', index: 0 })
     expect(innermost(NO_ROWS)).toBeUndefined()
   })
 
   it('is empty outside a repeater, so nothing else changes', () => {
-    // Every existing error key and every existing selector stays byte-identical
-    // for a document with no repeater. That is the whole migration story.
     expect(encodeRow(NO_ROWS)).toBe('')
     expect(addressOf(NO_ROWS, 'street')).toBe('street')
   })
@@ -62,11 +54,6 @@ describe('the row coordinate', () => {
   })
 
   it('refuses anything that is not a coordinate', () => {
-    /*
-     * Strict on purpose: no sign, no leading zero, no bare name. The grammar
-     * parses unambiguously only because the key grammar excludes the dot and
-     * the brackets, so it must not start accepting what that grammar refuses.
-     */
     const bad = [
       'addresses',
       'addresses[]',
@@ -84,16 +71,8 @@ describe('the row coordinate', () => {
   })
 
   it('bounds the index at the digits a double still counts one by one', () => {
-    /*
-     * The one part of the grammar carrying a stated invariant, and the one part
-     * the rejection list never reached: its longest index was `addresses[1]`.
-     *
-     * Fifteen digits is the last width where `String(Number(text))` gives back
-     * the text it was given. Relax the quantifier to `[0-9]*` and
-     * `addresses[1000000000000000000000]` decodes to `1e21`, which `encodeRow`
-     * writes as `addresses[1e+21]` -- a coordinate that no longer round-trips,
-     * so an error is reported at an address no input can be found at.
-     */
+    // Fifteen digits is the last width where `String(Number(text))` gives back
+    // the text, so a longer index would not round-trip.
     const fifteen = '999999999999999'
     const path = decodeRow('addresses[' + fifteen + ']')
 
@@ -112,8 +91,6 @@ describe('the row coordinate', () => {
   })
 
   it('treats a row that is not an object as an empty one', () => {
-    // Rows arrive from a request body, so a ragged one is reachable. Reading it
-    // as empty keeps every consumer total rather than throwing at the user.
     expect(rowContext(NO_ROWS, 'nonsense').values).toEqual({})
     expect(rowContext(NO_ROWS, ['a']).values).toEqual({})
     expect(rowContext(NO_ROWS, { street: 'x' }).values).toEqual({ street: 'x' })
@@ -135,18 +112,9 @@ describe('validating a repeater', () => {
   })
 
   /*
-   * `addressList` holding `addresses`, and `street` holding `line1`.
-   *
-   * Trap 11: this fixture set `key` and `dataKey` to the same string on the
-   * repeater and on both of its fields, so the row addressing design and its
-   * opposite produced identical output and nothing here could tell them apart.
-   * The skill names this file as one of three that were fixed on 2026-08-30;
-   * this describe was missed, which is exactly how a collapsed fixture survives.
-   *
-   * The row is addressed by the repeater's *data* key and the field by its
-   * *node* key, which is only observable when they differ. `postcode` keeps one
-   * name deliberately: a real document mixes the two, and a fixture where every
-   * field is renamed tests a form nobody builds.
+   * The row is addressed by the repeater's data key and the field by its node
+   * key, which is only observable when they differ. `postcode` keeps one name
+   * deliberately: a real document mixes the two.
    */
   const form: ComponentNode = {
     key: 'root',
@@ -190,7 +158,7 @@ describe('validating a repeater', () => {
 
   it('takes the row count from the data, never from a caller', () => {
     // A count from the request would let a client submit one row and have the
-    // rest go unchecked, the discipline validateAcross already follows.
+    // rest go unchecked.
     expect(Object.keys(validateForm(form, { email: 'a@b.co', addresses: [] }))).toEqual([])
     expect(Object.keys(validateForm(form, { email: 'a@b.co', addresses: [{}, {}] }))).toEqual([
       'addresses[0].street',
@@ -205,32 +173,15 @@ describe('validating a repeater', () => {
     ['a number', 7],
     ['an object', { line1: 'a' }],
   ])('reports %s in a repeater rather than reading it as no rows', (_label, stored) => {
-    /*
-     * A repeater's value arrives from a request body, so it can be anything.
-     *
-     * This used to assert the opposite, and the opposite was the defect: no rows
-     * means the rules inside the repeater do not run, so a body sending
-     * `"addresses": "nope"` turned every required field inside that repeater
-     * optional -- on the server, with nothing to see. The test called that "the
-     * permissive answer this codebase takes deliberately", which is exactly the
-     * silent permissive failure this project is organised against, defended in a
-     * comment.
-     *
-     * `rowsOf` still reads a non-list as no rows, and that is still right for
-     * `submittedData`: a projection submits what was asked and given. Validation
-     * is the side that has to refuse.
-     */
+    // `rowsOf` reads a non-list as no rows, which suits `submittedData`.
+    // Validation is the side that has to refuse.
     let errors: Record<string, string> = {}
     expect(() => {
       errors = validateForm(form, { addresses: stored })
     }).not.toThrow()
 
-    /*
-     * The keys first, then the message. `toEqual` treats a property whose value
-     * is `undefined` as a missing one, so asserting the whole object against a
-     * constant that had been deleted passed -- measured, by stashing the fix and
-     * watching this stay green.
-     */
+    // The keys first: `toEqual` treats a property whose value is `undefined` as
+    // missing, so an undefined message constant would still pass.
     expect(Object.keys(errors).sort()).toEqual(['addressList', 'email'])
     expect(errors['addressList']).toBe('This list was not sent as a list.')
     expect(errors['addressList']).toBe(NOT_A_LIST)
@@ -242,12 +193,6 @@ describe('validating a repeater', () => {
   ] as [string, JsonValue | undefined][])(
     'reads %s in a repeater as a list nobody has filled in',
     (_label, stored) => {
-      /*
-       * The other half, and the reason this is not simply "refuse anything that is
-       * not an array". An absent repeater is a form nobody has got to yet, and
-       * there is nothing inside it to check. Only an answer of the wrong *shape*
-       * is a problem.
-       */
       expect(validateForm(form, { addresses: stored } as FormData)).toEqual({
         email: DEFAULT_MESSAGES.required,
       })
@@ -255,8 +200,6 @@ describe('validating a repeater', () => {
   )
 
   it('still checks the rows of a list that is one', () => {
-    // The control. A repeater that refused every value would pass every row
-    // above and validate nothing.
     expect(validateForm(form, { addresses: [{}] })).toEqual({
       'addresses[0].street': DEFAULT_MESSAGES.required,
       'addresses[0].postcode': DEFAULT_MESSAGES.required,
@@ -302,7 +245,6 @@ describe('a condition scoped to its row', () => {
   const data: FormData = { business: true, orders: [{ business: false }, { business: true }] }
 
   it('reads the enclosing row when the scope says row', () => {
-    // Row 0 says no, so its vat field is hidden and not required. Row 1 says so.
     expect(validateForm(form('row'), data)).toEqual({
       'orders[1].vat': DEFAULT_MESSAGES.required,
     })
@@ -316,26 +258,12 @@ describe('a condition scoped to its row', () => {
   })
 
   it('does not fall back to the form when the row has no such field', () => {
-    /*
-     * The whole reason the scope is a discriminant rather than a fallback. Once
-     * a name can mean either, no caller can tell which one it got, and the fix
-     * is always another flavour of path.
-     */
     expect(validateForm(form('row'), { business: true, orders: [{}] })).toEqual({})
   })
 
   it('and says so at boot rather than leaving it quiet', () => {
-    /*
-     * The other half, which this file used to leave out: the assertion above is
-     * a required answer going unchecked because a condition read nothing, and a
-     * test that certifies that as correct and stops there is a test that blesses
-     * the silent-permissive ending. It is only acceptable because the document
-     * carrying it is refused before anyone submits.
-     *
-     * The fixture has to say which form key it means for that to fire, since
-     * `rowScopeProblems` reports a ref that demonstrably belongs to the other
-     * scope and not one naming a key nothing in the document writes.
-     */
+    // The form must hold `business` for this to fire: a ref is reported only
+    // when it belongs to the other scope, not when nothing writes its key.
     const document = { ...createDocument('Rows', 'rows'), root: form('row') }
     document.root.children?.unshift({
       key: 'business',
@@ -352,14 +280,6 @@ describe('a condition scoped to its row', () => {
 })
 
 describe('the quiet failure, caught before anyone submits', () => {
-  /*
-   * A condition authored inside a repeater, naming a field that only exists in
-   * a row, left at the default form scope. The read is undefined, the condition
-   * is false, the component is hidden, and validateForm skips it: a required
-   * answer becomes advisory, on the server, where nobody is looking. Nothing at
-   * evaluation time can tell it apart from a form-scoped ref to a key the form
-   * genuinely does not hold, so it takes a boot-time answer.
-   */
   const doc = (scope: 'form' | 'row' | undefined): FormDocument => ({
     ...createDocument('Rows', 'rows'),
     root: {
@@ -410,11 +330,8 @@ describe('the quiet failure, caught before anyone submits', () => {
   })
 
   it('says nothing when the form really does hold that key too', () => {
-    // Then form scope is a real choice rather than an oversight, and refusing
-    // it would take away the one case the discriminant exists to allow.
     const withRoot = doc(undefined)
-    // A distinct node key carrying the same data key: keys are unique, answers
-    // may repeat, which is exactly the split the document model draws.
+    // Node keys are unique; data keys may repeat.
     withRoot.root.children?.unshift({
       key: 'accountType',
       dataKey: 'business',
@@ -433,7 +350,6 @@ describe('writing an answer at an address', () => {
   }
 
   it('is an ordinary write outside a repeater', () => {
-    // A host that never adds a repeater sees no difference at all.
     expect(applyChange({ a: 1 }, 'a', 2)).toEqual({ a: 2 })
     expect(applyChange({ a: 1 }, 'b', 2)).toEqual({ a: 1, b: 2 })
   })
@@ -444,8 +360,6 @@ describe('writing an answer at an address', () => {
   })
 
   it('leaves the rows it did not touch identical, not merely equal', () => {
-    // Referential identity, so a kit comparing props by identity still skips
-    // them. Equality would be true of a full copy and prove nothing.
     const next = applyChange(data, 'addresses[1].postcode', 'Y')
     const before = data['addresses'] as { line1: string }[]
     const after = next['addresses'] as { line1: string }[]
@@ -455,11 +369,6 @@ describe('writing an answer at an address', () => {
   })
 
   it('changes nothing when the address cannot be placed', () => {
-    /*
-     * A row that is not there, a list that is not a list, a name the key
-     * grammar refuses. Returning the input is what stops a hostile index
-     * minting a sparse array with ten thousand holes.
-     */
     for (const address of [
       'addresses[9].postcode',
       'email[0].postcode',
@@ -473,13 +382,6 @@ describe('writing an answer at an address', () => {
   })
 
   it('changes nothing when the row is not an object', () => {
-    /*
-     * The third branch of the same guard, and the one the list above cannot
-     * reach: a missing row and a list that is not a list were both covered, and
-     * a list whose *entry* is a string or a number was not. A row is read as a
-     * record to write into, and writing into `'text'` produces an object with
-     * one key and nothing of the row left.
-     */
     for (const row of ['text', 7, null, ['a']]) {
       const ragged = { addresses: [row] }
       expect(applyChange(ragged, 'addresses[0].postcode', 'x'), JSON.stringify(row)).toBe(ragged)
@@ -494,14 +396,6 @@ describe('writing an answer at an address', () => {
   })
 })
 
-/**
- * Which keys a condition authored on a given node can name.
- *
- * The picker asks this. A ref inside a row that is left at the default scope
- * reads the top level, finds nothing, hides its component, and `validateForm`
- * then skips the rule — a required answer becoming advisory on the server. So
- * the panel has to be able to tell the two sets apart before it draws them.
- */
 describe('keyScopesFor', () => {
   /*
    * Every name differs from every other name on purpose. The repeater's node
@@ -550,7 +444,6 @@ describe('keyScopesFor', () => {
     const scopes = keyScopesFor(tree(), 'nameField')
 
     expect(scopes.form).toEqual(['fullName', 'contacts'])
-    // Not an empty list: there is no enclosing row to read at all.
     expect(scopes.row).toBeUndefined()
   })
 
@@ -558,14 +451,10 @@ describe('keyScopesFor', () => {
     const scopes = keyScopesFor(tree(), 'rowEmail')
 
     expect(scopes.row).toEqual(['email', 'kind'])
-    // The row's keys are not top-level keys, which is the whole distinction.
     expect(scopes.form).toEqual(['fullName', 'contacts'])
   })
 
   it('names the row by the repeater data key rather than its node key', () => {
-    // `contactList` is the node key and `contacts` is the answer's name. A
-    // scope list built from identity rather than from storage would say the
-    // former, and every fixture in this repository used to hide the difference.
     expect(keyScopesFor(tree(), 'rowEmail').form).toContain('contacts')
     expect(keyScopesFor(tree(), 'rowEmail').form).not.toContain('contactList')
   })
@@ -590,8 +479,6 @@ describe('keyScopesFor', () => {
       ],
     })
 
-    // The nested repeater's own key is an answer in the outer row; what it
-    // holds is not, because that lives one row deeper.
     expect(keyScopesFor(root, 'rowEmail').row).toEqual(['email', 'kind', 'notes'])
     expect(keyScopesFor(root, 'noteBody').row).toEqual(['body'])
   })
@@ -602,16 +489,8 @@ describe('keyScopesFor', () => {
 })
 
 /**
- * A repeater whose node key is not its data key.
- *
- * Trap 11 in this repository's own test skill: every repeater fixture here set
- * `key` and `dataKey` to the same string, so the row-addressing design and its
- * opposite produced byte-identical output across the entire suite. The suite
- * could not see the defect it was written to prevent.
- *
- * So every name in this fixture differs from every other. `addressList` is
- * identity; `addresses` is what the payload calls the answer; `street` is a
- * node key and `line1` is its answer's name.
+ * Every name in this fixture differs from every other, so a node key used where
+ * a data key belongs shows in the output.
  */
 describe('a repeater whose two names differ', () => {
   const rowField = (key: string, dataKey: string, required = false): ComponentNode => ({
@@ -643,12 +522,6 @@ describe('a repeater whose two names differ', () => {
   }
 
   it('addresses a row by the answer name, not by the component name', () => {
-    /*
-     * The coordinate is dereferenced in exactly one place, `applyChange`, and it
-     * is dereferenced as data. Built from the node key it names a list the data
-     * does not have — or worse, an unrelated list that happens to share the
-     * name.
-     */
     const errors = validateForm(root, data)
 
     expect(Object.keys(errors)).toEqual(['addresses[1].street'])
@@ -656,14 +529,10 @@ describe('a repeater whose two names differ', () => {
   })
 
   it('keeps the node key at the leaf, because that is identity', () => {
-    // The prefix disambiguates rows; the leaf carries identity. Two components
-    // may share a data key and still fail for different reasons.
     expect(validateForm(root, data)['addresses[1].street']).toBe(DEFAULT_MESSAGES.required)
   })
 
   it('lands a keystroke in the row it was typed in', () => {
-    // The whole point. Under the node key this returned the input unchanged and
-    // every edit inside a row was silently discarded.
     const address = 'addresses[1].line1'
     const next = applyChange(data, address, '2 Low Street')
 
@@ -672,7 +541,6 @@ describe('a repeater whose two names differ', () => {
       postcode: 'X',
       line1: '2 Low Street',
     })
-    // The row it was not typed in is untouched.
     expect((next['addresses'] as FormData[])[0]).toEqual({
       line1: '1 High Street',
       postcode: 'SW1A 1AA',
@@ -686,29 +554,9 @@ describe('a repeater whose two names differ', () => {
   })
 })
 
-/**
- * Two repeaters deep, which is where an address stops being decoration.
- *
- * Every repeater fixture in this file had one level, so `addresses[1].postcode`
- * and a single-frame row context produced the same answer as any number of
- * simpler schemes would have. The design says a row coordinate is a path, not a
- * pair, and nothing drove a nested one through the three functions that have to
- * agree about it: `validateForm` reports at an address, `applyChange` writes at
- * one, and `submittedData` reads the tree back out.
- */
 describe('a repeater inside a repeater', () => {
-  /*
-   * Every name differs from every other name, on purpose.
-   *
-   * Trap 11, the same collapse the single-level describe above was rescued from
-   * and this one was not: both repeaters set `key` and `dataKey` to the same
-   * string and neither inner field carried a `dataKey` at all, so a frame built
-   * from `dataKeyOf(node)` and a frame built from `node.key` produced identical
-   * output at every level. This describe added nesting and no coverage of the
-   * thing nesting was supposed to prove. `orderList` holds `orders`, `lineList`
-   * holds `lines`, `reference` holds `ref` and `sku` holds `code`, so which of
-   * the two names each position uses is now visible in every assertion.
-   */
+  // Every name differs from every other, so which of the two names each
+  // position uses is visible in every assertion.
   const root: ComponentNode = {
     key: 'root',
     type: 'Screen',
@@ -768,7 +616,6 @@ describe('a repeater inside a repeater', () => {
     const orders = next['orders'] as FormData[]
 
     expect((orders[0]?.['lines'] as FormData[])[1]).toEqual({ code: 'y' })
-    // The sibling row and the sibling order are untouched, and identically so.
     expect((orders[0]?.['lines'] as FormData[])[0]).toBe(
       ((data['orders'] as FormData[])[0]?.['lines'] as FormData[])[0],
     )
@@ -776,8 +623,6 @@ describe('a repeater inside a repeater', () => {
   })
 
   it('collects both levels under their answer names', () => {
-    // Not one node key anywhere in the payload: no `orderList`, no `lineList`,
-    // no `reference`, no `sku`.
     expect(submittedData(root, data)).toEqual({
       orders: [{ ref: 'A1', lines: [{ code: 'x' }, {}] }, { lines: [{}] }],
     })
@@ -785,8 +630,7 @@ describe('a repeater inside a repeater', () => {
 
   it('keeps a row coordinate readable in both directions', () => {
     const address = 'orders[1].lines[0].sku'
-    // Both prefixes are data keys and the leaf is a node key, which is the whole
-    // rule in one string.
+    // Data keys in the prefixes, a node key at the leaf.
     const decoded = decodeAddress(address)
     expect(decoded?.name).toBe('sku')
     expect(encodeRow(decoded?.path ?? NO_ROWS)).toBe('orders[1].lines[0]')
@@ -794,16 +638,6 @@ describe('a repeater inside a repeater', () => {
   })
 })
 
-/**
- * The third place a condition lives.
- *
- * A document holds conditions in three places: `renderWhen`, a `PropValue` on a
- * property, and a validation rule's `when` guard. `contextKeys` sweeps all
- * three. `rowScopeProblems` swept the first two, so a rule guard authored
- * inside a repeater and left at form scope was never reported — and that is the
- * worst of the three to miss, because the failure is the rule silently never
- * applying, on the server, which is the exact thing this check exists for.
- */
 describe('a rule guard inside a repeater', () => {
   const doc = (scope: 'form' | 'row' | undefined): FormDocument => ({
     ...createDocument('Rows', 'rows'),
@@ -865,8 +699,6 @@ describe('a rule guard inside a repeater', () => {
   })
 
   it('reports a guard on a property binding too', () => {
-    // The second of the three sites, which was already swept. Kept as a control
-    // so a change that narrows the sweep shows up here rather than nowhere.
     const withProp = doc('row')
     const vat = withProp.root.children?.[0]?.children?.[1]
     if (!vat) throw new Error('fixture lost its field')
@@ -943,17 +775,6 @@ describe('a cross-field rule and repeated scope', () => {
   })
 })
 
-/**
- * The mirror of the quiet failure, which was skipped by design.
- *
- * A form-scoped ref to a key that only exists in a row is reported. The reverse
- * — a `scope: 'row'` ref on a node that is not inside any repeater — was not,
- * and it always reads nothing: `operand` answers `undefined` when there is no
- * row, so the condition is false and the component is hidden forever.
- *
- * It is not a hypothetical. Dragging a conditional field out of a repeater
- * produces exactly this, and nothing about the document looks wrong afterwards.
- */
 describe('a row-scoped ref outside every row', () => {
   const doc = (scope: 'form' | 'row'): FormDocument => ({
     ...createDocument('Rows', 'rows'),
@@ -990,19 +811,10 @@ describe('a row-scoped ref outside every row', () => {
   })
 
   it('says nothing about the same ref at form scope', () => {
-    // The control: at the top level, form scope is simply correct.
     expect(validateDocument(doc('form'))).toEqual([])
   })
 })
 
-/**
- * How many rows a submitted body can ask to be validated.
- *
- * The row count comes out of the data, which is right — asking the browser
- * would let a client submit one row and have the rest go unchecked. But it is
- * the *request body* that decides how much work happens, with no cap, and rows
- * nest multiplicatively.
- */
 describe('validateForm and a body with too many rows', () => {
   const root: ComponentNode = {
     key: 'root',
@@ -1039,19 +851,11 @@ describe('validateForm and a body with too many rows', () => {
     const errors = validateForm(root, data)
 
     expect(Object.keys(errors).length).toBeLessThan(100_000)
-    // And says so, rather than quietly validating a prefix: a row nobody
-    // checked is the permissive failure this project is organised against.
+    // Says so, rather than quietly validating a prefix.
     expect(Object.values(errors).join(' ')).toContain('rows')
   })
 })
 
-/**
- * Which node the scopes are computed for, and how deep the walk goes.
- *
- * `keyScopesFor` runs during render -- the Properties panel and the Style tab
- * both call it in their component bodies -- so both of these are about what
- * happens on screen rather than about a walk in the abstract.
- */
 describe('keyScopesFor on a document nobody gated', () => {
   const twice = (): ComponentNode => ({
     key: 'root',
@@ -1083,21 +887,12 @@ describe('keyScopesFor on a document nobody gated', () => {
   })
 
   it('answers for the first node with that key, like every other lookup', () => {
-    /*
-     * Duplicate keys are a state `validateDocument` reports and cannot prevent,
-     * and `findNode`, `findParent` and `pathTo` all take the first match and
-     * say why. This took the last -- an unconditional assignment inside a walk
-     * that keeps going -- so the panel offered one node's row keys while every
-     * other lookup in the session resolved to another.
-     */
     expect(keyScopesFor(twice(), 'shared').row).toEqual(['shared'])
   })
 
   it('answers rather than overflowing on a tree nested past the bound', () => {
-    /*
-     * The bound `rowScopeProblems` already carries. A `RangeError` thrown from
-     * a React render unmounts the whole designer in React 19, not one panel.
-     */
+    // A `RangeError` thrown from a React render unmounts the whole designer, not
+    // one panel.
     let deep: ComponentNode = { key: 'leaf', type: 'Field', props: {} }
     for (let i = 0; i < 5000; i += 1) {
       deep = { key: 'stack' + String(i), type: 'Stack', props: {}, children: [deep] }
@@ -1109,16 +904,9 @@ describe('keyScopesFor on a document nobody gated', () => {
 
 describe('the picker and validation agree on what a row holds at the depth bound', () => {
   /*
-   * `keyScopesFor` feeds the field picker and `rowScopeProblems` feeds
-   * `validateDocument`. Both ask which data keys one row of a repeater holds,
-   * so a key the picker offers as a row answer must be one validation accepts
-   * as a row answer, and the reverse. The case that separates two walks is a
-   * nested repeater sitting exactly at the bound, counted from the outer
-   * repeater: its own data key is a row answer only while it is within
-   * `MAX_TREE_DEPTH` levels of the repeater.
-   *
-   * The form also holds `inner` (a distinct node with the same data key), so a
-   * `scope: 'row'` ref to it is reported exactly when the row does not hold it.
+   * A nested repeater's own data key is a row answer only within
+   * `MAX_TREE_DEPTH` levels of the outer repeater. The form also holds `inner`,
+   * so a `scope: 'row'` ref to it is reported exactly when the row does not.
    */
   const doc = (levels: number): FormDocument => {
     let below: ComponentNode = {
@@ -1202,20 +990,6 @@ describe('the picker and validation agree on what a row holds at the depth bound
 })
 
 describe('the shape that told the two repeater predicates apart', () => {
-  /*
-   * There were two definitions of "is this a repeater" and this file's one test
-   * of the rule could not distinguish them.
-   *
-   * `validation.ts` asked `children !== undefined` and `rows.ts` asked
-   * `Array.isArray`, and all three fixtures in "recognises a repeater from its
-   * shape, not from a type string" agree under both. The shape that separates
-   * them is a truthy non-array: `schema.type: 'array'` with `children: 5` was a
-   * repeater to `validateForm` -- which then expected a list and walked
-   * children that are not iterable -- and not to `rowScopeProblems` or
-   * `keyScopesFor`.
-   *
-   * One definition now, in `tree.ts`, which both modules already import.
-   */
   const odd = (children: unknown): ComponentNode =>
     ({
       key: 'addressList',
@@ -1235,16 +1009,10 @@ describe('the shape that told the two repeater predicates apart', () => {
   })
 
   it('still recognises a real repeater', () => {
-    // The control. Answering false for everything would pass all three rows.
     expect(isRowScope(odd([]))).toBe(true)
   })
 
   it('does not walk a malformed repeater as though it held rows', () => {
-    /*
-     * The consequence, driven through the function that was the permissive
-     * half. `validateForm` treated the node as a repeater and iterated
-     * `children: 5`.
-     */
     const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [odd(5)] }
 
     expect(() => validateForm(root, { addresses: [{}] })).not.toThrow()
@@ -1252,16 +1020,6 @@ describe('the shape that told the two repeater predicates apart', () => {
 })
 
 describe('which node a duplicate key resolves to', () => {
-  /*
-   * `keyScopesFor` did not take the first match, though its comment cites
-   * `findNode`, `findParent` and `pathTo` for the rule. The guard was
-   * `node.key === nodeKey && enclosing && row === undefined`, so a first match
-   * outside a repeater was skipped and a later duplicate inside one set the row
-   * scope.
-   *
-   * The author then picks `scope: 'row'` on a node in no row: the read is
-   * undefined, the condition false, the component hidden, and never validated.
-   */
   const twoNamed = (): ComponentNode => ({
     key: 'root',
     type: 'Screen',
@@ -1286,25 +1044,11 @@ describe('which node a duplicate key resolves to', () => {
   })
 
   it('agrees with findNode about which node that is', () => {
-    /*
-     * The point of the rule, stated as the comparison it is about: two
-     * functions disagreeing about which node a key means is a bug whichever
-     * answer is right.
-     */
     const root = twoNamed()
     const resolved = findNode(root, 'x')
     const atFormLevel = root.children?.[0]
     const insideRepeater = root.children?.[1]?.children?.[0]
 
-    /*
-     * Which node it IS, not only which it is not.
-     *
-     * `expect(resolved).not.toBe(insideRepeater)` passes when `findNode`
-     * returns `undefined`, so the assertion held for a `findNode` that stopped
-     * finding anything at all -- partially vacuous, and raised in review on PR
-     * #45. Naming the expected node makes both halves of "the two agree" say
-     * something.
-     */
     expect(atFormLevel, 'the fixture has no form-level x').toBeDefined()
     expect(resolved, 'findNode did not resolve x at all').toBe(atFormLevel)
     expect(resolved).not.toBe(insideRepeater)
@@ -1312,8 +1056,6 @@ describe('which node a duplicate key resolves to', () => {
   })
 
   it('still offers a row scope when the first match really is in one', () => {
-    // The control. Never offering a row scope would pass both rows above while
-    // breaking every repeater in the panel.
     const root = twoNamed()
     const onlyInside: ComponentNode = {
       ...root,

@@ -183,15 +183,6 @@ export const htmlKit: Kit = {
           editor: 'options',
           hint: 'Labels are displayed; values are saved with the answer.',
         },
-        /*
-         * The empty choice, and the reason it is a property.
-         *
-         * One kit hardcoded the English "Choose…" and the other drew no empty
-         * option at all, so a MUI select could not be returned to unanswered
-         * once somebody had picked something -- and neither string could be
-         * translated, on a builder whose whole point is that user-facing copy is
-         * a localizable prop.
-         */
         {
           name: 'placeholder',
           label: 'Placeholder',
@@ -263,13 +254,6 @@ export const htmlKit: Kit = {
       icon: 'box',
       group: 'layout',
       container: true,
-      /*
-       * A step is a container shown when `context.step` equals its own key.
-       * That condition is the whole difference between a step and a box, so it
-       * is stated here rather than left for every author to write by hand and
-       * get the path right. It is a starting value: the Rules tab edits it
-       * afterwards like any other visibility rule.
-       */
       defaultRenderWhen: (key) => ({
         kind: 'condition',
         condition: {
@@ -292,16 +276,8 @@ export const htmlKit: Kit = {
       icon: 'repeat',
       group: 'layout',
       container: true,
-      /*
-       * Data-bound *and* an array, which is the pairing core recognises -- so it
-       * never has to learn the type string `Repeater`.
-       *
-       * Not the only data-bound container: `RadioGroup` is one too, and it stays
-       * out of `isRowScope` because its `dataType` is a string rather than by
-       * anything about the pairing. Read that as the rule it is: a container
-       * whose answer is a list *is* a repeater, whatever it is called, and a kit
-       * adding one has declared repetition whether or not it meant to.
-       */
+      // Core's `isRowScope` makes any container whose answer is an array a
+      // repeater, whatever its type is called.
       dataBound: true,
       dataType: 'array',
       defaultProps: {

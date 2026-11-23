@@ -2,15 +2,8 @@
  * @vitest-environment jsdom
  */
 
-/**
- * What geometry can be checked without a layout engine.
- *
- * jsdom gives every element a zero rectangle, so anything about *where* things
- * are belongs in `e2e/`. What is checkable here is which elements are found at
- * all — and that is where the row bugs live: a key stopped being unique in the
- * DOM the moment a repeater drew its subtree more than once, and every one of
- * these functions was written when it was.
- */
+// jsdom gives every element a zero rectangle, so positions are tested in `e2e/`.
+// This file covers which elements are found.
 
 import { describe, expect, it } from 'vitest'
 import type { ComponentNode } from '@willowforms/core'
@@ -23,7 +16,6 @@ import {
   toLocal,
 } from './geometry.js'
 
-/** A canvas holding one repeater whose subtree is drawn twice. */
 function surfaceWithRows(): HTMLElement {
   const surface = document.createElement('div')
   surface.innerHTML = [
@@ -39,12 +31,6 @@ function surfaceWithRows(): HTMLElement {
 
 describe('finding a node in a canvas that repeats one', () => {
   it('finds the element in the row that was asked for', () => {
-    /*
-     * `querySelector` takes the first match, which was correct when a key was
-     * unique in the DOM. A repeater draws its subtree once per row, so the
-     * selection frame, `scrollIntoView` and the drop measurements all silently
-     * got row 0 whichever row the user was working in.
-     */
     const surface = surfaceWithRows()
 
     expect(nodeElement(surface, 'street', 'addresses[1]')?.dataset['fsRow']).toBe('addresses[1]')
@@ -81,16 +67,6 @@ describe('measuring a canvas that repeats a node', () => {
   }
 
   it('produces a candidate for every drawn element, not every authored node', () => {
-    /*
-     * It walked the *document* and measured one element per node, so rows 1..N
-     * produced no candidates at all: hovering row 1 resolved against row 0's
-     * children, and a container inside a row was invisible to the drop
-     * resolver for every row but the first.
-     *
-     * The key stays the same across rows, and that is right — a drop names the
-     * authored node, because that is the only thing a document has. What
-     * differs per row is the rectangle.
-     */
     const candidates = measureTree(surfaceWithRows(), tree, () => true)
 
     expect(candidates.filter((candidate) => candidate.key === 'street')).toHaveLength(2)
@@ -116,15 +92,6 @@ describe('measuring a canvas that repeats a node', () => {
   })
 })
 
-/**
- * Which node a click landed on, and which of its drawn copies.
- *
- * Both functions are pure DOM traversal, need no layout engine, and had no test
- * of their own -- they were exercised only through Canvas tests that never
- * varied where the attributes sit. `Canvas.tsx` feeds `rowFromEventTarget`
- * straight into `selectedRow`, so what it answers is what the selection frame,
- * the label and the row toolbar are drawn around.
- */
 describe('reading a click', () => {
   const clicked = (html: string, selector: string): Element => {
     const surface = document.createElement('div')
@@ -143,8 +110,6 @@ describe('reading a click', () => {
   ].join('')
 
   it('reads the key off the nearest keyed ancestor, not the element hit', () => {
-    // A click lands on whatever the kit drew innermost -- a span inside a label
-    // inside the field -- and the node it belongs to is above it.
     expect(keyFromEventTarget(clicked(ROW, '.inner'))).toBe('street')
     expect(keyFromEventTarget(clicked(ROW, 'input'))).toBe('street')
   })
@@ -159,8 +124,6 @@ describe('reading a click', () => {
   })
 
   it('answers nothing for a target that is not an element at all', () => {
-    // An event target can be the document, the window, or a text node picked up
-    // by a synthetic event. All three reach here from real handlers.
     for (const target of [null, document, window]) {
       expect(keyFromEventTarget(target as EventTarget | null)).toBeUndefined()
       expect(rowFromEventTarget(target as EventTarget | null)).toBeUndefined()
@@ -169,16 +132,9 @@ describe('reading a click', () => {
 
   it('answers no row when the row attribute is on a wrapper that is not the node', () => {
     /*
-     * The shape worth knowing about. Both functions look at the nearest
-     * `[data-fs-key]` and read `data-fs-row` off *that* element, so a kit that
-     * puts the row marker on an unkeyed wrapper gets `undefined` -- the click
-     * knows which row it was in and the answer is thrown away, which is the bug
-     * `rowFromEventTarget` was written to fix, in a new spelling.
-     *
-     * Written down rather than fixed by widening the search: the renderer emits
-     * `data-fs-row` on the same element as `data-fs-key` (`renderer/index.tsx`,
-     * the node boundary), so this is a contract between the two, and a guard
-     * that quietly accepted either placement would hide the day it broke.
+     * Not widened on purpose: the renderer puts `data-fs-row` on the same element
+     * as `data-fs-key` (`renderer/index.tsx`), and accepting either placement
+     * would hide the day that contract broke.
      */
     const stray = [
       '<div data-fs-row="addresses[1]">',
@@ -191,15 +147,6 @@ describe('reading a click', () => {
   })
 })
 
-/**
- * Client coordinates into surface coordinates.
- *
- * Pure arithmetic over two numbers, no test in any environment, and every drop
- * position in the designer passes through it: the canvas and the tree both
- * subtract the surface's origin before asking `resolveDrop` anything, so a sign
- * error here moves every drop by the surface's offset and nothing else would
- * say where it came from.
- */
 describe('toLocal', () => {
   it('subtracts the origin from the pointer', () => {
     expect(toLocal({ x: 10, y: 20 }, 40, 50)).toEqual([30, 30])

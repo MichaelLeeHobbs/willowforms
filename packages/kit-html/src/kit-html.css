@@ -1,14 +1,7 @@
 /*
- * The HTML kit's stylesheet.
- *
- * Every value is a custom property on `.fsh-screen`, so a host restyles the
- * whole kit by overriding tokens rather than fighting specificity. Nothing here
- * is scoped above `.fsh-`, so dropping this file into a page cannot reach the
- * host's own markup, and the designer's chrome cannot reach in here either.
- *
- * Contrast targets AA. `--fsh-muted` on `--fsh-surface` and the solid button's
- * text on `--fsh-accent` both clear 4.5:1 in the light palette, and the dark
- * swap below keeps them there.
+ * Values are tokens on `.fsh-screen` for a host to override, and every
+ * selector stays under a `.fsh-` class so the sheet cannot reach host markup.
+ * See docs/spec/11-theming.md.
  */
 
 .fsh-screen {
@@ -20,19 +13,11 @@
   --fsh-accent: #0f5c8c;
   --fsh-accent-text: #ffffff;
   --fsh-danger: #a4121a;
-  /*
-   * The other two states. These were hex literals down beside the alert rules,
-   * so a host restyling the kit by overriding tokens could change danger and not
-   * success, the dark swap left them at their light values, and the contrast
-   * suite -- which reads tokens -- never measured them at all.
-   */
   --fsh-success: #2e7d32;
   --fsh-warning: #b26a00;
   /*
-   * The shadow an elevated card casts. Pure black at 16% is invisible against a
-   * dark surface, so "elevated" and "flat" looked identical in dark mode; the
-   * dark swap below lifts the alpha and the size instead of the colour, which is
-   * what a light-on-dark elevation needs.
+   * Dark mode raises the alpha and size, not the colour: black at 16% is
+   * invisible on a dark surface.
    */
   --fsh-shadow: 0 1px 8px rgb(0 0 0 / 16%);
   --fsh-scrollbar-thumb: #6b7280;
@@ -53,14 +38,8 @@
 
 @media (prefers-color-scheme: dark) {
   /*
-   * `:where()`, so a host can override these.
-   *
-   * `:not()` takes its argument's specificity, so this rule was (0,2,0) while
-   * the recipe the README gives a host — `.fsh-screen { --fsh-accent: … }` — is
-   * (0,1,0). A host followed the documented instructions and its branding
-   * silently reverted for every viewer whose system is dark. `:where()`
-   * contributes nothing, which puts this at (0,1,0) and lets source order
-   * decide, which is what a host expects.
+   * `:where()` keeps this at (0,1,0); a bare `:not()` would make it (0,2,0) and
+   * beat a host's documented `.fsh-screen { --fsh-accent: ... }` override.
    */
   .fsh-screen:where(:not([data-fsh-theme='light'])) {
     --fsh-text: #eef0f4;
@@ -113,13 +92,8 @@
 }
 
 /*
- * `min-width: 0` on every component that can be a flex child.
- *
- * A flex item's minimum size is its content, so a long word or a wide table
- * inside a row `Stack` pushes the row wider than the form instead of shrinking
- * -- and the page grows a horizontal scrollbar rather than the component
- * wrapping. Four components carried it and four did not, which is why a card in
- * a row behaved differently from a field in one.
+ * `min-width: 0` on every component that can be a flex child: otherwise a flex
+ * item will not shrink below its content and a row overflows the form.
  */
 .fsh-stack {
   display: flex;
@@ -153,17 +127,7 @@
   line-height: 1.25;
 }
 
-/*
- * `min-width: 0` does nothing for a field in the usual column layout, and is
- * what stops one overflowing in a row.
- *
- * A flex item defaults to `min-width: auto`, which refuses to shrink below its
- * content. A field dropped into a `Stack` with `direction: row`, or into a
- * `Grid` column narrower than its own label or its longest option, pushes the
- * track wider rather than wrapping, and the row scrolls sideways. Left
- * unexplained this reads as a line to delete during a tidy-up, so: it is
- * inert for the common case on purpose, and load-bearing for the row one.
- */
+/* `min-width: 0` is inert in a column and stops a field overflowing a row. */
 .fsh-field {
   display: flex;
   flex-direction: column;
@@ -312,30 +276,14 @@
   cursor: not-allowed;
 }
 
-/*
- * A visible focus ring on every interactive element. Its absence is the single
- * most common keyboard-accessibility failure, and it costs three lines.
- */
 .fsh-input:focus-visible,
 .fsh-checkbox:focus-visible,
 .fsh-button:focus-visible,
-/*
- * The radios too, which carried no kit class and fell back to whatever ring the
- * browser draws -- a ring the contrast suite cannot measure and Windows high
- * contrast renders differently. "Every interactive element" is what the comment
- * above promised, so it says every one it means.
- */
 .fsh-radio input:focus-visible {
   outline: 2px solid var(--fsh-accent);
   outline-offset: 2px;
 }
 
-/*
- * Layout and display components.
- *
- * Every value below comes from a token or from the component's own props, so a
- * host restyles by overriding tokens rather than by fighting these rules.
- */
 .fsh-grid--fill {
   overflow-wrap: anywhere;
 }
@@ -409,9 +357,8 @@
 }
 
 /*
- * A vertical rule needs a height to be visible at all, and `stretch` only works
- * inside a flex row. Outside one it falls back to its own line, which is wrong
- * but visible, and visible is what an author can correct.
+ * `stretch` gives the rule its height only inside a flex row. Elsewhere it
+ * falls back to a visible line an author can correct.
  */
 .fsh-divider--vertical {
   align-self: stretch;
@@ -425,7 +372,6 @@
   border-radius: var(--fsh-radius);
 }
 
-/* Selection and grouping components. */
 .fsh-button-group {
   display: flex;
   gap: 8px;
@@ -461,11 +407,7 @@
   color: var(--fsh-text);
 }
 
-/*
- * The switch is a checkbox wearing a track. The input keeps its own size and
- * position so it stays the hit target and the focus target; only its paint is
- * replaced, which is what keeps the keyboard behaviour the platform's.
- */
+/* The input stays the hit and focus target: transparent, never hidden. */
 .fsh-switch {
   display: flex;
   align-items: center;
@@ -520,7 +462,6 @@
   opacity: 0.6;
 }
 
-/* A fieldset carries browser defaults that fight the field layout. */
 fieldset.fsh-field {
   min-width: 0;
   margin: 0;
@@ -529,12 +470,8 @@ fieldset.fsh-field {
 }
 
 /*
- * Feedback and navigation.
- *
- * Severity is carried by a border and never by the text colour, so every alert
- * reads at the same contrast as body text and needs no palette of its own. It
- * also means severity is not the only signal: an author who cannot distinguish
- * the four colours still has the title and the words.
+ * Severity is a border colour, never the text colour, so alerts keep body-text
+ * contrast and colour is not their only signal.
  */
 .fsh-alert {
   display: flex;
@@ -542,13 +479,7 @@ fieldset.fsh-field {
   gap: 2px;
   padding: 12px 14px;
   border: 1px solid var(--fsh-border);
-  /*
-   * The stripe every severity overrides, kept as the one an unrecognised
-   * severity would get. `AlertNode` narrows through `oneOf`, so today it always
-   * emits one of the four modifier classes and this value is never seen -- and
-   * it is one prop change away from being seen again, which is a stripe with a
-   * colour rather than none.
-   */
+  /* Fallback stripe for a severity with no modifier class. */
   border-inline-start: 4px solid var(--fsh-muted);
   border-radius: var(--fsh-radius);
   color: var(--fsh-text);
@@ -594,7 +525,6 @@ fieldset.fsh-field {
   background: var(--fsh-accent);
 }
 
-/* Indeterminate: no width was set, so it sweeps instead of filling. */
 .fsh-progress__fill--sweeping {
   inline-size: 40%;
   animation: fsh-progress-sweep 1.4s ease-in-out infinite;
@@ -628,7 +558,6 @@ fieldset.fsh-field {
   text-decoration: underline;
 }
 
-/* An address the kit refused. It is text, and it does not pretend otherwise. */
 .fsh-link.is-inert {
   color: var(--fsh-muted);
   text-decoration: none;
@@ -656,25 +585,11 @@ fieldset.fsh-field {
 }
 
 /*
- * State that survives the operating system repainting everything.
- *
- * Windows High Contrast and its equivalents replace author colours with a
- * system palette, so any state signalled only by `background` stops being
- * signalled. Two controls here said everything with background alone: the
- * switch is `--fsh-border` when off and `--fsh-accent` when on, and the
- * progress bar fills with `--fsh-accent` against `--fsh-field`. Under forced
- * colours both halves became the same colour and neither control said anything
- * at all.
- *
- * `forced-color-adjust: none` opts the two elements that carry the state out of
- * the automatic substitution, and they are then repainted in system colours:
- * `Highlight` for on or filled, `Canvas` for off or empty. That keeps the
- * meaning rather than the palette, which is the point.
- *
- * `outline` rather than `border` because this stylesheet sets no `box-sizing`,
- * so a border would resize both controls, and rather than `box-shadow` because
- * forced colours suppress shadows. An outline at a negative offset draws inside
- * the box, changes no layout, and is preserved.
+ * Forced colours replace author colours, which erases state shown only by
+ * background. The switch and progress opt out and repaint in system colours:
+ * `Highlight` for on or filled, `Canvas` for off or empty. `outline`, not
+ * `border` (no `box-sizing` here, so a border resizes) or `box-shadow`
+ * (suppressed under forced colours).
  */
 @media (forced-colors: active) {
   .fsh-switch__track {
@@ -688,7 +603,6 @@ fieldset.fsh-field {
     background: Highlight;
   }
 
-  /* The thumb inverts with the track, so the two never share a colour. */
   .fsh-switch__track::after {
     background: CanvasText;
   }

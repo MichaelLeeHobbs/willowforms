@@ -1,11 +1,4 @@
-/**
- * Operating the builder without a pointer.
- *
- * Drag and drop is a pointer gesture, so without the keyboard moves below there
- * is no way to rearrange a form with a keyboard at all. jsdom can check that the
- * handlers fire; only a browser can check that focus really lands where it
- * should and that the tab order is what a user meets.
- */
+// Where focus lands and the real tab order need a browser; jsdom only proves handlers fire.
 
 import type { Page } from '@playwright/test'
 
@@ -105,7 +98,6 @@ test('Delete removes once, and one undo brings it back', async ({ designer }) =>
 
   await designer.undo()
 
-  // One undo, not two: the keypress used to reach both the row and the shell.
   expect(await designer.rootChildren()).toContain('website')
 })
 
@@ -161,7 +153,6 @@ test('Control+D duplicates a component beside itself and focuses the copy', asyn
   expect(children).toContain('website')
   expect(children.filter((key) => key.startsWith('website'))).toHaveLength(2)
 
-  // Directly after the original, not appended at the end.
   const original = children.indexOf('website')
   expect(children[original + 1]).toMatch(/^website\d$/)
 
@@ -181,34 +172,10 @@ test('Control+D refuses the root rather than nesting a screen in itself', async 
   await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
 
-/**
- * The keyboard after a click on the canvas, which is how a person selects.
- *
- * Every test above reaches the keyboard through `.focus()` on a tree row, which
- * is a method no user has. So the whole file passed while the shortcut model was
- * broken for the gesture people actually use: on the canvas, the click that
- * selects a component left focus nowhere at all.
- *
- * Two guards disagreed about one click. The canvas cancels mousedown's default
- * in the capture phase, so clicking a field selects rather than types; the
- * shell's focus handler exempted `input, textarea, select, button` on the theory
- * that anything taking focus keeps it. On the canvas nothing does, so the
- * exemption fired on exactly the elements whose focus had just been cancelled.
- *
- * No `.focus()` anywhere below. That is the point of these three.
- *
- * Each starts by clicking outside the shell, and that is not decoration. The
- * shell's key handler is a React `onKeyDown` on the container, so it catches
- * anything bubbling from a descendant -- and the harness opens the Tree tab
- * during setup, which parks focus on a button inside the shell. With focus
- * already in there the shortcuts work whether or not the click moved it, and the
- * defect is invisible. Measured: after clicking a field on the canvas,
- * `document.activeElement` was still the Tree tab button.
- *
- * A person meets it on the first interaction with the page.
+/*
+ * The next three select by clicking the canvas, never `.focus()`, and start with focus outside the
+ * shell: the harness leaves focus inside it, where shortcuts work even if the click moved nothing.
  */
-
-/** Put focus outside the builder, the way a fresh page load leaves it. */
 async function focusOutsideTheShell(designer: { page: Page }): Promise<void> {
   await designer.page.locator('body').click({ position: { x: 2, y: 2 } })
   await expect(
@@ -256,19 +223,10 @@ test('Escape clears a selection made by clicking a field on the canvas', async (
   await expect(designer.page.locator('.fs-selection--active')).toHaveCount(0)
 })
 
-/**
- * Tab order, which this file's own docblock claimed to check and never did.
- *
- * "only a browser can check that focus really lands where it should and that
- * the tab order is what a user meets" -- and no spec in `e2e/` pressed Tab. The
- * shell is `tabIndex={-1}` on purpose, so it is reachable by script and not by
- * Tab, and what a keyboard user actually meets is the toolbar first.
- */
 test('Tab walks the shell from the top, and the shell itself is not a stop', async ({
   designer,
 }) => {
-  // From the document, not from an element: this is what a person gets after
-  // clicking into the page and pressing Tab.
+  // From the document, as after clicking into the page.
   await designer.page.locator('body').click({ position: { x: 2, y: 2 } })
 
   const stops: { tag: string; inShell: boolean; isShell: boolean; label: string }[] = []
@@ -290,19 +248,12 @@ test('Tab walks the shell from the top, and the shell itself is not a stop', asy
     )
   }
 
-  // Something takes focus on every press. A shell that swallowed Tab would
-  // report `body` for the rest of the run.
+  // A shell that swallowed Tab would leave focus on `body`.
   expect(stops.filter((stop) => stop.tag === 'body' || stop.tag === 'nothing')).toEqual([])
 
-  // The container is never itself a stop, which is what `tabIndex={-1}` says and
-  // what nothing in this repository checked.
   expect(stops.filter((stop) => stop.isShell)).toEqual([])
 
-  /*
-   * Tab reaches the builder rather than stopping at the playground's own chrome
-   * above it -- the first stop on this page is the kit switcher, which belongs
-   * to the demo and not to the designer.
-   */
+  // The playground's own controls come first, so only stops inside the shell count.
   const first = stops.findIndex((stop) => stop.inShell)
   expect(first, 'Tab never reached the designer').toBeGreaterThanOrEqual(0)
   expect(stops[first]?.tag).toBe('button')

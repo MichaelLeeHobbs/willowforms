@@ -1,8 +1,6 @@
-/**
- * Immutable operations over the component tree.
- *
- * Every mutation returns a new tree and leaves the input untouched, because the
- * designer's undo stack holds references to prior states. Nothing here mutates.
+/*
+ * Nothing here mutates its input: the designer's undo stack holds references to
+ * prior trees.
  */
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
@@ -113,10 +111,7 @@ export function flatten(root: ComponentNode): FlatNode[] {
     index: number,
     depth: number,
   ): void => {
-    /*
-     * Total and bounded, like `walk`: `validation.ts`'s `autoValidateKeys` walks
-     * the public tree with it, so it is not designer-only.
-     */
+    // Total and bounded, like `walk`: `autoValidateKeys` runs it on host trees.
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     out.push({ node, parentKey, index, depth })
     childNodesOf(node).forEach((child, i) => visit(child, node.key, i, depth + 1))
@@ -139,13 +134,9 @@ export function generateKey(root: ComponentNode, type: string): string {
   const camel = type.charAt(0).toLowerCase() + type.slice(1)
 
   /*
-   * Held to the same grammar the document's own validator applies. A kit is free
-   * to type a component `Date-Picker` or `2FA`, and the key minted from it went
-   * straight into a document `validateDocument` then refused -- a component the
-   * palette adds and the JSON dialog will not accept back.
-   *
-   * Stripping rather than refusing: dropping a component is not the answer to a
-   * hyphen in a type name, and `field` is always a name.
+   * Held to the key grammar `validateDocument` applies, since a kit may name a
+   * type `Date-Picker` or `2FA`. Stripped rather than refused, so adding the
+   * component never fails.
    */
   const cleaned = camel.replace(/[^A-Za-z0-9_]/g, '')
   const base = keyProblem(cleaned) ? 'field' : cleaned
@@ -153,25 +144,14 @@ export function generateKey(root: ComponentNode, type: string): string {
   return freeKey(new Set(collectKeys(root)), base)
 }
 
-/**
- * The first key starting from `base` that nothing has taken, held to
- * `MAX_KEY_LENGTH`: `base` itself when free, otherwise `base` numbered from 2.
- *
- * `copyKey` does not call this, because a copy continues the original key's
- * number rather than starting at 2. Both number through `numberedKey`.
- */
 function freeKey(taken: Set<string>, base: string): string {
   if (!taken.has(base)) return base
   return numberedKey(taken, base, 2)
 }
 
 /**
- * `base` followed by the first number from `from` that nothing has taken, held
- * to `MAX_KEY_LENGTH` so `validateDocument` accepts the result.
- *
- * When the number does not fit, the base is shortened rather than the key
- * refused, because a new key has to be named something and the digits are what
- * make it unique.
+ * Held to `MAX_KEY_LENGTH` so `validateDocument` accepts it. When the digits do
+ * not fit, the base is shortened: the digits are what make the key unique.
  */
 function numberedKey(taken: Set<string>, base: string, from: number): string {
   let n = from
@@ -191,16 +171,10 @@ function numberedKey(taken: Set<string>, base: string, from: number): string {
   return trimmed
 }
 
-/** A key's name with any trailing number removed, so `website2` copies to `website3`. */
 function baseOf(key: string): string {
   return key.replace(/\d+$/, '') || key
 }
 
-/**
- * The key for a copy of `key`. The copy keeps the original's name rather than
- * its type, so duplicating `emailAddress` does not produce `textField7`, and it
- * continues the original's number, so `website2` copies to `website3`.
- */
 function copyKey(taken: Set<string>, key: string): string {
   const base = baseOf(key)
   const digits = /(\d+)$/.exec(key)?.[1]
@@ -211,47 +185,24 @@ function copyKey(taken: Set<string>, key: string): string {
   return numberedKey(taken, base, from)
 }
 
-/**
- * A binding with every literal naming `from` changed to name `to`.
- *
- * Exported because two callers need the same rule: `duplicateNode` below, which
- * re-points a copy's own condition at its new key, and the designer's rename,
- * which has the same problem arriving from the other direction. A `Step` ships
- * with a condition comparing `context.step` against its own key, so either
- * operation leaves it naming a component that is not there.
- *
- * Structural and total, because a document is data: anything unreadable is
- * returned as it stands rather than throwing. Only literals are touched, and
- * only ones equal to the old key — a `ref` names a data key, which the copy
- * shares deliberately.
- *
- * And only inside a comparison that reads the host context, which is the part
- * this got wrong. A literal equal to a node key means "this node" when it is
- * being compared against `context.step`; in `chosen == 'panel'` the same string
- * is an answer's value, and rewriting it changed which answer reveals the copy.
- * `duplicateNode` said as much in a comment while calling a function that did
- * the opposite, and `renameKey` in the designer inherited it: renaming a
- * component silently rewrote every condition comparing an answer to a value
- * that happened to match the old key.
- */
-/** The three places an operand can sit in a condition. */
 const SIDES = ['left', 'right', 'value'] as const
 
+/**
+ * A binding with every literal naming `from` changed to name `to`, shared by
+ * `duplicateNode` and the designer's rename. A `Step`'s condition compares
+ * `context.step` against its own key, so both must re-point it.
+ *
+ * Total: anything unreadable is returned as it stands. Only literals inside a
+ * comparison that reads the context are rewritten: there a literal naming a key
+ * means that node (`context.step == 'panel'`), elsewhere it is an answer's value
+ * (`chosen == 'panel'`). A `ref` names a data key, which a copy shares.
+ */
 export function repointBinding(value: PropValue, from: string, to: string): PropValue {
   if (value.kind !== 'condition') return value
 
   const inCondition = (condition: Condition, depth = 0): Condition => {
     if (!condition || typeof condition !== 'object') return condition
-    /*
-     * Returned as it stands past the bound, which is what "total, and anything
-     * unreadable is returned as it stands" above already promised for every
-     * other malformed shape. It had no bound at all, so a document nested deep
-     * enough turned a duplicate or a rename into a `RangeError` in the store.
-     *
-     * The same number the evaluator stops at: a condition deeper than that is
-     * one nothing will ever read, so leaving it unrewritten changes no
-     * behaviour a form can observe.
-     */
+    // The evaluator never reads past this depth, so leaving it as is changes nothing.
     if (depth > MAX_CONDITION_DEPTH) return condition
 
     const operand = (side: Operand | undefined): Operand | undefined =>
@@ -260,12 +211,6 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
     const shape = condition as unknown as Record<string, unknown>
     const next: Record<string, unknown> = { ...shape }
 
-    /*
-     * Does this comparison read the context? That is what tells a key from a
-     * value: `context.step == 'welcome'` is about the component named `welcome`,
-     * `chosen == 'welcome'` is about an answer that happens to spell the same
-     * string, and only the first should follow a copy or a rename.
-     */
     const readsContext = SIDES.some(
       (name) => (shape[name] as Operand | undefined)?.kind === 'context',
     )
@@ -282,12 +227,6 @@ export function repointBinding(value: PropValue, from: string, to: string): Prop
     }
 
     if (Array.isArray(shape['conditions'])) {
-      /*
-       * `(each) => inCondition(each, depth + 1)`, never a bare `.map(inCondition)`.
-       * `map` hands its callback the index as a second argument, so passing the
-       * function directly would feed the array position in as the depth and
-       * bound nothing.
-       */
       next['conditions'] = (shape['conditions'] as Condition[]).map((each) =>
         inCondition(each, depth + 1),
       )
@@ -324,12 +263,7 @@ export function repointDataKey(
     const shape = condition as unknown as Record<string, unknown>
     const next: Record<string, unknown> = { ...shape }
 
-    /*
-     * Every side, with no `readsContext` test. That test is what tells a key
-     * from a value for a *literal*, where `'welcome'` could be either. A ref is
-     * never ambiguous: it names a data key by construction, so one naming the
-     * key that moved always follows it.
-     */
+    // Every side, with no `readsContext` test: unlike a literal, a ref always names a data key.
     for (const name of SIDES) {
       if (shape[name] !== undefined) next[name] = operand(shape[name] as Operand)
     }
@@ -386,13 +320,6 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
         ? { ...node.schema, validations: [...node.schema.validations] }
         : { ...node.schema }
     }
-    /*
-     * `css` and `events` too. Both are records a panel writes into, and the copy
-     * shared them by reference: styling the duplicate restyled the original,
-     * and every event handler wired on one appeared on the other. Tree
-     * operations are immutable, so the panels replace rather than mutate and
-     * nothing has gone wrong yet -- which is exactly when this is cheap.
-     */
     if (node.css) next.css = { ...node.css }
     if (node.events) {
       next.events = Object.fromEntries(
@@ -414,12 +341,6 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
 /**
  * Replace the node matching key, returning a new tree, sharing structure with
  * everything that did not change.
- *
- * The identity checks matter as much as the result. `.map` over the children
- * allocated a new object for every node on every edit, so an untouched sibling
- * subtree came back new, `React.memo` could never skip anything, and a no-op
- * edit produced a whole new tree that the undo stack then recorded as a version.
- * ARCHITECTURE.md has always claimed otherwise; now it is true.
  */
 export function updateNode(
   root: ComponentNode,
@@ -428,10 +349,8 @@ export function updateNode(
   depth = 0,
 ): ComponentNode {
   /*
-   * Total and bounded, like `walk`. `if (!root.children) return root` guards
-   * nullish only, so `children: 5` reached `.map` and threw out of an event
-   * handler on the first edit -- on the same unvalidated host document
-   * `store.ts` deliberately warns about rather than refusing.
+   * Total and bounded, like `walk`: `store.ts` warns about an invalid host
+   * document rather than refusing it, so this runs on unvalidated trees.
    */
   if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return root
   if (root.key === key) return update(root)
@@ -459,33 +378,14 @@ export function insertNode(
 ): ComponentNode {
   return updateNode(root, parentKey, (parent) => {
     /*
-     * A leaf is not given children here either.
-     *
-     * `moveNode` grew this guard and `insertNode` did not, though `moveNode`
-     * composes remove-then-*insert* -- so the rule lived one call above the
-     * function that breaks it, and a host calling `insertNode` directly got a
-     * text field with a field inside it: a subtree no renderer draws, which
-     * `validateForm` and `toJsonSchema` keep walking, so the document asks for
-     * an answer nobody can give. `moveNode`'s comment says the API is "the
-     * worse of the two places to leave it"; this is that place.
-     *
-     * Asked of the node, the way `isRowScope` asks: a container is
-     * instantiated with a `children` array and a leaf is not, so no kit is
-     * needed here.
+     * A leaf (no `children` array) is never given children: no renderer draws
+     * them, but `validateForm` and `toJsonSchema` still walk them.
      */
     if (!Array.isArray(parent.children)) return parent
 
     const children = [...parent.children]
 
-    /*
-     * A clamp that also handles what a clamp cannot.
-     *
-     * `Math.max(0, Math.min(NaN, len))` is `NaN`, and `splice(NaN, …)` coerces
-     * to 0 -- so a caller handing over a computed-but-broken index silently
-     * prepended, while the two `Math` calls read as though every non-number was
-     * covered. An index nobody can place is the end of the list, which is what
-     * an absent index already means.
-     */
+    // `splice` reads NaN as 0, so a non-finite index would prepend. It appends instead.
     const at = Number.isFinite(index) ? (index as number) : children.length
     children.splice(Math.max(0, Math.min(at, children.length)), 0, node)
     return { ...parent, children }
@@ -499,7 +399,7 @@ export function removeNode(root: ComponentNode, key: string, depth = 0): Compone
   if (root.key === key) return root
   if (!Array.isArray(root.children)) return root
 
-  // The first match only, for the reason `updateNode` gives.
+  // The first match only, like every lookup.
   let changed = false
   const children: ComponentNode[] = []
 
@@ -517,8 +417,7 @@ export function removeNode(root: ComponentNode, key: string, depth = 0): Compone
     children.push(next)
   }
 
-  // Removing a key that is not in this subtree returns the subtree itself, so a
-  // remove that finds nothing is not recorded as an edit.
+  // A remove that finds nothing returns `root` itself, so undo does not record it.
   return changed ? { ...root, children } : root
 }
 
@@ -541,7 +440,6 @@ export function moveNode(
 
   if (!Array.isArray(parent.children)) return root
 
-  // Dropping a subtree into its own descendant would detach the tree.
   if (pathTo(node, newParentKey).length > 0) return root
   return insertNode(removeNode(root, key), newParentKey, node, index)
 }
@@ -550,10 +448,7 @@ export function moveNode(
  * The name a node's value is stored under.
  *
  * One helper, used everywhere data is read or written, so `key` and `dataKey`
- * cannot be used interchangeably by accident. That mistake has been made once
- * already in this codebase, between a language's code and its tag, and it was
- * invisible in both directions: the writer and the reader each looked correct
- * on their own.
+ * cannot be used interchangeably by accident.
  */
 export function dataKeyOf(node: ComponentNode): string {
   return node.dataKey ?? node.key
@@ -579,23 +474,11 @@ export interface StructuralError {
   key?: string
 }
 
-/**
- * Every tag the two closed unions in a document actually have.
- *
- * Written out rather than derived, because these are the strings a *document*
- * may hold and the whole job is comparing an untrusted one against them. A type
- * cannot do that: by the time a value is typed as `PropValue`, the question has
- * been assumed away.
- *
- * Written out is how a guard goes stale, so both directions are checked by the
- * compiler below. `satisfies` refuses a string that is not in the union, and
- * `Covers` refuses a union member that is not in the list — so adding a kind or
- * a rule without adding it here stops the build rather than silently widening
- * what this gate accepts.
- *
- * The rule keys are not taken from `DEFAULT_MESSAGES`, which is the same list
- * and is already total over the union: `validation.ts` imports this file, so
- * reading it back would be a cycle.
+/*
+ * Written out because an untrusted string is checked against them at runtime.
+ * `satisfies` refuses a string outside the union and `Covers` refuses a missing
+ * member, so a new kind or rule stops the build. Not read from
+ * `DEFAULT_MESSAGES`: `validation.ts` imports this file, so that is a cycle.
  */
 const BINDING_KIND_LIST = [
   'static',
@@ -621,7 +504,6 @@ const RULE_KEY_LIST = [
   'custom',
 ] as const satisfies readonly ValidationRule['key'][]
 
-/** `true` only when the list names every member of the union. */
 type Covers<Union extends string, Listed extends string> = [Exclude<Union, Listed>] extends [never]
   ? true
   : ['missing from the list:', Exclude<Union, Listed>]
@@ -728,10 +610,6 @@ const ROW_SCOPES: ReadonlySet<string> = new Set(ROW_SCOPE_LIST)
 /**
  * How deep a document this gate will walk before refusing it.
  *
- * Its own walk recursed over `children` with no bound, in the function whose
- * entire job is to be the thing that never throws on a document — so a deep
- * enough one produced a `RangeError` out of the gate itself.
- *
  * Far past anything a form has: a hundred levels of nesting is a layout nobody
  * can use, and the panel draws depth by indentation in a 288px pane.
  */
@@ -837,28 +715,15 @@ function inspectDocument(doc: unknown): StructuralError[] {
       }
       seen.add(key)
 
-      /*
-       * The same rule a rename is judged by, so a pasted document cannot hold a
-       * key the panel would have refused. Reported after the emptiness check
-       * above, which says something more specific about the same failure.
-       */
+      // The rule a rename is judged by. The emptiness check above is more specific.
       const problem = keyProblem(key)
       if (problem) {
         errors.push({ code: 'invalid-key', message: 'Component ' + key + ': ' + problem, key })
       }
 
-      /*
-       * A present dataKey has to be usable as a name. It is not checked for
-       * uniqueness: sharing one is legal, and it is what lets two guarded
-       * fields write the same answer.
-       */
+      // Not checked for uniqueness: two guarded fields may write one answer.
       const dataKey = value['dataKey']
       if (dataKey !== undefined && typeof dataKey !== 'string') {
-        /*
-         * Told apart from an empty one, because "has an empty data key" is not
-         * what is wrong with `dataKey: 42` and the message is what somebody
-         * reads before deciding what to fix.
-         */
         errors.push({
           code: 'invalid-data-key',
           message:
@@ -872,11 +737,7 @@ function inspectDocument(doc: unknown): StructuralError[] {
           key,
         })
       } else if (dataKey !== undefined) {
-        /*
-         * Held to the same grammar, and it matters more here: a data key is a
-         * property name in the exported JSON Schema and a key in the submitted
-         * payload, so it leaves the document in a way a node key never does.
-         */
+        // A data key becomes a JSON Schema property name and a submitted payload key.
         const problem = keyProblem(dataKey)
         if (problem) {
           errors.push({
@@ -923,7 +784,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
       if (typeof value !== 'string') malformed(where(what) + ' must be text.')
     }
 
-    /** One `PropValue`: the tag, and the single field that tag promises. */
     const binding = (value: unknown, what: string): void => {
       if (value === undefined) return
       if (!isRecord(value)) {
@@ -934,11 +794,7 @@ function inspectDocument(doc: unknown): StructuralError[] {
 
       switch (value['kind']) {
         case 'static':
-          /*
-           * The one payload left unconstrained, deliberately. A prop can be a
-           * list of options or a nested object and the kit decides what it
-           * means, so there is nothing here to check beyond its presence.
-           */
+          // Unconstrained on purpose: the kit decides what a static value means.
           if (!('value' in value)) malformed(where(what) + ' is static with no value.')
           return
         case 'computed':
@@ -951,22 +807,14 @@ function inspectDocument(doc: unknown): StructuralError[] {
           condition(value['condition'], what + "'s condition")
           return
         /*
-         * Named rather than left to `default`, which is not tidiness.
-         *
-         * The `Covers` assertion below forces a fifth `PropValue['kind']` into
-         * `BINDING_KIND_LIST` the day one is added -- so it would pass `oneOf`
-         * above and land here, and a `default` that reads a condition would
-         * validate the new binding as one. Falling through to nothing is the
-         * honest answer for a tag this version does not know: the tag itself is
-         * already accepted by `oneOf`, so saying nothing more is saying "this
-         * gate has no opinion", not "this is fine".
+         * `condition` stays its own case: a new kind added to the union passes
+         * `oneOf` and lands here, and must not be validated as a condition.
          */
         default:
           return
       }
     }
 
-    /** One side of a comparison. */
     const operand = (value: unknown, what: string): void => {
       if (!isRecord(value)) {
         malformed(where(what) + ' must be an object.')
@@ -976,18 +824,14 @@ function inspectDocument(doc: unknown): StructuralError[] {
 
       if (value['kind'] === 'ref') {
         text(value['dataKey'], what + "'s data key")
-        // Absent means the form, which is what every ref written before
-        // repeaters existed already meant.
+        // Absent means the form.
         if (value['scope'] !== undefined) oneOf(value['scope'], ROW_SCOPES, what + "'s scope")
         return
       }
       if (value['kind'] === 'context') {
         /*
-         * Non-empty, unlike every other string here. `readPath(context, '')` is
-         * `undefined` forever, so a condition reading it is permanently false
-         * and its component permanently unvalidated — and `contextKeys` skips
-         * it, correctly, because it is not a path. Skipping it meant nothing
-         * reported it at all.
+         * Non-empty, unlike other strings here: `readPath(context, '')` is always
+         * undefined, so the condition is always false, and `contextKeys` skips it.
          */
         const path = value['path']
         if (typeof path !== 'string' || path === '') {
@@ -998,13 +842,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
       // undefined, which is what an unanswered field reads as too.
     }
 
-    /**
-     * One condition, and everything under it.
-     *
-     * Recursive, because a malformed condition three levels down is exactly as
-     * reachable at render time as one at the top, and `evaluateCondition`
-     * descends into every one of them.
-     */
     const condition = (value: unknown, what: string, depth = 0): void => {
       if (!isRecord(value)) {
         malformed(where(what) + ' must be an object.')
@@ -1070,11 +907,8 @@ function inspectDocument(doc: unknown): StructuralError[] {
         for (const [device, declarations] of Object.entries(css)) {
           oneOf(device, DEVICES, 'a css breakpoint')
           /*
-           * Only that it is text. Whether the text is *safe* is a different
-           * judgement and a later one: `safeDeclarations` drops a block that
-           * could escape its rule, and the Style tab says so. Refusing it here
-           * would make the panel that exists to repair such a document the one
-           * place it cannot be opened.
+           * Text only. Safety is `safeDeclarations`' job at render time: refusing
+           * unsafe CSS here would stop the Style tab opening the document to fix it.
            */
           text(declarations, 'the css for ' + device)
         }
@@ -1110,10 +944,8 @@ function inspectDocument(doc: unknown): StructuralError[] {
       if (!oneOf(rule['key'], RULE_KEYS, 'a rule key')) continue
 
       /*
-       * The parameter each rule promises. `minLength` compares with `<`, so a
-       * string bound compares lexicographically and reports nothing; `pattern`
-       * goes to `RegExp`. Both are wrong quietly, which is the failure this
-       * whole gate exists for.
+       * A wrong parameter type fails quietly: a string bound compares
+       * lexicographically, and `pattern` goes to `RegExp`.
        */
       const k = rule['key']
       if (
@@ -1202,13 +1034,7 @@ function inspectDocument(doc: unknown): StructuralError[] {
           }
           continue
         }
-        /*
-         * `Object.hasOwn`, not a plain lookup. `actions['toString']` finds
-         * `Object.prototype.toString`, so an event referencing `toString`
-         * passed the unknown-action check and named an action the document does
-         * not have — the same own-property rule `valueOf` and `readPath` follow
-         * everywhere else in this package.
-         */
+        // Own keys only: a plain lookup finds `Object.prototype.toString`.
         if (!actions || !Object.hasOwn(actions, name)) {
           errors.push({
             code: 'unknown-action',
@@ -1243,11 +1069,7 @@ function inspectDocument(doc: unknown): StructuralError[] {
   const tags = languages.map((language) => {
     if (!isRecord(language) || typeof language['code'] !== 'string') return undefined
 
-    /*
-     * The other two fields are read as well: `name` is what the language
-     * selector draws, and `bidi` becomes the `dir` attribute. A language with
-     * neither is a language the toolbar renders as a blank option.
-     */
+    // `name` is the language selector's label and `bidi` becomes `dir`.
     if (typeof language['name'] !== 'string') malformed('every language needs a name.')
     if (!BIDI.has(language['bidi'] as string)) {
       malformed(
@@ -1259,15 +1081,8 @@ function inspectDocument(doc: unknown): StructuralError[] {
       )
     }
     /*
-     * The same rule `languageTag` uses, and it has to be the same rule. That one
-     * is truthiness, so an empty dialect is no dialect and the tag is `en`; this
-     * copy said `typeof dialect === 'string'`, which is true for `''`, so the
-     * gate computed `en-` and compared *that* against `defaultLanguage`. A
-     * document with an empty dialect validated clean and then had no resolvable
-     * default language at runtime.
-     *
-     * Spelled out rather than calling `languageTag`, because the input here is
-     * untrusted and that function takes a `Language`.
+     * Must match `languageTag`: an empty dialect is no dialect. Spelled out
+     * because that function takes a typed `Language`.
      */
     const dialect = language['dialect']
     return typeof dialect === 'string' && dialect

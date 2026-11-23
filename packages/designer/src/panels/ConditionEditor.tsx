@@ -1,23 +1,10 @@
-/**
- * Authoring a structured condition.
- *
- * This is the whole point of the condition vocabulary being closed: a finite
- * set of comparisons can be drawn as a picker, so an author builds a rule by
- * choosing rather than by writing an expression a sandbox has to run. An
- * expression box would have been a tenth of this code and would have kept
- * conditional visibility behind a sandbox and a JSON editor.
- *
- * The editor is recursive because `and`, `or` and `not` take conditions. It is
- * deliberately plain at depth: a 288px pane cannot draw a tree, so nesting is
- * shown by indentation and nothing else.
- */
+// Nesting is shown by indentation only: the inspector pane is too narrow to draw a tree.
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { jsonToString } from '@willowforms/core'
 import type { Condition, JsonValue, Operand } from '@willowforms/core'
 
-/** Every operator, grouped by the shape of editor it needs. */
 const COMPARISONS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'] as const
 const UNARY = ['empty', 'notEmpty', 'truthy', 'falsy'] as const
 const MEMBERSHIP = ['in', 'notIn'] as const
@@ -47,7 +34,6 @@ const OP_LABELS: Record<Condition['op'], string> = {
  */
 const literal = (value: JsonValue): Operand => ({ kind: 'literal', value })
 
-/** Every operator, in the order the picker lists them. */
 const ORDER: Condition['op'][] = [...COMPARISONS, ...UNARY, ...MEMBERSHIP, ...GROUPS, 'not']
 
 function asList<T>(value: T[] | undefined): T[] {
@@ -55,12 +41,9 @@ function asList<T>(value: T[] | undefined): T[] {
 }
 
 /**
- * An operand, whatever the document holds in its place.
- *
- * Same reasoning as `asList`, and the shape I missed the first time: guarding
- * the lists and not the operands left `left: null` throwing on the first read
- * of `.kind`. An unreadable operand becomes an empty literal, which is what a
- * fresh one is, so the row renders and the author can retype it.
+ * Guards beyond the type: a hand-edited document can hold anything here. An
+ * unreadable operand becomes an empty literal so the row renders and can be
+ * retyped.
  */
 function asOperand(value: Operand | undefined): Operand {
   if (!value || typeof value !== 'object') return literal('')
@@ -115,22 +98,14 @@ function morph(current: Condition, op: Condition['op']): Condition {
 
 function asCondition(value: Condition | undefined): Condition {
   if (!value || typeof value !== 'object') return { op: 'truthy', value: literal('') }
-  /*
-   * The operator has to be one this editor can draw, not merely a string. An
-   * unknown one reached a controlled `<select>` with no matching option, which
-   * renders blank and leaves the author looking at a comparison with no name
-   * and no way to tell what the document actually says.
-   */
+  // An op the picker has no option for would render the controlled select blank.
   if (!(ORDER as string[]).includes(value.op)) return { op: 'truthy', value: literal('') }
   return value
 }
 
 /**
- * The default a fresh condition starts from: the commonest thing anyone writes.
- *
- * The scope is passed rather than defaulted, for the reason `switchKind` gives:
- * seeded at form scope inside a row, the condition is false from the moment it
- * is created and everything under it stops being validated.
+ * Pass `row` scope inside a repeater: seeded at form scope there, the condition
+ * is false from the start and everything under it stops being validated.
  */
 export function emptyCondition(dataKey: string, scope?: 'form' | 'row'): Condition {
   const ref: Operand =
@@ -143,26 +118,15 @@ interface OperandFieldProps {
   label: string
   value: Operand
   dataKeys: string[]
-  /**
-   * The enclosing row's data keys, when this condition is authored inside one.
-   *
-   * Absent means there is no row here, which is not the same as a row that
-   * holds nothing: the first draws one list and the second draws two.
-   */
+  /** Undefined means no enclosing row; `[]` is a row with no keys. */
   rowDataKeys?: string[] | undefined
   onChange: (next: Operand) => void
 }
 
 /**
- * A field option's value, carrying the scope the choice implies.
- *
- * The scope is not a second control. A ref names an answer, and inside a row
- * the same name can mean two answers, so the option the author picked has to
- * say which — otherwise the panel is guessing, and the guess that reads
- * plausibly and tests the wrong place is the whole failure mode here.
- *
- * Safe to split on the first `:` because a data key is a JavaScript identifier
- * and cannot hold one; `keyProblem` enforces that on both a paste and a rename.
+ * The option value carries the scope, since inside a row one name can mean two
+ * answers. Splitting on the first `:` is safe: `keyProblem` keeps data keys to
+ * identifiers.
  */
 function encodeRef(scope: 'form' | 'row', dataKey: string): string {
   return scope + ':' + dataKey
@@ -171,8 +135,7 @@ function encodeRef(scope: 'form' | 'row', dataKey: string): string {
 function decodeRef(encoded: string): Operand {
   const at = encoded.indexOf(':')
   const dataKey = encoded.slice(at + 1)
-  // Absent rather than `'form'`, because absent is what every ref written
-  // before repeaters existed already means and no document should change.
+  // Absent, not `'form'`: absent already means form scope in stored documents.
   return encoded.slice(0, at) === 'row'
     ? { kind: 'ref', dataKey, scope: 'row' }
     : { kind: 'ref', dataKey }
@@ -190,9 +153,7 @@ function OperandField({
   const isRef = value.kind === 'ref'
   const isContext = value.kind === 'context'
   const scope: 'form' | 'row' = isRef && value.scope === 'row' ? 'row' : 'form'
-  // Judged within the scope the ref claims. A row key that also exists at the
-  // top level is a different answer, so matching it against the wrong list
-  // would hide a stale ref behind a name that happens to appear twice.
+  // Checked against the claimed scope only: a name in both scopes is two answers.
   const known = isRef && (scope === 'row' ? (rowDataKeys ?? []) : dataKeys).includes(value.dataKey)
 
   const option = (key: string, of: 'form' | 'row'): ReactNode => (
@@ -226,10 +187,8 @@ function OperandField({
           onChange={(e) => onChange(decodeRef(e.target.value))}
         >
           {/*
-            A hand-edited document may name a key that is not on the list. It is
-            shown as it stands, in the scope it claims, rather than the select
-            falling back to the first real option: quietly re-pointing a rule at
-            a different field is worse than showing an unfamiliar name.
+            An unknown key is shown as it stands rather than letting the select
+            fall back to the first option, which would re-point the rule.
           */}
           {!known && (
             <option value={encodeRef(scope, value.dataKey)}>{value.dataKey || '(none)'}</option>
@@ -238,11 +197,7 @@ function OperandField({
             dataKeys.map((key) => option(key, 'form'))
           ) : (
             <>
-              {/*
-                The row first, because a condition authored inside a row almost
-                always means this row's answer, and because the group an option
-                sits in is the only thing that decides the scope written.
-              */}
+              {/* The group an option sits in decides the scope written. */}
               <optgroup label="This row">{rowDataKeys.map((key) => option(key, 'row'))}</optgroup>
               <optgroup label="This form">{dataKeys.map((key) => option(key, 'form'))}</optgroup>
             </>
@@ -266,12 +221,8 @@ function OperandField({
 }
 
 /**
- * The same operand, as a different kind.
- *
- * Nothing is carried across, and that is the point. A data key, a dot path and
- * a literal are three different things wearing the same box, and a field named
- * `email` becoming the context path `email` is a rule that reads plausibly and
- * tests something else entirely. Starting empty is visibly unfinished.
+ * Nothing carries across kinds: a data key, a context path and a literal only
+ * look alike, and a carried value reads plausibly while testing something else.
  */
 function switchKind(
   current: Operand,
@@ -279,28 +230,13 @@ function switchKind(
   dataKeys: string[],
   rowDataKeys?: string[],
 ): Operand {
-  /*
-   * Inside a row, a fresh ref starts on the row. Starting it on the form is the
-   * one default that fails silently: it reads a key the top level does not
-   * hold, the condition is false, the component is hidden, and validation then
-   * skips every rule under it.
-   */
+  // Inside a row, start on the row: a form-scope ref there is false, hides the
+  // component and skips its validation.
   if (kind === 'ref') {
     const inRow = rowDataKeys?.[0]
     if (inRow !== undefined) return { kind: 'ref', dataKey: inRow, scope: 'row' }
     const first = dataKeys[0]
-    /*
-     * A ref needs a key to read, and there is not always one to offer.
-     *
-     * `dataKeys[0] ?? ''` minted `{ kind: 'ref', dataKey: '' }` on a document
-     * whose only data-bound component is the one being edited -- which
-     * `validateDocument` refuses, and which reads nothing, so the condition is
-     * false and the component is hidden forever. The panel wrote a document its
-     * own gate rejects.
-     *
-     * A literal instead: it is the one operand kind that needs nothing from the
-     * document, and it is what the picker falls back to everywhere else.
-     */
+    // No key to offer: a ref with an empty dataKey fails `validateDocument`.
     if (first === undefined) return literal('')
     return { kind: 'ref', dataKey: first }
   }
@@ -317,20 +253,13 @@ function LiteralField({
   value: JsonValue
   onCommit: (next: JsonValue) => void
 }): ReactNode {
-  /*
-   * `jsonToString` answers `''` for an object, an array and `null`, so a literal
-   * a hand-edited document holds -- `{ kind: 'literal', value: { a: 1 } }` --
-   * drew an empty box. An empty box says the condition compares against nothing,
-   * which is not what the document says, and typing into it silently replaced a
-   * structure with a string. JSON is what those values are, so JSON is what the
-   * box shows, and committing it parses the JSON back.
-   */
+  // `jsonToString` gives `''` for objects, arrays and null, so `spell` shows
+  // those as JSON and a commit parses them back.
   const text = spell(value)
   const [draft, setDraft] = useState(text)
   const [committed, setCommitted] = useState(text)
 
-  // Re-sync when the document changes underneath, without losing an edit in
-  // progress. Undo, redo and a document swapped in from the JSON dialog.
+  // Re-sync on outside changes: undo, redo, or the JSON dialog.
   if (text !== committed) {
     setCommitted(text)
     setDraft(text)
@@ -364,36 +293,21 @@ function LiteralField({
   )
 }
 
-/**
- * What the author typed, as the value they almost certainly meant.
- *
- * A form's data is JSON, so `18` typed against a number field has to become the
- * number 18 or `is at least` can never be true: ordering refuses to compare a
- * string to a number rather than guessing. Text that merely looks numeric, like
- * a postcode or a phone number, is the cost, and it is why the comparison
- * operators are the only place this matters.
- */
-
 function spell(value: JsonValue): string {
   if (value === null || typeof value === 'object') return JSON.stringify(value)
   const plain = jsonToString(value)
   return coerce(plain) === value ? plain : JSON.stringify(value)
 }
 
+/**
+ * Numeric-looking text becomes a number: ordering refuses to compare a string to
+ * a number, so `18` must be 18 for `is at least` to hold.
+ */
 function coerce(text: string): JsonValue {
   if (text === '') return ''
 
-  /*
-   * JSON first, for the values plain typing cannot reach.
-   *
-   * `true`, `false` and anything spelled like a number become that value, which
-   * is right for a form and left the *strings* `"true"` and `"18"` unauthorable
-   * -- a condition testing a text field whose answer is the word "true" could
-   * not be written in this panel at all. Quoting is the escape hatch, and it is
-   * the same one JSON uses: `"true"` is the string, `true` is the boolean. An
-   * object or a list is the same story from the other end, and is what the box
-   * shows a document that already holds one.
-   */
+  // JSON first, so quoting reaches what plain typing cannot: `"true"` and `"18"`
+  // stay strings, and objects and lists parse.
   const first = text.trim()[0]
   if (first === '"' || first === '{' || first === '[') {
     try {
@@ -432,10 +346,7 @@ function OptionsField({
   const commit = (): void => {
     if (draft === committed) return
 
-    /*
-     * Trimmed per line, and blank lines dropped. A line of spaces kept as an
-     * option is a value no form data can ever equal.
-     */
+    // A whitespace-only option could never equal any answer.
     const parsed = draft
       .split('\n')
       .map((line) => line.trim())
@@ -469,9 +380,7 @@ function OptionsField({
 export interface ConditionEditorProps {
   id: string
   value: Condition
-  /** Every data key in the document, so a condition can only name a real one. */
   dataKeys: string[]
-  /** The enclosing row's data keys, when this condition sits inside a row. */
   rowDataKeys?: string[] | undefined
   onChange: (next: Condition) => void
   /**
@@ -564,14 +473,9 @@ export function ConditionEditor({
       {'conditions' in value && (
         <div className="fs-condition__nested">
           {/*
-           * Keyed by index, so removing a row shifts its neighbours into the
-           * mounted subtrees below. That is safe because the only local state
-           * down there is the options draft, and the re-sync above notices the
-           * props it now holds and re-reads them. Keying by content instead
-           * would remount on every keystroke and take focus with it.
-           *
-           * Two tests in Properties.test.tsx cover the removal, including one
-           * with an uncommitted draft in the row that survives.
+           * Keyed by index: the only local state below is a draft that re-syncs
+           * from props, and content keys would remount and drop focus on every
+           * keystroke. Removal is covered in Properties.test.tsx.
            */}
           {asList(value.conditions).map((inner, index) => (
             <div key={index} className="fs-condition__row">

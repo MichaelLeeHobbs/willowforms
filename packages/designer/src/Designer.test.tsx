@@ -3,12 +3,8 @@
  */
 
 /**
- * Toolbar controls that are view state rather than document state.
- *
- * Theme, canvas language and viewport all change what the author sees and none
- * of them changes the form. Two people editing one document must not disagree
- * about what it is because one of them last looked at it in dark mode on a
- * phone, so the test that matters most here is that the document does not move.
+ * Theme, canvas language and pane layout are view state: none of them may
+ * change the document.
  */
 
 import { act, fireEvent, render, screen } from '@testing-library/react'
@@ -164,7 +160,6 @@ describe('the theme control', () => {
 
 describe('the canvas language control', () => {
   it('is absent when the document has only one language', () => {
-    // A picker with one entry is furniture.
     setup([ENGLISH])
     expect(screen.queryByLabelText('Canvas language')).toBeNull()
   })
@@ -199,11 +194,6 @@ describe('the canvas language control', () => {
   })
 
   it('falls back when the language it is showing is removed', async () => {
-    /*
-     * Derived during render rather than corrected in an effect, so there is no
-     * frame where the canvas points at a language the document no longer has
-     * and renders every translation as its raw key.
-     */
     const { user } = setup()
     await user.selectOptions(screen.getByLabelText('Canvas language'), 'fr')
     expect(screen.getByText('Courriel')).toBeTruthy()
@@ -217,18 +207,6 @@ describe('the canvas language control', () => {
   })
 
   it('forgets the removed language rather than waiting for it to come back', async () => {
-    /*
-     * The test above does not reach the line the source says is the point.
-     * `activeLanguage` is already `undefined` through `stillThere`, so deleting
-     * `if (language !== undefined && !stillThere) setLanguage(undefined)` keeps
-     * that test and the four before it green -- the canvas looks right for as
-     * long as the language is gone.
-     *
-     * What the line is for is what happens when it comes back. A choice nobody
-     * remembers making is still sitting in state, so adding French again an hour
-     * later makes the canvas jump to French on its own. No test in the
-     * repository re-added a removed language.
-     */
     const { user } = setup()
     await user.selectOptions(screen.getByLabelText('Canvas language'), 'fr')
     expect(screen.getByText('Courriel')).toBeTruthy()
@@ -240,7 +218,6 @@ describe('the canvas language control', () => {
     await user.type(screen.getByLabelText('Name'), 'French')
     await user.click(screen.getByRole('button', { name: 'Add language' }))
 
-    // Back in the list, and not the one the canvas is showing.
     expect(screen.getByRole('button', { name: 'Remove French' })).toBeTruthy()
     expect(screen.getByLabelText<HTMLSelectElement>('Canvas language').value).toBe('')
     expect(screen.getByText('Email')).toBeTruthy()
@@ -248,14 +225,9 @@ describe('the canvas language control', () => {
 })
 
 /**
- * What the host is told, and how often.
- *
- * `onChange` is deliberately out of the effect's dependency list and held in a
- * ref, because a host passes an inline arrow and re-emitting on every one of its
- * own renders is a render loop if the host stores what it is given. The harness
- * above kept only the last document it was handed and never a call count, so the
- * repair was unpinned: putting `onChange` back in the list keeps every test in
- * this file green.
+ * `onChange` is held in a ref, out of the effect's dependencies: hosts pass
+ * inline arrows, and re-emitting on each host render loops when the host stores
+ * what it is given.
  */
 describe('emitting the document to the host', () => {
   const mounted = (): { emit: ReturnType<typeof vi.fn>; rerender: () => void } => {
@@ -300,8 +272,6 @@ describe('emitting the document to the host', () => {
   })
 
   it('still emits when the document actually changes', async () => {
-    // The control. Never emitting would pass the test above and leave the host
-    // with nothing to save.
     const user = userEvent.setup()
     const { emit } = mounted()
     emit.mockClear()
@@ -315,8 +285,6 @@ describe('emitting the document to the host', () => {
 
 describe('the Save button', () => {
   it('is absent when the host passes no onSave', () => {
-    // WillowForms does not persist. A Save button it cannot honour is worse
-    // than no button at all.
     setup()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
   })
@@ -325,11 +293,6 @@ describe('the Save button', () => {
     const onSave = vi.fn<(document: FormDocument) => void>()
     const { user, shell } = setup([ENGLISH, FRENCH], onSave)
 
-    /*
-     * With an edit in between, because the call count was the whole assertion:
-     * a Save that handed over the document the designer booted with -- the
-     * failure this button has exactly one way to get wrong -- passed it.
-     */
     await user.click(screen.getByRole('tab', { name: 'Tree' }))
     const row = shell.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
     if (!row) throw new Error('no tree row')
@@ -347,16 +310,7 @@ describe('the Save button', () => {
   })
 })
 
-/**
- * The undo shortcuts, which no test in any suite had ever pressed.
- *
- * The buttons are covered and the keys are not, and they are not the same code
- * path: the handler reads `ctrlKey || metaKey`, lowercases the key, and routes
- * shift to redo. Every one of those is a place to be wrong, and being wrong
- * there costs an author the edit they just made.
- */
 describe('the undo and redo shortcuts', () => {
-  /** Delete the one component, so the document has a visible before and after. */
   async function withAnEdit(): Promise<Harness> {
     const harness = setup()
     await harness.user.click(screen.getByRole('tab', { name: 'Tree' }))
@@ -369,15 +323,6 @@ describe('the undo and redo shortcuts', () => {
     return harness
   }
 
-  /**
-   * The components the canvas is drawing, by key.
-   *
-   * This was named `keys` and returned `textContent`, from a `queryAllByText`
-   * over the whole document rather than the shell -- so it answered about a
-   * label, from anywhere on the page, under a name that promised the tree. The
-   * canvas marks every node it drew with `data-fs-key`, which is the thing the
-   * assertion is actually about.
-   */
   const drawn = (harness: Harness): string[] =>
     [...harness.shell.querySelectorAll('.fs-canvas__frame [data-fs-key]')]
       .map((element) => element.getAttribute('data-fs-key') ?? '')
@@ -389,7 +334,6 @@ describe('the undo and redo shortcuts', () => {
 
     fireEvent.keyDown(shell, { key: 'z', ctrlKey: true })
     expect(latest().root.children?.map((child) => child.key)).toEqual(['email'])
-    // And the canvas says so too, not only the document the host was handed.
     expect(drawn(harness)).toEqual(['email'])
 
     fireEvent.keyDown(shell, { key: 'y', ctrlKey: true })
@@ -414,11 +358,6 @@ describe('the undo and redo shortcuts', () => {
   })
 
   it('leaves the shortcut alone while a text field has focus', async () => {
-    /*
-     * The guard that makes the rest safe. Ctrl+Z in a property box is the
-     * browser's own undo for the text being typed, and stealing it would undo
-     * the last structural edit instead of the last few characters.
-     */
     const { user, latest } = await withAnEdit()
 
     await user.click(screen.getByRole('tab', { name: 'Settings' }))
@@ -452,8 +391,6 @@ describe('collapsing a pane', () => {
   })
 
   it('leaves the grip reachable once the pane is gone', async () => {
-    // The grip sits outside the pane it controls. Inside it, collapsing would
-    // be a one-way door.
     const { user } = setup()
     await user.click(handle('left'))
 
@@ -483,10 +420,8 @@ describe('collapsing a pane', () => {
 
   it('names the pane it controls, in both states', async () => {
     /*
-     * aria-expanded without aria-controls tells a screen reader that something
-     * is expanded and not what. The pane is `hidden` rather than unmounted, so
-     * the reference resolves either way; an unresolved one would be invisible
-     * to axe, which is how the inspector's tabs shipped two of them.
+     * aria-expanded without aria-controls says something is expanded, not what.
+     * Checked by id here because axe may not flag an id that does not resolve.
      */
     const { user, shell } = setup()
 
@@ -502,22 +437,7 @@ describe('collapsing a pane', () => {
   })
 })
 
-/**
- * A palette entry is a button and a drag handle, and the two have to be told
- * apart.
- *
- * It arms a drag on `pointerdown` and adds on `click`. The drag controller
- * already decides which of the two happened and raises a flag saying "that
- * release was a drag, not a click" — and the palette never asked. So a drag
- * begun on a button and abandoned back over it added a component anyway, which
- * is what dragging out and changing your mind looks like.
- *
- * The canvas and the tree both ask. The palette could not: `PaletteProps` had
- * no way to reach the controller, so the gap was structural rather than an
- * oversight in a handler.
- */
 describe('a palette entry pressed and dragged', () => {
-  /** Press, move past the threshold, release — all over the same button. */
   function dragAndReturn(button: HTMLElement): void {
     fireEvent.pointerDown(button, { clientX: 10, clientY: 10, bubbles: true })
     fireEvent.pointerMove(window, { clientX: 12, clientY: 12 })
@@ -537,8 +457,6 @@ describe('a palette entry pressed and dragged', () => {
   })
 
   it('still adds one on a plain click', async () => {
-    // The control, and the one that matters most: this is the no-aim path the
-    // palette exists for, and swallowing every click would remove it.
     const harness = setup()
     await harness.user.click(screen.getByRole('tab', { name: 'Components' }))
 
@@ -550,20 +468,6 @@ describe('a palette entry pressed and dragged', () => {
 })
 
 describe('shell shortcuts and a target they cannot read', () => {
-  /*
-   * `backspaceIsSafe` inverted when `event.target` was not an `HTMLElement`.
-   *
-   * `target` was narrowed with `instanceof HTMLElement`, so anything else made
-   * it `null` -- and `Icon` renders SVG, whose elements are `SVGElement`. Then
-   * `target?.closest('[data-fs-tree-row]')` was `undefined`, and
-   * `undefined !== null` is `true`, so the keystroke was read as *safe* and
-   * removed the selected component. The clause on the line above guards the
-   * same case correctly with `=== true`, which is what made this easy to miss.
-   *
-   * The same `null` also defeated the modal guard, so all three failed open
-   * together -- and the destructive one failed open in the direction that
-   * destroys work.
-   */
   const selectEmail = async (harness: Harness): Promise<void> => {
     await harness.user.click(screen.getByRole('tab', { name: 'Tree' }))
     const row = harness.shell.querySelector<HTMLElement>('[data-fs-tree-row="email"]')
@@ -592,11 +496,7 @@ describe('shell shortcuts and a target they cannot read', () => {
   })
 
   it('still deletes on Backspace from the shell itself', async () => {
-    /*
-     * The control, and the reason the guard is not simply "refuse everything":
-     * the shell and the tree rows are the two places Backspace can only mean
-     * "remove what is selected".
-     */
+    // In the shell or a tree row, Backspace can only mean "remove the selection".
     const harness = setup()
     await selectEmail(harness)
 

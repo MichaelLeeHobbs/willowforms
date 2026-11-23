@@ -2,16 +2,11 @@ import { format } from 'node:util'
 import { afterEach, beforeEach } from 'vitest'
 
 /**
- * A test that writes to `console.error` fails, unless it said it would.
+ * A test that writes to `console.error` fails unless it declared it with
+ * `expectConsoleError`, and a declaration nothing matched fails too.
  *
- * The check is a declaration, not an allowance: `expectConsoleError` fails the
- * test when the message never arrives, so a stale declaration cannot swallow a
- * silence either. Both directions fail; neither skips.
- *
- * Matching is against `util.format(...args)`, the string a terminal would show.
- * React 19 calls `console.error('%o\n\n%s\n\n%s\n', error, where, what)`, so
- * `args[0]` on its own is the bare format string and matches nothing anybody
- * would write.
+ * Matches `util.format(...args)`: React 19 logs a format string first, so
+ * `args[0]` alone matches nothing a test would write.
  */
 interface Gate {
   expected: RegExp[]
@@ -43,7 +38,6 @@ export function installConsoleErrorGate(): void {
     console.error = (...args: unknown[]): void => {
       const text = format(...args)
       gate.seen.push(text)
-      // Declared output stays quiet; anything else is printed as well as failed.
       if (!gate.expected.some((p) => p.test(text))) original.apply(console, args)
     }
   }

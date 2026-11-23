@@ -1,20 +1,6 @@
-/**
- * The rendering half of the HTML kit.
- *
- * Semantic elements and a stylesheet, no component library. That is the point:
- * proving a second kit is a new package rather than a rewrite should not cost
- * this repo a second heavy dependency, and a consumer who wants their own design
- * system can copy this file and change the markup.
- *
- * Every renderer spreads `nodeProps` onto its outermost element. That is the
- * kit contract's one obligation: it puts `data-fs-key` in the DOM, which is what
- * the designer's canvas selection and drop targeting are built on, and what an
- * end-to-end test against a live form can hold onto.
- *
- * Accessibility is the kit's job, not the renderer's. Each field owns a real
- * `<label for>`, errors are announced through `aria-describedby` with
- * `role="alert"`, and an invalid field carries `aria-invalid`. A kit that skips
- * these produces an inaccessible form no amount of designer polish can fix.
+/*
+ * Every renderer spreads `nodeProps` onto its outermost element and owns its
+ * field accessibility; see docs/spec/02-kit-contract.md.
  */
 
 import { Children, createContext, createElement, useContext, useId } from 'react'
@@ -95,7 +81,6 @@ function Repeater({
   const label = str(props['label'], node.dataKey ?? node.key)
   return (
     <div {...nodeProps} style={backgroundImageStyle(props)}>
-      {/* Group-level help and errors describe the list independently of its rows. */}
       <div
         role="group"
         className="fsh-stack"
@@ -186,36 +171,21 @@ function isLevel(value: string): value is Level {
 }
 
 function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
-  /*
-   * Checked, not cast. `level` reaches this from the JSON editor or a computed
-   * binding, so the cast was a lie: a capitalised string made React treat it as
-   * a component reference and throw, and any other string rendered a tag the
-   * kit never intended.
-   */
-  /*
-   * `h2` when the document names no rank, in both kits.
-   *
-   * The MUI kit fell back to `h5`, so a hand-written document with no `level`
-   * rendered at a different rank depending on which kit drew it -- and a
-   * heading's rank is the document outline a screen reader navigates by, not a
-   * size. The two palettes still start a *new* heading at whatever rank suits
-   * them; this is only the answer for a document that says nothing.
-   */
+  // Checked, not cast: `level` is document data, and a capitalised string would
+  // render as a component reference.
+  // `h2` when the document names no rank, as in kit-mui: rank is the outline a
+  // screen reader navigates, so both kits must agree.
   const raw = str(props['level'], 'h2')
   const tag: Level = isLevel(raw) ? raw : 'h2'
 
-  // createElement rather than a dynamic JSX tag: the element type is data here,
-  // and writing it as <Tag> reads to React and to the linter as a component
-  // being defined during render.
+  // createElement, not a dynamic JSX tag, which React and the linter read as a
+  // component defined during render.
   return createElement(tag, { ...nodeProps, className: 'fsh-heading' }, str(props['text']))
 }
 
 /**
- * Label, control, and message, wired together.
- *
- * The message element is always rendered, even when empty, so a screen reader
- * that has already read `aria-describedby` picks up an error appearing later
- * rather than finding a reference to an element that did not exist.
+ * The message element renders even when empty, so `aria-describedby` never
+ * points at a missing element (docs/accessibility.md).
  */
 function Field({
   id,
@@ -388,12 +358,6 @@ function CheckboxNode({
         className={'fsh-field__message' + (error ? ' is-error' : '')}
         {...(error ? { role: 'alert' } : {})}
       >
-        {/*
-         * The error, or the helper text when there is no error -- which is
-         * what every other field in this kit does and what the MUI kit's
-         * checkbox already did. This one drew the error and dropped the
-         * helper text on the floor.
-         */}
         {error ?? str(props['helperText'])}
       </p>
     </div>
@@ -436,12 +400,8 @@ function SelectNode({
       >
         <option value="">{str(props['placeholder'], 'Choose…')}</option>
         {options.map((option, i) => {
-          /*
-           * `optionEntry` in core, which is `optionValue`'s inverse: the two
-           * have to agree on what an entry means or a choice cannot
-           * round-trip. Read inline here, it also threw on a `null` in the
-           * array, and a document is data.
-           */
+          // `optionEntry` is `optionValue`'s inverse; reading an entry any other
+          // way breaks the round trip.
           const { value: v, label } = optionEntry(option, i, options)
           return (
             <option key={String(i) + ':' + v} value={v}>
@@ -542,15 +502,11 @@ function Card({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   )
 }
 
-// The three the palette offers. Kept beside the renderer that draws them;
-// `test/kit-contract.test.tsx` checks a kit's declared options against what it
-// actually renders.
 const TEXT_VARIANTS = ['body', 'small', 'caption'] as const
 
 function Text({ props, nodeProps }: NodeRendererProps): ReactNode {
   const variant = oneOf(props['variant'], TEXT_VARIANTS, 'body')
-  // Narrowed rather than cast: the value comes from a document, which a person
-  // can hand-edit, so `align: "javascript:"` has to land somewhere harmless.
+  // Narrowed, not cast: `align` comes from a hand-editable document.
   const raw = props['align']
   const align = raw === 'center' || raw === 'end' ? raw : 'start'
   return (
@@ -562,10 +518,6 @@ function Text({ props, nodeProps }: NodeRendererProps): ReactNode {
 
 function Divider({ props, nodeProps }: NodeRendererProps): ReactNode {
   const vertical = props['orientation'] === 'vertical'
-  /*
-   * `<hr>` is the semantic element for a thematic break and carries an implicit
-   * role of separator, so a screen reader is told the same thing the eye is.
-   */
   return (
     <hr
       {...nodeProps}
@@ -634,11 +586,8 @@ function TextAreaNode({
 
 function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   const vertical = props['orientation'] === 'vertical'
-  /*
-   * `role="group"` rather than `toolbar`: toolbar implies arrow-key navigation
-   * between its controls, which this does not provide, and claiming a keyboard
-   * pattern that is not there is worse than claiming nothing.
-   */
+  // `group`, not `toolbar`: toolbar promises arrow-key navigation this does
+  // not provide.
   return (
     <div
       {...nodeProps}
@@ -662,11 +611,8 @@ function SwitchNode({
 }: NodeRendererProps): ReactNode {
   const id = useId()
   const messageId = id + '-message'
-  /*
-   * A checkbox with `role="switch"`, which is the platform pattern: the input
-   * carries the state and the keyboard behaviour, and the role changes only
-   * what a screen reader calls it.
-   */
+  // A checkbox with `role="switch"`: the native input keeps the state and
+  // keyboard behaviour.
   return (
     <div {...nodeProps} className="fsh-field">
       <label className="fsh-switch" htmlFor={id}>
@@ -699,15 +645,6 @@ function SwitchNode({
 interface RadioContext {
   name: string
   selected: string
-  /**
-   * The group's declared options, so a child can resolve its own value the way
-   * the group resolves one of its own.
-   *
-   * A `RadioItem` handed its value over as a string while the options path
-   * routed through `optionValue`, so a group holding both submitted a number
-   * from one control and the string spelling of it from the other -- one
-   * question with two answer types.
-   */
   options: readonly JsonValue[]
   onSelect: (value: JsonValue) => void
 }
@@ -763,14 +700,8 @@ function RadioGroupNode({
                   type="radio"
                   name={id}
                   value={v}
-                  /*
-                   * A value nobody wrote is not the selected one, which is
-                   * exactly what `RadioItemNode` twenty lines below guards and
-                   * this path did not. Options authored as
-                   * `[{ label: 'Prefer not to say', value: '' }, ...]` rendered
-                   * with the first radio already selected on an unanswered
-                   * group, because an unanswered group's value is `''` too.
-                   */
+                  // Never checked for `''`: an unanswered group's value is
+                  // `''` too.
                   checked={v !== '' && jsonToString(value) === v}
                   onChange={() => changed(onChange, events, optionValue(options, v))}
                 />
@@ -778,7 +709,6 @@ function RadioGroupNode({
               </label>
             )
           })}
-          {/* Children are RadioItems, for options that need their own layout. */}
           {children}
         </div>
       </RadioGroupContext.Provider>
@@ -797,38 +727,20 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const group = useContext(RadioGroupContext)
   const value = str(props['value'])
 
-  /*
-   * Outside a group there is no question to answer, so the radio is disabled
-   * rather than rendered as a control that cannot do anything. The designer
-   * lets a RadioItem be dropped anywhere; this is what it looks like when it
-   * has been dropped somewhere that makes no sense.
-   */
+  // Disabled outside a group: the palette lets a RadioItem be dropped anywhere,
+  // and alone it has no question to answer.
   return (
     <label {...nodeProps} className="fsh-radio">
       <input
         type="radio"
         name={group?.name}
         value={value}
-        /*
-         * A value nobody wrote is not the selected one.
-         *
-         * `RadioItem` ships with `value: ''` and an unanswered group's
-         * `selected` is `''` too, so a freshly dropped item rendered
-         * pre-checked -- and so did every other one, all at once. An empty
-         * value is a control that cannot answer anything, which is what the
-         * disabled state below already says.
-         */
+        // Never checked for `''`: the palette default is `''` and so is an
+        // unanswered group's value.
         checked={group ? value !== '' && group.selected === value : false}
         disabled={!group || bool(props['disabled'])}
-        /*
-         * Through `optionValue`, like the `options` path in the group above.
-         *
-         * This handed the raw string straight over, so a group holding both
-         * declared options and `RadioItem` children submitted a number from one
-         * control and the string spelling of it from the other -- one question
-         * with two answer types, which a server validating against the exported
-         * schema rejects for one of them.
-         */
+        // Through `optionValue`, like the group's own options, so both submit
+        // the same answer type.
         onChange={() => group?.onSelect(optionValue(group.options, value))}
       />
       <span>{str(props['label'])}</span>
@@ -880,21 +792,13 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     'info',
   )
   const title = str(props['title'])
-  /*
-   * Only an error announces itself. This component is authored into the form,
-   * so it is on screen from the first paint; `role="alert"` on all four would
-   * have a screen reader read every notice on the page before the form itself.
-   */
+  // Only an error is `role="alert"`: an authored alert is on screen from first
+  // paint, and announcing them all would read every notice before the form.
   return (
     <div
       {...nodeProps}
       className={'fsh-alert fsh-alert--' + severity}
-      /*
-       * An error announces itself; the other three are still a notice rather
-       * than a paragraph, and `role="note"` says so without interrupting. The
-       * MUI kit gives its alerts that role, so without this one document had two
-       * different accessibility trees depending on which kit rendered it.
-       */
+      // `role="note"` for the rest, as in kit-mui, so both kits give one tree.
       {...(severity === 'error' ? { role: 'alert' as const } : { role: 'note' as const })}
     >
       {title && <strong className="fsh-alert__title">{title}</strong>}
@@ -906,8 +810,7 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const circular = props['variant'] === 'circular'
   const raw = props['value']
-  // `Number.isFinite`, not `typeof === 'number'`: `NaN` is a number and a
-  // document can hold one. The same narrowing as `kit-mui`'s ProgressNode.
+  // `Number.isFinite`: a document can hold `NaN`.
   const determinate = typeof raw === 'number' && Number.isFinite(raw)
   const value = determinate ? Math.min(100, Math.max(0, raw)) : 0
 
@@ -932,10 +835,8 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 function LinkNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const href = safeHref(props['href'])
   const blank = props['target'] === 'blank'
-  /*
-   * A refused address renders as text, not as a dead link. A link that looks
-   * like a link and does nothing is the failure this project treats as worst.
-   */
+  // A refused address renders as text: a link that does nothing is worse than
+  // none.
   if (!href) {
     return (
       <span {...nodeProps} className="fsh-link is-inert">
@@ -948,8 +849,6 @@ function LinkNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
       {...nodeProps}
       className="fsh-link"
       href={href}
-      // noopener is what stops the opened page reaching back through
-      // window.opener; noreferrer is the courtesy that goes with it.
       {...(blank ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       onClick={() => events?.onClick?.()}
     >
@@ -964,23 +863,16 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const last = items.length - 1
 
   return (
-    // The landmark's name, which a screen reader reads out. It was the English
-    // word regardless of the form's language, on a component whose every other
-    // string is translatable.
     <nav {...nodeProps} aria-label={str(props['label'], 'Breadcrumb')}>
       <ol className="fsh-breadcrumbs">
         {items.map((item, i) => {
-          /*
-           * Guarded like an option, and for the same reason: a crumb comes out
-           * of a document. Reading `.label` off a `null` threw during render.
-           */
+          // A crumb is document data and can be anything, `null` included.
           const entry =
             item !== null && typeof item === 'object' && !Array.isArray(item) ? item : undefined
           const text = typeof entry?.['label'] === 'string' ? entry['label'] : String(i + 1)
           const href = safeHref(entry?.['href'])
           return (
             <li key={text + ':' + String(i)}>
-              {/* The last crumb is where you are, so it is text and says so. */}
               {i === last || !href ? (
                 <span {...(i === last ? { 'aria-current': 'page' as const } : {})}>{text}</span>
               ) : (

@@ -1,16 +1,4 @@
-/**
- * End-to-end tests against a real browser.
- *
- * Everything positional in this repo has been checked by driving the playground
- * by hand: drop geometry, selection frames, keyboard moves, what the canvas
- * actually renders. jsdom cannot do any of it, so those checks lived in a
- * transcript and protected nothing.
- *
- * They are gates now. The localization bug that shipped is the argument: it was
- * "verified in a browser" and the verification was worthless, because it read
- * the stored document rather than the rendered label. These tests read the
- * screen.
- */
+// Positional behaviour jsdom cannot check. These tests read the screen, not the stored document.
 
 import { defineConfig, devices } from '@playwright/test'
 
@@ -29,23 +17,12 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env['CI'],
-  /*
-   * No retries, on CI or anywhere.
-   *
-   * This suite exists for the checks jsdom cannot make -- a drop target, a
-   * focus order, a measured rectangle -- and every one of them is
-   * deterministic given the same build. A retry turns a real positional
-   * failure that only shows up sometimes into a green run with a note nobody
-   * reads, which is the failure mode this file's own header is about. A flaky
-   * test here is a bug in the test or in the product, and either way the run
-   * should say so the first time.
-   */
+  // No retries: every check is deterministic for a build, so a flaky test is a bug to fix.
   retries: 0,
   reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
 
   use: {
     baseURL,
-    // A failure that cannot be seen is a failure that gets guessed at.
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -58,14 +35,8 @@ export default defineConfig({
     command: 'pnpm --filter playground exec vite --port ' + String(PORT) + ' --strictPort',
     url: baseURL,
     /*
-     * Never reuse. This was `!CI`, which cancels the `--strictPort` reasoning
-     * two lines above it: when something already answers on this port,
-     * Playwright does not run the command at all — so a sibling worktree's dev
-     * server meant the whole suite ran green against another branch's code, and
-     * the strict port never got a chance to say so.
-     *
-     * The cost is a few seconds of startup per local run. The thing it buys is
-     * knowing which code the green came from.
+     * Never reuse: Playwright would skip the command when something already answers on the port,
+     * and test another checkout's server instead of this one.
      */
     reuseExistingServer: false,
     timeout: 60_000,

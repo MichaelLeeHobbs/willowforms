@@ -106,15 +106,10 @@ export const TOO_DEEP = 'This form is nested too deeply to check.'
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 export const INVALID_TYPE = 'This value does not match the field type.'
 
-/*
- * The rule keys that exist, taken from the message table rather than written
- * out again. `DEFAULT_MESSAGES` is typed as a total record over the union, so
- * adding a rule without a message does not compile and this set cannot drift
- * behind it.
- */
+// `DEFAULT_MESSAGES` is a total record over the rule union, so this set cannot
+// fall behind it.
 const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
 
-/** Maximum pattern and input sizes accepted by the validation engine. */
 const PATTERN_SOURCE_LIMIT = 1024
 const PATTERN_INPUT_LIMIT = 4096
 /*
@@ -185,15 +180,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
- * Requiredness is stricter than emptiness, and only for booleans.
- *
- * An unchecked box is a non-answer, not a value of false. "I accept the terms"
- * is the canonical required checkbox and it has to be checked, which is exactly
- * what the platform's own `<input type="checkbox" required>` means. Treating
- * `false` as a supplied value let a required consent box pass while unticked.
- *
- * Every other rule keeps using `isEmpty`, where `false` is a value: requiredness
- * is one rule's job.
+ * An unchecked box is a non-answer, as with `<input type="checkbox" required>`.
+ * Every other rule uses `isEmpty`, where `false` is a value.
  */
 function isMissing(value: JsonValue | undefined): boolean {
   return value === false || isEmpty(value)
@@ -237,7 +225,6 @@ function comparableNumber(value: JsonValue | undefined): number | undefined {
   return Number.isNaN(asNum) ? undefined : asNum
 }
 
-/** Is a rule's `when` guard satisfied? Unguarded rules always apply. */
 function guardPasses(when: PropValue | undefined, data: FormData, options: EvalOptions): boolean {
   if (!when) return true
   switch (when.kind) {
@@ -252,24 +239,15 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       } catch {
         return true
       }
-    /*
-     * A translation key is not a condition, so this reads as "no guard was
-     * expressed" and the rule applies -- the same answer `isVisible` gives the
-     * same kind, where "no condition expressed" means visible. Both directions
-     * are the permissive one: a rule that still runs, and a component that is
-     * still shown.
-     */
+    // A translation key expresses no guard, so the rule applies, matching
+    // `isVisible` for the same kind.
     case 'i18n':
       return true
-    // No sandbox needed, so a guarded rule works where an expression would not.
     case 'condition':
       return evaluateCondition(when.condition, data, options.context, options.row)
 
-    /*
-     * A guard this code cannot read has not said no, so the rule applies. The
-     * other direction skips the rule, which is a required answer quietly
-     * becoming optional — on the server, over a mistyped tag.
-     */
+    // An unreadable guard has not said no. Skipping the rule would make a
+    // required answer optional on the server over a mistyped tag.
     default:
       return unreadableTag(when, true)
   }
@@ -279,8 +257,7 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
  * Apply one rule. Returns an error message, or undefined when the value passes.
  *
  * Every rule except 'required' passes on an empty value. Requiredness is one
- * rule's job; a 'url' rule reporting "required" on an empty field is the exact
- * bug the prior-art study found in the demo it examined.
+ * rule's job.
  */
 export function applyRule(
   rule: ValidationRule,
@@ -292,13 +269,8 @@ export function applyRule(
 
   if (!guardPasses(rule.when, data, options)) return undefined
 
-  /*
-   * Before the empty short-circuit below, and that order is the point. "Every
-   * rule but `required` passes on an empty value" is a statement about rules,
-   * and a tag this code cannot read is not one. The case that matters is a
-   * mistyped `required`, and it arrives with an empty value, so checking after
-   * the short-circuit would let exactly that one through.
-   */
+  // Before the empty short-circuit: a mistyped `required` arrives with an empty
+  // value and must still fail.
   if (!KNOWN_RULES.has(rule.key)) return UNREADABLE_RULE
 
   const fail = (): string => {
@@ -390,28 +362,17 @@ export function applyRule(
     case 'email':
       return EMAIL.test(jsonToString(value)) ? undefined : fail()
     case 'url':
-      /*
-       * `safeHref`, not `URL.canParse`. That one answers yes to any well-formed
-       * URL, scheme included, so a `url` rule accepted `javascript:` and
-       * `data:` — and `safeHref` exists in this same package, keeping an
-       * allowlist, precisely because those are the schemes that matter. Telling
-       * an author their field holds a link and then accepting one that runs
-       * code is the two halves of this project disagreeing.
-       */
+      // `URL.canParse` accepts any scheme, `javascript:` and `data:` included;
+      // `isUrl` adds the `safeHref` allowlist.
       return isUrl(jsonToString(value)) ? undefined : fail()
     case 'uuid':
       return UUID.test(jsonToString(value)) ? undefined : fail()
     case 'custom':
       if (!options.evaluate) return undefined
       /*
-       * A throw fails the rule, which is the answer `matchesPattern` gives a
-       * pattern it refuses to run, in this file, for the same reason: a rule
-       * that cannot be run has not been satisfied.
-       *
-       * Not the same as the line above it. No evaluator is a host that declined
-       * to supply one, and failing every custom rule for that would make the
-       * library unusable without a sandbox; a throw is one expression that is
-       * broken, and letting the value through is the silent permissive failure.
+       * A throw fails the rule: a rule that cannot be run has not been
+       * satisfied. No evaluator passes instead, because failing every custom
+       * rule would make core unusable without a sandbox.
        */
       try {
         const scoped = options.row ? { ...data, ...options.row.values } : data
@@ -464,7 +425,6 @@ export function validateField(
   options: EvalOptions = {},
 ): string | undefined {
   if (!node.schema) return undefined
-  // A field inside a row holds its answer in that row, not at the top level.
   const held = valueOf(options.row?.values ?? data, dataKeyOf(node))
   if (!matchesFieldType(node.schema.type, held)) return INVALID_TYPE
   for (const rule of validationsOf(node)) {
@@ -488,11 +448,9 @@ export function validateForm(
   options: EvalOptions = {},
 ): FormErrors {
   /*
-   * No prototype, for the reason `submittedData` has none. A field keyed
-   * `__proto__` is refused by `validateDocument` and reachable anyway, because
-   * nothing on the render or validate path calls it — and on an object literal
-   * `errors['__proto__'] = message` runs the inherited setter, creates no own
-   * property, and hands back a form that reads as valid.
+   * No prototype: `validateDocument` is not on this path, and on a plain object
+   * `errors['__proto__'] = message` runs the setter and adds no key, which reads
+   * as a valid form.
    */
   const errors: FormErrors = Object.create(null) as FormErrors
 
@@ -501,11 +459,7 @@ export function validateForm(
 
     const path = scope.row?.path ?? NO_ROWS
 
-    /*
-     * The bound this walk did not have. See `TOO_DEEP`: reported at the address
-     * where the walk stopped, not returned silently, because a subtree nobody
-     * checked is a subtree whose required fields all passed.
-     */
+    // Reported, not returned silently: an unchecked subtree would read as valid.
     if (depth > MAX_TREE_DEPTH) {
       const at = addressOf(path, node.key)
       if (!Object.hasOwn(errors, at)) errors[at] = TOO_DEEP
@@ -514,24 +468,11 @@ export function validateForm(
     const error = validateField(node, data, scope)
     if (error) errors[addressOf(path, node.key)] = error
 
-    /*
-     * A repeater validates its children once per row, each under that row's
-     * own scope, so a required answer missing from row two is reported against
-     * row two rather than against the one authored node they share.
-     *
-     * The rows come out of the data. Nothing asks the browser how many there
-     * are, which is the same discipline `validateAcross` follows for steps: a
-     * count from the request would let a client submit one row and have the
-     * rest go unchecked.
-     */
     if (isRowScope(node)) {
       const stored = valueOf(rowData(data, scope), dataKeyOf(node))
 
-      /*
-       * An answer of the wrong shape is reported rather than read as no rows.
-       * See `NOT_A_LIST`: reading it as empty turned every required field inside
-       * the repeater optional.
-       */
+      // Reported rather than read as no rows, which would make every required
+      // field inside optional.
       if (stored !== undefined && stored !== null && !Array.isArray(stored)) {
         const at = addressOf(path, node.key)
         if (!Object.hasOwn(errors, at) || errors[at] === INVALID_TYPE) errors[at] = NOT_A_LIST
@@ -541,26 +482,12 @@ export function validateForm(
       const all = rowsOf(stored)
 
       /*
-       * The row count comes out of the data, which is right: asking the browser
-       * how many rows there are would let a client submit one and have the rest
-       * go unchecked. But that makes the *request body* the thing deciding how
-       * much work happens, with no cap, and rows nest multiplicatively — a
-       * couple of hundred kilobytes of JSON is millions of rule evaluations.
-       *
-       * Over the cap the form fails rather than validating a prefix. A row
-       * nobody checked passing silently is the permissive failure this whole
-       * project is organised against, and refusing is the only answer that is
-       * not one.
+       * Rows come from the data, never from a count the client sends, so the
+       * request body decides the work and rows nest multiplicatively. Over the
+       * cap the form fails rather than validating a prefix.
        */
       if (all.length > MAX_ROWS) {
-        /*
-         * Reported without overwriting the repeater's own failure.
-         *
-         * The rules on the repeater itself are checked a few lines up and write
-         * to this same address, so a list that is both `required` and over the
-         * cap reported only the cap -- losing the message a person can act on
-         * for one about the size of a body they did not choose.
-         */
+        // Keep the repeater's own rule failure, the message a person can act on.
         const at = addressOf(path, node.key)
         if (!Object.hasOwn(errors, at)) errors[at] = TOO_MANY_ROWS
         return
@@ -584,7 +511,6 @@ export function validateForm(
   return errors
 }
 
-/** The record a node's own value is read from: a row's object, or the form's data. */
 function rowData(data: FormData, scope: EvalOptions): FormData {
   return scope.row?.values ?? data
 }
@@ -626,12 +552,8 @@ export function submittedData(
 
     const held = scope.row?.values ?? data
 
-    /*
-     * A repeater keeps its rows, and each row keeps only the answers that row
-     * still asks for. Row order is preserved and no row is dropped: a row the
-     * user filled in is not a question the form stopped asking, it is one of
-     * several answers to the same one.
-     */
+    // No row is dropped: a filled-in row is an answer, not a question the form
+    // stopped asking. Each row keeps only the answers it still asks for.
     if (isRowScope(node)) {
       const key = dataKeyOf(node)
       const stored = valueOf(held, key)
@@ -719,21 +641,9 @@ export function validateAcross(
   scopes: EvalOptions[],
 ): FormErrors {
   /*
-   * No prototype, for the reason `validateForm` has none, and this is the
-   * function where it mattered more.
-   *
-   * `validateForm` assigns, so only `__proto__` bit there. This merge
-   * *coalesces*: `merged[key] ??= message` reads before it writes, and on an
-   * object literal that read finds `Object.prototype.toString` for a field keyed
-   * `toString`. Not nullish, so the write never happens, so the message is
-   * discarded and `Object.keys(merged)` comes back empty. Empty is what every
-   * caller reads as a valid form, and this is the function a server calls at
-   * submit. `toString`, `valueOf`, `hasOwnProperty`, `constructor` and
-   * `isPrototypeOf` all pass `KEY_PATTERN`, so nothing has to be bypassed.
-   *
-   * `RESERVED_KEYS` now names them too, but that is the second lock rather than
-   * this one: nothing on the render or validate path calls `validateDocument`,
-   * so a document carrying such a key reaches here regardless.
+   * No prototype: `??=` reads before it writes, so on a plain object a field
+   * keyed `toString` finds `Object.prototype.toString` and its message is
+   * dropped. `validateDocument`'s `RESERVED_KEYS` is not on this path.
    */
   const merged: FormErrors = Object.create(null) as FormErrors
 

@@ -4,14 +4,6 @@ import { flatten } from '@willowforms/core'
 
 import { describeMove, focusTarget, moveTarget } from './keyboard.js'
 
-/**
- * root
- *   heading
- *   stack        (container)
- *     first
- *     second
- *   footer
- */
 function tree(): ComponentNode {
   return {
     key: 'root',
@@ -36,18 +28,6 @@ function tree(): ComponentNode {
 const rows = (): ReturnType<typeof flatten> => flatten(tree())
 const isContainer = (type: string): boolean => type === 'Screen' || type === 'Stack'
 
-/**
- * The fixture this file navigates, stated once.
- *
- * `flatten` is core's, and its contract -- document order, `parentKey`, `index`,
- * `depth` -- is now pinned in `packages/core/src/tree.test.ts`, where the
- * function lives. Three tests here asserted it under a `describe('flatten')` in
- * a file named for `keyboard.ts`, so core's traversal was described by a suite
- * in another package and this file claimed coverage it was not providing.
- *
- * What is left is the one thing this file needs from it: the order the keyboard
- * moves through, which every test below reads.
- */
 describe('the flattened tree these tests move through', () => {
   it('is the document order the arrows follow', () => {
     expect(rows().map((r) => r.node.key)).toEqual([
@@ -127,7 +107,6 @@ describe('moveTarget', () => {
   })
 
   it('refuses to move right into a sibling that takes no children', () => {
-    // `stack` sits after `heading`, which is not a container.
     expect(moveTarget(rows(), 'stack', 'right', isContainer)).toBeUndefined()
   })
 
@@ -160,12 +139,6 @@ describe('moveTarget', () => {
 })
 
 describe('describeMove', () => {
-  /*
-   * The sentence a screen reader reads after a keyboard move, and the `down`
-   * arm had no test: a switch whose arms differ by one word is exactly where a
-   * copied line stays wrong, and the live region is the only feedback a
-   * keyboard user gets that the move happened at all.
-   */
   it.each([
     ['up', 'email moved up.'],
     ['down', 'email moved down.'],
@@ -177,14 +150,8 @@ describe('describeMove', () => {
 })
 
 /**
- * Two nodes with the same key, which a document can hold.
- *
- * `validateDocument` reports a duplicate key and cannot prevent one, because a
- * host may render a document it never validated -- and `findNode`, `findParent`
- * and `pathTo` in core all deliberately answer about the *first*. `moveTarget`
- * matched siblings by `parentKey` string, so it collected the children of every
- * parent with that name and counted a position in a list the document does not
- * have.
+ * A document can hold duplicate keys: `validateDocument` reports them, but a
+ * host may render a document it never validated.
  */
 describe('moveTarget when two parents share a key', () => {
   const leaf = (key: string): ComponentNode => ({ key, type: 'Field', props: {} })
@@ -202,44 +169,21 @@ describe('moveTarget when two parents share a key', () => {
   const isContainer = (type: string): boolean => type === 'Stack' || type === 'Screen'
 
   it('moves out to the grandparent past the right parent, not the first namesake', () => {
-    /*
-     * The `left` arm of this describe, which covered `up` and `down` only --
-     * and the branch still had the exact defect the block was written about.
-     *
-     * `moveTarget` found the parent with `rows.find((r) => r.node.key ===
-     * row.parentKey)`, and `find` answers the *first* row carrying the name.
-     * Both fields read off it are positional. Traced against this fixture
-     * before the fix: `moveTarget(flatten(twoStacks()), 'c', 'left',
-     * isContainer)` answered `index: 1` where `c` lives in the second stack and
-     * the correct answer is `2`. `moveNode` performs that happily and
-     * `describeMove` announces "moved out one level."
-     *
-     * The second stack sits at index 1 of the root, so a child moving out of it
-     * lands at index 2.
-     */
+    // The second stack sits at index 1 of the root, so a child moving out of it
+    // lands at index 2.
     const rows = flatten(twoStacks())
 
     expect(moveTarget(rows, 'c', 'left', isContainer)).toEqual({ parentKey: 'root', index: 2 })
   })
 
   it('still moves out of the first namesake correctly', () => {
-    /*
-     * The control, and it is what makes the row above mean something: the first
-     * stack is at index 0, so its children move out to index 1 -- which is the
-     * answer the broken version gave for *both* stacks.
-     */
+    // The first stack is at index 0, so its children move out to index 1.
     const rows = flatten(twoStacks())
 
     expect(moveTarget(rows, 'a', 'left', isContainer)).toEqual({ parentKey: 'root', index: 1 })
   })
 
   it('does not offer a move into a container that cannot hold children', () => {
-    /*
-     * `right` asked the *kit* whether the previous sibling is a container while
-     * `moveNode` asks the *node*: a type the kit marks `container: true` that
-     * carries no `children` array yields a MoveTarget `moveNode` silently
-     * refuses, after which `Tree.tsx` announces a move that did not happen.
-     */
     const hollow: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -255,8 +199,6 @@ describe('moveTarget when two parents share a key', () => {
   })
 
   it('still offers a move into a container that can', () => {
-    // The control. Refusing every right-move would pass the row above while
-    // removing the gesture.
     const rows = flatten(twoStacks())
 
     expect(moveTarget(rows, 'd', 'right', isContainer)).toBeUndefined()
@@ -277,12 +219,7 @@ describe('moveTarget when two parents share a key', () => {
   it('counts a position among this parent children, not every namesake parent', () => {
     const rows = flatten(twoStacks())
 
-    /*
-     * `d` is the last child of the second stack, so it cannot move down. With
-     * the siblings gathered by key string the list held four entries and `d`
-     * sat at position 3 of 4 -- which is not the end, so the move was offered
-     * and landed the node at an index its parent does not have.
-     */
+    // `d` is the last child of the second stack, so it cannot move down.
     expect(moveTarget(rows, 'd', 'down', isContainer)).toBeUndefined()
 
     // And `c` is the first, so it cannot move up.
@@ -290,7 +227,6 @@ describe('moveTarget when two parents share a key', () => {
   })
 
   it('still reorders within one parent', () => {
-    // The control. A sibling list that came back empty would refuse every move.
     const rows = flatten(twoStacks())
     expect(moveTarget(rows, 'a', 'down', isContainer)).toEqual({ parentKey: 'stack', index: 1 })
     expect(moveTarget(rows, 'd', 'up', isContainer)).toEqual({ parentKey: 'stack', index: 0 })

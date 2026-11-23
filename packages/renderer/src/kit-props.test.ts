@@ -74,7 +74,6 @@ describe('requiredProps', () => {
   })
 
   it('sets no attribute at all for an optional field', () => {
-    // Absent, not `false`: spreading it must leave no aria-required in the DOM.
     expect(Object.keys(requiredProps(false))).toEqual([])
   })
 })

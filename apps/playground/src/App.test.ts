@@ -8,11 +8,7 @@ import { loadChoice } from './App.js'
 const KEY = 'willowforms.test.choice'
 const REGISTRY = { first: 'First', second: 'Second' }
 
-/*
- * A global `localStorage` is not guaranteed under this runner: newer Node versions define their
- * own, which can shadow jsdom's and be undefined. Each test installs an in-memory store on the
- * global that `loadChoice` reads.
- */
+// Node's own `localStorage` global can shadow jsdom's and be undefined, so tests install one.
 function memoryStorage(): Pick<Storage, 'getItem' | 'setItem'> {
   const items = new Map<string, string>()
   return {

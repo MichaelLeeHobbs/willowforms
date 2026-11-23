@@ -1,9 +1,6 @@
 /**
- * Three tests run under the console gate, two of which must fail.
- *
- * Outside the main suite on purpose: two of these are supposed to be red, so
- * `vitest.config.ts` excludes `test/fixtures/` and `test/console-errors.test.ts`
- * runs this file through its own config and reads the result.
+ * Two of these must fail, so the main suite excludes `test/fixtures/` and
+ * `test/console-errors.test.ts` runs this file through its own config.
  */
 import { describe, expect, it } from 'vitest'
 

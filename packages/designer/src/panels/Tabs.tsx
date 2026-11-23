@@ -7,23 +7,13 @@ export interface TabDef<Id extends string> {
 }
 
 export interface TabsProps<Id extends string> {
-  /** Names the tablist for assistive technology. */
   label: string
   tabs: TabDef<Id>[]
   active: Id
   onSelect: (id: Id) => void
   /** The active panel's contents. Only the active panel is rendered. */
   children: ReactNode
-  /**
-   * Something to sit beside the strip, on the same row.
-   *
-   * The JSON dialog puts its close button there. It cannot go *inside* the
-   * strip, which is the `tablist` and may hold nothing but tabs, and the dialog
-   * having its own tab implementation to get that layout is what left its
-   * second view unreachable from the keyboard.
-   *
-   * Absent for every other caller, and then the markup is exactly what it was.
-   */
+  /** Drawn beside the strip, not in it: a `tablist` may hold only tabs. */
   aside?: ReactNode
 }
 
@@ -38,32 +28,15 @@ export function Tabs<Id extends string>({
   const base = useId()
   const strip = useRef<HTMLDivElement>(null)
 
-  /**
-   * Each tab and its panel get distinct ids from one base so the active tab's
-   * `aria-controls` and the panel's `aria-labelledby` can point at each other.
-   */
   const tabId = (id: Id): string => base + '-tab-' + id
   const panelId = (id: Id): string => base + '-panel-' + id
 
-  /**
-   * Left and right move between tabs; Home and End jump to the ends. Bound to
-   * each tab rather than the strip, because only the tabs take focus and a
-   * keydown handler on a non-focusable wrapper never fires from the keyboard.
-   */
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
       const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
       if (!keys.includes(event.key)) return
 
-      /*
-       * Before `preventDefault`, not after.
-       *
-       * With one tab there is nowhere to go -- and swallowing the key anyway
-       * meant Home and End did nothing at all on a one-tab strip, rather than
-       * scrolling the panel the way they would anywhere else on the page. A
-       * component that takes a key and declines to act on it has to give it
-       * back.
-       */
+      // Before `preventDefault`: a one-tab strip leaves Home and End to the page.
       if (tabs.length < 2) return
 
       event.preventDefault()
@@ -98,11 +71,7 @@ export function Tabs<Id extends string>({
           type="button"
           role="tab"
           aria-selected={active === tab.id}
-          /*
-           * Only the selected tab's panel is in the DOM, so only the selected
-           * tab can name one. An unresolved IDREF is not an axe violation,
-           * which is how the inspector shipped two of them for months.
-           */
+          // Only the active panel exists, so only the active tab may name one.
           {...(active === tab.id ? { 'aria-controls': panelId(tab.id) } : {})}
           tabIndex={active === tab.id ? 0 : -1}
           className={'fs-tabs__tab' + (active === tab.id ? ' is-active' : '')}
@@ -126,15 +95,7 @@ export function Tabs<Id extends string>({
         </div>
       )}
 
-      {/*
-       * No `tabIndex` on the panel.
-       *
-       * A tabpanel takes focus so a keyboard user can reach content that has
-       * none of its own; every panel here is a palette of buttons, a tree, or a
-       * form. Making it focusable anyway adds a tab stop that announces the
-       * panel's name and does nothing, between the tab strip and the first
-       * control, on every one of the five panels.
-       */}
+      {/* No `tabIndex`: every panel has focusable content, so a panel tab stop would be empty. */}
       <div
         id={panelId(active)}
         role="tabpanel"

@@ -1,10 +1,4 @@
-/**
- * Getting a document in and out, and swapping the kit under it.
- *
- * The JSON editor is where untrusted input meets the builder, so most of what
- * follows is about refusing things without falling over. The kit switch is the
- * architecture's central claim, exercised on one document.
- */
+// The JSON editor is where untrusted input meets the builder.
 
 import { STORAGE_KEY, expect, test } from './harness.js'
 
@@ -46,14 +40,12 @@ test('a document with a children field that is not an array is refused, not cras
   const before = await designer.rootChildren()
   await designer.page.getByRole('button', { name: 'JSON' }).click()
 
-  // This used to throw out of the click handler and take the builder down.
   await designer.page
     .getByLabel('Form document JSON')
     .fill('{"version":"1","id":"a","name":"b","root":{"key":"r","type":"Screen","children":5}}')
   await designer.page.getByRole('button', { name: 'Apply' }).click()
 
   await expect(designer.page.getByRole('alert')).toBeVisible()
-  // Still a working builder afterwards, which is the whole point.
   await expect(designer.page.locator('.fs-shell')).toBeVisible()
   await expect.poll(() => designer.rootChildren()).toEqual(before)
 })
@@ -63,12 +55,7 @@ test('every missing field is named at once, not one at a time', async ({ designe
   await designer.page.getByLabel('Form document JSON').fill('{}')
   await designer.page.getByRole('button', { name: 'Apply' }).click()
 
-  /*
-   * Named, not counted. `toHaveCount(4)` passes for any four messages, so a
-   * change that reported the same problem twice and dropped another one kept it
-   * green -- and the point of this test is that an empty document is refused for
-   * every reason at once rather than one at a time.
-   */
+  // Named as well as counted: a count alone passes with one problem reported twice.
   const problems = designer.page.getByRole('alert').getByRole('listitem')
   const text = (await problems.allTextContents()).join(' ')
 
@@ -97,17 +84,7 @@ test('a duplicate key is caught even though the JSON is well formed', async ({ d
 })
 
 test('a stored draft that is not a document loads the sample instead', async ({ designer }) => {
-  /*
-   * Valid JSON, invalid document. The playground guarded the parse and nothing
-   * else, so a draft like this one came back out of localStorage as a
-   * `FormDocument` on the strength of a type assertion and took the app down on
-   * first render, with no way out from inside a page that failed to start. The
-   * JSON dialog refuses exactly this input; the path that runs before anyone can
-   * open the dialog did not.
-   *
-   * The init script the fixture uses to clear the key runs first, so this plants
-   * a draft rather than racing one.
-   */
+  // Runs after the fixture's init script that clears the key, so this plants rather than races.
   await designer.page.addInitScript((key: string) => {
     window.localStorage.setItem(
       key,
@@ -142,11 +119,7 @@ test('the schema view describes the data, not the layout', async ({ designer }) 
   await designer.page.getByRole('button', { name: 'JSON' }).click()
   await designer.page.getByRole('tab', { name: 'JSON Schema' }).click()
 
-  /*
-   * The textarea, not the tabpanel. The dialog's views are real tabs now, and a
-   * tabpanel is labelled by its own tab — so "JSON Schema" names two elements
-   * and the looser locator resolved to the wrong one.
-   */
+  // The textbox, not the tabpanel: a tabpanel is labelled by its tab, so the name matches both.
   const schema = JSON.parse(
     await designer.page.getByRole('textbox', { name: 'JSON Schema' }).inputValue(),
   ) as {
@@ -174,16 +147,9 @@ test('the schema view cannot be edited', async ({ designer }) => {
 })
 
 test('the same document renders through either kit', async ({ designer }) => {
-  // The architecture's central claim, on one document, at runtime.
   await expect(designer.node('email').locator('.MuiInputBase-root')).toHaveCount(1)
 
-  /*
-   * With an edit first, because the switch remounts the designer and the
-   * document it remounts from is a choice this spec is the only one to make.
-   * Switching an unedited document proves the kit swap and nothing about
-   * whether the edit survives it -- and the version that read the boot document
-   * discarded every change since page load, silently, with no way back.
-   */
+  // An edit first: the switch remounts the designer, and the edit must survive it.
   await designer.select('email')
   await designer.openTab('Properties')
   await designer.page.getByRole('textbox', { name: /^Label/ }).fill('Work email')
@@ -195,7 +161,6 @@ test('the same document renders through either kit', async ({ designer }) => {
 
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
   await expect(designer.page.locator('.fs-canvas__surface .MuiInputBase-root')).toHaveCount(0)
-  // Still the same document, still selectable, still keyed the same way.
   await expect(designer.node('email')).toBeVisible()
   await designer.node('email').click()
   await expect(designer.page.locator('.fs-selection--active')).toBeVisible()
@@ -209,15 +174,7 @@ test('the html kit wires up its own accessibility', async ({ designer }) => {
   const input = designer.node('firstName').locator('input')
   await expect(input).toHaveAttribute('aria-invalid', 'true')
 
-  /*
-   * A token list, not an id.
-   *
-   * `aria-describedby` is space-separated, and this built a selector out of the
-   * whole attribute -- so the day the kit describes a field by a hint *and* its
-   * message, `#a b` is a descendant selector that matches nothing and the
-   * assertions below quietly stop being about the message. Every token is
-   * resolved, and the message has to be among them.
-   */
+  // `aria-describedby` is a space-separated list of ids, so each one is resolved.
   const describedBy = await input.getAttribute('aria-describedby')
   expect(describedBy).toBeTruthy()
 
@@ -238,17 +195,6 @@ test('the html kit wires up its own accessibility', async ({ designer }) => {
 })
 
 test('an edit survives switching the kit', async ({ designer }) => {
-  /*
-   * The playground held its boot document in a `useState` that never updated,
-   * and remounted the designer on a kit change with `key={kitId}`. The mount
-   * effect then fired `onChange` with that stale document, which the playground
-   * persists — so switching kits discarded every edit since page load, and a
-   * reload did not bring them back.
-   *
-   * The existing kit-switch test above switches without editing first, so it
-   * could not see this. That is the whole defect: the state being thrown away
-   * is the state a test has to create before it looks.
-   */
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Text field', exact: true }).click()
 
@@ -258,29 +204,18 @@ test('an edit survives switching the kit', async ({ designer }) => {
   await designer.page.locator('#pg-kit').selectOption('html')
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
 
-  // The document the new kit is drawing, and the one that was persisted.
   await expect.poll(() => designer.rootChildren()).toEqual(before)
   await expect(designer.node('textField')).toBeVisible()
 })
 
-/**
- * The dialog is modal, which is a browser behaviour and not a React one.
- *
- * `test/a11y.test.tsx` audits the designer with this dialog open, and jsdom has
- * no `<dialog>` implementation at all -- the suite polyfills `showModal()` as
- * `this.open = true`. So there is no top layer there, no inert background and
- * no `::backdrop`, and every property `docs/accessibility.md` credits to the
- * browser was being claimed in the one environment that cannot provide any of
- * it. This is that claim, checked where the behaviour actually exists.
- */
+// Modality needs a browser: jsdom has no `<dialog>`, so `test/a11y.test.tsx` cannot check it.
 test('the JSON dialog is modal, not merely open', async ({ designer }) => {
   await designer.page.getByRole('button', { name: 'JSON' }).click()
 
   const dialog = designer.page.getByRole('dialog', { name: 'Form JSON', exact: true })
   await expect(dialog).toBeVisible()
 
-  // `:modal` is true only for a dialog in the top layer, which is what makes
-  // the background inert and draws the backdrop. `open` alone is not that.
+  // `:modal` matches only a top-layer dialog, with an inert background; `open` alone does not.
   expect(await dialog.evaluate((element) => element.matches(':modal'))).toBe(true)
 })
 
@@ -311,8 +246,7 @@ test('Escape closes the dialog and leaves the document alone', async ({ designer
   await designer.page.getByRole('button', { name: 'JSON' }).click()
   await expect(designer.page.getByLabel('Form document JSON')).toBeVisible()
 
-  // The browser's own close, not a button this project drew. A dialog that
-  // takes Escape and does not close is a keyboard trap.
+  // The browser's own close. A dialog that ignores Escape is a keyboard trap.
   await designer.page.keyboard.press('Escape')
 
   await expect(designer.page.getByLabel('Form document JSON')).toHaveCount(0)

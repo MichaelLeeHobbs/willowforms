@@ -2,14 +2,6 @@
  * @vitest-environment jsdom
  */
 
-/**
- * The Style tab.
- *
- * The thing worth pinning is that the structured controls and the raw field are
- * two views of one string. Anything that let them drift would give a component
- * two styles and no way to say which wins.
- */
-
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -59,12 +51,7 @@ const kit: Kit = {
           label: 'Gap',
           editor: 'number',
           section: 'style',
-          /*
-           * Bindable to a condition, which is the whole reason `StyleTab`
-           * passes `scopes` down to `PropRows`. Without a conditional style
-           * property anywhere in this fixture, that argument could be replaced
-           * with `{ form: [] }` and every test here stayed green.
-           */
+          // Makes the `scopes` that `StyleTab` passes to `PropRows` observable.
           conditional: true,
         },
         { name: 'disabled', label: 'Disabled', editor: 'boolean', section: 'advanced' },
@@ -88,11 +75,8 @@ function setup(node: ComponentNode, selectKey: string = node.key): Harness {
     name: 'Styling',
     root: { key: 'root', type: 'Screen', props: {}, children: [node] },
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US`, as `createDocument` ships: a dialect-free fixture hides tag and
+    // code mix-ups (write-tests skill, Trap 5).
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -139,16 +123,12 @@ describe('the Style tab', () => {
     await harness.openStyle()
 
     await harness.user.type(screen.getByLabelText('Padding'), '8px')
-    // Committed on blur, not on every keystroke: the control holds a draft so a
-    // value with a space in it can be typed at all.
     await harness.user.tab()
 
     expect(harness.latest()?.css?.any).toContain('padding: 8px')
   })
 
   it('reads a value back out of hand-written CSS', async () => {
-    // The two editors are one string, so a control shows what the raw field
-    // holds without anything syncing them.
     const harness = setup({ ...field(), css: { any: 'padding: 12px; color: red' } })
     await harness.openStyle()
 
@@ -190,13 +170,6 @@ describe('the Style tab', () => {
   })
 
   it('shows a structured edit in the raw box, which is the direction never tested', async () => {
-    /*
-     * The two editors are one string and this file only ever checked the raw
-     * box feeding the controls. The other direction is the one that breaks
-     * quietly: a control that writes without re-syncing leaves the raw field
-     * showing the old CSS, and the author trusts whichever one they looked at
-     * last.
-     */
     const harness = setup({ ...field(), css: { any: 'color: red' } })
     await harness.openStyle()
 
@@ -209,11 +182,6 @@ describe('the Style tab', () => {
   })
 
   it('says so rather than silently dropping CSS that would escape the component', async () => {
-    /*
-     * `}` ends the block and starts a rule that could style the whole page, so
-     * the text is refused. Telling the author is the point: silently keeping a
-     * value that is never applied is the worst of both.
-     */
     const harness = setup(field())
     await harness.openStyle()
 
@@ -223,30 +191,13 @@ describe('the Style tab', () => {
 
     expect(screen.getByRole('alert').textContent).toMatch(/Declarations only/)
     expect(raw).toHaveProperty('ariaInvalid', 'true')
-    /*
-     * And the document does not have it. The warning and the flag were the whole
-     * assertion, so a refusal that said its piece and then committed the text
-     * anyway -- a rule that escapes the component, which is what the message is
-     * about -- passed this test.
-     */
     expect(harness.latest()?.css?.any ?? '').not.toContain('body')
     expect(harness.latest()?.css?.any ?? '').not.toContain('}')
   })
 
   it('drops the refusal when the value moves underneath it', async () => {
-    /*
-     * `refused` survived the resync that runs when the `value` prop moves, so a
-     * field that had refused something stayed `aria-invalid` with its alert on
-     * screen after an undo, a redo or an edit through the raw box put a valid
-     * value back. The control then said the text in it was wrong when it was
-     * not, and a message that outlives its cause is how somebody learns to
-     * ignore the messages.
-     *
-     * A commit first, then the refusal. A refusal writes nothing, so with
-     * nothing committed before it the undo has no edit for this declaration to
-     * step back over and `value` never moves -- which is why the obvious
-     * version of this test passes against the defect.
-     */
+    // Commit first: a refusal writes nothing, so without an earlier commit Undo
+    // has nothing to step back over and `value` never moves.
     const harness = setup(field())
     await harness.openStyle()
 
@@ -271,21 +222,8 @@ describe('the Style tab', () => {
   })
 
   it('drops the refusal when the typed text is repaired back to the written value', async () => {
-    /*
-     * The other way out of a refusal, and the one that had no way out.
-     *
-     * `commit` returns early when the draft matches what was written, and that
-     * path cleared nothing -- so refusing `6px}` and then deleting the brace
-     * left the alert up and the field `aria-invalid` over text that was now
-     * exactly the value in the document. Repairing the mistake by hand is the
-     * obvious thing to do and it was the one repair the control would not
-     * acknowledge; typing some *other* valid value cleared it, because that
-     * reaches the write.
-     *
-     * The commit first, so `4px` is genuinely the written value and the early
-     * return is the path under test. Without it `draft === committed` holds for
-     * the empty string and the refusal never happens.
-     */
+    // Commit first, so `4px` is the written value and the repair takes
+    // `commit`'s early return when the draft matches it.
     const harness = setup(field())
     await harness.openStyle()
 
@@ -300,7 +238,6 @@ describe('the Style tab', () => {
     expect(screen.getByRole('alert'), 'the refusal never happened').toBeTruthy()
     expect(radius).toHaveProperty('ariaInvalid', 'true')
 
-    // Take the brace back out, which puts the box back to what was written.
     await harness.user.type(radius, '{backspace}')
     await harness.user.tab()
 
@@ -310,8 +247,6 @@ describe('the Style tab', () => {
   })
 
   it('keeps the refused text in the box so it can be repaired', async () => {
-    // Refusing is not the same as deleting what somebody typed: the text stays,
-    // flagged, so the stray brace can be taken out rather than retyped.
     const harness = setup(field())
     await harness.openStyle()
 
@@ -357,12 +292,8 @@ describe('property sections', () => {
     expect(disclosure?.open).toBe(false)
     expect(screen.getByLabelText('Label')).toBeTruthy()
 
-    /*
-     * *Which* properties, which this never asked. A closed `<details>` still
-     * renders its children and `getByLabelText` does not filter on visibility,
-     * so inverting the routing -- the label folded away and the advanced
-     * property given the top of the panel -- kept every assertion above green.
-     */
+    // A closed `<details>` still renders its children and `getByLabelText`
+    // ignores visibility, so check which side of the fold each property is on.
     const advanced = screen.getByLabelText('Disabled')
     expect(advanced.closest('details'), 'an advanced property outside the fold').toBe(disclosure)
     expect(
@@ -386,16 +317,8 @@ describe('property sections', () => {
   })
 })
 
-/**
- * A structured control holds a draft, like every other editor here that parses.
- *
- * Trap 10 in this repository's own skill, and the third instance of it. The
- * controls read `readDeclaration` on every render and wrote `setDeclaration` on
- * every keystroke, so the value being typed was parsed, normalised and handed
- * back before it was finished. `setDeclaration` trims, so the space in
- * `8px auto` was removed the moment it was typed and the next character landed
- * against `8px` — the field's own placeholder could not be entered into it.
- */
+// A structured control holds a draft: `setDeclaration` trims, so writing per
+// keystroke would eat the space in `8px auto` (write-tests skill, Trap 10).
 describe('a value being typed into a structured control', () => {
   it.each([
     ['Margin', '0, or 8px auto', '8px auto', 'margin'],
@@ -417,8 +340,6 @@ describe('a value being typed into a structured control', () => {
   })
 
   it('shows what was typed while it is being typed', async () => {
-    // Not only the stored value: the box itself went blank-ish as the parse
-    // rewrote it, which is what made this look like a broken keyboard.
     const harness = setup(field())
     await harness.openStyle()
 
@@ -450,17 +371,6 @@ describe('a value being typed into a structured control', () => {
   })
 })
 
-/**
- * A style property bound to a condition, inside a repeater.
- *
- * `StyleTab` computes `keyScopesFor(api.document.root, node.key)` and hands it
- * to `PropRows` so a style property authored inside a repeater can name that
- * row's answers. Nothing here had a repeater or a conditional style property,
- * so the only test touching `PropRows` on this tab asserted that a Gap row
- * exists -- and passing `scopes={{ form: [] }}` instead would have left a
- * condition inside a row with no fields to offer and nothing to seed from,
- * with the suite green.
- */
 describe('a style property bound to a condition inside a row', () => {
   const inRow = (): ComponentNode => ({
     key: 'addressList',
@@ -564,14 +474,6 @@ describe('a brace typed into a structured control', () => {
   })
 
   it('says why, and keeps what was typed', async () => {
-    /*
-     * The half that made this worse than a plain refusal: `commit` set
-     * `committed` before calling `onCommit`, which returns early on a refusal,
-     * so the value prop never moved and the re-render overwrote the draft with
-     * the stale value. The field blanked back with no reason given and no
-     * chance to delete the stray character -- while the raw box beside it
-     * explains the identical refusal.
-     */
     const harness = setup(field())
     await harness.openStyle()
 
@@ -583,7 +485,6 @@ describe('a brace typed into a structured control', () => {
   })
 
   it('clears the refusal once the value is corrected', async () => {
-    // The control: a message that never goes away is its own defect.
     const harness = setup(field())
     await harness.openStyle()
 

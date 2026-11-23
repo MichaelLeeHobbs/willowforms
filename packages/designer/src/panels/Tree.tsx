@@ -24,14 +24,11 @@ export interface TreeProps {
   onRemove: (key: string) => void
 
   onMove: (key: string, parentKey: string, index: number) => boolean
-  /** Copy a component in beside itself. Returns the new key, or nothing if refused. */
   onDuplicate: (key: string) => string | undefined
-  /** Text for the live region, so a keyboard move is not silent. */
   announce: (message: string) => void
   drag: DragController
 }
 
-/** Row positions frozen when a drag begins, so render stays pure. */
 interface Snapshot {
   /** Which drag this was measured for. A mismatch means it is stale. */
   dragId: number
@@ -40,13 +37,8 @@ interface Snapshot {
 }
 
 /**
- * The structure panel, and the second place a drop can land.
- *
- * The canvas resolves a drop by finding the innermost container under the
- * pointer, which works because a container's box encloses its children. Tree
- * rows do not nest that way: a row covers only itself, and its children are
- * separate rows below it. So the tree resolves drops on its own terms, with the
- * shared arithmetic living in `dnd.ts`.
+ * A tree row covers only itself, not its children the way a canvas box does,
+ * so the tree resolves drops over a flat row list with `resolveTreeDrop`.
  */
 export function Tree({
   root,
@@ -64,14 +56,8 @@ export function Tree({
   const { state: dragState, begin, registerZone, consumeClick } = drag
 
   /**
-   * Read every row's position off the DOM.
-   *
-   * Only ever called from an event handler, never from an effect or from render.
-   * That is what keeps the drop indicator below derivable during render as a
-   * pure function of state.
-   *
-   * Rows are measured as a flat list in document order for `resolveTreeDrop`,
-   * unlike the canvas, which measures nested drop containers with `measureTree`.
+   * Call only from an event handler, never from render or an effect, so the
+   * drop indicator stays a pure function of state.
    */
   const measureNow = useCallback(
     (dragId: number): Snapshot | undefined => {
@@ -126,7 +112,6 @@ export function Tree({
     [begin, root.key],
   )
 
-  /** Move focus to a row and select it, since selection follows focus here. */
   const focusRow = useCallback(
     (key: string) => {
       onSelect(key)
@@ -153,14 +138,8 @@ export function Tree({
     [],
   )
 
-  /*
-   * Arrows move focus; the same arrows with Alt move the component.
-   *
-   * Drag and drop is a pointer gesture with no keyboard equivalent, which would
-   * otherwise make every rearrangement in this builder impossible without a
-   * mouse. WAI-ARIA has no standard pattern for that, so this follows the
-   * outliner convention people already know from editors and file trees.
-   */
+  // Alt with an arrow moves the component, the outliner convention: WAI-ARIA has
+  // no keyboard pattern for drag and drop.
 
   const rows = useMemo(() => flatten(root), [root])
   const defs = useMemo(() => indexKit(kit), [kit])
@@ -186,18 +165,12 @@ export function Tree({
             announce(node.key + ' cannot move that way.')
             return
           }
-          /*
-           * `moveTarget` said where, and the tree says whether. The two
-           * disagree when a kit declares a container that cannot hold this
-           * node, which is the case this branch was announcing through.
-           */
           if (!onMove(node.key, target.parentKey, target.index)) {
             announce(node.key + ' cannot move that way.')
             return
           }
 
           announce(describeMove(node.key, direction))
-          // The row is re-rendered in its new place; put focus back on it.
           focusRowSoon(node.key)
           return
         }
@@ -221,8 +194,7 @@ export function Tree({
       }
 
       if ((event.key === 'd' || event.key === 'D') && (event.ctrlKey || event.metaKey)) {
-        // The browser's own Ctrl+D is a bookmark, and this is the only place a
-        // component can be duplicated without a pointer.
+        // The browser's own Ctrl+D adds a bookmark.
         event.preventDefault()
         if (node.key === root.key) {
           announce('The root cannot be duplicated.')
@@ -240,27 +212,14 @@ export function Tree({
 
       if ((event.key === 'Delete' || event.key === 'Backspace') && node.key !== root.key) {
         event.preventDefault()
-        // The shell also listens for Delete on the window. Without this the same
-        // keypress removed the component twice, pushing two undo entries and
-        // needing two undos to get it back.
+        // The shell also handles Delete on the window; without this one keypress
+        // removes the component twice.
         event.stopPropagation()
         /*
-         * Where focus goes, which nothing decided. The move and duplicate paths
-         * both restore it and this one did not, so deleting from the keyboard
-         * dropped focus onto `document.body` — every subsequent arrow key went
-         * nowhere and the tree had to be tabbed back into.
-         *
-         * The next row *outside the subtree being removed*, or the previous one
-         * when there is none. The row is measured before the removal, because
-         * afterwards it is gone -- and `rows[position + 1]` is a child of the
-         * node being deleted whenever the node has children, so deleting a
-         * container focused something that went with it and left focus on the
-         * body after all. `flatten` is depth-first, so the subtree is the
-         * contiguous run of deeper rows that follows.
+         * Focus moves to the next row outside the removed subtree, or the
+         * previous row. Found before the removal; `flatten` is depth-first, so
+         * the subtree is the run of deeper rows that follows.
          */
-        // The same `rows` the handler opened with, not a second identical
-        // `flatten`: an inner one that shadows the outer reads as though it
-        // were measuring something the outer could not see.
         const position = rows.findIndex((r) => r.node.key === node.key)
         const depth = rows[position]?.depth ?? 0
         const beyond = rows.findIndex((r, i) => i > position && r.depth <= depth)
@@ -297,25 +256,17 @@ export function Tree({
   }, [dragState, snapshot])
 
   /*
-   * Asked by the controller when the pointer is released, measuring afresh
-   * rather than trusting the snapshot the indicator is drawn from. See the same
-   * note on the canvas: that snapshot is always one pointer event behind, and a
-   * quick release would otherwise be silently dropped.
+   * Measured afresh on release: the indicator's snapshot is one pointer event
+   * behind, and a quick release would otherwise be dropped.
    */
   const resolveRelease = useCallback(
     (clientX: number, clientY: number, draggedKey: string | undefined) => {
-      /*
-       * `-1`, a snapshot no drag can be holding, for the reason the canvas
-       * gives at its own call site: this one is measured for this release and
-       * thrown away, and `0` claims to be drag zero's.
-       */
+      // `-1`: an id no drag holds, because this snapshot is used once and discarded.
       const snap = measureNow(-1)
       if (!snap) return undefined
 
       const x = clientX - snap.origin.x
-      // The widest row, for the reason the indicator's copy above gives --
-      // including the `width === 0` half, which this copy was missing: a tree
-      // with no rows has no drop to claim, and `x <= 0` would have claimed one.
+      // `width === 0`: a tree with no rows has no drop to claim.
       const width = Math.max(0, ...snap.rows.map((row) => row.rect.width))
       if (width === 0 || x < 0 || x > width) return undefined
 
@@ -327,11 +278,8 @@ export function Tree({
 
   useEffect(() => registerZone('tree', resolveRelease), [registerZone, resolveRelease])
 
-  /*
-   * One tab stop for the whole tree: the selection if it is still in the
-   * document, and the root otherwise. Without this every row is a tab stop and
-   * a long form buries the rest of the page behind dozens of them.
-   */
+  // One tab stop for the whole tree, so a long form does not bury the rest of
+  // the page behind its rows.
   const tabStop =
     selectedKey && rows.some((r) => r.node.key === selectedKey) ? selectedKey : root.key
 
@@ -374,7 +322,6 @@ interface TreeItemProps {
   onRemove: (key: string) => void
   onRowPointerDown: (node: ComponentNode, event: ReactPointerEvent) => void
   onRowKeyDown: (node: ComponentNode, event: ReactKeyboardEvent<HTMLDivElement>) => void
-  /** Key of the one row that holds the tab stop. */
   tabStop: string
   consumeClick: () => boolean
   target: TreeDropTarget | undefined
@@ -405,17 +352,9 @@ function TreeItem({
         data-fs-tree-row={node.key}
         aria-selected={selected}
         aria-level={depth + 1}
-        /*
-         * Always `true` for a row that has children, because every node is
-         * expanded and there is no way to collapse one. That is a real state
-         * rather than a placeholder -- a tree with no collapse affordance is a
-         * tree whose branches are all open -- and `keyboard.ts` relies on it:
-         * Right steps to the first child, which has to be in the flattened list
-         * for focus to reach it.
-         */
+        // Always `true` for a parent: nothing collapses, and `keyboard.ts`
+        // relies on every child being in the flattened list.
         aria-expanded={children.length > 0 ? true : undefined}
-        // Roving tabindex: exactly one row is in the tab order, so Tab reaches
-        // the tree once and the arrows take over inside it.
         tabIndex={tabStop === node.key ? 0 : -1}
         className={
           'fs-tree__row' + (selected ? ' is-selected' : '') + (drop ? ' is-drop-' + drop : '')

@@ -2,15 +2,6 @@
  * @vitest-environment jsdom
  */
 
-/**
- * The data key field.
- *
- * A component has two names. The key is identity and has to be unique; the data
- * key is what the payload calls the answer and may repeat. The panel has to keep
- * them separable, and has to stop storing an override the moment it stops
- * meaning anything.
- */
-
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -58,19 +49,13 @@ const kit: Kit = {
       defaultProps: {},
       props: [
         { name: 'label', label: 'Label', editor: 'string' },
-        // A number editor, so what this panel stores for one can be checked.
         { name: 'padding', label: 'Padding', editor: 'number' },
         { name: 'tint', label: 'Tint', editor: 'color' },
         { name: 'glyph', label: 'Glyph', editor: 'icon' },
         { name: 'script', label: 'Script', editor: 'code' },
         { name: 'notes', label: 'Notes', editor: 'multiline' },
         { name: 'locked', label: 'Locked', editor: 'boolean', conditional: true },
-        /*
-         * A select whose declared values are not strings, which is the case the
-         * panel's own comment says it handles. Neither shipped kit declares one,
-         * which is the only reason the defect was invisible: the panel is the
-         * part a third kit meets first.
-         */
+        // Declared values that are not strings, which neither shipped kit has.
         {
           name: 'weight',
           label: 'Weight',
@@ -94,11 +79,7 @@ const kit: Kit = {
       props: [],
       events: [],
     },
-    /*
-     * A repeater: a container whose data type is `array`, which is what core
-     * reads as row scope. It is here so a condition can be authored *inside* a
-     * row, which is the only place `scope: 'row'` means anything.
-     */
+    // A repeater (`dataType: 'array'`), so a condition can be authored in a row.
     {
       type: 'List',
       label: 'List',
@@ -118,9 +99,7 @@ interface Harness {
   user: ReturnType<typeof userEvent.setup>
   latest: () => ComponentNode | undefined
   select: () => Promise<void>
-  /** Select any node in the tree, not only the first child of the root. */
   selectKey: (key: string) => Promise<void>
-  /** Any node in the current document, by key. */
   node: (key: string) => ComponentNode | undefined
 }
 
@@ -132,11 +111,8 @@ function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
     name: 'Contact',
     root: { key: 'root', type: 'Screen', props: {}, children: [node, ...siblings] },
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US`, as `createDocument` makes: without a dialect, a tag and its bare
+    // code are the same string (Trap 5 in the write-tests skill).
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -154,8 +130,6 @@ function setup(node: ComponentNode, siblings: ComponentNode[] = []): Harness {
     />,
   )
 
-  // The structure tree is behind a tab in the left pane. Opened here so every
-  // test starts where it used to, rather than repeating the click in each.
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const clickRow = async (key: string): Promise<void> => {
@@ -189,15 +163,6 @@ const dataField = (): ComponentNode => ({
   schema: { type: 'string', validations: [] },
 })
 
-/**
- * The Key field, which this file never touched.
- *
- * The write-tests skill names it as the reference draft-and-commit shape --
- * type freely, commit on blur or Enter, refuse with a reason and keep the text
- * so it can be corrected -- and the panel that owns it had no test for it here
- * at all. A rename also re-points every condition naming the old key, so a
- * refusal that quietly half-applied is the worst outcome available.
- */
 describe('the key field', () => {
   const keyBox = (): HTMLElement => screen.getByRole('textbox', { name: /^Key/ })
 
@@ -213,16 +178,8 @@ describe('the key field', () => {
   })
 
   it('keeps focus in the field it renamed from', async () => {
-    /*
-     * `<KeyField key={node.key}>` made a successful rename change the key this
-     * field is keyed on, so React unmounted it and mounted a new one -- taking
-     * the focus with it. `document.body` is also outside `.fs-shell`, so the
-     * shell's keyboard shortcuts stopped firing as well: one rename and the
-     * keyboard was gone until something was clicked.
-     *
-     * Nothing in this file looked at focus, so the fix that removed the `key`
-     * had nothing holding it in place. Focus is checkable in jsdom.
-     */
+    // Keying `KeyField` by `node.key` would remount it on rename and drop focus
+    // to `document.body`, outside `.fs-shell` and its keyboard shortcuts.
     const { user, select } = setup(dataField())
     await select()
 
@@ -234,18 +191,9 @@ describe('the key field', () => {
 
   it('is gone rather than stale after the rename is undone', async () => {
     /*
-     * The other half of removing that `key`, and it is not the half it looks
-     * like. This field holds a draft and has no re-sync, so a key changing
-     * underneath it would leave the box showing text the document does not
-     * have -- and the next blur would commit that text, silently redoing the
-     * rename the undo had just taken back. That is the failure `DataKeyField`
-     * has its own describe for, further down this file.
-     *
-     * It cannot happen here, and this is why: undo restores a document in which
-     * `email` does not exist, the store refuses to leave the selection on a node
-     * that is gone, and the whole panel unmounts with it. Written down as a test
-     * because the safety comes from two components agreeing, and the agreement
-     * is invisible from either one.
+     * A stale draft here would redo the rename on the next blur. It cannot,
+     * because undo removes `email`, the store drops the selection, and the
+     * panel unmounts: safety that comes from two components agreeing.
      */
     const { user, select, node } = setup(dataField())
     await select()
@@ -275,12 +223,6 @@ describe('the key field', () => {
   })
 
   it('holds the draft while it is being typed, and changes nothing yet', async () => {
-    /*
-     * The reason this is a draft rather than a live write: every intermediate
-     * spelling of a key is a rename of its own, and `em` is a key like any
-     * other. Committing per keystroke would rewrite the document, and every
-     * condition naming it, eleven times.
-     */
     const { user, select, node } = setup(dataField())
     await select()
 
@@ -301,12 +243,6 @@ describe('the key field', () => {
 
     expect(screen.getByRole('alert').textContent).toMatch(/already used/)
     expect(keyBox().getAttribute('aria-invalid')).toBe('true')
-    /*
-     * The field goes back to the key the component actually has. It reverts and
-     * says why, which is the whole point of the docblock on `KeyField`: the
-     * version before it reverted silently, so a refused rename looked like a
-     * field that would not accept typing.
-     */
     expect(keyBox()).toHaveProperty('value', 'emailField')
     expect(node('emailField')).toBeDefined()
     expect(node('taken')).toBeDefined()
@@ -336,13 +272,9 @@ describe('the key field', () => {
 
   it("re-points the component's own condition, which names its own key", async () => {
     /*
-     * A `Step` is a Step because its `renderWhen` compares `context.step`
-     * against its own key, so a rename that moved the key and left the
-     * condition made the step unsatisfiable, permanently, with nothing
-     * reporting why. Same hole `duplicateNode` had from the other side.
-     *
-     * Only its own condition. What a *sibling* names is a data key, and a
-     * rename does not follow those -- see `found.md`.
+     * A Step's `renderWhen` compares `context.step` with its own key, so a
+     * rename must re-point it. Only its own: what a sibling names is a data
+     * key, and a rename does not follow those.
      */
     const step: ComponentNode = {
       key: 'who',
@@ -409,7 +341,6 @@ describe('the data key field', () => {
     await user.type(screen.getByLabelText('Data key'), 'email')
     await user.tab()
 
-    // Identity is not what was being edited.
     expect(latest()?.key).toBe('emailField')
   })
 
@@ -444,9 +375,6 @@ describe('the data key field', () => {
     await user.type(input, '  email  ')
     await user.tab()
 
-    // The padded string is not a different data key, so nothing is written.
-    // The field still has to stop displaying it, or the panel shows a value the
-    // document does not hold.
     expect(latest()?.dataKey).toBe('email')
     expect(input).toHaveProperty('value', 'email')
   })
@@ -475,7 +403,6 @@ describe('the data key field', () => {
     const { select } = setup({ key: 'row', type: 'Row', props: {}, children: [] })
     await select()
 
-    // A layout component submits nothing, so naming its answer is meaningless.
     expect(screen.queryByLabelText('Data key')).toBeNull()
   })
 })
@@ -488,11 +415,8 @@ describe('the colour editor', () => {
   }
 
   it('keeps the text as the value and the swatch as a convenience', async () => {
-    /*
-     * `<input type="color">` can only hold #rrggbb, and the useful things to
-     * write are var(--brand), transparent and rgb(...). A swatch that owned the
-     * value would rewrite every one of them to the nearest hex on first touch.
-     */
+    // `<input type="color">` holds only #rrggbb, so a swatch that owned the value
+    // would rewrite var(--brand), transparent or rgb(...) to hex.
     const { user, latest } = await open()
     const text = screen.getByLabelText('Tint')
 
@@ -502,8 +426,6 @@ describe('the colour editor', () => {
   })
 
   it('shows a hex value in the swatch', async () => {
-    // The wiring, asserted first, because everything below is about what the
-    // swatch does *not* do and none of it means anything if it shows nothing.
     const { user } = await open()
     await user.type(screen.getByLabelText('Tint'), '#336699')
 
@@ -511,18 +433,8 @@ describe('the colour editor', () => {
   })
 
   it('leaves a value it cannot represent exactly where it was', async () => {
-    /*
-     * The swatch falls back to black for anything that is not `#rrggbb`, and the
-     * assertion here used to be that it shows `#000000` -- which jsdom produces
-     * on its own for an unparseable value, so deleting the fallback left it
-     * green. What can fail, and is the actual contract, is the other half: the
-     * text and the document still say `transparent`, because a swatch that owned
-     * the value would have rewritten it to the nearest hex on first paint.
-     *
-     * So the `#000000` assertion is gone rather than kept as a comment saying
-     * it cannot fail: a line that always passes is a line a reader has to
-     * re-derive the uselessness of every time they meet it.
-     */
+    // No `#000000` swatch assertion: jsdom shows that for any unparseable
+    // value, so it cannot fail.
     const { user, latest } = await open()
     const text = screen.getByLabelText('Tint')
     await user.type(text, 'transparent')
@@ -537,13 +449,8 @@ describe('the colour editor', () => {
 
     fireEvent.change(screen.getByLabelText('Pick a colour'), { target: { value: '#ff0000' } })
 
-    // Picking is a deliberate act, so it replaces whatever was there.
     expect(latest()?.props['tint']).toEqual({ kind: 'static', value: '#ff0000' })
-    /*
-     * By role, because the row's label picks up a visually hidden "(modified)"
-     * once the property has been touched, which is the marker the panel draws to
-     * say a value is no longer the default.
-     */
+    // By role: once set, the label gains a visually hidden "(modified)".
     expect(screen.getByRole('textbox', { name: /^Tint/ })).toHaveProperty('value', '#ff0000')
   })
 
@@ -571,13 +478,10 @@ describe('the icon editor', () => {
     })
     await harness.select()
 
-    // An unrecognised name is what a hand-edited document produces. It must not
-    // crash, and it must not draw something arbitrary.
     const preview = document.querySelector('.fs-icon-picker__preview')
     expect(preview?.querySelector('svg')).toBeNull()
 
-    // A property with a value set says so inside its own label, for a screen
-    // reader. /Glyph/ would also match the binding mode picker beside it.
+    // The exact label: /Glyph/ also matches the binding mode picker.
     await harness.user.selectOptions(screen.getByLabelText('Glyph (modified)'), 'text')
     expect(document.querySelector('.fs-icon-picker__preview svg')).not.toBeNull()
   })
@@ -607,8 +511,6 @@ describe('the code editor', () => {
 
 describe('the multiline editor', () => {
   it('is a textarea, not a one-line box', async () => {
-    // Declared in PropEditor from the first commit and unimplemented until
-    // Text wanted one, so a kit asking for it got the single-line fallback.
     const harness = setup(dataField())
     await harness.select()
 
@@ -663,28 +565,11 @@ describe('the visibility row', () => {
     })
   })
 
-  /**
-   * Every arm of the operator picker, not just the unary one.
-   *
-   * `morph` has five arms -- comparison, unary, membership, group and `not` --
-   * and one `selectOptions` on the Comparison picker in the whole file, which
-   * drove one of them. The arms it did not drive are where the carrying logic
-   * lives: what a group turns into when it becomes a scalar, and what a scalar
-   * turns into when it becomes a group. Its own docblock records the regression
-   * that logic exists for -- changing a group to a scalar used to discard the
-   * group outright, and the store coalesces by label, so one undo went back to
-   * before the whole condition was authored.
-   */
   const morphTo = async (harness: Harness, ops: string[]): Promise<void> => {
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
     for (const op of ops) {
-      /*
-       * The outermost picker, which is the first in the DOM. A group draws a
-       * Comparison select of its own for every condition inside it, so once
-       * the operator is `and` there is more than one on screen and the
-       * unqualified query is ambiguous -- Trap 4, in the panel it keeps
-       * happening in.
-       */
+      // The outermost picker is first in the DOM; a group draws one more per
+      // inner condition (Trap 4 in the write-tests skill).
       const pickers = screen.getAllByLabelText('Comparison')
       const outer = pickers[0]
       if (!outer) throw new Error('no operator picker')
@@ -743,12 +628,6 @@ describe('the visibility row', () => {
   })
 
   it('carries the first inner condition back out when a group becomes a scalar', async () => {
-    /*
-     * The regression the carrying logic was written for. Delete it and the
-     * group's contents go with the change of operator -- and because the store
-     * coalesces edits by label, the one undo available goes back to before the
-     * condition was authored at all rather than restoring the group.
-     */
     const harness = await withSibling()
     await morphTo(harness, ['and', 'empty'])
 
@@ -769,19 +648,8 @@ describe('the visibility row', () => {
   })
 
   it('shows a subject the document names but the form no longer has', async () => {
-    /*
-     * A hand-edited document, or a field renamed after the condition was
-     * authored. The select offers the fields that exist, so a ref to a missing
-     * one has nothing to match -- and a `<select>` with no matching option
-     * shows its first, which would mean the panel displaying a different
-     * subject than the document holds. Quietly re-pointing a rule at another
-     * field is worse than showing an unfamiliar name, which is what the extra
-     * option is for.
-     *
-     * Every ref fixture in this file named a key that is in the list, and the
-     * malformed ones all degrade to literals, so this option could be deleted
-     * with nothing red.
-     */
+    // A `<select>` with no matching option shows its first, so without the
+    // extra option the panel would show a subject the document does not hold.
     const node = pair()
     const harness = setup(
       {
@@ -801,7 +669,6 @@ describe('the visibility row', () => {
       'renamedAway',
     )
 
-    // And the document is untouched by having been looked at.
     expect(harness.latest()?.renderWhen).toEqual({
       kind: 'condition',
       condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'renamedAway' } },
@@ -809,7 +676,6 @@ describe('the visibility row', () => {
   })
 
   it('removes renderWhen when set back to Always', async () => {
-    // Absent is not the same as a condition that is false: absent means shown.
     const harness = await withSibling()
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
     expect(harness.latest()?.renderWhen).toBeDefined()
@@ -828,11 +694,6 @@ describe('the visibility row', () => {
   })
 
   it('refuses a condition when there is no other field to test', async () => {
-    /*
-     * A condition naming no field evaluates to false, so offering it here would
-     * hide the component the moment it was chosen and give the author no field
-     * that could bring it back.
-     */
     const harness = setup(pair())
     await harness.select()
 
@@ -850,18 +711,6 @@ describe('the visibility row', () => {
     ['a translation key', { kind: 'i18n', key: 'x' }, 'other'],
     ['an expression', { kind: 'computed', expression: 'a' }, 'computed'],
   ])('reads %s out of a hand-edited document as %s', async (_label, renderWhen, expected) => {
-    /*
-     * `renderWhen` is a PropValue, so a document can hold any of its kinds.
-     * Reading anything truthy as "a condition" left the select saying so while
-     * rendering no editor, which made those documents unfixable from the panel.
-     *
-     * A static truthy and a translation key both *behave* as no condition, which
-     * is what `isVisible` does with them -- and they read as `other` rather than
-     * `always`, because a select already showing Always fires no change when
-     * Always is chosen, so the row displayed the stray value and could not
-     * remove it. The option says "Always (unrecognised rule)" and choosing
-     * anything replaces it.
-     */
     const harness = setup({ ...dataField(), renderWhen: renderWhen as PropValue }, [
       { key: 'firstName', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
     ])
@@ -890,11 +739,6 @@ describe('the visibility row', () => {
   })
 
   it('offers every field to a component that has none of its own', async () => {
-    /*
-     * `dataKeyOf` falls back to the node key, so filtering unconditionally hid
-     * a real field from a container that happened to share its name. Only a
-     * component that carries data has an own field to exclude.
-     */
     // The sibling has to share the container's key, or the filter removes
     // nothing and the test passes against the bug it was written for.
     const container: ComponentNode = { key: 'country', type: 'Row', props: {}, children: [] }
@@ -935,12 +779,8 @@ describe('the visibility row', () => {
   })
 
   it('does not carry a data key across into a context path', async () => {
-    /*
-     * A field named `email` becoming the context path `email` reads perfectly
-     * plausibly and tests something else entirely. Starting empty is visibly
-     * unfinished, which is the only honest state for a switch that cannot be
-     * translated.
-     */
+    // Field `email` becoming context path `email` reads plausibly and tests
+    // something else; empty is visibly unfinished.
     const harness = await withSibling()
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
 
@@ -973,8 +813,6 @@ describe('the visibility row', () => {
   })
 
   it('does not offer the component its own field', async () => {
-    // Hiding a component when its own value is empty hides the only control
-    // that could fill it.
     const harness = await withSibling()
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
 
@@ -987,12 +825,7 @@ describe('the visibility row', () => {
 })
 
 describe('the condition binding mode', () => {
-  /*
-   * A property whose schema opts in with `conditional: true`. No kit ships one
-   * yet, so this is the only place the path is exercised — and it shipped as a
-   * dead option once already, offered in the list and doing nothing when
-   * chosen.
-   */
+  // No shipped kit opts into `conditional: true`, so this is its only coverage.
   const field = (): ComponentNode => ({
     key: 'website',
     type: 'Field',
@@ -1013,12 +846,8 @@ describe('the condition binding mode', () => {
 
     await harness.user.selectOptions(screen.getByLabelText('Locked binding'), 'condition')
 
-    /*
-     * Seeded with the first field on the document, which here is the selected
-     * component's own. Unlike `renderWhen`, a property may test its own value:
-     * hiding a component on its own emptiness removes the control that would
-     * fill it, but disabling one on its own value is a real thing to want.
-     */
+    // Seeded with the component's own field, which a property, unlike
+    // `renderWhen`, may test.
     expect(harness.latest()?.props['locked']).toEqual({
       kind: 'condition',
       condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'website' } },
@@ -1026,8 +855,6 @@ describe('the condition binding mode', () => {
   })
 
   it('refuses the mode when no field is available to seed it', async () => {
-    // No component on the document carries a schema, so there is no data key
-    // anywhere to test. A hand-authored document can look like this.
     const harness = setup({ key: 'website', type: 'Field', props: {} })
     await harness.select()
 
@@ -1062,8 +889,6 @@ describe('a literal the plain grammar cannot spell', () => {
   }
 
   it('shows an object literal as JSON rather than as an empty box', async () => {
-    // An empty box says the condition compares against nothing, which is not
-    // what the document says -- and typing into it replaced the structure.
     await open({ a: 1 })
     expect(screen.getByDisplayValue('{"a":1}')).toBeTruthy()
   })
@@ -1074,12 +899,8 @@ describe('a literal the plain grammar cannot spell', () => {
   })
 
   it('lets a quoted string be authored as a string', async () => {
-    /*
-     * `true` and `18` become the boolean and the number, which is what a form
-     * needs and what made the *words* unauthorable: a condition testing a text
-     * field whose answer is "true" could not be written here at all. Quoting is
-     * the escape hatch, and it is JSON's own.
-     */
+    // Unquoted `true` and `18` parse as boolean and number, so JSON quoting is
+    // how to write the word.
     const harness = await open('x')
     const box = screen.getByDisplayValue('x')
     await harness.user.clear(box)
@@ -1106,13 +927,6 @@ describe('a literal the plain grammar cannot spell', () => {
 })
 
 describe('the condition editor survives a hand-edited document', () => {
-  /*
-   * `evaluateCondition` was made total against these shapes and the editor was
-   * not, so a document with `options: "not-a-list"` rendered fine on the canvas
-   * and took the designer down when the panel tried to map over it. The panel
-   * is where someone goes to fix a broken document, so it is the last place
-   * that can afford to fall over on one.
-   */
   const withRenderWhen = (condition: unknown): ComponentNode => ({
     key: 'website',
     type: 'Field',
@@ -1142,21 +956,12 @@ describe('the condition editor survives a hand-edited document', () => {
   ]
 
   it('draws an operator it does not know as one it does', async () => {
-    /*
-     * A controlled select whose value matches no option renders blank, so the
-     * author sees a comparison with no name and cannot tell what the document
-     * says. Falling back to a real operator gives them something to change.
-     */
+    // A controlled select whose value matches no option renders blank.
     const harness = setup(withRenderWhen({ op: 'sorcery' }))
     await harness.select()
 
-    /*
-     * Asserting on the select's value alone proves nothing: jsdom quietly
-     * falls back to the first option when the value matches none, so the
-     * broken and fixed states look identical from there. What differs is that
-     * a real operator draws its operands — `sorcery` has none, `truthy` has a
-     * subject — so that is the thing to check.
-     */
+    // Not the select's value alone: jsdom falls back to the first option when
+    // none matches. A real operator draws operands; `sorcery` draws none.
     expect(screen.getByLabelText('Subject')).toBeTruthy()
     expect(screen.getByLabelText('Comparison')).toHaveProperty('value', 'truthy')
   })
@@ -1164,18 +969,9 @@ describe('the condition editor survives a hand-edited document', () => {
   it.each(malformed.map((c) => [JSON.stringify(c), c] as const))(
     'renders %s without crashing',
     async (_label, condition) => {
-      /*
-       * `await harness.select()`, not `expect(...).resolves.toBeUndefined()`.
-       *
-       * That asserted the return value of `user.click`, which is `undefined` on
-       * every path that resolves -- so it read as "selecting worked" while
-       * saying nothing at all. What the test is about is the row below.
-       */
       const harness = setup(withRenderWhen(condition))
       await harness.select()
 
-      // The row is on screen, so the author can pick a different operator and
-      // repair it rather than being left with a blank panel.
       expect(screen.getByLabelText('Show when')).toHaveProperty('value', 'condition')
     },
   )
@@ -1194,12 +990,6 @@ describe('membership options', () => {
   })
 
   it('lets a newline be typed at all', async () => {
-    /*
-     * The box holds a draft and commits on blur. Deriving its text from the
-     * parsed list on every keystroke normalised the newline away the instant it
-     * was typed, so `18` Enter `21` arrived as `1821` and a multi-line list
-     * could not be entered.
-     */
     const harness = setup(listy())
     await harness.select()
 
@@ -1211,10 +1001,7 @@ describe('membership options', () => {
   })
 
   it('drops blank lines and trims the rest', async () => {
-    /*
-     * A line of spaces is not an option. Kept, it becomes a value no form data
-     * can ever equal, so the condition silently never matches.
-     */
+    // A blank option is a value no form data can equal.
     const harness = setup(listy())
     await harness.select()
 
@@ -1245,11 +1032,6 @@ describe('membership options', () => {
   })
 
   it('re-syncs when the document changes underneath', async () => {
-    /*
-     * Undo, redo, and a document replaced from the JSON dialog all change the
-     * options without touching this box. Holding a draft and never re-reading
-     * would leave the old text on screen and write it back on the next blur.
-     */
     const harness = setup(listy())
     await harness.select()
 
@@ -1266,12 +1048,8 @@ describe('membership options', () => {
 })
 
 describe('removing a nested condition', () => {
-  /*
-   * Nested rows are keyed by index, so removing the first shifts the second
-   * into its slot and React reuses the mounted subtree. Anything holding local
-   * state there — the options box holds a draft — could end up attached to the
-   * wrong condition. This is the test that says whether it does.
-   */
+  // Nested rows are keyed by index, so removing the first hands its mounted
+  // subtree, and any draft it holds, to the second.
   const twoLists = (): ComponentNode => ({
     key: 'website',
     type: 'Field',
@@ -1290,26 +1068,10 @@ describe('removing a nested condition', () => {
   })
 
   it('adds a row when Add condition is clicked', async () => {
-    /*
-     * The `ConditionEditor`'s only suite never pressed this button, so the one
-     * gesture that grows a condition group -- the reason the group exists -- was
-     * covered by nothing. Everything else here starts from a group somebody else
-     * built.
-     *
-     * Counted by the remove buttons rather than by the options boxes: a new row
-     * is an `eq` comparison, which has no options list, so counting textareas
-     * counts the rows that happen to be membership tests.
-     */
-    /*
-     * With a sibling field, so the panel has a data key to seed a new clause
-     * with.
-     *
-     * This fixture used to be the edited node alone -- and a condition cannot
-     * test its own field, so the key list was empty and the button minted
-     * `{ kind: 'ref', dataKey: '' }`: a clause that reads nothing, is false
-     * forever, and takes everything under it out of validation. The test
-     * counted the row and called it added. It was asserting the defect.
-     */
+    // Counted by remove buttons: a new row is an `eq` comparison, which has no
+    // options box.
+    // A sibling, so there is a field to seed the new clause with: the node's
+    // own field is excluded.
     const harness = setup(twoLists(), [
       { key: 'other', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
     ])
@@ -1321,7 +1083,6 @@ describe('removing a nested condition', () => {
 
     expect(screen.getAllByRole('button', { name: /^Remove condition/ })).toHaveLength(3)
 
-    // The document has it too, not only the panel.
     const held = harness.latest()?.renderWhen
     const condition = held?.kind === 'condition' ? held.condition : undefined
     expect(
@@ -1330,10 +1091,6 @@ describe('removing a nested condition', () => {
         : 0,
     ).toBe(3)
 
-    /*
-     * And the clause it added reads a real field. Counting rows says a row
-     * appeared; this says the row is one an author can satisfy.
-     */
     const clauses =
       condition && 'conditions' in condition && Array.isArray(condition.conditions)
         ? condition.conditions
@@ -1343,18 +1100,9 @@ describe('removing a nested condition', () => {
   })
 
   it('offers no way to add a clause when there is no field to read', async () => {
-    /*
-     * The other half. With nothing to seed from, the button is disabled rather
-     * than minting a clause that reads nothing -- the same argument the
-     * Show-when select already makes, where "A condition" is disabled when
-     * there is nothing to test.
-     */
     const harness = setup(twoLists())
     await harness.select()
 
-    // `hasAttribute` rather than a cast to `HTMLButtonElement`: `getByRole`
-    // already returns one narrow enough that the cast changed no type, and
-    // this reads the attribute the user agent actually acts on.
     const add = screen.getByRole('button', { name: 'Add condition' })
     expect(add.hasAttribute('disabled')).toBe(true)
   })
@@ -1377,17 +1125,10 @@ describe('removing a nested condition', () => {
     const harness = setup(twoLists())
     await harness.select()
 
-    // Type into the first row without blurring, then remove that row.
     const boxes = screen.getAllByLabelText('Options, one per line')
     await harness.user.clear(boxes[0] as HTMLElement)
     await harness.user.type(boxes[0] as HTMLElement, 'typed-but-not-committed')
 
-    /*
-     * The draft exists. Without this the test's name was a claim about a state
-     * it never reached: `clear` plus `type` with no blur is what makes an
-     * uncommitted draft, and if either had stopped working the row below would
-     * still have read `second` and the test would still have passed.
-     */
     expect(boxes[0]).toHaveProperty('value', 'typed-but-not-committed')
 
     await harness.user.click(screen.getByRole('button', { name: 'Remove condition 1' }))
@@ -1398,26 +1139,11 @@ describe('removing a nested condition', () => {
 })
 
 /**
- * Authoring a condition inside a repeater's row.
- *
- * A `ref` carries an optional scope, and absent means the top level. So a
- * condition authored inside a row and left at the default reads a key the top
- * level does not hold, resolves to nothing, hides its component, and
- * `validateForm` then skips every rule beneath it. A required answer becomes
- * advisory on the server, where nobody is looking.
- *
- * The panel answers that by never offering the choice loosely: inside a row the
- * field list is two groups, and which group an option came from is what decides
- * the scope. There is no default to leave wrong.
+ * A `ref` with no scope reads the top level, so a row condition left at that
+ * default hides its component and `validateForm` skips every rule beneath it.
  */
 describe('a condition authored inside a row', () => {
-  /*
-   * Not one name in this fixture is reused. The repeater's key is `contactList`
-   * and its data key is `contacts`; every field's key differs from its data key
-   * too. Every repeater fixture in this repository used to set the two to the
-   * same string, which made the row-addressing design and its opposite produce
-   * identical output across the whole suite.
-   */
+  // No key equals its data key, so addressing by key and by data key differ.
   const field = (key: string, dataKey: string): ComponentNode => ({
     key,
     type: 'Field',
@@ -1449,12 +1175,6 @@ describe('a condition authored inside a row', () => {
   const subject = (): HTMLElement => screen.getByLabelText('Subject')
 
   it('keeps the row scope when the field it tests is changed', async () => {
-    /*
-     * The CRITICAL. The field select rebuilt the operand from scratch, so
-     * changing which field a row-scoped condition tested silently re-pointed it
-     * at the form — the same rule, reading a different place, with nothing on
-     * screen saying so.
-     */
     const harness = setup(list(rowScoped('kind')), [topLevel])
     await harness.selectKey('rowEmail')
 
@@ -1487,9 +1207,6 @@ describe('a condition authored inside a row', () => {
   })
 
   it('seeds a fresh condition on the row rather than on the form', async () => {
-    // The default is the failure: a condition seeded at form scope inside a row
-    // names a key the top level does not hold, so it is false on arrival and
-    // hides the component it was just authored on.
     const harness = setup(list(), [topLevel])
     await harness.selectKey('rowEmail')
 
@@ -1502,8 +1219,6 @@ describe('a condition authored inside a row', () => {
   })
 
   it('writes no scope for a field at the top level, because absent means the form', async () => {
-    // The other half of the same control. If the picker wrote `row` whenever it
-    // could, the test above would pass and the feature would still be broken.
     const harness = setup(list(rowScoped('kind')), [topLevel])
     await harness.selectKey('rowEmail')
 
@@ -1535,8 +1250,6 @@ describe('a condition authored inside a row', () => {
   })
 
   it('offers no groups at all outside a row', async () => {
-    // Nothing changes for the document that has no repeater in it, which is
-    // every document written before this existed.
     const harness = setup(topLevel, [field('other', 'phone')])
     await harness.select()
     await harness.user.selectOptions(screen.getByLabelText('Show when'), 'condition')
@@ -1550,14 +1263,8 @@ describe('a condition authored inside a row', () => {
 })
 
 /**
- * Tabbing past a control is not editing it.
- *
- * The options box commits on blur, and it committed unconditionally — so simply
- * moving focus through the panel parsed the stored list and wrote the parse
- * back. Parsing is lossy on purpose: it trims, drops blanks, and reads text that
- * looks numeric as a number. So a stored `"007"` became the number `7` and a
- * stored `" x "` became `"x"`, without anybody typing anything, and each pass
- * left an undo entry for an edit that was never made.
+ * The options box parses lossily (it trims, drops blanks and reads numeric text
+ * as numbers), so a blur with no edit must not commit.
  */
 describe('moving focus through a membership condition', () => {
   const stored = (options: unknown[]): ComponentNode => ({
@@ -1576,11 +1283,7 @@ describe('moving focus through a membership condition', () => {
   })
 
   it('leaves the stored options byte-identical', async () => {
-    /*
-     * Both of these survive a render and are changed by a parse, which is what
-     * makes them the fixture: `007` is text a postcode or an account number
-     * would hold, and the spaces are somebody's deliberate padding.
-     */
+    // Both survive a render and are changed by a parse.
     const harness = setup(stored(['007', ' x ']))
     await harness.select()
 
@@ -1595,8 +1298,6 @@ describe('moving focus through a membership condition', () => {
   })
 
   it('records no edit at all', async () => {
-    // Undo is the visible half. Every tab-through used to push a version, so
-    // undo walked back through edits nobody made before reaching a real one.
     const harness = setup(stored([18, 21]))
     await harness.select()
 
@@ -1612,7 +1313,6 @@ describe('moving focus through a membership condition', () => {
   })
 
   it('still commits an edit that was actually made', async () => {
-    // The control. Never committing would pass both tests above.
     const harness = setup(stored(['007']))
     await harness.select()
 
@@ -1628,18 +1328,6 @@ describe('moving focus through a membership condition', () => {
   })
 })
 
-/**
- * The data key field, after an undo.
- *
- * It holds a draft and commits on blur, which is right — but it never re-synced,
- * and its React key is the node's key, which does not change when only the data
- * key changes. So an undo restored the document while the box went on showing
- * the text from before it, and the next blur wrote that text back: the undo
- * silently reversed, and the payload's key with it.
- *
- * The same shape as the raw CSS field, the JSON editor and the options box.
- * This one was the last editor here without it.
- */
 describe('the data key field and undo', () => {
   const named = (): ComponentNode => ({
     key: 'emailField',
@@ -1664,8 +1352,6 @@ describe('the data key field and undo', () => {
   })
 
   it('does not write the stale text back on the next blur', async () => {
-    // The failure that made this worth fixing. The box kept the old text, and
-    // blurring it committed that text — so the undo undid itself.
     const harness = setup(named())
     await harness.select()
 
@@ -1682,11 +1368,6 @@ describe('the data key field and undo', () => {
   })
 
   it('keeps an edit in progress when the document changes elsewhere', async () => {
-    /*
-     * The control, and the reason a draft exists at all. Re-syncing on every
-     * render would throw away what is being typed; only the version this field
-     * last saw is replaced.
-     */
     const harness = setup(named())
     await harness.select()
 
@@ -1700,17 +1381,8 @@ describe('the data key field and undo', () => {
 })
 
 /**
- * A literal that looks numeric and is not.
- *
- * `coerce` turned anything `Number()` accepts into a number, so `is 01234`
- * stored `1234` and could never match the string a postcode field holds. The
- * doc comment beside it named postcodes and phone numbers as the cost and said
- * comparison operators "are the only place this matters" — the code applied it
- * to every literal in every operator.
- *
- * The rule now is that a number has to be spelled the way JavaScript spells it.
- * `18` round-trips to `18` and becomes a number; `01234` round-trips to `1234`,
- * which is not what was typed, so it stays text.
+ * A number must be spelled the way JavaScript prints it: `01234` prints as
+ * `1234`, so it stays text.
  */
 describe('typing a literal into a condition', () => {
   const listy = (): ComponentNode => ({
@@ -1758,11 +1430,8 @@ describe('typing a literal into a condition', () => {
     ['a decimal', '1.5', 1.5],
     ['zero', '0', 0],
   ])('still reads %s as a number', async (_what, typed, expected) => {
-    /*
-     * The control, and the reason coercion exists: ordering refuses to compare
-     * a string to a number rather than guessing, so `is at least 18` against a
-     * number field can never be true if the literal is text.
-     */
+    // Ordering refuses to compare a string with a number, so `is at least 18`
+    // needs a numeric literal.
     const harness = setup(listy())
     await harness.select()
 
@@ -1787,28 +1456,9 @@ describe('typing a literal into a condition', () => {
   })
 })
 
-/**
- * A select whose declared values are not strings.
- *
- * The comment above this editor says it reads and writes through `jsonToString`
- * and `optionValue`, "which are inverses", and that treating the value as a
- * string in both directions made a kit declaring `{ label: 'Two', value: 2 }`
- * store `"2"`. The comment describes the fix; the call does not perform it.
- *
- * `optionValue(options, submitted)` reads `option['value']` off each entry, so
- * it wants the declared options. The call passes `options.map((o) => o.value)`,
- * which unwraps them first -- so the declared-value pass matches nothing, the
- * position pass matches nothing either, and the raw string falls out of the end.
- * Theme 2 of the review, in the panel a third kit meets first.
- */
 describe('the select editor and a value that is not a string', () => {
-  /*
-   * By id, not by label text or by role and name. A property with a value set
-   * announces itself as "Weight (modified)", so an exact label misses after the
-   * first edit; a loose pattern then matches two comboboxes, because the binding
-   * mode selector on the same row carries the same label. Trap 4, twice, in four
-   * tests. The id is what names this one control.
-   */
+  // By id: the label gains "(modified)" once set, and a loose pattern also
+  // matches the binding mode select on the same row (Trap 4).
   const weightSelect = (): HTMLSelectElement => {
     const element = document.querySelector('[id$="fs-prop-weight"]')
     if (!(element instanceof HTMLSelectElement)) throw new Error('no Weight select')
@@ -1841,11 +1491,6 @@ describe('the select editor and a value that is not a string', () => {
   })
 
   it('shows the stored value as selected when it comes back', async () => {
-    /*
-     * The other direction, and the reason "inverses" is the word the comment
-     * uses. A panel that stored 2 and then showed nothing selected is the same
-     * defect read from the other end.
-     */
     const { user, latest, select } = setup(withSelect())
     await select()
 
@@ -1855,8 +1500,6 @@ describe('the select editor and a value that is not a string', () => {
   })
 
   it('still clears back to no value at all', async () => {
-    // The control: the empty placeholder must keep meaning "no value" rather
-    // than becoming a stored empty string.
     const { user, latest, select } = setup(withSelect())
     await select()
 
@@ -1872,14 +1515,8 @@ describe('the select editor and a value that is not a string', () => {
 })
 
 /**
- * Choosing "Always" after authoring a condition.
- *
- * Consecutive edits sharing a coalescing label replace the entry on top rather
- * than stacking on it, which is right for typing and wrong for changing what
- * kind of rule this is. Every `setRenderWhen` write shared `renderWhen:<key>`,
- * so selecting "Always" replaced the version holding the condition -- removing
- * it from `past` and from `present` in one move, so it was reachable by neither
- * undo nor redo, and the panel offers no other way back.
+ * Consecutive edits sharing a coalescing label replace the top undo entry:
+ * right for typing, wrong for changing what kind of rule this is.
  */
 describe('a visibility condition and the undo stack', () => {
   const sibling = (): ComponentNode => ({
@@ -1890,16 +1527,8 @@ describe('a visibility condition and the undo stack', () => {
   })
 
   it('is reachable by undo after choosing Always, and by redo after that', async () => {
-    /*
-     * Authored here rather than loaded from the fixture, and that is what makes
-     * the test able to fail. Coalescing replaces the entry on *top* of the
-     * stack, so it only bites when the condition was written by an edit that is
-     * still the labelled one -- which is the ordinary case, and exactly what
-     * "choosing Always after authoring a condition" means. A fixture that
-     * arrives with the condition already in it has no labelled entry to
-     * replace, and the first version of this test passed against the defect for
-     * that reason.
-     */
+    // Authored, not loaded: coalescing only replaces an entry a labelled edit
+    // wrote, so a preloaded condition could not fail this.
     const { user, latest, select } = setup(
       { key: 'field', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
       [sibling()],
@@ -1916,27 +1545,13 @@ describe('a visibility condition and the undo stack', () => {
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(latest()?.renderWhen, 'the condition was destroyed rather than undone').toEqual(authored)
 
-    /*
-     * And forward again. An undo that restores it while a redo cannot take it
-     * away would mean the entry was rebuilt rather than kept, which is a
-     * different bug with the same first half.
-     */
     await user.click(screen.getByRole('button', { name: 'Redo' }))
     expect(latest()?.renderWhen).toBeUndefined()
   })
 
   it('still folds a run of typing into one entry rather than one per keystroke', async () => {
-    /*
-     * The control, and the reason the label is not simply removed. Coalescing is
-     * what makes typing an expression one undo step, and without it each
-     * character would be its own -- one undo would leave `ab`.
-     *
-     * Three characters typed and one undo takes all of it *and* the mode change
-     * that created the empty expression, because that edit is the entry the
-     * typing folds into. That is the coalescing working, not a second bug: the
-     * empty expression a mode change produces is not a state anybody wants to
-     * return to.
-     */
+    // One undo also takes the mode change, because that edit is the entry the
+    // typing folds into.
     const { user, latest, select } = setup(
       { key: 'field', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
       [sibling()],
@@ -1947,27 +1562,11 @@ describe('a visibility condition and the undo stack', () => {
     await user.type(screen.getByLabelText('Show when expression'), 'abc')
     expect(latest()?.renderWhen).toEqual({ kind: 'computed', expression: 'abc' })
 
-    // One undo takes the whole run, not one character of it. Without the label
-    // this would be `{ kind: 'computed', expression: 'ab' }`.
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(latest()?.renderWhen).toBeUndefined()
   })
 })
 
-/**
- * The membership options box, and the values it could not spell.
- *
- * `coerce` parses a line beginning `{`, `[` or `"` as JSON, and its comment says
- * an object "is what the box shows a document that already holds one". The box
- * spelled its lines with `jsonToString`, which answers the empty string for an
- * object, a list and `null` -- so the document's option showed as a blank line,
- * and a blank line is dropped on commit. Touching the control at all deleted the
- * option.
- *
- * The quoting half is the same defect one step quieter: a stored string `"18"`
- * spelled as `18` came back from `coerce` as the number, so editing one line
- * silently changed a neighbour's type.
- */
 describe('the options a membership condition holds', () => {
   const withOptions = (options: unknown[]): ComponentNode => ({
     key: 'field',
@@ -2002,11 +1601,6 @@ describe('the options a membership condition holds', () => {
   })
 
   it('keeps an object option when an unrelated line is edited', async () => {
-    /*
-     * The consequence. A blank line is dropped on commit, so the option was
-     * deleted by the first edit anybody made to any other line -- silently, and
-     * with the condition still looking right in the panel.
-     */
     const { user, latest, select } = setup(withOptions([{ a: 1 }, 'GB']), [sibling()])
     await select()
 
@@ -2038,8 +1632,6 @@ describe('the options a membership condition holds', () => {
   })
 
   it('still writes a number as a number, and a plain string plainly', async () => {
-    // The controls. Quoting everything would be its own defect: the panel's
-    // whole point is that `18` is the number and `"18"` is the text.
     const { select } = setup(withOptions([18, 'GB', true]), [sibling()])
     await select()
 
@@ -2047,19 +1639,6 @@ describe('the options a membership condition holds', () => {
   })
 })
 
-/**
- * A data key judged by the rule a key is judged by.
- *
- * `setDataKey` never called `keyProblem`. Its only call site is `renameKey`, one
- * function away, which validates and reports the reason so the field can show
- * it -- so the panel refused `first-name` as a key and stored it as a data key,
- * writing a document its own `validateDocument` reports as malformed.
- *
- * A data key does the same jobs a key does: it is the property name in the
- * submitted payload, in exported JSON Schema, and the name a `ref` in a
- * condition mentions. One rule, so a rename and a data key are judged the same
- * way, which is exactly what `keys.ts` says about a rename and a paste.
- */
 describe('a data key that breaks the key grammar', () => {
   const field = (): ComponentNode => ({
     key: 'emailField',
@@ -2097,8 +1676,6 @@ describe('a data key that breaks the key grammar', () => {
   })
 
   it('still accepts an ordinary data key, and still clears back to the key', async () => {
-    // The controls. A field that refused everything would pass every row above
-    // and make the override unauthorable.
     const { user, latest, select } = setup(field())
     await select()
 
@@ -2156,17 +1733,10 @@ describe('the Rules tab and a pattern nobody can run', () => {
   })
 
   it('says nothing about a pattern the engine will run', async () => {
-    // The control, and it includes a half-typed one: an error under the field
-    // before the first character is finished would be worse than none.
     const { user, select } = setup(withPattern())
     await select()
     await user.click(screen.getByRole('tab', { name: 'Rules' }))
 
-    /*
-     * By id suffix, not by label text. The row's label is the rule's own hint,
-     * which differs per rule key, and a loose pattern matches the `<label>`
-     * element as well as the input it names.
-     */
     const field = document.querySelector('input[id$="-value"]')
     if (!(field instanceof HTMLInputElement)) throw new Error('no pattern field')
     await user.clear(field)
@@ -2177,20 +1747,6 @@ describe('the Rules tab and a pattern nobody can run', () => {
   })
 })
 
-/**
- * The panel across a selection change, which no test in this file or in `e2e/`
- * ever performed.
- *
- * The harness has had `selectKey` since it was written and every test called it
- * exactly once, as the first selection -- so the transition that every editor
- * in this panel has to survive was the one transition never driven. Eight
- * editors carry a re-sync guard for it and several more are keyed per node at
- * their call site; `KeyField` was neither, and the docblock justifying that
- * said "the panel above already remounts on that", which nothing does.
- *
- * The test at 'is gone rather than stale after the rename is undone' pins the
- * unmount-on-undo half of exactly this reasoning. This is the selection half.
- */
 describe('moving the selection from one component to another', () => {
   const keyBox = (): HTMLElement => screen.getByRole('textbox', { name: /^Key/ })
 
@@ -2212,32 +1768,14 @@ describe('moving the selection from one component to another', () => {
   })
 
   it('does not rename the new component to the old one when the old one is gone', async () => {
-    /*
-     * The whole defect, end to end, and the reason it is worse than a display
-     * bug. With the stale draft still reading `email`, `commit()` compares it
-     * against value `'phone'`, finds them different, and calls
-     * `renameKey('phone', 'email')` -- which now *succeeds*, because deleting
-     * `email` freed the name. `phone` is silently renamed, and since
-     * `dataKeyOf` falls back to the node key, the submitted payload key goes
-     * with it.
-     */
     const [first, rest] = two()
     const { user, selectKey, node } = setup(first, rest)
 
     await selectKey('email')
     await selectKey('phone')
 
-    /*
-     * The row's Remove button, not a click on the row followed by Delete.
-     *
-     * That was the first version and it was vacuous -- it passed with the guard
-     * deleted. Selecting `email` in order to delete it leaves the selection on
-     * a node that is then gone, `Properties` takes its `!node` early return, and
-     * the unmount destroys the stale draft the test exists to observe. The
-     * review's scenario is specifically that the selection *stays* on `phone`,
-     * and this button is the control that does that: it carries
-     * `onPointerDown` `stopPropagation` so removing a row does not select it.
-     */
+    // The row's Remove button, which does not select the row: selecting `email`
+    // to delete it would unmount the panel and the stale draft under test.
     await user.click(screen.getByRole('button', { name: 'Remove email' }))
     expect(node('email'), 'the fixture did not actually remove email').toBeUndefined()
 
@@ -2266,39 +1804,14 @@ describe('moving the selection from one component to another', () => {
   })
 
   /*
-   * The sweep, and the reason it is not a list of editor names.
-   *
-   * The panel is safe today because eight editors each carry their own
-   * `if (value !== committed)` block, not because anything keys the panel on the
-   * selection -- so a ninth editor added without one inherits the bug silently,
-   * and a test naming the eight would not notice. This drives whatever the panel
-   * actually renders: every textbox gets typed into under the first selection,
-   * and none of them may still be showing that text under the second.
-   *
-   * A key on the panel would make all of this structural, and it is the wrong
-   * fix here: the store keeps the selection on a node it just renamed, so
-   * keying on `api.selectedKey` unmounts the Key field mid-rename and takes the
-   * focus and the refusal alert with it -- the defect its call site records as
-   * already fixed once.
+   * Reads every textbox rather than naming editors: each carries its own
+   * `if (value !== committed)` guard, so a new one without it must fail here.
+   * Keying the panel on `api.selectedKey` is the wrong fix: a rename keeps the
+   * selection, so the Key field would unmount mid-rename and lose focus.
    */
   it('leaves no editor in the panel showing the previous selection value', async () => {
-    /*
-     * The sweep, and the reason it types nothing.
-     *
-     * An editor with no re-sync guard seeds its draft with `useState(value)`
-     * and never updates it, so it shows the previous node's value across a
-     * selection change with no interaction at all -- which is exactly what the
-     * Key row did. Driving the boxes first was the first draft of this test and
-     * it was worse than useless: typing into the Key box renames the node on
-     * blur, which remounts every keyed sibling, so the captured elements
-     * detached and the test failed on "could not be focused" rather than on
-     * anything about staleness.
-     *
-     * Not a list of editor names, because the panel is safe today only by eight
-     * independent guards rather than by one key on the panel -- so the ninth
-     * editor added without one is the thing this has to catch, and a test
-     * naming the eight would not. This reads whatever the panel renders.
-     */
+    // Types nothing: a missing guard shows the old value without interaction,
+    // and typing in the Key box would rename and remount the editors.
     const marker = 'zzfirst'
     const { selectKey } = setup(
       { key: marker, type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
@@ -2325,32 +1838,8 @@ describe('moving the selection from one component to another', () => {
 })
 
 describe('the number editor, which the fixture kit declares and nothing drove', () => {
-  /*
-   * The `padding` prop carries the comment "so what this panel stores for one
-   * can be checked", and nothing in this file or in `e2e/` ever touched it.
-   *
-   * Delete the `Number.isFinite` arm and the suite stays green while `Infinity`
-   * and `NaN` land in `node.props` -- which `JSON.stringify` writes as `null`,
-   * so the export and the submitted payload disagree with what the author
-   * typed. The comment there names that as a fixed defect; nothing held the fix
-   * in place.
-   */
-  /*
-   * By role, not by label and not by tag.
-   *
-   * The row renders a "Padding" label and a "Padding binding" one, so a
-   * name-based lookup matches neither cleanly -- but the first version of this
-   * reached for `document.querySelector` to get around that, which searches the
-   * whole document and silently returns the first hit. Two number editors on
-   * the panel and this drives one while asserting about the other, with nothing
-   * to say it happened. That is the unscoped-query trap in the write-tests
-   * skill.
-   *
-   * `getByRole` is the accessible query without the name problem: a number
-   * input is a `spinbutton`, and Testing Library throws when a lookup matches
-   * more than one element rather than picking. If a second number editor ever
-   * lands on this panel, this fails and says so.
-   */
+  // By role: "Padding" and "Padding binding" labels defeat a name lookup, and
+  // `getByRole` throws rather than picking if a second number editor appears.
   const numberBox = (): HTMLInputElement => {
     const box = screen.getByRole('spinbutton')
     if (!(box instanceof HTMLInputElement)) {
@@ -2370,25 +1859,11 @@ describe('the number editor, which the fixture kit declares and nothing drove', 
   })
 
   /*
-   * The `Number.isFinite` arm is NOT covered here, and that is said rather than
-   * papered over.
-   *
-   * It exists for `1e999`, which a real browser accepts into a `type="number"`
-   * input and hands over as the raw string, so `Number(value)` is `Infinity` --
-   * a value `JSON.stringify` writes as `null`, which is the defect the comment
-   * beside it records. jsdom sanitises an invalid number-input value to `''`
-   * before any handler sees it, so the empty-string branch fires instead and no
-   * test driven here can tell the two apart. Two attempts confirmed it:
-   * `user.type` never reaches the handler, and `fireEvent.change` with the same
-   * string arrives as `''`.
-   *
-   * Recorded in `docs/build-out/found.md`. It belongs in `e2e/`, which is what
-   * `CLAUDE.md` says about anything jsdom cannot represent.
+   * The `Number.isFinite` arm is not covered here: a browser hands `1e999` to
+   * the handler, but jsdom sanitises it to '' first, so it needs `e2e/`.
    */
 
   it('clears the property when the box is emptied', async () => {
-    // The control for the other half of the same branch: an empty box removes
-    // the property so the component default applies again.
     const { user, select, latest } = setup(dataField())
     await select()
 

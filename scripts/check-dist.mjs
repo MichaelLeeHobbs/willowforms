@@ -1,16 +1,6 @@
-/**
- * Prove that every package emitted what a consumer installs.
- *
- * A script rather than eight lines of YAML, and that is the point. The check
- * lived inline in `ci.yml`, where nobody could run it, and it had drifted: the
- * loop named `core renderer designer kit-mui` and `kit-html` had been added to
- * the repository since. The one package the whole "a kit is a package, not a
- * rewrite" claim rests on was the one package nothing checked shipped.
- *
- * So nothing here is hand-listed. The packages come from the directory, so a
- * sixth is covered the day it exists, and the stylesheets come from
- * `copy-assets.mjs` itself, so the thing that copies them and the thing that
- * checks they arrived cannot name different files.
+/*
+ * Checks what every package ships. Nothing is hand-listed: packages come from the directory and
+ * stylesheets from `copy-assets.mjs`, so the copy and the check cannot name different files.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -31,8 +21,6 @@ const packages = readdirSync(at('packages'), { withFileTypes: true })
   .map((entry) => entry.name)
 
 if (packages.length === 0) {
-  // A readdir that finds nothing would otherwise report success having checked
-  // nothing at all, which is the failure this whole run is about.
   console.error('no packages found under packages/, so nothing was checked')
   process.exit(1)
 }
@@ -45,8 +33,6 @@ for (const name of packages) {
 }
 
 if (ASSETS.length === 0) {
-  // Same trap as an empty package list: the asset list is derived now, so a
-  // derivation that finds nothing must fail rather than check nothing.
   console.error('no stylesheets found under packages/*/src, so none were checked')
   process.exit(1)
 }
@@ -87,17 +73,8 @@ if (broken.length > 0) {
 }
 
 /*
- * And what the tarball contains covers what the source maps point at.
- *
- * `declarationMap` and `sourceMap` are on for every package, so `dist` ships
- * `.js.map` and `.d.ts.map` files whose `sources` name `../src/*.ts`. `files`
- * listed only `dist` and the README, so every one of those maps resolved to
- * nothing on a consumer's disk: step into a stack frame or a go-to-definition
- * and the editor lands on a file that was never published.
- *
- * npm's own packing rules decide this, not a pattern re-implemented here, which
- * is why this shells out to `npm pack --dry-run` rather than reading `files` and
- * guessing what it means.
+ * Every source a published map names must itself be published. `npm pack --dry-run` decides what
+ * ships, rather than a re-implementation of the `files` rules.
  */
 const unreachable = []
 for (const name of packages) {

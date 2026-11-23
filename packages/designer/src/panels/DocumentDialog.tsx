@@ -42,11 +42,7 @@ export function DocumentDialog({
 
   return (
     <dialog ref={ref} className="fs-dialog" onClose={onClose} aria-label="Form JSON">
-      {/*
-        The body mounts only while open, so every state it holds starts fresh
-        each time. That is React's own answer to resetting state on a prop
-        change, and it beats clearing five things from an effect.
-      */}
+      {/* Mounted only while open, so its state starts fresh each time. */}
       {open && <DialogBody document={doc} onClose={onClose} onReplace={onReplace} />}
     </dialog>
   )
@@ -186,13 +182,7 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
 
             {errors.length > 0 && (
               <ul className="fs-dialog__errors" role="alert">
-                {/*
-                 * Keyed by position as well as text. `validateDocument` reports
-                 * per node, so two components can produce the same sentence --
-                 * "root.children[0] is not a component node" for a document with
-                 * two of them -- and React kept one row and dropped the other,
-                 * so the count on screen disagreed with the list.
-                 */}
+                {/* Position in the key: `validateDocument` can repeat a message. */}
                 {errors.map((message, index) => (
                   <li key={String(index) + ':' + message}>{message}</li>
                 ))}

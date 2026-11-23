@@ -1,22 +1,3 @@
-/**
- * What a document expects the host to hand it.
- *
- * A condition that reads context and a host that never supplies it produce the
- * quietest failure in this project. The path reads as missing, the condition is
- * false, the component is hidden, and `validateForm` skips it: a required field
- * silently becomes advisory, on the server, where nobody is looking.
- *
- * Nothing at evaluation time can fix that. Core cannot tell an unwired host from
- * a context that genuinely has no such key, and a form still has to render for
- * the person filling it in either way. But wiring is not a per-submit question,
- * it is a boot-time one, so it gets a boot-time answer: this names every path a
- * document reads, and a host asserts against it once, next to the code that
- * builds the context.
- *
- * The same shape as `autoValidateKeys`: core states what the document asked
- * for, and the host decides what to do about it.
- */
-
 import { MAX_CONDITION_DEPTH, same } from './condition.js'
 import { readPath } from './json.js'
 import { MAX_TREE_DEPTH, validationsOf } from './tree.js'
@@ -29,7 +10,6 @@ import type {
   PropValue,
 } from './types.js'
 
-/** Every context path a condition anywhere in this condition reads. */
 function fromCondition(condition: Condition | undefined, out: Set<string>, depth = 0): void {
   if (depth > MAX_CONDITION_DEPTH) return
   if (!condition || typeof condition !== 'object') return
@@ -41,9 +21,8 @@ function fromCondition(condition: Condition | undefined, out: Set<string>, depth
   }
 
   /*
-   * Read structurally rather than by `op`, because this walks documents that
-   * are data and may be malformed, and because a new operator would otherwise
-   * be silently excluded from the check that exists to catch omissions.
+   * Read by shape, not by `op`, so neither a malformed document nor a new
+   * operator drops out of the check that exists to catch omissions.
    */
   const shape = condition as Partial<Record<string, unknown>>
   operand(shape['left'] as Operand | undefined)
@@ -80,9 +59,6 @@ export function contextKeys(root: ComponentNode): Set<string> {
    * document — so throwing is the one thing it must not do.
    */
   const visit = (node: ComponentNode, depth = 0): void => {
-    // The same bound `validateDocument` walks a tree with. This docblock promises
-    // totality on a document that was never gated, and an unbounded walk is the
-    // one way a total function stops being one.
     if (depth > MAX_TREE_DEPTH) return
     if (!node || typeof node !== 'object') return
 
@@ -130,8 +106,6 @@ export function evaluatorKeys(root: ComponentNode): string[] {
 
   const walkNode = (node: ComponentNode, depth = 0): void => {
     if (!node || typeof node !== 'object') return
-    // The same bound `validateDocument` walks a tree with. This runs on a
-    // document a host may never have gated.
     if (depth > MAX_TREE_DEPTH) return
 
     const needs = (value: PropValue | undefined): boolean => value?.kind === 'computed'
@@ -177,6 +151,8 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
   return missing.sort()
 }
 
+export const MAX_CONTEXT_VALUES = 1000
+
 /**
  * Every value a document compares one context path against.
  *
@@ -206,29 +182,14 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
  * An operator comparing a context path to a field contributes nothing, because
  * there is no name there to collect.
  */
-
-export const MAX_CONTEXT_VALUES = 1000
-
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
-  /*
-   * An empty path reads nothing, so it names no flow. `contextKeys` already
-   * skips one for that reason, and answering here anyway told a host that a
-   * document declares steps under a path `readPath` refuses to walk -- steps it
-   * would then run a validation pass for, each of them against a condition that
-   * can never be true.
-   */
+  // `readPath` refuses an empty path, so it names no flow.
   if (path === '') return []
 
   const seen: JsonValue[] = []
 
   const add = (value: JsonValue | undefined): void => {
     if (value === undefined || seen.length >= MAX_CONTEXT_VALUES) return
-    /*
-     * Structural, the same comparison a condition itself uses. With `===` two
-     * literals spelling the same object each counted as a step, so a host asking
-     * for a form's steps got duplicates -- and the reference server runs a full
-     * validation pass per step it is given.
-     */
     if (!seen.some((held) => same(held, value))) seen.push(value)
   }
 
@@ -244,12 +205,9 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
       : undefined
 
   const visit = (condition: Condition | undefined, depth = 0): void => {
-    // Bounded like every other walk over a document, because a document is data
-    // and `and: [{ and: [...] }]` can nest as deeply as somebody types.
     if (!condition || typeof condition !== 'object' || depth > MAX_CONDITION_DEPTH) return
     const shape = condition as Partial<Record<string, unknown>>
 
-    // Either side may be the one reading the context.
     if (reads(shape['left'])) add(literal(shape['right']))
     if (reads(shape['right'])) add(literal(shape['left']))
 
@@ -270,8 +228,6 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
    */
   const walkNode = (node: ComponentNode, depth = 0): void => {
     if (!node || typeof node !== 'object') return
-    // The same bound `validateDocument` walks a tree with. This runs on a
-    // document a host may never have gated.
     if (depth > MAX_TREE_DEPTH) return
 
     const collect = (value: PropValue | undefined): void => {

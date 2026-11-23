@@ -1,5 +1,3 @@
-/** Documentation contracts that can be checked without interpreting prose. */
-
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -8,13 +6,6 @@ import { isFixture } from './fixtures.js'
 
 const root = new URL('../', import.meta.url)
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(path, root)), 'utf8')
-
-/*
- * A link that names any scheme, or a network path, is somebody else's. The
- * check used to exclude only http and https, so a `mailto:` or `tel:` link
- * would have been chased as a relative file path and reported broken. None
- * exists yet, which is exactly when a rule like this is cheap to get right.
- */
 
 /** The anchors a markdown file offers, slugged the way GitHub slugs a heading. */
 function headings(text: string): string[] {
@@ -28,18 +19,8 @@ function headings(text: string): string[] {
 }
 
 /**
- * What the kit contract claims the suite enforces, against the suite.
- *
- * `02-kit-contract.md` listed five accessibility obligations and said which of
- * them a test executed. Both halves were wrong: it said no test checks
- * `aria-invalid` and one does, against every kit, and it omitted `aria-required`
- * entirely, which is also checked. Understating enforcement is the dangerous
- * direction -- a kit author budgets against the document and meets a red build.
- *
- * The claim is a column now, and this is what reads it. Both directions, because
- * a check that only confirms the `yes` rows would let the document go on
- * claiming something is unchecked while a test quietly enforces it, which is the
- * half that was wrong.
+ * Both directions: understating enforcement misleads a kit author, who budgets
+ * against the document and meets a red build.
  */
 describe('the accessibility obligations table', () => {
   const rows = (): { obligation: string; attribute: string; enforced: string }[] => {
@@ -59,8 +40,6 @@ describe('the accessibility obligations table', () => {
   }
 
   it('was read, and says something', () => {
-    // The control. A table this could not parse would make every row below pass
-    // over nothing, which is the shape the rule-count guard above already had.
     const found = rows()
     expect(found.length, 'the obligations table could not be read').toBeGreaterThan(4)
     expect(found.filter((row) => row.enforced === 'yes').length).toBeGreaterThan(2)
@@ -72,9 +51,8 @@ describe('the accessibility obligations table', () => {
     const wrong: string[] = []
 
     for (const row of rows()) {
-      // A row with no attribute is an obligation no attribute expresses -- a
-      // label pointing at its control, a focus indicator surviving -- and both
-      // are marked `no` for the honest reason that they need a browser.
+      // A row with no attribute (a label pointing at its control, a focus
+      // indicator surviving) needs a browser, so it cannot be marked enforced.
       if (row.attribute === '' || row.attribute === '—') {
         if (row.enforced === 'yes')
           wrong.push(row.obligation + ' claims enforcement and names no attribute')
@@ -108,7 +86,6 @@ describe('the README package table', () => {
   })
 
   it.each(published)('lists %s', (name) => {
-    // A package nobody can find in the README may as well not be published.
     expect(readme).toContain(name)
   })
 
@@ -133,17 +110,12 @@ describe('the specification index', () => {
   })
 
   it.each(files)('lists %s', (name) => {
-    // A contract nobody can find from the index may as well not be written.
     expect(index).toContain('(' + name + ')')
   })
 
   /**
-   * The field names an `interface` block declares, comments and types dropped.
-   *
-   * Brace-matched from the opening line rather than read to the first `}`,
-   * because a field can be a function type or an object literal and take a
-   * brace with it. `defaultRenderWhen` is one, which is the field this was
-   * written to catch.
+   * Brace-matched rather than read to the first `}`, because a field can be a
+   * function type or an object literal and take a brace with it.
    */
   const fieldsOf = (text: string, name: string): string[] => {
     const open = text.indexOf('interface ' + name)
@@ -169,33 +141,13 @@ describe('the specification index', () => {
   }
 
   it('publishes the key grammar core actually enforces', () => {
-    /*
-     * `12-api.md` is the contract a consumer reads, and it published
-     * `RESERVED_KEYS` as three names where the export has thirteen, with no
-     * length bound mentioned at all.
-     *
-     * The ten missing names are not incidental. The list's own docblock records
-     * a required field keyed `toString` having its error merged with
-     * `merged[key] ??= message`, compared against `Object.prototype.toString`,
-     * found not nullish and dropped -- a form with a missing required answer
-     * submitting clean. A consumer generating documents checks against what the
-     * contract publishes, emits `toString` as a `dataKey`, and is refused by
-     * `validateDocument` with nothing in the specification to explain it.
-     *
-     * Read out of the fenced block rather than out of the prose around it, and
-     * compared as sets: this is the block a reader copies.
-     */
     const keys = read('packages/core/src/keys.ts')
     const spec = read('docs/spec/12-api.md')
 
     /*
-     * From the end of the line that opens the array to the `]` that closes it.
-     *
-     * Not from the first `[` after the name: the export is typed
-     * `readonly string[]`, so that bracket belongs to the type, and reading from
-     * it produced an empty list. It failed loudly only because the other side
-     * was full, which is luck rather than design -- hence the emptiness check on
-     * both sides below.
+     * From the end of the line that opens the array, not from the first `[`
+     * after the name: the export is typed `readonly string[]`, so that bracket
+     * belongs to the type.
      */
     const namesIn = (text: string): string[] => {
       const at = text.search(/^.*RESERVED_KEYS[^\n]*\[\s*$/m)
@@ -203,25 +155,11 @@ describe('the specification index', () => {
 
       const from = text.indexOf('\n', at)
 
-      /*
-       * The bracket that closes a multi-line array is the first one standing at
-       * the start of a line. Plain `indexOf(']')` finds the next bracket
-       * anywhere -- including one belonging to something else further down the
-       * file, which is what made deleting this array's own `]` invisible to an
-       * earlier version of this check.
-       */
+      // The first `]` at the start of a line, not the next `]` anywhere, which
+      // may belong to something further down the file.
       const found = /^\s*\]/m.exec(text.slice(from))
       const close = found ? from + found.index : -1
 
-      /*
-       * A missing `]` is a broken read, not an empty list.
-       *
-       * `indexOf` answers -1, and `slice(from, -1)` is the rest of the file
-       * short one character -- so this would have returned every quoted string
-       * below the array and reported a difference that is not there, or, worse,
-       * matched by accident. A guard that cannot find what it is reading has to
-       * say so.
-       */
       expect(close, 'the RESERVED_KEYS array is not closed').toBeGreaterThan(from)
 
       const list = text.slice(from, close)
@@ -240,20 +178,8 @@ describe('the specification index', () => {
       0,
     )
 
-    /*
-     * And the two figures beside it. `MAX_KEY_LENGTH` was in neither the block
-     * nor the prose, so a host importing generated documents met `invalid-key`
-     * on a name satisfying every rule the contract stated.
-     */
-    /*
-     * Read both sides first, then check each is there, then compare.
-     *
-     * `exec(...)?.[1]` is `undefined` when the pattern stops matching, and
-     * `undefined === undefined` passes -- so a whitespace change in either file
-     * would have turned both of these into assertions that compare nothing and
-     * report success. That is the failure this whole test exists to prevent,
-     * one level up.
-     */
+    // Each side is checked present first: `exec(...)?.[1]` is `undefined` on a
+    // miss, and `undefined === undefined` passes.
     const figure = (expression: RegExp, text: string, what: string): string => {
       const found = expression.exec(text)?.[1]
       expect(found, 'no ' + what + ' to read, so this compared nothing').toBeDefined()
@@ -277,42 +203,16 @@ describe('the specification index', () => {
     ['03-components.md', 'ComponentDef', 'packages/core/src/kit.ts'],
     ['01-document-model.md', 'ComponentNode', 'packages/core/src/types.ts'],
   ])('%s declares the same fields as %s in core', (file, name, source) => {
-    /*
-     * A code block in the specification is read as the thing itself.
-     *
-     * `ComponentDef` omitted `root` and `defaultRenderWhen`. Both are
-     * load-bearing: `02-kit-contract.md` makes "exactly one component is the
-     * root, and it is not in the palette" a rule the contract suite enforces,
-     * and this block gave a kit author no field to declare one with -- so a
-     * third-party kit written against the specification failed a rule whose
-     * mechanism appeared nowhere. `ComponentNode` omitted `dataKey`, which the
-     * same file documents as Built eleven lines further down.
-     *
-     * Names only, not types. A block that renamed `icon`'s type to something
-     * shorter for a reader is fine; a block missing a field is not, and the
-     * missing field is the failure both of these were.
-     */
+    // Names only, not types: a spec block may shorten a type for a reader, but
+    // it may not miss a field.
     expect(fieldsOf(read('docs/spec/' + file), name)).toEqual(fieldsOf(read(source), name))
   })
 
   it.each(files)('%s opens with the status the index gives it', (name) => {
     /*
-     * The index and the file, in both directions.
-     *
-     * `README.md` states the rule -- a file's status "has to match what the
-     * file itself opens with" -- and nothing held anything to it. The index
-     * gave `03-components.md` **Partial** while that file opened **Built** over
-     * two `### Still to build` lists, and the index went further and named `03`
-     * among the files that "read Partial ... and each of those files says which
-     * one in its own preamble", which 03's preamble did not.
-     *
-     * The direction matters. A reader scanning the index is asking the
-     * pessimistic question and gets Partial; the file, which is the copy that
-     * gets edited as work lands, is the one that overstates. So the check is an
-     * equality rather than a "no worse than".
-     *
-     * `00-product.md` is exempt in both places at once: the index gives it a
-     * dash and the file says it carries no status, for the same reason.
+     * An equality, not "no worse than": the file is the copy edited as work
+     * lands, so it is the one that overstates. `00-product.md` carries no
+     * status in either place.
      */
     if (name === '00-product.md') return
 
@@ -323,11 +223,8 @@ describe('the specification index', () => {
 
     expect(opens, name + ' has no status before its first section').toBeTruthy()
 
-    /*
-     * The row for this file in the index table, read by the link rather than by
-     * position: the table has a Covers column full of prose, and a column index
-     * would move the first time somebody adds one.
-     */
+    // Found by its link, not by position: the Covers column is prose, and a
+    // column index would move when a column is added.
     const row = index
       .split('\n')
       .find((line) => line.startsWith('|') && line.includes('(' + name + ')'))
@@ -344,15 +241,7 @@ describe('the specification index', () => {
   })
 
   it.each(files)('%s opens with a status', (name) => {
-    /*
-     * The status is what makes this document also the roadmap. A section with
-     * none is a claim with no accountability. 00-product is a statement of
-     * intent with no code to match, so it deliberately carries none.
-     *
-     * Only the preamble counts, meaning everything before the first H2. The
-     * regex used to run against the whole file, so a status buried in the last
-     * section satisfied a test named "opens with a status".
-     */
+    // 00-product is a statement of intent with no code to match, so it carries no status.
     if (name === '00-product.md') return
     const text = read('docs/spec/' + name)
     const end = text.indexOf('\n## ')
@@ -369,18 +258,7 @@ describe('the specification index', () => {
     expect(missing).toEqual([])
   })
 
-  /*
-   * Cross-references between spec files went unchecked: only the index's links
-   * were, and only those naming a numbered file. Twelve files pointing at each
-   * other's headings could all rot without a test noticing.
-   */
   it.each([...files, 'README.md'])('%s links only to files and headings that exist', (name) => {
-    /*
-     * The index included, which it was not. It is the file with the most links
-     * in it and the one every reader starts from, and it was excluded from the
-     * only check that follows a link anywhere -- its own check reads the link
-     * text and ignores anchors entirely.
-     */
     const text = read('docs/spec/' + name)
     const broken: string[] = []
 
@@ -404,7 +282,6 @@ describe('the specification index', () => {
   })
 })
 
-/** How many obligations the kit contract states. See the assertion that uses it. */
 const CONTRACT_RULES = 27
 
 /**
@@ -424,58 +301,22 @@ const CONTRACT_RULES = 27
  */
 const CONTRACT_RULES_PER_KIT = 23
 
-/**
- * The describes that are about this repository rather than about a kit.
- *
- * `the two kits in this repository agree` is a courtesy these two keep, not a
- * contract; `a default copied between kits` is the same. Neither belongs in a
- * document a third-party kit author reads as their obligations.
- */
+/** Courtesies these two kits keep, not obligations on a third-party kit. */
 const NOT_OBLIGATIONS = ['the two kits in this repository agree', 'a default copied between kits']
 
 describe('the kit contract table', () => {
   it('has one row for every rule the contract suite runs', () => {
-    /*
-     * The table said twelve while the suite ran thirteen. Nothing compared the
-     * two, so the missing rule was invisible to anyone deciding what their own
-     * kit had to satisfy.
-     */
     const spec = read('docs/spec/02-kit-contract.md')
-    /*
-     * The rule table, and only it. This sliced to the end of the file and
-     * counted every row of every table after it -- so adding the accessibility
-     * obligations table below made the count 28 against 21, for a reason that
-     * had nothing to do with the rules. A guard that reads "everything after a
-     * marker" is a guard that changes meaning when somebody writes prose.
-     */
+    // The rule table only, not every table after it.
     const fromRules = spec.slice(spec.indexOf('| Rule'))
     const afterTable = fromRules.search(/\n[ \t]*\n/)
     const table = afterTable === -1 ? fromRules : fromRules.slice(0, afterTable)
-    /*
-     * Any first character, not a capital letter. A row beginning with a
-     * backtick -- `nodeProps`, which is how half the obligations in this table
-     * would naturally be written -- was silently uncounted, so adding one made
-     * the two numbers disagree for a reason nobody would guess from the message.
-     * The separator row is dropped by matching the dashes rather than by
-     * subtracting one.
-     */
+    // Any first character, since a row may open with a backtick.
     const rows = [...table.matchAll(/^\|(?! *-)[^|\n]+\|/gm)].length - 1
 
-    /*
-     * Only the rules, meaning the tests inside the per-kit block. The file also
-     * holds checks that are not obligations on a kit at all, such as the two
-     * kits in this repository agreeing with each other, and counting those
-     * would demand rows for rules that do not exist.
-     */
     const suite = read('test/kit-contract.test.tsx')
-    /*
-     * From the per-kit block to the next top-level `describe`, not to the end of
-     * the file. Everything written after that block was counted too -- the
-     * "a default copied between kits" case is about these two kits agreeing with
-     * each other, not an obligation any third-party kit has -- so the table
-     * needed a row for a rule that does not exist. The counts matched today by
-     * the coincidence of such a row having been added.
-     */
+    // To the next top-level `describe`, not the end of the file: the describes
+    // after the per-kit block are not obligations on a kit.
     const fromKits = suite.slice(suite.indexOf('describe.each(KITS)'))
     const nextBlock = fromKits.indexOf('\ndescribe(')
     const rules = nextBlock === -1 ? fromKits : fromKits.slice(0, nextBlock)
@@ -486,24 +327,8 @@ describe('the kit contract table', () => {
   })
 
   it('has a second row for every rule driven per kit outside that block', () => {
-    /*
-     * The other half, and the half nothing checked. `it.each(KITS)` outside the
-     * per-kit block is a rule that runs against every registered kit and fails
-     * it by name -- the same consequence as a row in the first table, and until
-     * now none of them was written down.
-     */
     const suite = read('test/kit-contract.test.tsx')
 
-    // Everything but the describes that are about these two kits rather than
-    // about kits, so a courtesy is not read as an obligation.
-    /*
-     * The whole file with the per-kit block cut out, not just what precedes it.
-     *
-     * This sliced to the start of that block, so a per-kit rule written *after*
-     * it was counted by nothing -- and one was, the day this guard was added.
-     * A guard that reads "everything before a marker" has the same weakness as
-     * one that reads "everything after" it.
-     */
     const blockAt = suite.indexOf('describe.each(KITS)')
     const blockEnds = suite.indexOf('\ndescribe(', blockAt)
     let outside = suite.slice(0, blockAt) + (blockEnds === -1 ? '' : suite.slice(blockEnds))
@@ -534,31 +359,12 @@ describe('the kit contract table', () => {
 
     expect(rows, 'the second table and the suite disagree').toBe(cases)
 
-    /*
-     * And both against a number stated here, because the comparison above is
-     * two integers and nothing else. Deleting a test *and* an unrelated table
-     * row leaves them equal to each other while the table documents a rule
-     * nothing runs — which is the Trap 7 condition this guard exists to prevent,
-     * reached through the guard itself.
-     *
-     * One number to maintain rather than thirty-eight strings, and adding a rule
-     * is meant to be a deliberate act in three places: the spec, the suite, and
-     * here.
-     */
+    // The fixed counts catch a test and an unrelated table row deleted
+    // together, which leaves the table and the suite equal to each other.
   })
 })
 
-/**
- * The events table in `03-components.md`, against what the kits declare.
- *
- * Its own preamble says the right-hand column is what the kits declare today,
- * and both of its concrete claims were wrong: `onFocus` was said to be missing
- * from every input but `TextField` while `TextArea` declares it, and
- * `DatePicker`'s `onBlur` was not listed at all. Whoever eventually builds the
- * Actions tab reads this table as the inventory of what needs settling.
- */
 describe('the events table', () => {
-  /** Every component type in a kit definitions file, with the events it declares. */
   const declared = (path: string): Map<string, string[]> => {
     const source = read(path)
     const found = new Map<string, string[]>()
@@ -580,8 +386,6 @@ describe('the events table', () => {
   const html = declared('packages/kit-html/src/definitions.ts')
 
   it('found the declarations to check against', () => {
-    // The control for everything below: a reader that matched nothing would
-    // make every comparison a comparison of two empty maps.
     expect(mui.size).toBeGreaterThan(15)
     expect([...mui.keys()].sort()).toEqual([...html.keys()].sort())
   })
@@ -615,16 +419,10 @@ describe('the events table', () => {
 })
 
 /**
- * The theming document, against the tokens the stylesheets define.
- *
- * `11-theming.md` says a host restyles by overriding tokens rather than
- * fighting specificity, and it is the only place the names are written down --
- * so a token missing from it is a token nobody can override. Four were:
- * `--fs-control-border`, and the kit's `--fsh-success`, `--fsh-warning` and
- * `--fsh-shadow`.
+ * `11-theming.md` is the only place token names are written down, so a token
+ * missing from it is one no host can override.
  */
 describe('the theming document', () => {
-  /** Every custom property a stylesheet declares. */
   const tokensIn = (path: string): string[] => {
     const css = read(path).replace(/\/\*[\s\S]*?\*\//g, '')
     return [
@@ -640,17 +438,12 @@ describe('the theming document', () => {
   ])('documents every token %s defines', (_what, path) => {
     const tokens = tokensIn(path)
 
-    // The control: a reader that found nothing would document nothing and pass.
     expect(tokens.length, 'no tokens were found in ' + path).toBeGreaterThan(8)
 
     expect(tokens.filter((token) => !spec.includes(token)).sort()).toEqual([])
   })
 
   it('documents no token that has since been removed', () => {
-    /*
-     * The other direction, and the one a reader meets: a name in this table
-     * that no stylesheet defines is an override that silently does nothing.
-     */
     const defined = new Set([
       ...tokensIn('packages/designer/src/designer.css'),
       ...tokensIn('packages/kit-html/src/kit-html.css'),
@@ -666,13 +459,6 @@ describe('the theming document', () => {
 
 describe('the accessibility document', () => {
   it('lists exactly the axe rules the suite disables', () => {
-    /*
-     * `NEEDS_LAYOUT` in `a11y.test.tsx` names the rules turned off because
-     * jsdom has no layout engine, and `docs/accessibility.md` lists the same
-     * three for a reader deciding how much the audit is worth. Nothing compared
-     * them, so disabling a fourth rule would have gone unmentioned in the one
-     * document that says what is checked.
-     */
     const suite = read('test/a11y.test.tsx')
     const declared = [
       ...(/const NEEDS_LAYOUT = \[([^\]]*)\]/.exec(suite)?.[1] ?? '').matchAll(/'([\w-]+)'/g),
@@ -697,19 +483,8 @@ describe('the accessibility document', () => {
     const audits = suite.slice(suite.indexOf("describe('axe audit of the designer'"))
     const states = [...audits.matchAll(/^\s+it\(/gm)].length
 
-    /*
-     * Every document that states the figure, found rather than listed.
-     *
-     * Three were compared by name and two more said it in prose that no check
-     * read -- `docs/ROADMAP.md` and `docs/spec/00-product.md`. A list of the
-     * documents that happen to mention a number is the same shape as the
-     * hand-written file list this suite already replaced once: it covers what
-     * somebody remembered.
-     *
-     * The pattern is deliberately loose about the verb, because the five sites
-     * word it four different ways, and exact about the shape "<number> states"
-     * so a sentence about something else cannot be swept in.
-     */
+    // Loose about the verb, which the documents word differently, and exact
+    // about "<number> states", so a sentence about something else is not swept in.
     const SAYS_STATES = /(?:axe(?:-core)?[^.\n]*?) in (\w+) states\b/g
 
     const stated: { file: string; word: string }[] = []
@@ -753,33 +528,18 @@ describe('the accessibility document', () => {
     ['test/a11y.test.tsx'],
     ['e2e/keyboard.spec.ts'],
   ])('%s, which the table names as the enforcement, exists', (path) => {
-    // A table of guarantees pointing at a file nobody has is worse than no
-    // table: it reads as enforcement and is prose.
     expect(() => read(path)).not.toThrow()
   })
 })
 
 /**
- * Whether a document is a dated record rather than live documentation.
- *
- * A review states what was true on the day it was written, and a report states
- * what a run did. Correcting a figure in one to match today would falsify the
- * record -- the deep review really did say eleven, because the suite really did
- * report eleven before the count that produced it was fixed.
- *
- * The same boundary `.prettierignore` draws for `docs/reviews`, and for the same
- * reason it gives: these are artefacts, not repo prose. `docs/reports` is
- * included here because it is the same kind of thing, which the ignore file did
- * not say.
- *
- * Link checking still applies to all of them: a dead link is wrong whenever it
- * was written.
+ * Reviews and reports state what was true on the day they were written, so a
+ * figure in one is not corrected to match today. Link checking still applies.
  */
 function isDatedRecord(file: string): boolean {
   return file.startsWith('docs/reviews/') || file.startsWith('docs/reports/')
 }
 
-/** Every markdown file under a directory, repository-relative, sorted. */
 function markdownUnder(directory: string): string[] {
   const found: string[] = []
 
@@ -809,22 +569,11 @@ describe('documentation links', () => {
     '.claude/skills/write-tests/SKILL.md',
   ]
 
-  /*
-   * Anchors included. This used to exclude any link containing a `#`, so every
-   * link that named a heading was unchecked, which is the half most likely to
-   * rot: a heading gets reworded and the link still resolves to a file.
-   */
   it.each(files)('%s links only to files and headings that exist', (file) => {
     const text = read(file)
     const base = file.includes('/') ? file.slice(0, file.lastIndexOf('/') + 1) : ''
     const broken: string[] = []
 
-    /*
-     * `](target)` and `](target "title")` both. The pattern refused anything
-     * with a space in it, so a link carrying a title was skipped in silence --
-     * and a check that quietly declines to look is worse than no check, because
-     * the file reads as covered.
-     */
     for (const match of text.matchAll(
       /\]\((?![a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)([^)\s]+)(?:\s+"[^"]*")?\)/g,
     )) {
@@ -850,11 +599,8 @@ describe('documentation links', () => {
 })
 
 /**
- * Every file in the repository, repository-relative, skipping what is generated.
- *
- * `sourceFiles` below is deliberately narrower -- it answers "does the product
- * do this", so it drops tests and fixtures. A pointer at a test file is a
- * different question and has to see all of them.
+ * Not `sourceFiles`, which drops tests: a pointer at a test file has to see
+ * every file.
  */
 function everyFile(dir = ''): string[] {
   const found: string[] = []
@@ -863,22 +609,14 @@ function everyFile(dir = ''): string[] {
   })) {
     const path = dir + entry.name
     if (entry.isDirectory()) {
-      // `tmp` is in `.gitignore` and holds a copy of a review, which an earlier
-      // draft of this read and then failed on.
+      // `tmp` is git-ignored scratch space.
       if (['node_modules', 'dist', '.git', 'coverage', 'test-results', 'tmp'].includes(entry.name))
         continue
       found.push(...everyFile(path + '/'))
       continue
     }
 
-    /*
-     * Not the guardrail fixtures. `eslint.config.test.ts` writes those into
-     * `packages/core/src` and `packages/designer/src`, lints them and deletes
-     * them, and vitest runs test files in parallel -- so this walk could list
-     * one and then find it gone before `read` opens it, failing with an
-     * `ENOENT` on a run where nothing changed. `sourceFiles` skips them for the
-     * same reason and says so at more length.
-     */
+    // A guardrail fixture can vanish mid-walk: vitest runs test files in parallel.
     if (isFixture(entry.name)) continue
 
     found.push(path)
@@ -889,28 +627,9 @@ function everyFile(dir = ''): string[] {
 describe('a pointer at a test file', () => {
   it('names one that exists', () => {
     /*
-     * A comment in `Canvas.tsx` sent a reader to a `Canvas.data` variant for
-     * the assertion behind a rule axe cannot check without a layout engine.
-     * There is no such file; the assertion is in `Canvas.test.tsx`. The comment
-     * was true when it was written and a rename made it a dead end, which is
-     * the only kind of stale comment that costs real time: the reader goes
-     * looking, finds nothing, and cannot tell whether the check was moved or
-     * deleted.
-     *
-     * Comments are not compiled and nothing else in this repository reads them,
-     * so the pointer decays silently.
-     *
-     * Code only, and this is the line worth being exact about. Markdown names
-     * test files it does not have: the write-tests skill teaches with an
-     * invented `thing`, and `docs/reviews` asks for tests that were never
-     * written, which is what a review is for. Both are correct prose and
-     * neither is a broken pointer. A comment beside the code is a different
-     * promise -- it says "the check is over there" about a repository the
-     * reader is already standing in.
-     *
-     * Matched by basename, so moving a test between packages does not fail
-     * this. A pointer at a directory or a symbol is a wider problem and this
-     * does not pretend to solve it.
+     * Code only: markdown may name test files that do not exist, such as the
+     * write-tests skill's examples and the tests a review asks for. Matched by
+     * basename, so moving a test between packages does not fail this.
      */
     const files = everyFile()
     const tests = new Set(
@@ -933,19 +652,6 @@ describe('a pointer at a test file', () => {
   })
 })
 
-/*
- * Everything below is one kind of drift: the specification saying a thing does
- * not exist while the repository holds it. That is the direction that matters.
- * A document overstating what is built is caught by anybody who tries the
- * feature; a document understating it is read as a to-do list, and the work
- * gets scheduled twice.
- *
- * Every one of these guards was written against a drift that was live in this
- * repository on 2026-08-30, and each was watched failing before the prose was
- * corrected.
- */
-
-/** The source a claim about "nothing does this" is checked against. */
 function sourceFiles(): { path: string; text: string }[] {
   const found: { path: string; text: string }[] = []
 
@@ -960,17 +666,8 @@ function sourceFiles(): { path: string; text: string }[] {
       // never touches, which is exactly what a "nothing reads it" claim means.
       if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue
 
-      /*
-       * And not the guardrail fixtures either. `eslint.config.test.ts` writes
-       * those into `packages/core/src` and `packages/designer/src`, lints them
-       * and deletes them, and vitest runs test files in parallel -- so this walk
-       * could list one and then find it gone before reading it, and every
-       * DISPROOF case below would fail on a run where nothing changed.
-       *
-       * Skipped by the name they share with the file that writes them, rather
-       * than by catching the `ENOENT`: a file that vanishes mid-walk is a race
-       * worth not having, not an error worth swallowing.
-       */
+      // Guardrail fixtures are skipped by name rather than by catching the
+      // `ENOENT` of one that vanished mid-walk: the race is avoided, not swallowed.
       if (isFixture(entry.name)) continue
 
       found.push({ path, text: read(path) })
@@ -983,7 +680,6 @@ function sourceFiles(): { path: string; text: string }[] {
   return found
 }
 
-/** Where a string appears in the product, if anywhere. */
 function mentions(needle: string): string[] {
   return sourceFiles()
     .filter((file) => file.text.includes(needle))
@@ -991,21 +687,13 @@ function mentions(needle: string): string[] {
 }
 
 describe('the component catalogue and the kits agree', () => {
-  /*
-   * The catalogue's preamble carried "Eight of the twenty-six below are built"
-   * long after all twenty-seven were, because the number is prose and the table
-   * beneath it is where the work actually lands. Both are now read from the
-   * kits, which are the thing the sentence is about.
-   */
   const catalogue = read('docs/spec/03-components.md')
 
-  /** Component types a kit declares, read out of its definitions. */
   const typesIn = (kit: string): string[] =>
     [...read('packages/' + kit + '/src/definitions.ts').matchAll(/^ {6}type: '(\w+)',$/gm)]
       .map((match) => match[1] ?? '')
       .sort()
 
-  /** Every row of the catalogue tables, as name and status. */
   const rows = [...catalogue.matchAll(/^\| `(\w+)`\s*\| (Built|Planned)\s*\|/gm)].map((match) => ({
     name: match[1] ?? '',
     status: match[2] ?? '',
@@ -1017,11 +705,6 @@ describe('the component catalogue and the kits agree', () => {
       .map((row) => row.name)
       .sort()
 
-    /*
-     * Both sides come out of a regex over a file this test does not control the
-     * formatting of. A regex that stopped matching would leave both lists empty
-     * and the comparison would pass, having read nothing.
-     */
     expect(built.length, 'no Built rows were parsed out of the catalogue').toBeGreaterThan(0)
     expect(typesIn('kit-mui').length, 'no types were parsed out of kit-mui').toBeGreaterThan(0)
 
@@ -1032,10 +715,6 @@ describe('the component catalogue and the kits agree', () => {
   })
 
   it('states a built count that matches the table', () => {
-    /*
-     * Digits, not words. The count is a guarded number like the test totals
-     * above, and "twenty-six" is a number no regex should have to read.
-     */
     const claim = /(\d+) of the (\d+) below are built/.exec(catalogue)
     expect(claim, 'the preamble no longer states a built count in digits').toBeTruthy()
 
@@ -1051,12 +730,6 @@ describe('the component catalogue and the kits agree', () => {
 })
 
 describe('the roadmap does not deny a component that exists', () => {
-  /*
-   * "**Steps.** _Decided, and the core is built._ No Step component" sat in the
-   * roadmap after `Step` shipped in both kits. The roadmap is the first thing
-   * anybody reads to decide what to work on, so a stale absence there is a
-   * feature built twice.
-   */
   it.each(['kit-mui', 'kit-html'])('%s implements nothing the roadmap calls missing', (kit) => {
     const declared = new Set(
       [...read('packages/' + kit + '/src/definitions.ts').matchAll(/^ {6}type: '(\w+)',$/gm)].map(
@@ -1074,35 +747,18 @@ describe('the roadmap does not deny a component that exists', () => {
 
 describe('a section that calls itself planned is still planned', () => {
   /*
-   * The general shape of the two drifts above. A `Status: planned` heading, or
-   * a `**Planned:**` paragraph, is a claim that something is absent — and
-   * nothing re-reads it once the thing arrives. `ComponentNode.css` was called
-   * planned with "nothing writes it and nothing reads it" while the Style tab
-   * wrote it and `styleSheetFor` read it; a language selector was called
-   * planned while the toolbar drew one.
-   *
-   * So each claim names a string whose presence in the product disproves it.
-   * The table is keyed by the claim, and a claim with no entry fails, which is
-   * what stops the table going stale as sections are added.
-   *
-   * `null` means there is nothing to look for yet, and it has to say why. That
-   * is an honest answer for a feature with no named surface — it is not an
-   * excuse, because the next guard rejects a `null` with no reason.
+   * Keyed by each `Status: planned` heading or `**Planned:**` paragraph; the
+   * needle is a string whose presence in the product disproves the claim. `null`
+   * means there is nothing to look for yet, and `because` must say why.
    */
   const DISPROOF: Record<string, { needle: string | null; because: string }> = {}
 
-  /** Every planned claim in the specification, named the way the table names it. */
   function claims(): string[] {
     const found: string[] = []
     for (const file of readdirSync(fileURLToPath(new URL('docs/spec/', root)))) {
       if (!file.endsWith('.md')) continue
       const text = read('docs/spec/' + file)
 
-      /*
-       * A `Status: planned` marker belongs to the heading above it; a
-       * `**Planned:**` paragraph is named by its own first few words. Both are
-       * claims of absence and both are checked.
-       */
       for (const match of text.matchAll(/\*\*Status: planned\.?\*\*|\*\*Planned:\*\*([^\n]*)/g)) {
         const before = text.slice(0, match.index ?? 0)
         const heading = [...before.matchAll(/^#{2,3} +(.+?)\s*$/gm)].at(-1)?.[1]
@@ -1116,7 +772,6 @@ describe('a section that calls itself planned is still planned', () => {
     return found
   }
 
-  /** A `**Planned:**` paragraph, shortened to the phrase the table keys on. */
   function summarise(rest: string): string {
     const words = rest.trim().replace(/[`*]/g, '').split(/\s+/)
     if (words.join(' ').startsWith('a language selector')) return 'a language selector'
@@ -1126,16 +781,10 @@ describe('a section that calls itself planned is still planned', () => {
   }
 
   it('has an entry for every planned claim, and no entry without one', () => {
-    // Both directions. An unlisted claim goes unchecked; a listed one that no
-    // longer exists is a guard nobody is maintaining.
     expect([...claims()].sort()).toEqual(Object.keys(DISPROOF).sort())
   })
 
   it.each(Object.entries(DISPROOF))('%s is not disproved by the source', (name, entry) => {
-    /*
-     * `null` means there is nothing to look for, which is a decision and not a
-     * shrug — so the reason is checked for every entry, not only those ones.
-     */
     expect(entry.because.length, name + ' gives no reason').toBeGreaterThan(20)
 
     const found = entry.needle === null ? [] : mentions(entry.needle)
@@ -1143,29 +792,7 @@ describe('a section that calls itself planned is still planned', () => {
   })
 })
 
-/**
- * The parity contract against the server it points at.
- *
- * `08-validation.md`'s "Server parity" section is marked built and said the
- * demo server's "only purpose is to prove that `validateForm` is the same
- * function in both places". The demo server does not import `validateForm`. It
- * uses `validateAcross` and `submittedAcross`, once per step scope, and a host
- * copying the documented snippet onto a wizard document got `{}` back for a
- * submission missing every required answer -- every `Step` is hidden by a
- * context the snippet never builds.
- *
- * Checked against the import block rather than against a hand-kept list,
- * because a hand-kept list is what drifted. The section is the reference a
- * server implementer reads, and the reference server is the thing it describes,
- * so if they stop naming the same functions one of the two is wrong.
- */
 describe('the server parity section and the server it cites', () => {
-  /** Everything the demo server imports from core, from the import block. */
-  /*
-   * Parsed once per describe rather than per call. Four assertions each
-   * re-reading and re-scanning the same file is work with one answer, and the
-   * answer cannot change inside a run.
-   */
   let cached: Set<string> | undefined
   const imported = (): Set<string> => {
     if (cached) return cached
@@ -1181,7 +808,6 @@ describe('the server parity section and the server it cites', () => {
     return names
   }
 
-  /** The "Server parity" section of the validation contract, on its own. */
   const parity = (): string => {
     const text = read('docs/spec/08-validation.md')
     const from = text.indexOf('## Server parity')
@@ -1191,18 +817,12 @@ describe('the server parity section and the server it cites', () => {
   }
 
   it('reads the demo server import block at all', () => {
-    // The control. An empty set would satisfy every assertion below by having
-    // nothing to disagree with -- the same vacuous green this run keeps finding.
     const names = imported()
 
     expect(names.size).toBeGreaterThan(3)
     expect([...names]).toContain('validateDocument')
   })
 
-  /*
-   * The per-scope half of the contract, named once. Both directions below are
-   * about these four.
-   */
   const PER_SCOPE = ['validateAcross', 'submittedAcross', 'contextValues', 'missingContext']
 
   it('names the functions the reference server actually calls', () => {
@@ -1218,17 +838,6 @@ describe('the server parity section and the server it cites', () => {
   })
 
   it('does not name one the reference server has stopped calling', () => {
-    /*
-     * The other direction, which the check above does not cover.
-     *
-     * It asserts only that an imported name is mentioned, so the spec could get
-     * *ahead* of the server -- keep teaching `validateAcross` after the route
-     * stopped calling it -- and nothing would fail. That is the same drift this
-     * whole item is about, pointing the other way: the section claimed
-     * `validateForm` was what the server used long after it was not.
-     *
-     * Raised in review on PR #37.
-     */
     const section = parity()
     const names = imported()
     const stale = PER_SCOPE.filter((name) => section.includes(name)).filter(
@@ -1241,22 +850,12 @@ describe('the server parity section and the server it cites', () => {
   })
 
   it('does not offer a function the reference server does not import', () => {
-    /*
-     * The direction that actually bit. `validateForm` is a real export and a
-     * correct call for a single-scope form, so the section may still teach it
-     * -- but it may not do so while claiming the demo server is the proof, and
-     * the wizard half has to be there beside it.
-     */
+    // `validateForm` is correct for a single-scope form, so the section may
+    // teach it, but only beside the per-scope functions.
     const section = parity()
     const teachesSingleScope = section.includes('validateForm')
     const teachesPerScope = section.includes('validateAcross')
 
-    /*
-     * Stated as one unconditional expectation rather than as an `if` around an
-     * `expect`. `vitest/no-conditional-expect` refuses that shape and is right
-     * to: a guarded assertion passes having asserted nothing the moment the
-     * guard stops holding, which is this run's whole subject.
-     */
     expect(
       teachesSingleScope && !teachesPerScope,
       'the section teaches validateForm as the parity example while the server it cites validates per scope',

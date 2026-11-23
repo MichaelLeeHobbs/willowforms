@@ -1,11 +1,3 @@
-/**
- * Prop readers for kit renderers.
- *
- * A renderer receives `props` as resolved JSON, so any value can arrive in any
- * slot. These narrow one value to what a component can draw, with the same
- * answer in every kit.
- */
-
 import { jsonToString } from '@willowforms/core'
 import type { JsonValue } from '@willowforms/core'
 import type { NodeEventHandlers } from './index.js'

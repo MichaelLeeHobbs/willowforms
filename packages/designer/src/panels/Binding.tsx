@@ -26,18 +26,8 @@ import { emptyCondition } from './ConditionEditor.js'
 export type BindingKind = PropValue['kind']
 
 /**
- * The conventional key for a translated property, per ARCHITECTURE.md.
- *
- * Baked in when the binding is made, and never rewritten afterwards: renaming
- * the component leaves `email_label` on a component now keyed `contact`, and the
- * translation still resolves, because the key is a string in the document and
- * the bundle is keyed by that string.
- *
- * So the convention holds until the first rename, and it is a convention rather
- * than a rule for that reason -- a translation key belongs to the text, not to
- * the component that happens to show it, and rewriting bundles on a rename would
- * be a migration with two ways to go wrong (a key two components share, a key a
- * host also uses) to keep a naming habit tidy.
+ * A seed only: a component rename never rewrites the key or its bundles. See
+ * docs/spec/07-bindings.md.
  */
 export function translationKey(componentKey: string, propName: string): string {
   return componentKey + '_' + propName
@@ -65,15 +55,11 @@ export interface BindingModeProps {
   componentKey: string
   /** A field the condition mode can start by testing. Empty means it cannot. */
   firstDataKey?: string
-  /**
-   * Which scope that field lives in. `row` inside a repeater, where a seed at
-   * form scope names a key the top level does not hold and is false on arrival.
-   */
+  /** `row` inside a repeater: a form-scope seed there is false on arrival. */
   firstDataKeyScope?: 'form' | 'row'
   onChange: (value: PropValue | undefined) => void
 }
 
-/** The mode picker. Rendered only when a property has more than one mode. */
 export function BindingMode({
   id,
   schema,
@@ -102,15 +88,8 @@ export function BindingMode({
           if (kind === current) return
 
           /*
-           * A switch, so a fifth `PropValue` kind is a compile error here rather
-           * than an option in the list that does nothing when chosen. This was
-           * four independent `if`s, which is exactly the shape the comment
-           * beneath them warns about: the `condition` arm had been added late
-           * because nothing made its absence visible.
-           *
-           * Switching mode starts that mode empty rather than carrying a value
-           * across: an expression is not a label, and a translation key is not
-           * either.
+           * Exhaustive, so a new `PropValue` kind fails to compile here. Each
+           * mode starts empty: a value from one mode means nothing in another.
            */
           switch (kind) {
             case 'static':
@@ -123,7 +102,6 @@ export function BindingMode({
               onChange({ kind: 'i18n', key: translationKey(componentKey, schema.name) })
               return
             case 'condition':
-              // Only with a field to test; the option is disabled without one.
               if (firstDataKey) {
                 onChange({
                   kind: 'condition',
@@ -137,12 +115,8 @@ export function BindingMode({
         }}
       >
         {modes.map((mode) => (
-          /*
-           * A condition needs a field to test. With none on the document it
-           * would be seeded with an empty key, evaluate to false, and leave a
-           * control that cannot be corrected: the same refusal the visibility
-           * row makes, and this path had been left without it.
-           */
+          // Without a field, a condition would be seeded with an empty key that
+          // is always false.
           <option key={mode} value={mode} disabled={mode === 'condition' && !firstDataKey}>
             {MODE_LABELS[mode]}
           </option>
@@ -154,7 +128,6 @@ export function BindingMode({
 
 export interface ComputedEditorProps {
   id: string
-  /** What this expression is for, so the box can name itself. */
   label?: string
   value: Extract<PropValue, { kind: 'computed' }>
   onChange: (value: PropValue) => void
@@ -166,12 +139,7 @@ export function ComputedEditor({ id, value, label, onChange }: ComputedEditorPro
       <textarea
         id={id}
         className="fs-binding__expression"
-        /*
-         * Named. The only label on this row points at the mode select, so this
-         * box announced itself as nothing — and the accessibility suite audits a
-         * selected component at rest, which is a state in which this box is not
-         * on screen, so axe never saw it.
-         */
+        // Named, because the only label on this row points at the mode select.
         aria-label={(label ? label + ' ' : '') + 'expression'}
         rows={2}
         spellCheck={false}
@@ -198,12 +166,8 @@ export interface TranslationEditorProps {
 }
 
 /**
- * One language's bundle, whatever the document holds in its place.
- *
- * `translations[tag]?.[key]` guards the bundle and not the record, so a
- * document missing `translations` altogether crashed this panel — and the panel
- * is where somebody goes to repair such a document. `validateDocument` refuses
- * it now; nothing on the path from a host's storage to here runs that.
+ * Guards the record as well as the bundle: a host's document reaches this panel
+ * even when `validateDocument` rejects it (see `store.ts`).
  */
 function bundleFor(
   translations: Record<string, Record<string, string>>,
@@ -301,18 +265,7 @@ export function TranslationEditor({
         onRename={(next, carried) => {
           onChange({ kind: 'i18n', key: next })
 
-          /*
-           * Written under the new key, and cleared from the old one.
-           *
-           * The comment above says the rename "carries the translations with
-           * it" and it only copied them: every rename left the old key's text
-           * in every bundle, unreachable from the panel and exported with the
-           * document. A translator opening the file sees two entries for one
-           * string and no way to tell which one the form reads.
-           *
-           * `setTranslation` deletes a key when the text is empty, which is the
-           * same path clearing a box takes.
-           */
+          // A move, not a copy: `setTranslation` deletes a key given empty text.
           for (const [language, text] of carried) {
             onTranslate(language, next, text)
             onTranslate(language, value.key, '')
@@ -322,22 +275,14 @@ export function TranslationEditor({
 
       <ul className="fs-binding__languages">
         {languages.map((language, at) => {
-          /*
-           * Bundles are keyed by BCP 47 tag, which is what the renderer looks up.
-           * Writing to the bare code put every translation authored here into a
-           * bundle nothing read, so the canvas kept showing the raw key.
-           */
+          // Bundles are keyed by BCP 47 tag, which is what the renderer looks up.
           const tag = languageTag(language)
           const text = textFor(bundleFor(translations, tag), value.key)
           const fieldId = id + '-' + String(at) + '-' + tag
           return (
             /*
-             * Position and tag, because two languages can carry the same tag:
-             * nothing dedupes `languages` and the gate checks only that
-             * `defaultLanguage` is present. Keyed by tag alone, a document with
-             * `en` twice gave React two children with one key, and the id built
-             * from the tag gave two inputs one `id` -- so `label for` resolved
-             * to the first and the second box had no accessible name.
+             * Position and tag: nothing dedupes `languages`, so two entries can
+             * share a tag, and the React key and the input id must stay unique.
              */
             <li key={String(at) + ':' + tag}>
               {/*
@@ -346,13 +291,8 @@ export function TranslationEditor({
               */}
               <div className="fs-binding__language-head">
                 {/*
-                  The tag when the language has no name, so the field always has
-                  an accessible name: `docs/accessibility.md` makes "Every form
-                  control in the shell has a label" a build-failing check.
-
-                  The tag rather than a placeholder: it is what the author sees
-                  in the language list beside it for the same case, so the two
-                  panels name the same language the same way.
+                  The tag for a nameless language, so every control has a label
+                  (docs/accessibility.md) and matches the language list.
                 */}
                 <label htmlFor={fieldId}>{nameOf(language) || tag}</label>
                 {tag === defaultLanguage && <span className="fs-binding__default">default</span>}

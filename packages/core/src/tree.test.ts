@@ -32,15 +32,10 @@ function container(key: string, children: ComponentNode[]): ComponentNode {
   return { key, type: 'Stack', props: {}, children }
 }
 
-/** root > [ stack > [ a, b ], c ] */
 function fixture(): ComponentNode {
   return container('root', [container('stack', [leaf('a'), leaf('b')]), leaf('c')])
 }
 
-/**
- * `instantiate`, narrowed. It answers `undefined` for a definition with no
- * usable `type`, which no fixture here supplies.
- */
 const made = (def: ComponentDef, root: ComponentNode): ComponentNode => {
   const node = instantiate(def, root)
   if (!node) throw new Error('instantiate refused a definition this test expects it to accept')
@@ -78,14 +73,6 @@ describe('generateKey', () => {
     expect(generateKey(root, 'TextField')).toBe('textField3')
   })
 
-  /*
-   * The sanitising branch, which exists because of a named incident and had no
-   * test at all: only `TextField` was ever passed, and `TextField` needs no
-   * sanitising. A kit is free to type a component `Date-Picker` or `2FA`, and
-   * the key minted from it went straight into a document `validateDocument`
-   * then refused -- a component the palette adds and the JSON dialog will not
-   * accept back.
-   */
   it.each([
     ['Date-Picker', 'datePicker', 'a hyphen, which an expression would read as a subtraction'],
     ['2FA', 'field', 'a leading digit, which no key may start with'],
@@ -96,15 +83,9 @@ describe('generateKey', () => {
     const key = generateKey(emptyRoot(), type)
 
     expect(key).toBe(expected)
-    // The claim underneath: whatever it mints, the gate accepts it.
     expect(keyProblem(key)).toBeUndefined()
   })
 
-  /*
-   * A base that fits `MAX_KEY_LENGTH` on its own can overflow once a number is
-   * appended. The 127-character case takes suffixes 2 to 9 as well, so the
-   * number it needs is two digits wide.
-   */
   it.each<[string, number, number[]]>([
     ['a 128-character base', MAX_KEY_LENGTH, []],
     ['a 127-character base needing two digits', MAX_KEY_LENGTH - 1, [2, 3, 4, 5, 6, 7, 8, 9]],
@@ -142,11 +123,8 @@ describe('mutations: what they return, and what they leave alone', () => {
 
   it('clamps a negative index to the front', () => {
     /*
-     * The other half of the same clamp, and it has to be an index the array is
-     * long enough to feel: `splice` clamps a start below `-length` to zero by
-     * itself, so `-3` on two children lands at the front either way. `-1` on
-     * three children lands *before the last one* without `Math.max`, which is
-     * the difference the clamp exists for.
+     * `splice` already clamps a start below `-length` to 0, so only an index like
+     * `-1` on three children shows whether `Math.max` clamps.
      */
     const wide = container('root', [container('stack', [leaf('a'), leaf('b'), leaf('c')])])
 
@@ -155,13 +133,6 @@ describe('mutations: what they return, and what they leave alone', () => {
   })
 
   it('appends for an index that is not a position at all', () => {
-    /*
-     * `Math.max(0, Math.min(NaN, len))` is `NaN`, and `splice(NaN, ...)`
-     * coerces to 0 -- so a caller handing over a computed-but-broken index
-     * silently *prepended*, while the two `Math` calls read as though every
-     * non-number was covered. An index nobody can place is the end of the
-     * list, which is what an absent index already means.
-     */
     for (const index of [NaN, Infinity, -Infinity]) {
       expect(
         findNode(insertNode(fixture(), 'stack', leaf('d'), index), 'stack')?.children?.map(
@@ -177,13 +148,6 @@ describe('mutations: what they return, and what they leave alone', () => {
   })
 
   it('removeNode leaves the original tree untouched', () => {
-    /*
-     * Invariant 4, for the one operation that deletes. `insertNode` and
-     * `updateNode` are both pinned here and `removeNode` was not, so the
-     * operation with the most to destroy was the one nothing watched -- and undo
-     * holds references to prior documents, so a mutation here is a previous
-     * version of the form silently losing a component.
-     */
     const before = fixture()
     const keysBefore = collectKeys(before)
     const stackBefore = findNode(before, 'stack')
@@ -207,7 +171,6 @@ describe('mutations: what they return, and what they leave alone', () => {
     // Untouched subtrees keep referential identity, which is what memoisation needs.
     expect(findNode(after, 'c')).toBe(findNode(before, 'c'))
     expect(findNode(after, 'b')).toBe(findNode(before, 'b'))
-    // Ancestors of the edited node are new objects.
     expect(findNode(after, 'stack')).not.toBe(findNode(before, 'stack'))
   })
 })
@@ -240,17 +203,9 @@ describe('moveNode', () => {
   })
 
   /*
-   * Reordering inside one parent, which is the commonest gesture in the
-   * designer and the only one this describe never made.
-   *
-   * The index is read after the node has been taken out, because `moveNode`
-   * composes `insertNode(removeNode(...))`. That is not an accident to be tidied
-   * away later: `dnd.ts:253` and `:411` both subtract one from an index measured
-   * against the children as they are drawn, precisely because of it, and
-   * `dnd.test.ts:463` pins that arithmetic from the other side. What was missing
-   * was anything saying which of the two conventions this function holds, so a
-   * reader had to derive it from the composition and a caller could reasonably
-   * guess wrong.
+   * The index counts from the list without the node, because `moveNode` composes
+   * `insertNode(removeNode(...))`. The designer's `dnd.ts` adjusts its indexes
+   * for this, so it is a contract, not an accident.
    */
   const order = (root: ComponentNode, parent: string): string[] | undefined =>
     findNode(root, parent)?.children?.map((child) => child.key)
@@ -259,8 +214,6 @@ describe('moveNode', () => {
     container('root', [container('stack', [leaf('a'), leaf('b'), leaf('c')])])
 
   it('reorders within one parent, counting from the list without the node', () => {
-    // `a` out first leaves [b, c], so index 2 is the end and index 1 is between
-    // them. Counting in the list as drawn, index 2 would mean before `c`.
     expect(order(moveNode(three(), 'a', 'stack', 2), 'stack')).toEqual(['b', 'c', 'a'])
     expect(order(moveNode(three(), 'a', 'stack', 1), 'stack')).toEqual(['b', 'a', 'c'])
   })
@@ -271,11 +224,6 @@ describe('moveNode', () => {
   })
 
   it('keeps the node exactly once, wherever it lands', () => {
-    /*
-     * The control. An off-by-one is a wrong position; a remove that missed, or
-     * an insert that ran twice, is a duplicated key, and the two read alike in
-     * an assertion that only looks at one slot.
-     */
     for (const index of [0, 1, 2, 3, 99]) {
       expect(order(moveNode(three(), 'b', 'stack', index), 'stack')?.sort()).toEqual([
         'a',
@@ -360,11 +308,9 @@ describe('validateDocument', () => {
   })
 })
 
-/**
- * validateDocument is the gate untrusted documents pass through: the designer's
- * JSON editor runs pasted text through it, and apps/demo-server runs request
- * bodies through it. It must judge anything without throwing, because a throw
- * here took the builder down and reached the server as an unhandled 500.
+/*
+ * The gate for untrusted documents (pasted JSON, demo-server request bodies): it
+ * must judge anything without throwing.
  */
 describe('validateDocument against malformed input', () => {
   const wellFormed = (): FormDocument => ({
@@ -373,43 +319,24 @@ describe('validateDocument against malformed input', () => {
     name: 'Doc',
     root: { key: 'root', type: 'Screen', props: {} },
     actions: {},
-    // `en-US`, the tag `createDocument` produces. A dialect-free fixture makes a
-    // bundle keyed by tag and one keyed by bare code the same string, which is
-    // the distinction half this file's language checks are about.
+    // `en-US`, as `createDocument` produces: with no dialect, tag and code are
+    // the same string and the language checks prove nothing.
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
     settings: {},
   })
 
-  /** Anything at all, as a document. */
   const judge = (mutate: (doc: Record<string, unknown>) => void): StructuralError[] => {
     const doc = wellFormed() as unknown as Record<string, unknown>
     mutate(doc)
     return validateDocument(doc)
   }
 
-  /*
-   * The control. Every row below mutates this fixture and asserts an error, so
-   * a fixture that was already invalid would make the whole table pass without
-   * the mutations doing anything. That is not hypothetical: the language row
-   * did exactly this on its own, reported below.
-   */
   it('accepts the fixture the table mutates', () => {
     expect(judge(() => undefined)).toEqual([])
   })
 
-  /*
-   * Each row names the message it expects, not just that something was
-   * reported.
-   *
-   * "A language with no code" already produced two errors: the missing code and
-   * `defaultLanguage en is not in languages`, which follows from it. Deleting
-   * the code check left the row green on the consequence — a check with no test
-   * behind it, in the function that stands between a pasted document and the
-   * builder. The other twelve rows were sound and are pinned so they stay that
-   * way.
-   */
   it.each([
     [
       'a number for children',
@@ -515,13 +442,6 @@ describe('validateDocument against malformed input', () => {
   })
 })
 
-/**
- * ARCHITECTURE.md claims that an edit allocates only the edited node's ancestors
- * and that untouched subtrees keep referential identity. That was not true: both
- * updateNode and removeNode rebuilt every node on every call, so React.memo
- * could never skip a subtree and a no-op edit produced a whole new tree that the
- * undo stack recorded as a version.
- */
 describe('structural sharing', () => {
   const tree = (): ComponentNode => ({
     key: 'root',
@@ -548,17 +468,12 @@ describe('structural sharing', () => {
     const after = updateNode(before, 'a', (n) => ({ ...n, type: 'Changed' }))
 
     expect(after).not.toBe(before)
-    // The branch that contains the edit is rebuilt.
     expect(after.children?.[0]).not.toBe(before.children?.[0])
-    // The branch that does not is the very same object.
     expect(after.children?.[1]).toBe(before.children?.[1])
-    // And so is the untouched sibling inside the edited branch.
     expect(after.children?.[0]?.children?.[1]).toBe(before.children?.[0]?.children?.[1])
   })
 
   it('updates the root itself', () => {
-    // The one node with no parent to rewrite through, and the branch every
-    // other case in this describe walks past.
     const before = tree()
     const after = updateNode(before, 'root', (node) => ({ ...node, type: 'Wizard' }))
 
@@ -581,8 +496,6 @@ describe('structural sharing', () => {
 
   it('returns the same tree when a removal matches nothing', () => {
     const before = tree()
-    // A remove that finds nothing must not read as an edit, or the undo stack
-    // grows with a version identical to the one before it.
     expect(removeNode(before, 'missing')).toBe(before)
   })
 
@@ -631,11 +544,6 @@ describe('duplicateNode', () => {
   })
 
   it('re-keys every descendant, reserving each key as it goes', () => {
-    /*
-     * Both children are TextFields and textField/textField2 are taken, so a
-     * generator reading only the original tree would name both copies
-     * textField3 and produce a document that fails its own validation.
-     */
     const copy = duplicateNode(tree(), 'stack')
     const keys = copy?.children?.map((child) => child.key)
     expect(keys).toEqual(['textField3', 'textField4'])
@@ -659,19 +567,10 @@ describe('duplicateNode', () => {
     const next = insertNode(original, 'root', copy as ComponentNode, 1)
     const document = { ...createDocument('Duplicated', 'doc'), root: next }
 
-    // Duplicate keys are the failure this whole function exists to avoid, and
-    // validateDocument is what would report them.
     expect(validateDocument(document)).toEqual([])
   })
 
   it('re-points a condition that named the copied node at the copy', () => {
-    /*
-     * A Step is a Step because its `renderWhen` compares `context.step` against
-     * its own key. Copied by reference, the duplicate was shown by the
-     * original's name: both steps render at once, and the copy can never be
-     * reached by asking for it. Nothing tested this, and the run that found it
-     * confirmed it by execution.
-     */
     const original: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -706,12 +605,6 @@ describe('duplicateNode', () => {
   })
 
   it('leaves a literal that merely matches the copied key alone', () => {
-    /*
-     * The other half of the rule, and the reason this is not a blanket rewrite:
-     * a condition on an answer whose value happens to equal the copied key is
-     * about that answer, not about the node. Rewriting it would change what the
-     * copy is asking.
-     */
     const original: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -739,12 +632,6 @@ describe('duplicateNode', () => {
   })
 
   it('copies css and events without sharing the records that hold them', () => {
-    /*
-     * The other two records a panel writes into. They were shared by reference,
-     * so styling the duplicate restyled the original and an event wired on one
-     * appeared on the other -- invisible today because every writer replaces
-     * rather than mutates, which is what makes it cheap to close now.
-     */
     const original: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -805,8 +692,6 @@ describe('duplicateNode', () => {
       children: [{ key: 'emailAddress', type: 'TextField', props: {} }],
     }
 
-    // Keying off the type would call this textField, throwing away the only
-    // part of the name a form author chose.
     expect(duplicateNode(named, 'emailAddress')?.key).toBe('emailAddress2')
   })
 
@@ -835,18 +720,6 @@ describe('duplicateNode', () => {
     expect(JSON.stringify(original)).toBe(before)
   })
 
-  /*
-   * The same rewrite, in the shapes a condition actually takes.
-   *
-   * Every fixture above is one flat `eq`, so the rewrite was only ever proven
-   * against a condition one level deep with two operands. `repointBinding`
-   * (tree.ts:233-246) also walks `conditions` and `condition` for the boolean
-   * operators and rewrites the `options` array for `in` and `notIn` -- three
-   * branches nothing reached. Delete the recursion and a Step wrapped in a
-   * one-element `and` duplicates still carrying the original's key: both steps
-   * render at once and the copy can never be asked for, which is exactly the
-   * defect the flat case was written for.
-   */
   const step = (renderWhen: ComponentNode['renderWhen']): ComponentNode => ({
     key: 'root',
     type: 'Screen',
@@ -899,8 +772,6 @@ describe('duplicateNode', () => {
   })
 
   it('re-points a key nested inside a not', () => {
-    // `not` carries a single `condition`, not a `conditions` list, so it is a
-    // separate line in the walk and a separate way to miss the subtree.
     const copy = duplicateNode(
       step({
         kind: 'condition',
@@ -953,12 +824,6 @@ describe('duplicateNode', () => {
   })
 
   it('leaves an in list alone when nothing in the comparison reads the context', () => {
-    /*
-     * The control for the options rewrite, and the same rule the flat case
-     * holds: a list of answers that happens to contain the copied key is about
-     * the answers. `readsContext` gates the whole rewrite, so a `ref` on the
-     * left has to leave the list byte-identical.
-     */
     const condition = {
       kind: 'condition' as const,
       condition: {
@@ -1020,9 +885,6 @@ describe('validateDocument and data keys', () => {
   })
 
   it('rejects a data key that is not a string, and says that is what is wrong', () => {
-    // It used to be reported as `empty-data-key`, "has an empty data key",
-    // which is not what is wrong with `dataKey: 7` and sends the reader looking
-    // for a blank field. The message is the whole product of this function.
     const errors = validateDocument(withDataKey(7))
     expect(errors.map((e) => e.code)).toEqual(['invalid-data-key'])
     expect(errors[0]?.message).toContain('not text')
@@ -1037,11 +899,6 @@ describe('validateDocument and data keys', () => {
   })
 
   it('rejects a data key the grammar does not allow', () => {
-    /*
-     * It matters more here than for a node key: a data key is a property name
-     * in the exported JSON Schema and a key in the submitted payload, so it
-     * leaves the document in a way a node key never does.
-     */
     expect(validateDocument(withDataKey('first-name')).map((e) => e.code)).toEqual([
       'invalid-data-key',
     ])
@@ -1051,8 +908,6 @@ describe('validateDocument and data keys', () => {
   })
 
   it('rejects a component key the grammar does not allow', () => {
-    // The same rule a rename is judged by, so a pasted document cannot hold a
-    // key the panel would have refused.
     const document: FormDocument = {
       ...createDocument('Keys', 'keys'),
       root: {
@@ -1070,13 +925,6 @@ describe('validateDocument and data keys', () => {
 })
 
 describe('a component that arrives with a visibility rule', () => {
-  /*
-   * A Step is a container shown when `context.step` equals its own key. That
-   * condition is the whole difference between a step and a box, so a kit states
-   * it rather than asking every author to write it by hand and get the path
-   * right. It has to be applied after the key is generated, because the rule
-   * names the node.
-   */
   const stepDef: ComponentDef = {
     type: 'Step',
     label: 'Step',
@@ -1112,8 +960,6 @@ describe('a component that arrives with a visibility rule', () => {
   })
 
   it('gives two steps different rules, so they are different steps', () => {
-    // Generated from the key, so a second one cannot silently share the first's
-    // condition and show at the same time.
     const first = made(stepDef, root)
     const withFirst: ComponentNode = { ...root, children: [first] }
     const second = made(stepDef, withFirst)
@@ -1132,15 +978,9 @@ describe('a component that arrives with a visibility rule', () => {
 
 describe('two lookups for one key', () => {
   /*
-   * Keys are unique: validateDocument reports a duplicate and the panel refuses
-   * a rename that would make one. But reporting is not preventing, and a host
-   * can render a document it never validated — so what these do when a document
-   * is wrong is worth pinning, because they used to do different things.
-   *
-   * findNode and findParent assigned on every match with no early exit, so they
-   * answered with the last match while pathTo answered with the first. Two
-   * functions in one file disagreeing about which node a key means is a bug
-   * whichever answer is correct.
+   * A host can render a document it never validated, so duplicate keys reach
+   * these. Every lookup takes the first match, so they agree on which node a
+   * key means.
    */
   const twins: ComponentNode = {
     key: 'root',
@@ -1169,10 +1009,8 @@ describe('two lookups for one key', () => {
 describe('a key that only looks unique', () => {
   it('refuses a pasted key wearing whitespace, which its twin would not have', () => {
     /*
-     * `email` and ` email ` are two components as far as the duplicate check is
-     * concerned, and one name everywhere downstream: the panel would store the
-     * trimmed form for either, so a rename of one silently becomes the other.
-     * The stored key is judged as stored.
+     * `email` and ` email ` pass the duplicate check, but the panel stores the
+     * trimmed form, so downstream they are one name.
      */
     const document: FormDocument = {
       ...createDocument('Keys', 'keys'),
@@ -1191,17 +1029,7 @@ describe('a key that only looks unique', () => {
   })
 })
 
-/**
- * The gate's opinion about `translations`.
- *
- * `validateDocument` checked the tree, the actions and the languages, and said
- * nothing about the bundle those languages are looked up in. So a document could
- * pass the gate and still take the React root down on the first render, because
- * the renderer reads `document.translations[tag]` with nothing in front of it.
- *
- * A document is data — hand-edited JSON, a paste, a row out of a database — so
- * "the type says it is a record" is not a check.
- */
+// The renderer reads `translations[tag]` unguarded, so the gate checks its shape.
 describe('validateDocument and translations', () => {
   const withTranslations = (translations: unknown): FormDocument =>
     ({ ...createDocument('Contact', 'doc'), translations }) as unknown as FormDocument
@@ -1242,22 +1070,11 @@ describe('validateDocument and translations', () => {
   })
 
   it('does not care which languages the bundle names', () => {
-    /*
-     * A bundle for a language the document does not declare is dead weight, not
-     * a fault: it is what a half-finished translation looks like, and deleting
-     * a language should not make the document invalid.
-     */
+    // Deleting a language must not make the document invalid.
     expect(codes({ fr: { greeting: 'Bonjour' } })).toEqual([])
   })
 })
 
-/**
- * The gate rejects a tag nothing can read.
- *
- * The runtime readings are the second answer, not the first. A document holding
- * `kind: 'conditon'` is malformed, and the point of a boot-time check is that
- * nobody has to reason about what a malformed document does at render time.
- */
 describe('validateDocument and unrecognised tags', () => {
   const documentWith = (node: Partial<ComponentNode>): FormDocument => ({
     ...createDocument('Contact', 'doc'),
@@ -1323,19 +1140,10 @@ describe('validateDocument and unrecognised tags', () => {
   })
 })
 
-/**
- * The gate looks at the whole document, not at the parts that were easy.
- *
- * `validateDocument` checked keys, actions and languages, and said nothing about
- * `props`, `renderWhen`'s payload, `schema.validations`' payloads, `version`,
- * `settings` or `css`. Every one of those is read at render time without a
- * guard in front of it, and a document is data: it is authored by one person,
- * stored by another, and hand-editable in between.
- *
- * The rule these tests hold the gate to is narrow and worth stating. It refuses
- * what is **malformed**, meaning a shape no version of this library ever wrote.
- * It does not refuse what is merely unusual, because a gate that rejects a
- * document somebody is holding is worse than the render it was protecting.
+/*
+ * The gate refuses what is malformed (a shape no version of this library wrote),
+ * not what is merely unusual: refusing a document somebody holds is worse than
+ * the render it protects.
  */
 describe('validateDocument over the whole document', () => {
   const docWith = (patch: Record<string, unknown>): FormDocument => ({
@@ -1421,8 +1229,6 @@ describe('validateDocument over the whole document', () => {
     })
 
     it('accepts a static binding holding any JSON at all', () => {
-      // `static` is the one kind whose payload is unconstrained, deliberately: a
-      // prop can be a list of options or a nested object, and the kit decides.
       for (const value of ['x', 7, true, null, [1, 2], { a: { b: 'c' } }]) {
         expect(codes(nodeWith({ props: { label: { kind: 'static', value } } }))).toEqual([])
       }
@@ -1479,8 +1285,6 @@ describe('validateDocument over the whole document', () => {
     })
 
     it('reaches a condition nested inside a group', () => {
-      // The recursion is the point. A malformed condition three levels down is
-      // exactly as reachable at render time as one at the top.
       expect(
         codes(
           renderWhen({
@@ -1506,8 +1310,6 @@ describe('validateDocument over the whole document', () => {
     })
 
     it('rejects a rule whose parameter is the wrong kind of thing', () => {
-      // `minLength` compares with `<`, so a string bound silently compares
-      // lexicographically; `pattern` is handed to RegExp.
       const rule = (r: unknown): FormDocument =>
         nodeWith({ schema: { type: 'string', validations: [r] } })
 
@@ -1561,12 +1363,6 @@ describe('validateDocument over the whole document', () => {
     })
 
     it('does not refuse CSS that `safeDeclarations` will drop', () => {
-      /*
-       * A separate judgement on purpose. Text holding a brace is refused at
-       * render time and reported in the Style tab, and a document carrying it
-       * still opens and can be fixed. Refusing it here would make the panel that
-       * exists to repair such a document the one place you cannot load it.
-       */
       expect(codes(nodeWith({ css: { any: 'color: red}html{display:none}' } }))).toEqual([])
     })
   })
@@ -1598,10 +1394,6 @@ describe('validateDocument over the whole document', () => {
   })
 })
 
-/**
- * Four ways the tree treated a duplicate key, or a key literal, as somebody
- * else's problem.
- */
 describe('the tree and keys that repeat or are quoted', () => {
   const node = (key: string, children?: ComponentNode[]): ComponentNode => ({
     key,
@@ -1618,14 +1410,6 @@ describe('the tree and keys that repeat or are quoted', () => {
   })
 
   it('updates the first match only, like every read path', () => {
-    /*
-     * `findNode`, `findParent` and `pathTo` all deliberately take the first
-     * match, with a comment saying why: two functions disagreeing about which
-     * node a key means is a bug whichever answer is right. The three mutators
-     * acted on *every* match, so with duplicate keys an edit landed twice —
-     * and `moveNode` composes remove and insert, so one node ended up at two
-     * places in the tree.
-     */
     const next = updateNode(twice(), 'same', (n) => ({ ...n, type: 'Changed' }))
     const kinds = (next.children ?? []).map((c) => c.type)
 
@@ -1634,23 +1418,9 @@ describe('the tree and keys that repeat or are quoted', () => {
 
   it('stops at the first match even when that update changes nothing', () => {
     /*
-     * The case the test above cannot see, and the one the `found` flag exists
-     * for.
-     *
-     * `updateNode` documents the distinction itself: it stopped at the first
-     * child whose subtree came back a *different object*, so an update that
-     * returns its input unchanged left the flag down and the walk carried on
-     * into the next sibling. Every `updateNode` call in this repository's tests
-     * either mutates the node or targets a missing key -- so restoring the
-     * pre-fix `changed`-only implementation left all six of them green.
-     *
-     * A controlled property editor writing the value the node already holds is
-     * exactly this: a no-op update, on every keystroke that does not change
-     * anything. With a duplicate key -- which `validateDocument` reports and
-     * cannot prevent -- the second node was silently edited instead.
-     *
-     * Observed through identity rather than through a value, because a no-op
-     * update by definition leaves no value to look at.
+     * What `updateNode`'s `found` flag is for: a no-op update (a controlled
+     * editor rewriting the same value) must still stop at the first match.
+     * Observed through identity, since a no-op leaves no value to compare.
      */
     const before = twice()
     const seen: ComponentNode[] = []
@@ -1683,8 +1453,6 @@ describe('the tree and keys that repeat or are quoted', () => {
   })
 
   it('still edits a unique key wherever it is', () => {
-    // The control. Stopping at the first match must not mean stopping at the
-    // first child: the node may be anywhere in the tree.
     const deep: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -1697,13 +1465,6 @@ describe('the tree and keys that repeat or are quoted', () => {
   })
 
   it('re-points a duplicated node at its own key', () => {
-    /*
-     * `Step` ships with a `renderWhen` naming its own key, which is what makes
-     * it a step. Duplicating one copied the condition by reference, so the copy
-     * was shown by the *original's* name: two steps render at once and the copy
-     * can never be reached. `factory.ts` applies `defaultRenderWhen(node.key)`
-     * after the key for exactly this reason.
-     */
     const stepped: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -1727,12 +1488,6 @@ describe('the tree and keys that repeat or are quoted', () => {
     }
 
     const copy = duplicateNode(stepped, 'step1')
-    /*
-     * `step2`, not `step`. The name is taken from the source's own number
-     * upwards, so a copy is never named below the thing it was copied from --
-     * duplicating `step1` used to produce `step` whenever `step` happened to be
-     * free, which reads as the original coming back rather than as a copy.
-     */
     expect(copy?.key).toBe('step2')
 
     const when = copy?.renderWhen
@@ -1742,8 +1497,6 @@ describe('the tree and keys that repeat or are quoted', () => {
   })
 
   it('leaves a condition that names something else alone', () => {
-    // The control. Rewriting every literal that happens to match would corrupt
-    // a condition testing an unrelated field whose value is the copied key.
     const guarded: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -1766,16 +1519,8 @@ describe('the tree and keys that repeat or are quoted', () => {
   })
 })
 
-/**
- * Two lookups in `validateDocument` that read through the prototype.
- */
 describe('validateDocument and inherited properties', () => {
   it('reports an action reference naming something only Object has', () => {
-    /*
-     * `actions[name] === undefined` finds `Object.prototype.toString`, so an
-     * event referencing `toString` passed the unknown-action check and named an
-     * action the document does not have.
-     */
     const doc = {
       ...createDocument('Contact', 'doc'),
       root: {
@@ -1819,13 +1564,6 @@ describe('validateDocument and inherited properties', () => {
   })
 
   it('reads an empty dialect the way languageTag does', () => {
-    /*
-     * The gate spelled the rule out as `typeof dialect === 'string'`, which is
-     * true for `''`, so it computed `en-` and compared that against
-     * `defaultLanguage`. `languageTag` uses truthiness and answers `en`. A
-     * document with an empty dialect validated clean and then had no resolvable
-     * default language at runtime.
-     */
     const doc = {
       ...createDocument('Contact', 'doc'),
       languages: [{ code: 'en', dialect: '', name: 'English', bidi: 'ltr' }],
@@ -1836,18 +1574,6 @@ describe('validateDocument and inherited properties', () => {
   })
 })
 
-/**
- * A context path that can never resolve.
- *
- * `contextKeys` skips an empty path, deliberately — it is not a path, and
- * `missingContext` returns a list of paths, so an empty entry in it would be a
- * host's problem rather than an answer. But skipping it meant nothing reported
- * it at all, and a `context` operand with an empty path reads `undefined`
- * forever: its condition is permanently false and its component permanently
- * unvalidated.
- *
- * So the gate refuses it, which is where a document that cannot work belongs.
- */
 describe('validateDocument and an unusable context path', () => {
   const reading = (path: unknown): FormDocument =>
     ({
@@ -1883,24 +1609,11 @@ describe('validateDocument and an unusable context path', () => {
   })
 
   it('accepts a path the host may or may not supply', () => {
-    /*
-     * The control, and the line this draws. Whether the *host* holds
-     * `user.role` is `missingContext`'s question, asked at that host's startup
-     * against its own context. Whether the document said anything at all is
-     * this one.
-     */
+    // Whether the host holds the path is `missingContext`'s question, not the gate's.
     expect(validateDocument(reading('user.role'))).toEqual([])
   })
 })
 
-/**
- * A document nested deeper than the stack.
- *
- * `validateDocument`'s own walk and `rowScopeProblems` both recurse over
- * `children` with no bound, in the function whose entire job is to be the thing
- * that never throws on a document. A `RangeError` here is the gate failing in
- * the one way it exists to prevent.
- */
 describe('validateDocument and a document nested too deep', () => {
   const deep = (n: number): FormDocument => {
     let node: ComponentNode = { key: 'leaf', type: 'TextField', props: {} }
@@ -1919,21 +1632,10 @@ describe('validateDocument and a document nested too deep', () => {
   })
 
   it('still walks a document anybody would build', () => {
-    // The control. A bound low enough to catch real nesting would refuse
-    // documents that work, which is worse than the crash.
     expect(validateDocument(deep(30))).toEqual([])
   })
 })
 
-/**
- * Two components that submit the same answer, in the exported schema.
- *
- * Sharing a `dataKey` is deliberate and documented: two fields behind opposite
- * guards write one answer. The export visited them in order and let the last
- * win, so the first component's type, format and constraints were discarded
- * with nothing reported — and `unexportableRules`, which exists to say what the
- * export could not carry, said nothing.
- */
 describe('toJsonSchema and a shared data key', () => {
   const shared = (): FormDocument =>
     ({
@@ -1966,30 +1668,12 @@ describe('toJsonSchema and a shared data key', () => {
   })
 })
 
-/**
- * A schema with no `validations` at all.
- *
- * `validateDocument` accepts one -- `validations === undefined` returns early
- * from its schema check, deliberately, because a field with no rules is an
- * ordinary field and demanding `validations: []` would refuse hand-written
- * documents for nothing. The type said `ValidationRule[]`, required, so every
- * reader was written as though the array were always there.
- *
- * Three of them were not guarded. `duplicateNode` spread it, which is the
- * finding the review made; `validateField` and `toJsonSchema` iterated it, which
- * are the two twins, and the first of those is the validation path itself. So a
- * document the gate calls valid threw a `TypeError` out of the duplicate action,
- * out of `validateForm`, and out of the schema export.
- *
- * Ten other readers already guarded with `Array.isArray`, which is what made
- * this look handled.
+/*
+ * The gate accepts a schema with no `validations` (a field with no rules is
+ * ordinary), so every reader must guard the array.
  */
 describe('a field whose schema has no validations', () => {
-  /*
-   * Built as JSON and cast, because that is how it arrives: from a file, a
-   * paste into the JSON dialog, or a request body. A fixture that could only be
-   * built by defeating the type checker is still a fixture the product receives.
-   */
+  // Built as JSON and cast: that is how a document arrives.
   const document_ = (): FormDocument =>
     JSON.parse(
       JSON.stringify({
@@ -2017,8 +1701,6 @@ describe('a field whose schema has no validations', () => {
   })
 
   it('can be validated', () => {
-    // The worst of the three. A document the gate called valid took the whole
-    // submit down, on the server, with a TypeError.
     const root = document_().root
     expect(() => validateForm(root, {})).not.toThrow()
     expect(validateForm(root, {})).toEqual({})
@@ -2031,11 +1713,7 @@ describe('a field whose schema has no validations', () => {
   })
 
   it('is still read as having no rules when the field holds something that is not a list', () => {
-    /*
-     * The other half, and the reason the fix reads the value rather than merely
-     * defaulting it. A document is data, so `validations` can be a string, and
-     * `?? []` would let that through to a `for...of` that throws on it.
-     */
+    // A string `validations` would pass `?? []`, so readers check `Array.isArray`.
     const doc = JSON.parse(
       JSON.stringify({
         ...createDocument('Not a list', 'not-a-list'),
@@ -2061,15 +1739,6 @@ describe('a field whose schema has no validations', () => {
   })
 })
 
-/**
- * What a copy is called when the source already carries a number.
- *
- * `baseOf` strips the trailing digits and `freeKey` returned the bare base
- * whenever nothing had taken it -- so in a document where `website` was renamed
- * away and `website2` remains, duplicating `website2` produced `website`. A
- * copy named below its source contradicts the rule `duplicateNode`'s own
- * docstring states, and reads as the original having been restored.
- */
 describe('naming a copy of a copy', () => {
   const withKeys = (...keys: string[]): ComponentNode =>
     container(
@@ -2087,21 +1756,12 @@ describe('naming a copy of a copy', () => {
   })
 
   it('still numbers a copy of an unnumbered key from two', () => {
-    // The ordinary case, unchanged: `website` copies to `website2`.
     expect(duplicateNode(withKeys('website'), 'website')?.key).toBe('website2')
     expect(duplicateNode(withKeys('website', 'website2'), 'website')?.key).toBe('website3')
   })
 })
 
-/**
- * A node whose key is unusable is still a node worth reading.
- *
- * `visitShape` and `visitEvents` sat inside the final `else` of the key chain,
- * so a component with an empty or non-string key had its props, conditions,
- * css and rules go unchecked. Fixing the key then produced a second round of
- * errors about a document the first report had already called broken -- and a
- * host gating on `validateDocument` sees one problem at a time.
- */
+// A node with an unusable key still has its shape checked, so one pass reports everything.
 describe('validateDocument and a node with no usable key', () => {
   const broken = (key: unknown): FormDocument => ({
     ...createDocument('Broken', 'broken'),
@@ -2119,13 +1779,11 @@ describe('validateDocument and a node with no usable key', () => {
   ])('reports the misspelled binding as well as %s', (_what, key) => {
     const codes = validateDocument(broken(key)).map((problem) => problem.code)
 
-    // Both, in one pass. The key problem was the only one reported.
     expect(codes.length).toBeGreaterThan(1)
     expect(codes.some((code) => code === 'malformed')).toBe(true)
   })
 
   it('still reports nothing for a node that is fine', () => {
-    // The control: reading the shape of every node must not invent problems.
     const fine: FormDocument = {
       ...createDocument('Fine', 'fine'),
       root: {
@@ -2140,16 +1798,6 @@ describe('validateDocument and a node with no usable key', () => {
   })
 })
 
-/**
- * `flatten` and `walk`, in the package that owns them.
- *
- * Both are exported from `tree.ts` and neither was imported by this file:
- * `flatten`'s `parentKey`/`index`/`depth` contract was pinned only in
- * `packages/designer/src/keyboard.test.ts`, so core's own traversal was
- * described by a test in another package that could be deleted with core's
- * suite staying green -- and `walk` is what `styleSheetFor`,
- * `unexportableRules` and `collectKeys` all traverse with.
- */
 describe('flatten', () => {
   it('reports every node with its parent, index and depth, in document order', () => {
     expect(flatten(fixture())).toEqual([
@@ -2187,21 +1835,8 @@ describe('walk', () => {
 
 describe('the lookup and mutation family on a document nothing gated', () => {
   /*
-   * The malformed-shape rows `walk` has had for a while and its six neighbours
-   * never borrowed.
-   *
-   * `store.ts` deliberately only `console.warn`s an invalid `initialDocument`,
-   * arguing that a library which will not open a host's own saved document is
-   * worse than one that opens it and says what is wrong. That is a good
-   * decision and it makes every function here load-bearing: `flatten` runs in
-   * `Tree.tsx`'s render body, and a throw during render unmounts the whole
-   * designer in React 19 -- including the JSON dialog that was the repair
-   * route. `flatten` is not designer-only either: `autoValidateKeys` walks the
-   * public tree with it.
-   *
-   * No source change was needed for any of these to throw. `children: {}` and
-   * `children: "ab"` are not nullish, so `?? []` and `?.forEach` let them
-   * through.
+   * `store.ts` only warns on an invalid `initialDocument`, so these run on
+   * ungated documents, some during render, where a throw unmounts the designer.
    */
   const broken = (children: unknown): ComponentNode =>
     ({ key: 'root', type: 'Screen', props: {}, children }) as unknown as ComponentNode
@@ -2233,12 +1868,7 @@ describe('the lookup and mutation family on a document nothing gated', () => {
   })
 
   it('and none of them is bounded only by the stack', () => {
-    /*
-     * `walk` is depth-bounded and its comment calls it "the walk every other
-     * module borrows". These six were not, so a document nested past the stack
-     * was a RangeError out of a render body or an event handler. Built with a
-     * loop; building it recursively would overflow before the assertion could.
-     */
+    // Built with a loop: building it recursively would overflow first.
     let deep: ComponentNode = { key: 'leaf', type: 'Field', props: {} }
     for (let i = 0; i < 50_000; i += 1) {
       deep = { key: 'box' + String(i), type: 'Screen', props: {}, children: [deep] }
@@ -2251,16 +1881,8 @@ describe('the lookup and mutation family on a document nothing gated', () => {
 
   it('duplicates a malformed children value without changing its shape', () => {
     /*
-     * `if (node.children)` is truthy for a non-array, so `children: {}` was
-     * silently coerced into `children: []` on the copy -- a *different*
-     * malformed document rather than the same one, and unlike `updateNode` and
-     * `removeNode`, which leave a non-array `children` exactly as they found
-     * it. Raised in review on PR #42.
-     *
-     * A copy differs from its source in its keys and in nothing else, and a
-     * document this shape is one somebody is about to repair -- where a copy
-     * that quietly differs from what they are looking at is the worst thing to
-     * hand them.
+     * A copy differs from its source only in its keys, so a malformed `children`
+     * is carried over as is, the way `updateNode` and `removeNode` leave it.
      */
     for (const children of [{}, 'ab', 5]) {
       const source = { key: 'odd', type: 'Field', props: {}, children } as unknown as ComponentNode
@@ -2278,11 +1900,6 @@ describe('the lookup and mutation family on a document nothing gated', () => {
   })
 
   it('trims a copied key that would exceed the length bound', () => {
-    /*
-     * Duplicating a component with a 128-character key appends a number, so the
-     * copy has to come out trimmed or `validateDocument` reports it as
-     * `invalid-key`.
-     */
     const long = 'a'.repeat(MAX_KEY_LENGTH)
     const root: ComponentNode = {
       key: 'root',
@@ -2300,12 +1917,6 @@ describe('the lookup and mutation family on a document nothing gated', () => {
   })
 
   it('keeps trimming until it finds a free one', () => {
-    /*
-     * The loop, not only the first trim. Two long keys whose trimmed forms
-     * would collide have to end up distinct, or duplicating twice mints a
-     * document with a duplicate key -- which `updateNode` then resolves to the
-     * first match forever after.
-     */
     const long = 'b'.repeat(MAX_KEY_LENGTH)
     let root: ComponentNode = {
       key: 'root',
@@ -2328,8 +1939,6 @@ describe('the lookup and mutation family on a document nothing gated', () => {
   })
 
   it('still copies a real list of children', () => {
-    // The control. Carrying every `children` through untouched would pass the
-    // row above while leaving the copy's descendants sharing the source's keys.
     const root: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -2351,10 +1960,6 @@ describe('the lookup and mutation family on a document nothing gated', () => {
   })
 
   it('still walks a document that is fine', () => {
-    /*
-     * The control. Guarding by returning nothing would pass every row above
-     * while breaking the panel, so each call is checked against a real answer.
-     */
     const root: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -2372,21 +1977,8 @@ describe('the lookup and mutation family on a document nothing gated', () => {
 
 describe('the gate branches nothing ever drove', () => {
   /*
-   * Four `malformed(...)` calls in `validateDocument` that no test in this
-   * repository reaches.
-   *
-   * The nearest thing was a test building the exact document one of them has a
-   * branch for -- `schema.validations: 'required'` -- and asserting only that
-   * three consumers do not throw, never that the gate reports it. A repo-wide
-   * grep for the message string found nothing. Delete any one of these four
-   * calls and the whole suite stays green, which makes the gate's report a
-   * claim nothing checks.
-   *
-   * Asserted on the message, not only on the code: `malformed` is the code all
-   * four share, so a `codes.some(c => c === 'malformed')` assertion is
-   * satisfied by whichever other problem the fixture happens to have. That is
-   * the shape of the `key: 42` row elsewhere in this file, where the key error
-   * is itself coded `malformed` and only the length check does any work.
+   * Asserted on the message: all four share the code `malformed`, which any
+   * other problem in the fixture would also satisfy.
    */
   const doc = (root: unknown): FormDocument =>
     ({ ...createDocument('Gate', 'gate'), root }) as unknown as FormDocument
@@ -2433,8 +2025,6 @@ describe('the gate branches nothing ever drove', () => {
   })
 
   it('says nothing about a document that is fine', () => {
-    // The control. A gate that reported on everything would pass every row
-    // above while refusing every real document.
     expect(validateDocument(doc(node({ children: [] })))).toEqual([])
   })
 })
@@ -2451,16 +2041,6 @@ describe('invariant 4 on the operations that had no assertion for it', () => {
   })
 
   it('moveNode leaves its input alone on a move that succeeds', () => {
-    /*
-     * `insertNode`, `removeNode` and `updateNode` each pin invariant 4 and
-     * `moveNode` had no immutability assertion at all -- the operation that
-     * composes remove-then-insert, and the one drag-and-drop calls. Undo holds
-     * references to prior documents, so a mutation here is an undo that
-     * silently does nothing.
-     *
-     * On a *successful* move specifically: a refused move returns the same root
-     * and would satisfy any comparison trivially.
-     */
     const before = tree()
     const snapshot = JSON.stringify(before)
 
@@ -2471,13 +2051,6 @@ describe('invariant 4 on the operations that had no assertion for it', () => {
   })
 
   it('duplicateNode does not alias the records it copies', () => {
-    /*
-     * The existing assertion compares JSON before and after on a fixture whose
-     * nodes carry no `css`, `events`, `schema` or nested props -- none of the
-     * records `duplicateNode` actually copies -- so it is the one invariant-4
-     * check for this function and it cannot observe aliasing. This fixture
-     * carries all four and mutates the copy.
-     */
     const source: ComponentNode = {
       key: 'rich',
       type: 'Field',
@@ -2492,17 +2065,6 @@ describe('invariant 4 on the operations that had no assertion for it', () => {
     if (!copy) throw new Error('nothing was duplicated')
     expect(copy.key, 'the copy kept its source key').not.toBe('rich')
 
-    /*
-     * Every record is asserted present *before* it is mutated, and mutated
-     * without optional chaining.
-     *
-     * The first version used `copy?.events?.onChange?.push(...)`, so if a
-     * record had not been copied at all the mutation was a silent no-op and the
-     * source was unchanged for the wrong reason -- the test passed while
-     * proving nothing about aliasing. Raised in review on PR #43, and it is the
-     * exact shape this run keeps finding: an assertion that cannot fail because
-     * the thing it acts on is not there.
-     */
     const events = copy.events?.onChange
     const validations = copy.schema?.validations
     const css = copy.css

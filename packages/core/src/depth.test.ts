@@ -1,22 +1,9 @@
 /**
  * Every recursive walker that crosses a condition, driven past its bound.
  *
- * One walker was bounded and the five beside it were not. `evaluate` counted
- * depth through `not` and dropped it through `and` and `or`; `same` counted it
- * through objects and dropped it through arrays; `validateDocument`'s outer
- * `visit` had `MAX_TREE_DEPTH` and the condition walker nested inside it, in the
- * function documented as total, had nothing. So the existing depth tests were
- * green while five of six branches an author's nesting actually goes through
- * were unbounded — `condition.test.ts` nested only `not`, which is the one
- * recursion that already propagated depth.
- *
- * A document is data. The nesting is whatever somebody stored, and a
- * `RangeError` out of any of these is an unhandled 500 on submit or a blank form
- * in the browser. Each row below drives one walker through the branch that
- * lacked the bound and asserts it reports something rather than throwing.
- *
- * Table-driven on purpose. A sixth walker added later is a row, and a row that
- * is not added is a hole somebody can see.
+ * A document's nesting is whatever somebody stored, and a `RangeError` out of
+ * any of these is an unhandled 500 on submit or a blank form in the browser. A
+ * new walker that crosses a condition gets a row here.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -29,50 +16,30 @@ import { rowScopeProblems } from './rows.js'
 import { TOO_DEEP, submittedData, validateForm } from './validation.js'
 
 /*
- * Far past the bound and far past the stack. The same figure `condition.test.ts`
- * already uses, which is known to produce a `RangeError` on every one of these
- * walkers when they are unbounded.
+ * Far past the stack, not just past the bound: a thousand-deep structure does
+ * not overflow, so an unbounded walker would still pass `not.toThrow()`.
  */
 const DEPTH = 50_000
 
-/** `[[[…1…]]]`, n deep. Built with a loop, or building it would overflow too. */
+// Built with a loop, or building it would overflow too.
 const deepList = (n: number): JsonValue => {
   let value: JsonValue = 1
   for (let i = 0; i < n; i += 1) value = [value]
   return value
 }
 
-/** `and(and(and(…)))`, n deep, ending on something readable. */
 const deepAnd = (n: number): Condition => {
   let condition: Condition = { op: 'truthy', value: { kind: 'literal', value: true } }
   for (let i = 0; i < n; i += 1) condition = { op: 'and', conditions: [condition] }
   return condition
 }
 
-/** `or(or(or(…)))`, the other half of the branch that dropped its depth. */
 const deepOr = (n: number): Condition => {
   let condition: Condition = { op: 'truthy', value: { kind: 'literal', value: true } }
   for (let i = 0; i < n; i += 1) condition = { op: 'or', conditions: [condition] }
   return condition
 }
 
-/**
- * A chain of nested containers, n deep, each one guarded by a condition.
- *
- * The other builders in this file nest a *condition*; this one nests the tree,
- * because the walker it drives recurses over children and calls `isVisible` --
- * and so crosses a condition -- on every level. Built with a loop for the same
- * reason as the rest: building it recursively would overflow before the test
- * could.
- *
- * Driven at `DEPTH`, the same 50 000 the rest of this file uses, and not at
- * some smaller number just past `MAX_TREE_DEPTH`. That distinction is the whole
- * point of this file: a thousand-deep tree does not overflow the stack, so a
- * row built at that depth passes `not.toThrow()` whether or not the walker is
- * bounded, and proves only that the bound's *message* appears. Measured while
- * writing this -- deleting `submittedData`'s bound left the first version of
- * these rows green.
- */
 const deepTree = (n: number): ComponentNode => {
   let node: ComponentNode = {
     key: 'leaf',
@@ -94,19 +61,11 @@ const guardedBy = (key: string, condition: Condition): ComponentNode => ({
   schema: { type: 'string', validations: [] },
 })
 
-/*
- * Through the factory. A hand-written envelope is trap 5 -- a fixture shaped
- * more simply than anything the product builds -- and it showed up immediately:
- * the first version of this file quoted `version: 1` where `createDocument`
- * writes `'1'`, so `validateDocument` reported three envelope problems that had
- * nothing to do with depth.
- */
 const documentOf = (root: ComponentNode): FormDocument => ({
   ...createDocument('Deep', 'deep'),
   root,
 })
 
-/** Which nodes `rowScopeProblems` named, and whether it said why. */
 const reported = (result: unknown): { keys: string[]; said: boolean } => {
   const problems = result as { key: string; problem: string }[]
   return {
@@ -116,13 +75,9 @@ const reported = (result: unknown): { keys: string[]; said: boolean } => {
 }
 
 interface Walker {
-  /** The function, and the branch that had no bound. */
   name: string
-  /** Drive it past the bound. A throw here is the defect this row is about. */
   drive: () => unknown
-  /** The result cut down to the fact this row is about. */
   read: (result: unknown) => unknown
-  /** What a bounded walker answers instead of throwing. */
   answer: unknown
 }
 
@@ -130,21 +85,15 @@ const WALKERS: Walker[] = [
   {
     name: 'same, through a list inside a list',
     drive: () => same(deepList(DEPTH), deepList(DEPTH)),
-    /*
-     * Two distinct structures, not one value compared with itself, or the
-     * `a === b` line above the bound would answer before recursing and the row
-     * would prove nothing. Past the bound they are not equal, which is what
-     * `same` already documents: refusing to answer would make `ne` true and show
-     * a component whose rule could not be read.
-     */
+    // Two distinct structures: one value compared with itself would hit
+    // `a === b` before recursing.
     read: (result) => result,
     answer: false,
   },
   {
     name: 'evaluate, through and',
     drive: () => evaluateCondition(deepAnd(DEPTH), {}),
-    // Unreadable, which the boundary turns into false: hidden is what this
-    // project says about a rule it cannot evaluate.
+    // An unreadable rule evaluates to false, which hides the component.
     read: (result) => result,
     answer: false,
   },
@@ -202,11 +151,8 @@ const WALKERS: Walker[] = [
         'before',
         'after',
       ),
-    /*
-     * The shallow half still gets rewritten. Bounding a walker by making it stop
-     * doing its job would be a second bug wearing the fix's clothes, so the row
-     * reads back the rename it exists to perform.
-     */
+    // Reads back the shallow rename: a walker bounded by doing nothing would
+    // also not throw.
     read: (result) => {
       const value = result as PropValue & { condition: { conditions: Condition[] } }
       return (value.condition.conditions[0] as { right: { value: string } }).right.value
@@ -246,23 +192,6 @@ const WALKERS: Walker[] = [
     read: (result) => reported(result),
     answer: { keys: ['loose'], said: true },
   },
-  /*
-   * The walker on the submit path, which was missing from this table.
-   *
-   * This file states its own completeness rule -- "a row that is not added is a
-   * hole somebody can see" -- and the hole was the one walk that runs on a
-   * server against a body somebody else chose the shape of. `validateForm`'s
-   * `visit` was declared `(node, scope)` with no depth parameter at all, while
-   * `walk`, `contextKeys`, `objectFor`, `keyScopesFor` and `submittedData`
-   * beside it all check `depth > MAX_TREE_DEPTH`. It belongs here by this
-   * file's own criterion: it calls `isVisible` on every node, so it crosses a
-   * condition on every level.
-   *
-   * It answers rather than throwing, and what it answers is a refusal -- see
-   * `TOO_DEEP`. Returning silently would leave every field past the bound
-   * unchecked and the submit successful, which is the permissive failure the
-   * whole package is organised against.
-   */
   {
     name: 'validateForm, through a tree deeper than the bound',
     drive: () => validateForm(deepTree(DEPTH), {}),
@@ -272,11 +201,8 @@ const WALKERS: Walker[] = [
   {
     name: 'submittedData, through the same tree',
     drive: () => submittedData(deepTree(DEPTH), {}),
-    /*
-     * The projection stops rather than refusing, which is the difference the
-     * two docblocks now spell out. Read as "it returned an object" rather than
-     * as a specific payload: what matters here is that it did not throw.
-     */
+    // The projection stops rather than refusing, so there is no payload to
+    // assert beyond "it returned an object".
     read: (result) => typeof result === 'object' && result !== null,
     answer: true,
   },
@@ -291,11 +217,6 @@ describe('a recursive walker driven past its bound', () => {
   })
 
   it('still walks everything a person would author', () => {
-    /*
-     * The control, and the reason the bound is 200 rather than 20. A limit low
-     * enough to catch real authoring would be worse than the crash: conditions
-     * would silently stop being read and components would silently disappear.
-     */
     expect(evaluateCondition(deepAnd(MAX_CONDITION_DEPTH - 1), {})).toBe(true)
     expect(same(deepList(MAX_CONDITION_DEPTH - 1), deepList(MAX_CONDITION_DEPTH - 1))).toBe(true)
     expect(

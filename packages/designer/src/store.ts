@@ -1,11 +1,7 @@
 /**
- * Designer state: the document, the selection, and the undo stack.
- *
- * History is a past/present/future triple over whole documents. Snapshots are
- * cheap because every tree operation in @willowforms/core is immutable and shares
- * structure with the previous version, so an edit deep in the tree allocates
- * only its own ancestors. The stack is capped; an unbounded undo history is a
- * memory leak that only shows up in long authoring sessions.
+ * Undo snapshots whole documents, which is cheap only because core tree
+ * operations share structure (invariant 4). The stack is capped because an
+ * unbounded history leaks memory in long sessions.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -52,30 +48,20 @@ interface History {
   past: FormDocument[]
   present: FormDocument
   future: FormDocument[]
-  /**
-   * What produced `present`. Consecutive edits sharing a label are folded into
-   * one entry, so typing a label is one undo step rather than one per keystroke.
-   */
+  /** An edit with the same label as `present` replaces it, so a run of typing is one undo step. */
   label?: string
 }
 
 function commit(history: History, next: FormDocument, label?: string): History {
   if (next === history.present) return history
 
-  // Same label as the version already on top: replace it rather than stack on it.
   if (label !== undefined && history.label === label) {
     return { past: history.past, present: next, future: [], label }
   }
 
   const past = [...history.past, history.present]
   return {
-    /*
-     * `MAX_HISTORY` past documents, plus the present one.
-     *
-     * The specification said "the last hundred documents" and this keeps a
-     * hundred *edits* to go back through, which is one more document in memory
-     * and the number a person counts. `12-api.md` says that now.
-     */
+    // `MAX_HISTORY` past documents plus the present one: docs/spec/12-api.md#undo.
     past: past.length > MAX_HISTORY ? past.slice(past.length - MAX_HISTORY) : past,
     present: next,
     future: [],
@@ -185,23 +171,10 @@ export interface DesignerApi {
 }
 
 /**
- * Where a component dropped "onto" this key actually goes.
- *
- * `insertNode` gives `children` to whatever it is pointed at, so nesting a
- * component inside a leaf produces a subtree no renderer draws — while
- * `validateForm` and `toJsonSchema` still walk it, so it adds a required field
- * nobody can fill in. Every other insertion path already refused that:
- * `dnd.ts` skips a non-container drop target and `keyboard.ts` refuses to move
- * right into one. The palette's click did not.
- *
- * Refusing is the wrong answer here, though. Clicking a palette entry and
- * having nothing happen is the dead control this project treats as the worst
- * failure, so this walks out to the nearest ancestor that can hold children —
- * which is what an author selecting a field and adding a component means.
- *
- * Whether a node can hold children is asked of the node. A container is
- * instantiated with `children: []` and a leaf is not, so no kit is needed:
- * the same "recognise it from the node" rule `isRowScope` follows.
+ * The nearest node at or above `key` that can hold children. `insertNode` would
+ * give a leaf children no renderer draws, and refusing would make the palette
+ * click a dead control. A container is the node with a `children` array, so no
+ * kit is needed.
  */
 function containerFor(root: ComponentNode, key: string | undefined): string {
   if (key === undefined) return root.key
@@ -218,11 +191,8 @@ function containerFor(root: ComponentNode, key: string | undefined): string {
 }
 
 /**
- * How a visibility rule is *shaped*, for the undo label.
- *
- * The operator and how many clauses hang off it. Two edits that leave both alone
- * are somebody typing; one that changes either is a different decision, and the
- * two must not share a history entry.
+ * Operator and clause count, for the undo label: an edit that changes either
+ * starts a new undo entry instead of folding into a run of typing.
  */
 function conditionShape(value: PropValue | undefined): string {
   if (!value || value.kind !== 'condition') return ''
@@ -242,16 +212,8 @@ function writeNode(
     updateNode(doc.root, key, (node) => {
       const next = update(node)
       /*
-       * `same`, which is core's deep equality, not `JSON.stringify` on both
-       * sides.
-       *
-       * A `ComponentNode` is built by spreading -- `{ ...node, dataKey }` puts
-       * the new key last, `{ dataKey, ...node }` puts it first -- so two nodes
-       * that are equal in every value could serialise differently, and a no-op
-       * edit then took an undo slot and rebuilt every ancestor. `stringify` also
-       * drops `undefined` values, so it cannot tell an absent property from one
-       * holding `undefined`, which `exactOptionalPropertyTypes` makes a real
-       * distinction in this codebase.
+       * `same`, not `JSON.stringify`: spreads put keys in different orders, and
+       * stringify cannot tell an absent property from one holding `undefined`.
        */
       return same(next as unknown as JsonValue, node as unknown as JsonValue) ? node : next
     }),
@@ -354,16 +316,9 @@ export function useDesigner(initial: FormDocument): DesignerApi {
    * an effect rather than during render, for the reason `drag.ts` gives.
    */
   /*
-   * A host's own document, checked once and said out loud.
-   *
-   * The only in-repo write path is gated by `validateDocument` — the JSON
-   * dialog refuses anything that would crash the renderer — and a document
-   * restored from a host's storage goes through no gate at all. Duplicate keys
-   * then make every tree operation edit the first match, silently.
-   *
-   * A warning rather than a refusal: a library that will not open a host's own
-   * saved document is worse than one that opens it and says what is wrong, and
-   * the designer is where somebody goes to repair it.
+   * A host's document skips the `validateDocument` gate pasted JSON passes, so
+   * it is checked once per mount. A warning, not a refusal: the designer is
+   * where somebody repairs a broken document.
    */
 
   const mountedWith = useRef(initial)
@@ -391,12 +346,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
   }, [])
 
   /**
-   * Every other edit, decided out here for the same reason.
-   *
-   * This ran `mutate` inside the updater, so it never advanced the ref -- and a
-   * `setProp` followed by an `addComponent` in one tick therefore left the
-   * insert deciding against a document that no longer existed. `mutate` is pure
-   * by contract, so running it out here changes nothing about what is written.
+   * Runs `mutate` outside the state updater so `latest` advances before the
+   * next write in the same tick. `mutate` must be pure.
    */
   const apply = useCallback(
     (mutate: (doc: FormDocument) => FormDocument, label?: string) => {
@@ -445,7 +396,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         (doc) =>
           writeNode(doc, key, (node) => {
             const props = { ...node.props }
-            // Clearing a property removes it so the component default applies again.
             if (value === undefined) delete props[name]
             else props[name] = value
             return { ...node, props }
@@ -463,23 +413,13 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         (doc) =>
           writeNode(doc, key, (node) => {
             if (!schema) {
-              // exactOptionalPropertyTypes: an absent schema is an absent key,
-              // not a key holding undefined.
               const { schema: _dropped, ...rest } = node
               return rest
             }
             return { ...node, schema }
           }),
-        /*
-         * The rule keys too, for the reason above. Every write on the Rules tab
-         * shared one label, so adding a rule folded into the preceding run of
-         * typing and one undo took away both -- the rule and the message being
-         * typed into the rule before it.
-         *
-         * Typing a rule's value leaves the set of rules alone and still
-         * coalesces. Adding or removing one changes it, which is what starts a
-         * new entry.
-         */
+        // Rule keys are in the label, so adding or removing a rule starts a new
+        // undo entry while typing a rule's value still folds.
 
         'schema:' +
           key +
@@ -527,12 +467,7 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         const first = languages[0]
         if (!first) return doc
 
-        /*
-         * Compared as BCP 47 tags, not bare codes. A document's default is a tag
-         * such as `en-US`, and comparing it against `['en']` decided the default
-         * was missing and silently rewrote it, which then made the document fail
-         * its own structural validation on re-import.
-         */
+        // Compared as BCP 47 tags: a default such as `en-US` never equals a bare code.
         const tags = languages.map(languageTag)
         const preferred = defaultLanguage ?? doc.defaultLanguage
 
@@ -552,30 +487,17 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       const trimmed = nextKey.trim()
       if (trimmed === key) return { ok: true }
 
-      /*
-       * The same rule `validateDocument` applies to a pasted document, so the
-       * panel cannot create a key a paste would be told off for.
-       */
+      // The grammar `validateDocument` applies, so the panel cannot write a key an
+      // import would refuse.
       const problem = keyProblem(trimmed)
       if (problem) return { ok: false, reason: problem }
 
-      /*
-       * Checked against the current document rather than inside the updater. A
-       * state updater does not run when it is called, so a decision made in
-       * there cannot be reported back to the caller, and the old version moved
-       * the selection regardless: the panel silently began editing whichever
-       * component already owned the name.
-       */
+      // Decided here, not in a state updater: an updater runs later, so its
+      // decision could not be returned to the caller.
       if (findNode(doc.root, trimmed)) {
         return { ok: false, reason: trimmed + ' is already used by another component.' }
       }
 
-      /*
-       * And the component being renamed has to exist. It answered `{ok: true}`,
-       * moved the selection onto the new name, and committed an entry for an
-       * edit that did not happen — reachable whenever the selection names a node
-       * an undo has removed, which is an ordinary state rather than a rare one.
-       */
       const before = findNode(doc.root, key)
       if (!before) {
         return { ok: false, reason: 'There is no component keyed ' + key + ' any more.' }
@@ -627,21 +549,9 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const moveComponent = useCallback(
     (key: string, parentKey: string, index?: number) => {
-      /*
-       * Answers whether the move happened, for the reason `addComponent` does:
-       * every caller announced one unconditionally, and `moveNode` returns the
-       * identical root for an illegal move -- so a screen-reader user was told a
-       * component moved into a container that will not hold it.
-       */
       const doc = latest.current
       const root = moveNode(doc.root, key, parentKey, index)
 
-      /*
-       * `moveNode` returns the identical root for an illegal move, and wrapping
-       * it in a new document anyway defeated the identity check in `commit` --
-       * so a refused drop still grew the undo stack with a state identical to
-       * the one before it.
-       */
       if (root === doc.root) return false
 
       commitDecided(doc, { ...doc, root })
@@ -663,17 +573,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 
   const duplicateComponent = useCallback(
     (key: string): string | undefined => {
-      /*
-       * `latest.current`, and committed against it, the way `addComponent` does.
-       *
-       * This read `history.present` out of the render closure, which is a render
-       * behind whenever two edits land in one tick -- and `duplicateNode` derives
-       * the copy's key from the root it is handed. Two duplications resolved
-       * against the same stale root produce two nodes with the same generated key,
-       * which is the duplicate-key state that makes every later tree operation
-       * edit the first match, silently. The whole point of this callback is to
-       * hand back a key nothing else is using.
-       */
       const doc = latest.current
 
       const parent = findParent(doc.root, key)
@@ -685,24 +584,10 @@ export function useDesigner(initial: FormDocument): DesignerApi {
       const index = parent.children?.findIndex((child) => child.key === key) ?? -1
       if (index === -1) return undefined
 
-      // Directly after the original, which is where a duplicate belongs and
-      // where the eye is already looking.
       const root = insertNode(doc.root, parent.key, copy, index + 1)
 
-      /*
-       * Nothing landed, so nothing is committed, the way every other writer here
-       * guards. An insert the tree refused still took a slot in a capped
-       * undo stack -- which means a real edit fell off the end of it -- and still
-       * moved the selection onto a key that is not in the document.
-       */
       if (root === doc.root) return undefined
 
-      /*
-       * Through `commitDecided`, which advances the ref -- so the next call in
-       * this tick derives its copy's key from a tree that already holds this one.
-       * That is what stops two duplications producing one key twice, which is the
-       * collision this callback exists to avoid.
-       */
       commitDecided(doc, { ...doc, root })
       setSelectedKey(copy.key)
       return copy.key
@@ -716,8 +601,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         (doc) =>
           writeNode(doc, key, (node) => {
             if (!value) {
-              // exactOptionalPropertyTypes: absent is an absent key, not a key
-              // holding undefined.
               const { renderWhen: _dropped, ...rest } = node
               return rest
             }
@@ -779,18 +662,12 @@ export function useDesigner(initial: FormDocument): DesignerApi {
             else delete next[device]
 
             if (Object.keys(next).length === 0) {
-              // exactOptionalPropertyTypes: absent is an absent key.
               const { css: _dropped, ...rest } = node
               return rest
             }
             return { ...node, css: next }
           }),
-        // Coalesced per device, so typing a padding value is one undo entry.
-        /*
-         * The device, and the *shape* of what is being written. Same reasoning
-         * as `setProp` above: within one device a coalesced run of typing and
-         * the gesture that clears the box shared a slot, so one undo took both.
-         */
+        // A run of typing is one undo entry per device; clearing the box starts a new one.
         'css:' + key + ':' + device + ':' + (text.trim() === '' ? 'cleared' : 'text'),
       )
     },
@@ -801,18 +678,9 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     (key: string, dataKey: string): RenameResult => {
       const trimmed = dataKey.trim()
       /*
-       * The same rule a rename is judged by, which this never applied.
-       *
-       * A `dataKey` is the name an answer takes in the payload, in exported
-       * JSON Schema and in every `ref` a condition writes -- the same jobs a
-       * `key` does, judged by the same grammar in `validateDocument`. The panel
-       * refused `first-name` as a key and accepted it here, so the panel could
-       * write a document its own gate reports as malformed.
-       *
-       * `renameKey` is the twin and already had the shape: report the reason so
-       * the field can show it, rather than storing it or silently doing nothing.
-       * Clearing the override is exempt, because an empty value means "use the
-       * key" rather than a name to check.
+       * A data key names the answer in the payload, JSON Schema and refs, so
+       * `validateDocument` judges it by the key grammar. An empty value clears
+       * the override and is not checked.
        */
       if (trimmed && trimmed !== key) {
         const problem = keyProblem(trimmed)
@@ -822,8 +690,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
         (doc) =>
           writeNode(doc, key, (node) => {
             if (!trimmed || trimmed === key) {
-              // exactOptionalPropertyTypes: no override is an absent key, not a
-              // key holding undefined.
               const { dataKey: _dropped, ...rest } = node
               return rest
             }
@@ -925,18 +791,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
 }
 
 /**
- * The three pure functions, exported for tests; the hook wraps them.
- *
- * Named `history` at module scope while the hook holds a state variable also
- * called `history`, which is legal and reads badly: two different things with
- * one name in one file. The state is what a reader of the hook means, so the
- * export is the one that changes.
- *
- * This is the only way to assert the half of invariant 4 the hook cannot show.
- * "Undo holds references to prior documents" is a claim about these arrays as
- * much as about the tree -- a `History` React has already rendered from must
- * not change underneath it -- and `useDesigner` never hands a caller the
- * history, so an `undo` written as `past.pop()` returns the same array and
- * every observable answer through the hook is identical.
+ * Exported for tests: `useDesigner` never exposes the history, so only these
+ * can show that a `History` React already rendered from is not mutated
+ * (invariant 4).
  */
 export const historyOps = { commit, undo, redo }

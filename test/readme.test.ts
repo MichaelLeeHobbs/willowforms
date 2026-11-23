@@ -1,30 +1,7 @@
 /**
- * The published READMEs, compiled rather than read.
- *
- * These are the first thing anybody meets and the only documentation that ships
- * inside the package. Every one of them was wrong in a way a reader would hit on
- * their first paste:
- *
- * - `@willowforms/renderer`'s example wrote `{ ...data, [key]: value }`, which is
- *   the anti-pattern `applyChange`'s own doc comment warns against by name.
- *   Inside a repeater the address is `addresses[1].line1`, so that spread
- *   creates a literal property with that name and every row answer is lost.
- * - the designer and renderer examples imported `@willowforms/kit-mui` from an
- *   install line that did not include it, and could not: the lint config forbids
- *   those packages from depending on a kit, so the transitive install a reader
- *   would rely on does not exist.
- * - both kit READMEs advertised eight component types. Both kits ship 27.
- *
- * Nothing checked any of it, because prose is not run. These blocks are compiled
- * now, so an example that would not build fails here instead of in somebody's
- * editor.
- *
- * Against the sources the `exports` maps point at rather than against `dist`,
- * deliberately: the gate runs `pnpm test` before `pnpm build`, so a check that
- * needed `dist` would fail on a clean checkout for a reason that has nothing to
- * do with the READMEs. It is the same public surface either way -- these are the
- * entry files `dist` is built from -- and the `exports` check below is what
- * covers the part a build would have caught.
+ * Compiled against the sources the `exports` maps point at, not against `dist`:
+ * the gate runs `pnpm test` before `pnpm build`. The `exports` check below
+ * covers what a build would have caught.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -42,19 +19,11 @@ const at = (path: string): string => fileURLToPath(new URL(path, root))
 const read = (path: string): string => readFileSync(at(path), 'utf8')
 
 interface Readme {
-  /** The package name, e.g. `@willowforms/core`. */
   name: string
   path: string
   text: string
 }
 
-/**
- * Every package that publishes a README.
- *
- * Read off the directory rather than listed, so a sixth package is covered the
- * day it exists. A private package is skipped: its README is not published and
- * nobody installs it.
- */
 const READMES: Readme[] = readdirSync(at('packages'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => ({ dir: entry.name, path: 'packages/' + entry.name + '/README.md' }))
@@ -70,7 +39,6 @@ const READMES: Readme[] = readdirSync(at('packages'), { withFileTypes: true })
     text: read(entry.path),
   }))
 
-/** Every fenced `ts` or `tsx` block, with the language it declared. */
 function blocks(text: string): { lang: 'ts' | 'tsx'; code: string }[] {
   return [...text.matchAll(/^```(ts|tsx)\n([\s\S]*?)^```$/gm)].map((match) => ({
     lang: match[1] as 'ts' | 'tsx',
@@ -78,7 +46,6 @@ function blocks(text: string): { lang: 'ts' | 'tsx'; code: string }[] {
   }))
 }
 
-/** Every package name an install line in this README tells the reader to add. */
 function installed(text: string): Set<string> {
   const names = new Set<string>()
   for (const match of text.matchAll(/^(?:npm install|pnpm add|yarn add) (.+)$/gm)) {
@@ -89,7 +56,6 @@ function installed(text: string): Set<string> {
   return names
 }
 
-/** The package a bare import specifier belongs to, ignoring any subpath. */
 function packageOf(specifier: string): string {
   const parts = specifier.split('/')
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : (parts[0] ?? specifier)
@@ -103,8 +69,6 @@ function importsIn(code: string): string[] {
 
 describe('every published README', () => {
   it('was found, and there is more than one', () => {
-    // The control for the discovery above. An empty list would make every rule
-    // below pass over nothing.
     expect(READMES.length).toBeGreaterThan(3)
     expect(READMES.map((entry) => entry.name)).toContain('@willowforms/core')
   })
@@ -143,12 +107,8 @@ describe('every published README', () => {
   it.each(READMES.map((entry) => [entry.name, entry] as const))(
     '%s imports only subpaths the package publishes',
     (_name, entry) => {
-      /*
-       * The half a typecheck against sources cannot see. `@willowforms/kit-html/styles.css`
-       * resolves for a consumer only if the `exports` map says so, and a README
-       * naming a subpath nobody publishes is a paste that fails at install time
-       * rather than at compile time.
-       */
+      // The half a typecheck against sources cannot see: a subpath resolves for a
+      // consumer only if the `exports` map lists it.
       const wrong: string[] = []
 
       for (const block of blocks(entry.text)) {
@@ -172,20 +132,8 @@ describe('every published README', () => {
 })
 
 /**
- * The write an example shows a host doing.
- *
- * `FormRenderer`'s `onChange` hands over an *address*, not a key. Outside a
- * repeater the two are the same string, which is why the wrong version looked
- * right for a year; inside one it is `addresses[1].line1`, and
- * `{ ...data, [address]: value }` then creates a literal property with that name
- * and every row answer is lost. `applyChange` exists in core so no host has to
- * implement array descent, and its doc comment names this exact spread as the
- * anti-pattern it replaces.
- *
- * A text rule rather than a type one, deliberately: the spread is perfectly
- * well-typed. The compile check below cannot see this and never will, which is
- * why it is a rule of its own -- measured, by putting the spread back and
- * watching the suite stay green until this existed.
+ * A text rule: `{ ...data, [address]: value }` is well-typed, so the compile
+ * check below cannot catch it.
  */
 describe('an example that writes an answer', () => {
   it.each(READMES.map((entry) => [entry.name, entry] as const))(
@@ -208,12 +156,6 @@ describe('an example that writes an answer', () => {
   )
 })
 
-/**
- * The counts a kit README states, against the kit.
- *
- * Both said eight. Both ship 27. A number in prose is exactly the kind of fact
- * that is true on the day it is written and never again.
- */
 describe('what a kit README claims it ships', () => {
   it.each([
     ['@willowforms/kit-mui', 'packages/kit-mui/README.md', muiKit.components.length],
@@ -228,12 +170,7 @@ describe('what a kit README claims it ships', () => {
   })
 })
 
-/**
- * And they compile.
- *
- * One `tsc` for all of them, because a type-aware pass is not cheap and the
- * blocks are independent files anyway.
- */
+/** One `tsc` for all of them, because a type-aware pass is not cheap. */
 describe('the examples in every published README', () => {
   const workspace = mkdtempSync(join(tmpdir(), 'willowforms-readme-'))
 

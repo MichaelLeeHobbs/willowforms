@@ -2,15 +2,6 @@
  * @vitest-environment jsdom
  */
 
-/**
- * The rules editor and the inspector tabs.
- *
- * None of this needs layout, so unlike the canvas it is fully testable here.
- * The tab assertions are deliberate: the product studied in docs/prior-art ships
- * tab strips with no `role="tablist"`, and the whole point of doing it properly
- * is lost if nobody checks it stays that way.
- */
-
 import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -72,11 +63,8 @@ function makeDocument(validations: ValidationRule[] = []): FormDocument {
       ],
     },
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US`, as `createDocument` ships: a dialect-free fixture hides tag and
+    // code mix-ups (write-tests skill, Trap 5).
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -106,8 +94,6 @@ function setup(validations: ValidationRule[] = [], document?: FormDocument): Har
     />,
   )
 
-  // The structure tree is behind a tab in the left pane. Opened here so every
-  // test starts where it used to, rather than repeating the click in each.
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const selectRow = async (key: string): Promise<void> => {
@@ -122,12 +108,10 @@ function setup(validations: ValidationRule[] = [], document?: FormDocument): Har
   return { user, view, latest: () => current, selectRow, openRules }
 }
 
-/** The schema on one field, read back out of the document. */
 function schemaOf(doc: FormDocument, key: string): ComponentNode['schema'] {
   return doc.root.children?.find((c) => c.key === key)?.schema
 }
 
-/** The rules on the selected field, read back out of the document. */
 function rulesOf(doc: FormDocument, key: string): ValidationRule[] {
   return doc.root.children?.find((c) => c.key === key)?.schema?.validations ?? []
 }
@@ -138,14 +122,11 @@ describe('inspector tabs', () => {
 
     const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
     const tabs = within(tablist).getAllByRole('tab')
-    // Form settings moved to the left pane: it belongs to the document, not to
-    // whatever is selected.
     expect(tabs.map((t) => t.textContent)).toEqual(['Properties', 'Style', 'Actions', 'Rules'])
 
     const selected = tabs.find((t) => t.getAttribute('aria-selected') === 'true')
     expect(selected?.textContent).toBe('Properties')
 
-    // The panel points back at the tab that controls it, in both directions.
     // Scoped to the inspector: the left pane is a tablist too, and its panel
     // comes first in the DOM.
     const panel = view.container.querySelector('.fs-inspector [role="tabpanel"]')
@@ -156,10 +137,7 @@ describe('inspector tabs', () => {
   it('never points a tab at a panel that is not rendered', () => {
     const { view } = setup()
 
-    // Only the selected panel is in the DOM. Every tab used to claim one, so
-    // two of the three named an id nothing resolved to. An unresolved IDREF is
-    // not an axe violation, which is how this survived an accessibility suite.
-    // Named: the left pane is a tablist too now.
+    // An unresolved IDREF is not an axe violation, so only this catches it.
     const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
     for (const tab of within(tablist).getAllByRole('tab')) {
       const controls = tab.getAttribute('aria-controls')
@@ -194,7 +172,6 @@ describe('inspector tabs', () => {
     await user.keyboard('{ArrowRight}')
     expect(focused()).toBe('Rules')
 
-    // Wraps around rather than stopping at the end.
     await user.keyboard('{ArrowRight}')
     expect(focused()).toBe('Properties')
     await user.keyboard('{ArrowLeft}')
@@ -251,13 +228,7 @@ describe('rules editor', () => {
   })
 
   it('writes "Validate while typing" onto the field it belongs to', async () => {
-    /*
-     * The one control on this tab with no test anywhere, and it decides which
-     * errors somebody sees before they press anything: `autoValidateKeys` reads
-     * it, the renderer asks that set which fields validate on every keystroke.
-     * It was written by this tab and read by nothing at all for the whole of
-     * the tab's life, which is the reason to pin both ends of it.
-     */
+    // Both ends: this tab writes the flag and `autoValidateKeys` reads it.
     const { user, selectRow, openRules, latest } = setup()
 
     await selectRow('email')
@@ -312,19 +283,12 @@ describe('rules editor', () => {
     const input = screen.getByLabelText('Value')
     await user.clear(input)
     await user.type(input, '8')
-    // Committed on blur, because the box holds a draft: written straight
-    // through, clearing it would have stored `Number('') === 0`.
     await user.tab()
 
     expect(rulesOf(latest(), 'email')).toEqual([{ key: 'minLength', value: 8 }])
   })
 
   it('leaves the rule alone while the box is empty', async () => {
-    /*
-     * `Number('')` is `0`, so backspacing the last digit used to set
-     * `minLength` to zero -- a rule that passes everything, written by somebody
-     * in the middle of typing a different number.
-     */
     const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
 
     await selectRow('email')
@@ -348,9 +312,6 @@ describe('rules editor', () => {
   })
 
   it('edits a pattern, which is text rather than a number', async () => {
-    // The `pattern` editor had no test: it is the one parameter that is a
-    // string, so a row that reused the numeric input would have stored
-    // `Number('^a')` -- `NaN` -- and refused every value silently.
     const { user, selectRow, openRules, latest } = setup()
 
     await selectRow('email')
@@ -366,12 +327,8 @@ describe('rules editor', () => {
   })
 
   it('edits a custom rule expression, and says it needs an evaluator', async () => {
-    /*
-     * The other untested editor, and the one whose failure is quietest: with no
-     * evaluator injected a `custom` rule passes, so a form that looks guarded is
-     * not. The panel says so beside the box, which is why the text matters as
-     * much as the write.
-     */
+    // The hint matters as much as the write: with no evaluator injected, a
+    // `custom` rule passes.
     const { user, selectRow, openRules, latest } = setup()
 
     await selectRow('email')
@@ -538,17 +495,8 @@ describe('rules editor', () => {
   })
 })
 
-/**
- * A repeater on this tab, which the fixture could not produce.
- *
- * `repeats` is `schema.type === 'array'` plus children, and the only data-bound
- * component the fixture kit offers is a childless `Field` with `dataType:
- * 'string'` -- so `repeats` was `false` in every test in this file, the
- * `aria-describedby` wiring never fired, and the note never rendered. That
- * makes the Data type select the most dangerous control on the tab and the
- * least covered one: changing it away from `array` stops the subtree repeating
- * and makes every `scope: 'row'` condition inside read nothing.
- */
+// The fixture kit has no repeater, so `withRepeater` builds one: an `array`
+// schema with children.
 describe('the data type of a component that repeats', () => {
   const withRepeater = (): FormDocument => {
     const base = makeDocument()
@@ -583,8 +531,7 @@ describe('the data type of a component that repeats', () => {
   })
 
   it('says nothing of the kind on a field that does not repeat', async () => {
-    // The control. A note shown always is a note nobody reads, and it would
-    // make the assertion above true for a component it is wrong about.
+    // The control: a note shown always would pass the test above.
     const { selectRow, openRules } = setup([], withRepeater())
     await selectRow('email')
     await openRules()
@@ -594,8 +541,6 @@ describe('the data type of a component that repeats', () => {
   })
 
   it('still changes the type when asked', async () => {
-    // And the control for the control: the select has to work on a repeater,
-    // warning or not. This is the edit the note is warning about.
     const { user, selectRow, openRules, latest } = setup([], withRepeater())
     await selectRow('addressList')
     await openRules()
@@ -606,15 +551,6 @@ describe('the data type of a component that repeats', () => {
   })
 })
 
-/**
- * A document nobody gated, opened on this tab.
- *
- * `Rules.tsx` reads `Array.isArray(schema.validations) ? ... : []` because a
- * pasted `"schema": {"type":"string"}` took the whole designer down the moment
- * this tab was opened -- and the fixture always passed an array, so the guard
- * could be deleted with nothing red. The condition editor has a fifteen-case
- * describe for the same hardening; this tab had none.
- */
 describe('a schema a paste can produce', () => {
   const malformed = (validations: unknown): FormDocument => {
     const base = makeDocument()
@@ -641,15 +577,8 @@ describe('a schema a paste can produce', () => {
     ['a number', 5],
     ['null', null],
     /*
-     * An *array* whose entries are junk, which this table did not have -- so it
-     * blessed `Array.isArray(schema.validations)` as a sufficient guard when it
-     * is not. Such a list passes that check and crashes one line later at
-     * `new Set(rules.map((r) => r.key))`.
-     *
-     * `validateDocument` does reject these entries, and `store.ts` only *warns*
-     * for a host-supplied `initialDocument` -- which is exactly the path this
-     * describe's own docblock says is ungated, and the one a restored document
-     * takes.
+     * Arrays of junk pass `Array.isArray` but are not rules. `validateDocument`
+     * rejects them, but `store.ts` only warns for a host's `initialDocument`.
      */
     ['a list holding null', [null]],
     ['a list holding a string', ['required']],
@@ -661,17 +590,12 @@ describe('a schema a paste can produce', () => {
     await selectRow('email')
     await openRules()
 
-    // The tab is the place somebody goes to repair such a document, so it has
-    // to draw its controls rather than take the designer down.
     expect(screen.getByLabelText('Data type')).toBeTruthy()
     expect(screen.getByLabelText('Add a rule')).toBeTruthy()
   })
 
   it('still draws the rules a well-formed document has', async () => {
-    /*
-     * The control. Filtering every entry out would pass every row above while
-     * emptying the panel for every real document.
-     */
+    // The control: dropping every entry would pass the rows above.
     const { selectRow, openRules } = setup([], malformed([{ key: 'required' }]))
     await selectRow('email')
     await openRules()
@@ -680,14 +604,8 @@ describe('a schema a paste can produce', () => {
   })
 
   it('keeps the real rule in a list that also holds junk', async () => {
-    /*
-     * The half that says the filter is a filter rather than an early return: a
-     * list of one real rule plus junk draws the same rules as that rule alone.
-     *
-     * Counted as a comparison rather than against a literal, because the panel
-     * draws Remove buttons for things other than rules and pinning a number
-     * would be pinning the panel's whole shape.
-     */
+    // Compared with the clean count, not a literal, so the panel's shape is not
+    // pinned.
     const drawn = async (validations: unknown): Promise<number> => {
       const view = setup([], malformed(validations))
       await view.selectRow('email')
@@ -710,30 +628,17 @@ describe('a schema a paste can produce', () => {
     ['a key that is a number', { key: 5 }],
   ])('opens the tab for a schema holding %s', async (_what, rule) => {
     /*
-     * The filter checked "a non-null object with a string `key`", which admits
-     * every one of these -- and the pattern row calls
-     * `patternProblem(rule.value)`, which reads `.length`. On `null` that
-     * throws and takes the Rules tab down, which is the failure the filter
-     * exists to prevent, through the half of the shape it was not looking at.
-     *
-     * An unrecognised key is dropped for a different reason: `validateForm`
-     * refuses it with `UNREADABLE_RULE`, so a row for it would offer to edit a
-     * rule the server will not run.
+     * `patternProblem` reads `.length`, so a non-string pattern throws. An
+     * unknown key is one `validateForm` refuses with `UNREADABLE_RULE`.
      */
     const view = setup([], malformed([rule, { key: 'required' }]))
     await view.selectRow('email')
     await view.openRules()
 
-    // The tab is up and the real rule beside the junk is still drawn.
     expect(view.view.container.querySelectorAll('.fs-rule').length).toBe(1)
   })
 
   it('leaves a rule it cannot draw in the document', async () => {
-    /*
-     * Dropped from the panel, never from the document. Opening a tab must not
-     * delete data: `write` sends what the author edited, so an undrawable rule
-     * survives untouched -- and a host that fixes its JSON gets it back.
-     */
     const { selectRow, openRules, latest } = setup(
       [],
       malformed([{ key: 'pattern', value: null }, { key: 'required' }]),
@@ -759,17 +664,6 @@ describe('a schema a paste can produce', () => {
   })
 })
 
-/**
- * A rule's number, after the document moves underneath it.
- *
- * `NumberField` holds a draft and re-reads the value when the document changes
- * -- undo, redo, a JSON swap -- and no test in this file ever entered that
- * block: every case either committed and then matched, or cleared without
- * committing, or reverted through `commit` itself. With the re-sync deleted the
- * box keeps showing `8` while the document holds `3`, and the next blur writes
- * `8` back, which is the undo-reversal the data key field has its own describe
- * for.
- */
 describe('a rule number and undo', () => {
   const box = (): HTMLInputElement => screen.getByLabelText<HTMLInputElement>('Value')
 
@@ -790,8 +684,6 @@ describe('a rule number and undo', () => {
   })
 
   it('does not write the stale number back on the next blur', async () => {
-    // The failure that makes it worth fixing: the box kept the old number, and
-    // blurring it committed that number, so the undo undid itself.
     const { user, selectRow, openRules, latest } = setup([{ key: 'minLength', value: 3 }])
     await selectRow('email')
     await openRules()

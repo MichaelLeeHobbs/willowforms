@@ -1,19 +1,12 @@
-/**
- * A component a condition hides is still authorable.
- *
- * Shipped broken, and only a browser can prove the fix: dropping into a
- * container is resolved from measured rectangles, and jsdom gives every element
- * a zero rectangle. The canvas renders with empty data and swallows pointer
- * events so a click selects rather than types, so nothing here can satisfy a
- * condition. A hidden node was therefore absent from the DOM and `measureTree`
- * skipped it, which made it undroppable as well as invisible.
+/*
+ * A hidden component stays authorable on the canvas. Needs a browser: drop targeting measures
+ * real rectangles, and jsdom gives every element a zero one.
  */
 
 import type { Page } from '@playwright/test'
 
 import { dragFrom, expect, stableBox, test } from './harness.js'
 
-/** Set the selected component's visibility through the panel, as an author would. */
 const hide = async (designer: { page: Page }): Promise<void> => {
   await designer.page.getByLabel('Show when').selectOption('never')
 }
@@ -31,13 +24,7 @@ test('a hidden container stays on the canvas and says it is hidden', async ({ de
 })
 
 test('a component that is shown carries no marker', async ({ designer }) => {
-  /*
-   * Without this the attribute would say "hidden" for everything, and the canvas
-   * could not tell the two apart. The count beside it is what makes this a
-   * control rather than a second way of passing: an attribute nothing emits
-   * anywhere satisfies "not hidden" perfectly, and the test above is where the
-   * one hidden component comes from.
-   */
+  // The count below proves the marker is emitted at all, so "not hidden" is not vacuous.
   await expect(designer.node('email')).not.toHaveAttribute('data-fs-hidden', 'true')
 
   await designer.select('name')
@@ -68,7 +55,7 @@ test('something can still be dropped into a hidden container', async ({ designer
   await designer.page.mouse.move(start.x + 40, start.y + start.height / 2)
   await designer.page.mouse.down()
   await designer.page.mouse.move(start.x + 50, start.y + 12, { steps: 4 })
-  // Just right of firstName's midpoint, which is inside `name`, a row.
+  // The right half of firstName, inside the `name` row.
   await designer.page.mouse.move(target.x + target.width - 4, target.y + target.height / 2, {
     steps: 12,
   })

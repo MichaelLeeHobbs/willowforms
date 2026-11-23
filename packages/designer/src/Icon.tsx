@@ -1,25 +1,12 @@
 /**
- * The designer's icon set.
- *
- * Core names the vocabulary and this draws it. The designer imports no component
- * library, which rules out every icon package as surely as it rules out MUI, so
- * these are hand-authored and inline. That is the price of the seam and it is a
- * small one: a form builder needs about twenty glyphs, not a thousand.
- *
- * Every glyph is a 24x24 stroke drawing on `currentColor`, so it takes the
- * colour of whatever it sits in and needs no token of its own.
+ * Hand-drawn: the designer imports no component library, icon packages
+ * included. Every glyph is a 24x24 stroke drawing on `currentColor`.
  */
 
 import type { IconName } from '@willowforms/core'
 import type { ReactNode } from 'react'
 
-/**
- * One entry per name in `IconName`.
- *
- * Typed as a total record, so adding a name to the vocabulary in core fails to
- * compile here until it is drawn. A palette entry silently rendering nothing is
- * exactly the failure this project treats as worst.
- */
+/** A total record, so a name added to `IconName` fails to compile here until drawn. */
 const GLYPHS: Record<IconName, ReactNode> = {
   text: (
     <>
@@ -243,17 +230,7 @@ export function Icon({ name, size = 16 }: IconProps): ReactNode {
 }
 
 /**
- * Every name the vocabulary declares, for tests and for a future icon picker.
- *
- * The assertion is real and stays. `Object.keys` is typed `string[]` because a
- * value can carry keys its type does not declare, so no amount of typing on
- * `GLYPHS` makes TypeScript hand back `IconName[]` on its own -- `Object.entries`
- * does not either, which is what an earlier version of this comment claimed
- * while its `.map()` still asserted on every element. A comment that says a cast
- * is gone, with the cast on the next line, has now been written here twice.
- *
- * What makes the assertion safe is the annotation on `GLYPHS`: `Record<IconName,
- * ReactNode>` is missing-key checked, so a name added to `IconName` in core
- * stops this file compiling until a glyph exists for it.
+ * `Object.keys` is always typed `string[]`, so the cast is needed. It is safe
+ * because `GLYPHS` is a total `Record<IconName, ReactNode>`.
  */
 export const ICON_NAMES: IconName[] = Object.keys(GLYPHS) as IconName[]
