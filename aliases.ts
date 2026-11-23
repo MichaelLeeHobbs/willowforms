@@ -1,15 +1,9 @@
 import { fileURLToPath } from 'node:url'
 
 /**
- * In-repo source aliases.
- *
- * Published packages resolve through `dist`, but during development and tests we
- * point at `src` so an edit in core shows up in the playground with no rebuild.
- * Shared by vitest and the playground's vite config so the two cannot drift.
- *
- * These are anchored regexes rather than bare prefixes: a plain string alias for
- * `@willowforms/designer` also rewrites `@willowforms/designer/styles.css`, which
- * resolves to a path inside index.ts and fails at build time.
+ * Workspace packages resolved to `src`, shared by vitest and the playground. Anchored regexes,
+ * because a plain string alias for `@willowforms/designer` also rewrites
+ * `@willowforms/designer/styles.css` and breaks the build.
  */
 const at = (p: string): string => fileURLToPath(new URL(p, import.meta.url))
 

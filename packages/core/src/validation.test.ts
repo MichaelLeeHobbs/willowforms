@@ -48,12 +48,6 @@ describe('required', () => {
   })
 
   it('rejects false, because an unchecked box is a non-answer', () => {
-    /*
-     * This assertion used to say the opposite, and the opposite was wrong: it
-     * let a required consent checkbox pass while unticked. `false` stays a
-     * value for every other rule; requiredness alone is stricter, matching
-     * `<input type="checkbox" required>`.
-     */
     expect(check({ key: 'required' }, false)).toBe(DEFAULT_MESSAGES.required)
   })
 
@@ -63,25 +57,8 @@ describe('required', () => {
 })
 
 describe('every non-required rule passes on an empty value', () => {
-  /*
-   * This is the bug the prior-art study found in the demo it examined: a field
-   * declaring only a `url` rule reported "Required" when left blank.
-   * Requiredness is one rule's job, and only one.
-   *
-   * This table is derived against `DEFAULT_MESSAGES` below, so a newly added
-   * rule cannot silently sit outside the invariant.
-   *
-   * What each half earns is worth being exact about. Removing the empty guard
-   * for `maxLength`, `max` or `custom` fails none of these rows, because those
-   * three pass an empty value anyway -- 0 is within any maximum, and `custom`
-   * with no evaluator passes. Their rows state the contract rather than
-   * exercising the mechanism, and that is still worth having: invariant 5 is a
-   * claim about behaviour, and a later rewrite of `maxLength` that decided an
-   * empty answer is too short would be caught here.
-   *
-   * The empty *shapes* do exercise it. Measured: with `isEmpty` no longer
-   * counting whitespace or an empty list, twelve of these rows go red.
-   */
+  // The `maxLength`, `max` and `custom` rows pass on empty even without the
+  // empty guard; they pin invariant 5 as a contract.
   const rules: ValidationRule[] = [
     { key: 'email' },
     { key: 'url' },
@@ -99,11 +76,8 @@ describe('every non-required rule passes on an empty value', () => {
   ]
 
   it('covers every rule the union has except required', () => {
-    /*
-     * Read from the message table rather than listed here, so a rule added
-     * later is not silently outside the invariant. `DEFAULT_MESSAGES` is typed
-     * as a total record over the union, which is what makes it the right source.
-     */
+    // `DEFAULT_MESSAGES` is a total record over the rule union, so a new rule
+    // shows up here.
     const covered = new Set(rules.map((rule) => rule.key))
     const missing = Object.keys(DEFAULT_MESSAGES).filter(
       (key) => key !== 'required' && !covered.has(key as ValidationRule['key']),
@@ -118,12 +92,6 @@ describe('every non-required rule passes on an empty value', () => {
     ['an empty string', ''],
     ['whitespace', '   '],
     ['an empty list', []],
-    /*
-     * `{}`, which `json.ts` counts as empty and this table omitted -- so the
-     * object branch of the shared `isEmpty` was defended for `required` and for
-     * nothing else. Two definitions of empty diverging is the failure that
-     * function's docblock names.
-     */
     ['an empty object', {}],
   ]
 
@@ -134,11 +102,6 @@ describe('every non-required rule passes on an empty value', () => {
   })
 
   it('still fails each of them on a value that is not empty', () => {
-    /*
-     * The control, and it is the whole difference between "the rule passes on
-     * empty" and "the rule never fails". Without it a rule that returned
-     * undefined unconditionally would satisfy every row above.
-     */
     expect(check({ key: 'email' }, 'nope')).toBeDefined()
     expect(check({ key: 'url' }, 'nope')).toBeDefined()
     expect(check({ key: 'uuid' }, 'nope')).toBeDefined()
@@ -180,17 +143,10 @@ describe('format rules', () => {
     ['vbscript:msgbox(1)'],
     ['//evil.example.com'],
   ])('refuses %s, which parses as a URL and is not one anybody should follow', (value) => {
-    /*
-     * The rule was tested against `not a url` only, so what it did with a
-     * scheme was unmeasured — and this rule is what a host trusts before it
-     * writes an answer into an `href`. `javascript:` parses perfectly well.
-     * `isUrl` asks `safeHref` for exactly this reason and nothing said so.
-     */
     expect(check({ key: 'url' }, value)).toBe(DEFAULT_MESSAGES.url)
   })
 
   it('accepts the schemes a link can safely carry', () => {
-    // The control. A rule that refused everything would pass the rows above.
     expect(check({ key: 'url' }, 'http://example.com/x?y=1')).toBeUndefined()
     expect(check({ key: 'url' }, 'mailto:someone@example.com')).toBeUndefined()
     expect(check({ key: 'url' }, 'tel:+441234567890')).toBeUndefined()
@@ -301,12 +257,6 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
   })
 
   it('runs a computed guard in both directions once one is', () => {
-    /*
-     * Only the no-evaluator direction was tested, so a guard that answered
-     * "skip" whatever the expression said would have passed: the permissive
-     * half was pinned and the half that makes a rule apply was not. This is
-     * `required` on an empty value, so the guard alone decides the outcome.
-     */
     const evaluate: Evaluator = (expression) => expression === 'true'
     const guarded = (expression: string): ValidationRule => ({
       key: 'required',
@@ -325,17 +275,6 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
   })
 
   it('hands the host context to the evaluator, for a guard and for a rule', () => {
-    /*
-     * Every evaluator in this file was `(expression) => expression === 'true'`,
-     * so the third argument could be dropped at the call site and nothing would
-     * say so -- and a `computed` guard reading `context.user.role` would then
-     * evaluate against `undefined`, come back falsy, and stop applying a
-     * `required` rule on the server. That is the permissive failure, arrived at
-     * through a parameter list.
-     *
-     * Both call sites pass it and both are checked here: the guard and the
-     * `custom` rule.
-     */
     const evaluate: Evaluator = (expression, _data, context) =>
       expression === 'admin' &&
       (context?.['user'] as { role?: string } | undefined)?.role === 'admin'
@@ -356,13 +295,6 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
   })
 
   it('applies a rule guarded by a translation, which says nothing about whether it holds', () => {
-    /*
-     * The fourth guard kind, and the only one with no test. An `i18n` binding
-     * names a translated string; it is not a decision, so there is nothing for
-     * it to say no with, and the rule applies. Flip that to `false` and every
-     * rule carrying an `i18n` guard stops applying, quietly, which is the
-     * direction this whole file leans against.
-     */
     const rule: ValidationRule = { key: 'required', when: { kind: 'i18n', key: 'when_required' } }
 
     expect(check(rule, '')).toBe(DEFAULT_MESSAGES.required)
@@ -370,16 +302,6 @@ describe('expression-backed rules degrade permissively without an evaluator', ()
   })
 })
 
-/**
- * What a kit asks before it writes `aria-required` on a control.
- *
- * Exported from core, called from four places across the two kits, and driven
- * by no test in the repository until now -- `kit-contract.test.tsx` reaches it
- * only through `[{key:'required'}]` and `[]`, which is the easy half. Drop
- * `&& !rule.when` and a conditionally-required field is announced to a screen
- * reader as always mandatory, which is the case the function's own docblock
- * says it exists to avoid.
- */
 describe('isRequired', () => {
   const node = (validations: ValidationRule[]): ComponentNode => ({
     key: 'email',
@@ -394,9 +316,8 @@ describe('isRequired', () => {
   })
 
   it('is false when the rule is guarded, however the guard would answer', () => {
-    // Including a guard that is statically true: what a screen reader is told
-    // has to match what the form does now, and `isRequired` is asked without
-    // the data or the evaluator that would settle it.
+    // Even a statically true guard: without data, only unconditional rules
+    // count.
     expect(isRequired(node([{ key: 'required', when: { kind: 'static', value: true } }]))).toBe(
       false,
     )
@@ -537,14 +458,6 @@ describe('validateForm', () => {
   })
 })
 
-/**
- * Requiredness on a boolean.
- *
- * Found by writing docs/spec/08-validation.md: the prose said an unchecked
- * required box was caught, the code said otherwise, and the code was wrong. A
- * consent checkbox that passes while unticked is the whole reason the rule
- * exists.
- */
 describe('required on a boolean', () => {
   const box = (validations: ValidationRule[]): ComponentNode => ({
     key: 'terms',
@@ -572,21 +485,12 @@ describe('required on a boolean', () => {
   })
 
   it('does not make false empty for every other rule', () => {
-    /*
-     * Requiredness is one rule's job; nothing else changes meaning.
-     *
-     * `minLength` on a boolean used to be the fixture here, and it passes under
-     * either reading: a rule that skipped `false` as empty and a rule that ran
-     * and found nothing to measure both answer "fine". A custom rule tells them
-     * apart, because every rule but `required` short-circuits on an empty value
-     * — so if `false` were empty this expression would never run and the
-     * assertion would flip.
-     */
+    // A custom rule runs only if `false` is not empty; a length rule would pass
+    // either way.
     const evaluate: Evaluator = () => false
     const node = box([{ key: 'custom', expression: 'never' }])
 
     expect(validateField(node, { terms: false }, { evaluate })).toBe(DEFAULT_MESSAGES.custom)
-    // And the empty answer really is skipped, which is what makes that a test.
     expect(
       validateField(box([{ key: 'custom', expression: 'never' }]), {}, { evaluate }),
     ).toBeUndefined()
@@ -594,10 +498,6 @@ describe('required on a boolean', () => {
 })
 
 describe('autoValidateKeys', () => {
-  /*
-   * The Rules tab wrote `autoValidate` and nothing anywhere read it, so the
-   * checkbox was decoration for the whole of the tab's life.
-   */
   const tree: ComponentNode = {
     key: 'root',
     type: 'Screen',
@@ -664,8 +564,6 @@ describe('dataKey in validation', () => {
   })
 
   it('reads the value under the data key', () => {
-    // The answer is in the payload under `email`, so the field is satisfied
-    // even though the component is called emailField.
     const errors = validateForm(root([node('emailField', 'email')]), { email: 'a@b.com' })
     expect(errors).toEqual({})
   })
@@ -676,10 +574,6 @@ describe('dataKey in validation', () => {
   })
 
   it('reports the error against the component key, not the data key', () => {
-    /*
-     * Two components may share a data key and still fail for different
-     * reasons, so an error belongs to the component rather than the answer.
-     */
     const errors = validateForm(root([node('emailField', 'email')]), {})
     expect(Object.keys(errors)).toEqual(['emailField'])
   })
@@ -695,11 +589,6 @@ describe('dataKey in validation', () => {
 })
 
 describe('submittedData', () => {
-  /*
-   * A value stays in `data` after its field is hidden, so the payload carries
-   * an answer to a question the form no longer asks. validateForm already
-   * stops checking it; this is the other half.
-   */
   const married: Condition = { op: 'truthy', value: { kind: 'ref', dataKey: 'married' } }
 
   const form: ComponentNode = {
@@ -741,8 +630,6 @@ describe('submittedData', () => {
   })
 
   it('leaves the held data alone, because hiding is often temporary', () => {
-    // An accordion closing must not destroy what someone typed. This is a
-    // projection applied at submit, not an edit to the value.
     const data = { married: false, spouseName: 'Alex' }
     submittedData(form, data)
     expect(data['spouseName']).toBe('Alex')
@@ -761,14 +648,6 @@ describe('submittedData', () => {
   })
 
   it('reads the same context the renderer was given', () => {
-    /*
-     * This decides which answers leave. Given a different context than the
-     * renderer had, it strips answers to questions the user really was asked —
-     * the disagreement `isVisible` exists to prevent, arriving through an
-     * argument list rather than a second code path. It was reachable: the two
-     * halves of this were built on separate branches and `submittedData` kept a
-     * positional `evaluate` while everything else moved to the options bag.
-     */
     const gated: ComponentNode = {
       key: 'form',
       type: 'Form',
@@ -799,13 +678,6 @@ describe('submittedData', () => {
   })
 
   it('carries a field called __proto__ as an answer, not as a prototype', () => {
-    /*
-     * `out[key] = value` on an object literal runs the `__proto__` setter
-     * rather than adding a property: the answer disappears from the payload and
-     * the payload's prototype becomes whatever it pointed at. Data keys come
-     * out of a document and the grammar for them is still only planned, so this
-     * is reachable now rather than in theory.
-     */
     const odd: ComponentNode = {
       key: 'odd',
       type: 'Form',
@@ -821,8 +693,7 @@ describe('submittedData', () => {
       props: {},
     }
 
-    // The literal `{ __proto__: … }` sets the prototype rather than a key, so
-    // even building the input takes care. This is how ordinary a mistake it is.
+    // Parsed, because a `{ __proto__: … }` literal sets the prototype, not a key.
     const data = JSON.parse('{"__proto__": {"polluted": true}}') as FormData
     expect(Object.hasOwn(data, '__proto__')).toBe(true)
 
@@ -834,11 +705,6 @@ describe('submittedData', () => {
   })
 
   it('agrees with validateForm about what is on screen', () => {
-    /*
-     * The two must not disagree: a field validateForm checks and this drops
-     * would be required and unsendable, and the reverse sends an answer nobody
-     * checked.
-     */
     const data = { married: false, spouseName: 'Alex' }
     const required: ComponentNode = {
       ...form,
@@ -865,11 +731,6 @@ describe('submittedData', () => {
 })
 
 describe('validateAcross, and the submit it exists to stop', () => {
-  /*
-   * A three-step form, each step a container shown when `context.step` matches.
-   * The trap is measured rather than described: submitting from the last step
-   * validates only the last step, so an answer skipped on step two is accepted.
-   */
   const field = (key: string): ComponentNode => ({
     key,
     type: 'TextField',
@@ -878,9 +739,7 @@ describe('validateAcross, and the submit it exists to stop', () => {
   })
 
   const step = (name: string, children: ComponentNode[]): ComponentNode => ({
-    // `stepWho`, not `step-who`: a hyphen is not in the key grammar, so the
-    // fixture was a document `validateDocument` refuses -- a wizard nobody
-    // could have authored, standing in for the one people do.
+    // `stepWho`, not `step-who`: a hyphen is not in the key grammar.
     key: 'step' + name.charAt(0).toUpperCase() + name.slice(1),
     type: 'Box',
     props: {},
@@ -908,11 +767,7 @@ describe('validateAcross, and the submit it exists to stop', () => {
 
   const onStep = (name: string): EvalOptions => ({ context: { step: name } })
 
-  /*
-   * The steps as a server would take them: out of the document, never out of
-   * the request. A value that is not a string is not a step name, so it is not
-   * quietly stringified into one.
-   */
+  // A context value that is not a string is not a step name; do not stringify it.
   const stepScopes = (root: ComponentNode): EvalOptions[] =>
     contextValues(root, 'step')
       .filter((name): name is string => typeof name === 'string')
@@ -927,8 +782,7 @@ describe('validateAcross, and the submit it exists to stop', () => {
   })
 
   it('accepts a submit missing an earlier step, which is the bug', () => {
-    // Not a wish: this is what validateForm does, correctly, and why the merge
-    // below has to exist. `city` was required and never answered.
+    // Correct for validateForm, which skips hidden steps. validateAcross covers it.
     expect(validateForm(wizard, answered, onStep('pay'))).toEqual({})
   })
 
@@ -938,11 +792,6 @@ describe('validateAcross, and the submit it exists to stop', () => {
   })
 
   it('takes the steps from the document, so a client cannot name only its own', () => {
-    /*
-     * The server never asks the browser which steps exist. A client that named
-     * only `pay` would have the rest go unchecked, and unlike a blocked submit
-     * that failure is invisible.
-     */
     const scopes = stepScopes(wizard)
     expect(scopes).toHaveLength(3)
     expect(validateAcross(wizard, answered, scopes)).toEqual({ city: DEFAULT_MESSAGES.required })
@@ -955,22 +804,9 @@ describe('validateAcross, and the submit it exists to stop', () => {
 
   it('keeps the first message when two scopes report the same field', () => {
     /*
-     * A field can be reported under more than one scope, and the merge takes the
-     * first message rather than the last. Which one is arbitrary; that it is
-     * decided is not, because a caller showing "Too short" where the earlier
-     * step said "Required" is a form arguing with itself.
-     *
-     * The fixture this replaces could not collide. It used two components keyed
-     * `nickname` and `nickname2`, and `validateForm` keys an error by the
-     * *node's* key -- so the two never shared an entry and the merge had nothing
-     * to resolve. Two nodes can never collide, because keys are unique in a
-     * document.
-     *
-     * One node reported twice is the case that exists: a field outside every
-     * step is visible under every scope. Two guarded rules on it, each applying
-     * in a different step, make the two visits produce different messages -- so
-     * "the first wins" is observable rather than asserted about identical
-     * strings.
+     * Keys are unique, so only one node seen under two scopes can collide. Two
+     * guarded rules make each scope give a different message, so which one wins
+     * is observable.
      */
     const shared: ComponentNode = {
       key: 'root',
@@ -1016,8 +852,6 @@ describe('validateAcross, and the submit it exists to stop', () => {
       ],
     }
 
-    // Each scope on its own reports its own message, which is what makes the
-    // merge a choice rather than a formality.
     expect(validateForm(shared, {}, onStep('who'))['nickname']).toBe('The first step says so.')
     expect(validateForm(shared, {}, onStep('where'))['nickname']).toBe('The second step says so.')
 
@@ -1025,35 +859,15 @@ describe('validateAcross, and the submit it exists to stop', () => {
     expect(Object.keys(merged)).toEqual(['nickname'])
     expect(merged['nickname']).toBe('The first step says so.')
 
-    // And the order is the scope order, not the rule order: reversing the
-    // scopes reverses the answer.
     const backwards = validateAcross(shared, {}, ['where', 'who'].map(onStep))
     expect(backwards['nickname']).toBe('The second step says so.')
   })
 
   it('merges nothing into an empty scope list, rather than validating everything', () => {
-    // A document that declares no steps yields no scopes, and the honest answer
-    // to "validate across nothing" is nothing. A host that means the whole form
-    // calls validateForm.
     expect(validateAcross(wizard, {}, [])).toEqual({})
   })
 })
 
-/**
- * The merge is the submit gate, and it read names off `Object.prototype`.
- *
- * `validateForm` builds its errors on a null prototype and explains why. The
- * merge one function below built on `{}` and coalesced with `??=`, so a message
- * keyed `toString` was compared against `Object.prototype.toString`, found not
- * nullish, and dropped. `Object.keys` on the result is then empty, and empty is
- * what every caller reads as a valid form — `apps/demo-server` submits on
- * exactly that check.
- *
- * Nothing has to be bypassed to reach it. `toString`, `valueOf` and
- * `hasOwnProperty` all pass `KEY_PATTERN`, and nothing on the render or
- * validate path calls `validateDocument`, which is the same reason the
- * `__proto__` twin above is reachable.
- */
 describe('validateAcross and a key that lives on Object.prototype', () => {
   const required = (key: string): ComponentNode => ({
     key,
@@ -1079,10 +893,7 @@ describe('validateAcross and a key that lives on Object.prototype', () => {
 
   const onStep = (name: string): EvalOptions => ({ context: { step: name } })
 
-  /*
-   * Two scopes, not one, so the coalescing branch is the code under test rather
-   * than a single pass that never merges anything.
-   */
+  // Two scopes, so the merge actually coalesces.
   const scopes = ['who', 'where'].map(onStep)
 
   const wizardWith = (key: string): ComponentNode => ({
@@ -1092,8 +903,7 @@ describe('validateAcross and a key that lives on Object.prototype', () => {
     children: [step('who', [required(key)]), step('where', [required('city')])],
   })
 
-  // The answer to every field except the one under test, so the only thing that
-  // can make the gate report a problem is the inherited key.
+  // Every other field answered, so only the inherited key can fail.
   const answered: FormData = { city: 'Ely' }
 
   const inherited = ['toString', 'valueOf', 'hasOwnProperty', 'constructor', 'isPrototypeOf']
@@ -1106,18 +916,10 @@ describe('validateAcross and a key that lives on Object.prototype', () => {
   })
 
   it.each(inherited)('does not read as a valid form when only %s is missing', (key) => {
-    /*
-     * The consequence in the shape the caller reads it. The demo server
-     * submits when `Object.keys(errors).length === 0`, so a dropped message is
-     * not a cosmetic loss — it is a submit accepted with a required answer
-     * missing.
-     */
     expect(Object.keys(validateAcross(wizardWith(key), answered, scopes))).toEqual([key])
   })
 
   it('reports a field whose key is __proto__', () => {
-    // The twin of the `validateForm` pin above. It was pinned for the walk and
-    // not for the merge, which is the shape this whole run exists to stop.
     const errors = validateAcross(wizardWith('__proto__'), answered, scopes)
 
     expect(Object.keys(errors)).toEqual(['__proto__'])
@@ -1135,20 +937,11 @@ describe('validateAcross and a key that lives on Object.prototype', () => {
     const errors = validateAcross(hostile, {}, scopes)
 
     expect(Object.keys(errors).sort()).toEqual(['__proto__', 'email'])
-    // A control. The merge never reached the inherited setter even unfixed,
-    // because `??=` read a truthy `Object.prototype` and skipped the write.
     expect(({} as Record<string, unknown>)['email']).toBeUndefined()
   })
 })
 
 describe('length rules on a value that is not text', () => {
-  /*
-   * `jsonToString` returns '' for anything that is not a string, number or
-   * boolean, so an array measured zero: `minLength: 2` failed for every
-   * multi-select no matter how many options were chosen, and `maxLength` passed
-   * for all of them. Silently, with the chosen options on screen and a message
-   * saying the answer was too short.
-   */
   it('counts the items in an array', () => {
     expect(check({ key: 'minLength', value: 2 }, ['a', 'b'])).toBeUndefined()
     expect(check({ key: 'minLength', value: 3 }, ['a', 'b'])).toBe(DEFAULT_MESSAGES.minLength)
@@ -1162,23 +955,11 @@ describe('length rules on a value that is not text', () => {
   })
 
   it('leaves an empty array to required, like every other empty value', () => {
-    // `isEmpty` counts an empty array as empty, and only `required` fails on
-    // an empty value. A `minLength` on an unanswered multi-select must not
-    // report before the user has touched it.
     expect(check({ key: 'minLength', value: 1 }, [])).toBeUndefined()
     expect(check({ key: 'required' }, [])).toBe(DEFAULT_MESSAGES.required)
   })
 })
 
-/**
- * A rule tag this code does not recognise.
- *
- * The same shape as the `renderWhen` typo, one function over. Both switches are
- * exhaustive over a closed union and neither had a tail, so an unrecognised tag
- * returned `undefined` — read as *guard not satisfied* in one and as *the value
- * passed* in the other. Either way the rule silently stopped applying, which on
- * the server is a required answer becoming optional with nothing logged.
- */
 describe('a validation tag this code cannot read', () => {
   it('applies a rule whose guard is unreadable, rather than skipping it', () => {
     const rule = {
@@ -1186,21 +967,15 @@ describe('a validation tag this code cannot read', () => {
       when: { kind: 'conditon', condition: { op: 'truthy', value: { kind: 'literal', value: 1 } } },
     }
 
-    // A guard that cannot be read has not said no. Skipping the rule is the
-    // permissive answer, and permissive is the direction that fails silently.
     expect(check(rule as unknown as ValidationRule, '')).toBe(DEFAULT_MESSAGES.required)
   })
 
   it('still honours a guard it can read', () => {
-    // The control. If an unreadable guard passing were achieved by ignoring
-    // guards altogether, this would fail.
     const rule: ValidationRule = { key: 'required', when: { kind: 'static', value: false } }
     expect(check(rule, '')).toBeUndefined()
   })
 
   it('fails a rule whose key is unreadable, rather than passing the value', () => {
-    // `{ key: 'requird' }` used to fall off the second switch and read as "the
-    // value is fine", so a mistyped rule was a rule that never ran.
     expect(check({ key: 'requird', value: 3 } as unknown as ValidationRule, '')).toBe(
       UNREADABLE_RULE,
     )
@@ -1228,20 +1003,6 @@ describe('a validation tag this code cannot read', () => {
   })
 })
 
-/**
- * Two ways a required answer stopped being required, both silent, both on the
- * server.
- *
- * The first is an empty object: `isEmpty` fell through to `false` for anything
- * that was not a string or an array, so `{"consent": {}}` satisfied `required`.
- * The second is a key named `__proto__`: the error message was computed
- * correctly and then assigned into a plain object literal, where `__proto__` is
- * a setter rather than a slot, so the assignment evaporated and `validateForm`
- * returned an empty object — a valid form.
- *
- * `validateDocument` refuses that key. Nothing on the render or validate path
- * calls `validateDocument`, which is what makes it reachable.
- */
 describe('a required answer that was not required', () => {
   const field = (key: string): ComponentNode => ({
     key,
@@ -1272,12 +1033,6 @@ describe('a required answer that was not required', () => {
   })
 
   it('reports a field whose key is __proto__', () => {
-    /*
-     * The message was always computed. It was the *assignment* that vanished:
-     * `errors['__proto__'] = message` on an object literal runs the inherited
-     * setter and creates no own property, so the result had zero keys and read
-     * as a valid form.
-     */
     const errors = validateForm(root([field('__proto__')]), {})
 
     expect(Object.keys(errors)).toEqual(['__proto__'])
@@ -1287,8 +1042,6 @@ describe('a required answer that was not required', () => {
   it('does not let a hostile key reshape the errors it returns', () => {
     const errors = validateForm(root([field('__proto__'), field('email')]), {})
 
-    // The other field still reports, and nothing has been written onto a
-    // prototype that a later `errors[key]` read could pick up.
     expect(Object.keys(errors).sort()).toEqual(['__proto__', 'email'])
     expect(({} as Record<string, unknown>)['email']).toBeUndefined()
   })
@@ -1320,14 +1073,6 @@ describe('a pattern rule', () => {
   })
 })
 
-/**
- * Three holes in this file, each one a branch nothing executed.
- *
- * Every case here was written by mutating the source and watching the suite
- * stay green. That is the only evidence a test is doing anything, and it is how
- * these were found: `guardPasses`' whole condition branch could be replaced with
- * `return false` and nothing went red.
- */
 describe('branches this file used to leave unexecuted', () => {
   const field = (key: string, validations: ValidationRule[]): ComponentNode => ({
     key,
@@ -1345,12 +1090,6 @@ describe('branches this file used to leave unexecuted', () => {
 
   describe('a rule whose message is empty', () => {
     it('still fails, with the default message', () => {
-      /*
-       * `rule.message ?? DEFAULT` keeps `''`, because `''` is not nullish — and
-       * `validateForm` records an error only `if (error)`, so an empty string
-       * made the rule stop failing. A pasted `"message": ""` turned a required
-       * field optional on the server with nothing to see.
-       */
       expect(check({ key: 'required', message: '' }, '')).toBe(DEFAULT_MESSAGES.required)
     })
 
@@ -1361,7 +1100,6 @@ describe('branches this file used to leave unexecuted', () => {
     })
 
     it('still prefers a message the author wrote', () => {
-      // The control. Ignoring `message` entirely would pass both tests above.
       expect(check({ key: 'required', message: 'We need this.' }, '')).toBe('We need this.')
     })
 
@@ -1402,12 +1140,6 @@ describe('branches this file used to leave unexecuted', () => {
   })
 
   describe('a rule guarded by a structured condition', () => {
-    /*
-     * The whole no-sandbox story, and no test executed it. `guardPasses`'
-     * `condition` branch could be replaced with `return false` and the entire
-     * repository suite stayed green — which would have made every guarded rule
-     * silently stop applying.
-     */
     const guarded = (): ComponentNode =>
       field('vat', [
         {
@@ -1430,18 +1162,12 @@ describe('branches this file used to leave unexecuted', () => {
     })
 
     it('reads the condition rather than merely noticing there is one', () => {
-      // Both directions above, on one fixture, which is what makes this a test
-      // of the branch and not of its presence.
       expect(validateForm(root([guarded()]), {})).toEqual({})
     })
   })
 
   describe('submittedData over a repeater', () => {
-    /*
-     * The row branch had no fixture at all: deleting the `isRowScope` case left
-     * every test green. Named so the two names differ, because a fixture that
-     * spells them the same cannot see the branch that tells them apart.
-     */
+    // Component and data keys differ, so the test sees which one is read.
     const withRows = (): ComponentNode =>
       root([
         {
@@ -1468,20 +1194,12 @@ describe('branches this file used to leave unexecuted', () => {
     })
 
     it('drops what a row no longer asks for', () => {
-      // The point of `submittedData`: it projects the document over the data,
-      // so an answer to a question that has been deleted does not survive.
       const data = { addresses: [{ line1: 'kept', removed: 'gone' }], email: '' }
 
       expect(submittedData(withRows(), data)).toEqual({ addresses: [{ line1: 'kept' }], email: '' })
     })
 
     it('reads a repeater whose stored value is not a list as no answer at all', () => {
-      /*
-       * Not `addresses: []`, which is what this used to expect. An empty list is
-       * an answer -- "I have no addresses" -- and inventing one for a value the
-       * form never collected is the thing `submittedData` exists to stop: it
-       * submits what was asked and given, and nothing else.
-       */
       const out = submittedData(withRows(), { addresses: 'nonsense', email: '' })
       expect(out).toEqual({ email: '' })
       expect(Object.hasOwn(out, 'addresses')).toBe(false)
@@ -1496,22 +1214,13 @@ describe('branches this file used to leave unexecuted', () => {
   })
 })
 
-/**
- * Two rules that let through exactly what they exist to stop.
- */
 describe('bounds and schemes', () => {
   it('fails min and max on a value that is not a number', () => {
-    /*
-     * `Number('not telling')` is `NaN`, and every comparison with `NaN` is
-     * false — so `min` and `max` both passed. The exported schema says
-     * `{"type":"number","minimum":18}` while the form accepts a sentence.
-     */
     expect(check({ key: 'min', value: 18 }, 'not telling')).toBe(DEFAULT_MESSAGES.min)
     expect(check({ key: 'max', value: 65 }, 'not telling')).toBe(DEFAULT_MESSAGES.max)
   })
 
   it('still compares numbers, however they were typed', () => {
-    // The control. A number field's value can arrive as a string from an input.
     expect(check({ key: 'min', value: 18 }, 21)).toBeUndefined()
     expect(check({ key: 'min', value: 18 }, '21')).toBeUndefined()
     expect(check({ key: 'min', value: 18 }, 3)).toBe(DEFAULT_MESSAGES.min)
@@ -1521,12 +1230,6 @@ describe('bounds and schemes', () => {
   it.each(['javascript:alert(1)', 'data:text/html,<script>', 'vbscript:x', 'file:///etc/passwd'])(
     'refuses %s as a URL',
     (value) => {
-      /*
-       * `URL.canParse` answers yes to any well-formed URL, scheme included —
-       * and `safeHref` in the same package keeps an allowlist precisely because
-       * these schemes are the ones that matter. A `url` rule that accepts
-       * `javascript:` tells an author their field holds a link.
-       */
       expect(check({ key: 'url' }, value)).toBe(DEFAULT_MESSAGES.url)
     },
   )
@@ -1558,13 +1261,7 @@ describe('bounds and schemes', () => {
  * sentence rather than to the distinction inside it.
  */
 describe('bounded matching of nested quantifiers', () => {
-  /*
-   * Each row supplies a value the pattern *matches*, which is what separates
-   * "refused" from "ran and did not match". Both answer with the same message,
-   * so a helper that fed every pattern a non-matching string would report every
-   * one of them as refused -- including the controls -- and the table would have
-   * proved nothing. That was the first version of this block.
-   */
+  // Each value matches its pattern, so a refusal cannot pass for a mismatch.
   const refused = (pattern: string, matching: string): boolean =>
     check({ key: 'pattern', value: pattern }, matching) === DEFAULT_MESSAGES.pattern
 
@@ -1583,8 +1280,6 @@ describe('bounded matching of nested quantifiers', () => {
     ['(\\d{3}-){4}x', '123-456-789-012-x', 'a fixed-length inner group is common'],
     ['(\\d{1,3}\\.){3}\\d{1,3}', '10.0.0.1', 'and an IP address must keep working'],
   ])('still runs %s — %s', (pattern, matching) => {
-    // The controls. A guard that refused every quantified group would pass every
-    // assertion above and break patterns people actually write.
     expect(refused(pattern, matching)).toBe(false)
   })
 })
@@ -1639,12 +1334,6 @@ describe('an evaluator that throws', () => {
   })
 
   it('leaves the guarded rule applying, because a guard nobody can read has not said no', () => {
-    /*
-     * The same answer the `default` case in `guardPasses` gives an unreadable
-     * guard, and for the same reason. The other direction is a required answer
-     * quietly becoming optional on the server, which is the permissive failure
-     * this project is organised against.
-     */
     expect(validateForm(root(guardedRule()), {}, { evaluate: boom })).toEqual({
       spouse: DEFAULT_MESSAGES.required,
     })
@@ -1655,19 +1344,12 @@ describe('an evaluator that throws', () => {
   })
 
   it('fails the custom rule, because a rule that cannot be run has not been satisfied', () => {
-    /*
-     * The same answer `matchesPattern` gives a pattern it refuses to run, in the
-     * same file. Not the same as a host that supplied no evaluator at all: that
-     * is a configuration the boot-time `evaluatorKeys` check already covers, and
-     * failing every custom rule for it would be wrong.
-     */
     expect(validateForm(root(customRule()), { code: 'x' }, { evaluate: boom })).toEqual({
       code: DEFAULT_MESSAGES.custom,
     })
   })
 
   it('still runs a custom rule whose evaluator works', () => {
-    // The control, in both directions.
     const yes: Evaluator = () => true
     const no: Evaluator = () => false
 
@@ -1678,30 +1360,14 @@ describe('an evaluator that throws', () => {
   })
 })
 
-/**
- * Three ways a rule read the wrong thing, or nothing.
- */
 describe('rules that a document can malform or misplace', () => {
   it('fails a pattern rule that carries no pattern rather than throwing', () => {
-    /*
-     * A document is data, so `{ key: 'pattern' }` with no `value` arrives from a
-     * paste, and `nestedUnbounded(undefined)` read `.length` off it -- out of
-     * `validateForm`, which is a 500 on submit. The same answer a pattern this
-     * refuses to run already gets.
-     */
     expect(() => check({ key: 'pattern' } as ValidationRule, 'x')).not.toThrow()
     expect(check({ key: 'pattern' } as ValidationRule, 'x')).toBe(DEFAULT_MESSAGES.pattern)
   })
 
   it('evaluates a custom rule inside a row against that row', () => {
-    /*
-     * `validateField` already resolves the *value* from the row, and the custom
-     * rule handed the expression top-level `FormData` -- so it checked a key
-     * from outside the row and reported against the row it never read.
-     *
-     * The fixture's two names differ, because that is the distinction the code
-     * branches on: the row is addressed by the repeater's data key.
-     */
+    // Component and data keys differ: the row is addressed by the data key.
     const seen: FormData[] = []
     const evaluate: Evaluator = (_expression, data) => {
       seen.push(data)
@@ -1743,11 +1409,6 @@ describe('rules that a document can malform or misplace', () => {
   })
 
   it('still lets a custom rule inside a row read a form-level answer', () => {
-    /*
-     * The control, and why the row's values are layered over the form's rather
-     * than replacing them: an expression comparing a row answer against
-     * something asked once, at the top of the form, has to reach both.
-     */
     const evaluate: Evaluator = (_expression, data) => data['country'] === 'GB'
 
     const root: ComponentNode = {
@@ -1811,10 +1472,7 @@ describe('patternProblem', () => {
     }
   })
 
-  /*
-   * Short source, large program: each counted repeat expands into a copy of its
-   * body. The value matches, so a refusal cannot be mistaken for a mismatch.
-   */
+  // The value matches, so a refusal cannot be mistaken for a mismatch.
   it('refuses a pattern whose compiled program is too large, and rule evaluation agrees', () => {
     const pattern = '^(a|b){999}$'
     const matching = 'a'.repeat(999)
@@ -1834,19 +1492,6 @@ describe('patternProblem', () => {
   })
 })
 
-/**
- * The cap on how much work a request body can ask for.
- *
- * `MAX_ROWS` and `TOO_MANY_ROWS` appeared in `validation.ts` and in the
- * re-export from `index.ts` and in no test anywhere in the repository. The row
- * count comes out of the data on purpose -- asking the browser how many rows
- * there are would let a client submit one and have the rest go unchecked -- so
- * the body decides how much work happens, and rows nest multiplicatively.
- *
- * Both directions matter. Delete the cap and a couple of hundred kilobytes of
- * JSON is millions of rule evaluations; flip the comparison and every repeater
- * refuses instead, which is a form nobody can submit.
- */
 describe('a repeater with more rows than will be checked', () => {
   const root: ComponentNode = {
     key: 'root',
@@ -1879,17 +1524,10 @@ describe('a repeater with more rows than will be checked', () => {
   it('refuses the list rather than checking a prefix of it', () => {
     const errors = validateForm(root, rows(MAX_ROWS + 1))
 
-    // At the repeater's own address, and alone: a prefix that validated clean
-    // would answer with the rows nobody looked at reported as fine.
     expect(errors).toEqual({ addressList: TOO_MANY_ROWS })
   })
 
   it('checks a list exactly at the cap', () => {
-    /*
-     * The boundary, and the control for the direction of the comparison. With
-     * `<` in place of `>` this list would report `TOO_MANY_ROWS` too, and the
-     * test above would still pass.
-     */
     const full = rows(MAX_ROWS)
     expect(validateForm(root, full)).toEqual({})
 
@@ -1901,13 +1539,6 @@ describe('a repeater with more rows than will be checked', () => {
   })
 })
 
-/**
- * A repeater that fails its own rule and is also over the cap.
- *
- * The rules on the repeater itself are checked first and write to the same
- * address, so `TOO_MANY_ROWS` overwrote them -- losing the message a person can
- * act on for one about the size of a body they did not choose.
- */
 describe('a repeater failing its own rule and the row cap at once', () => {
   const root: ComponentNode = {
     key: 'root',
@@ -1940,7 +1571,6 @@ describe('a repeater failing its own rule and the row cap at once', () => {
   })
 
   it('still reports the cap when the repeater own rules pass', () => {
-    // The control, and the reason the cap is there at all.
     const root2: ComponentNode = {
       ...root,
       children: [
@@ -1957,20 +1587,6 @@ describe('a repeater failing its own rule and the row cap at once', () => {
 })
 
 describe('a document nested deeper than the tree bound', () => {
-  /*
-   * The submit path, driven deep, which nothing in this file ever did.
-   *
-   * `validateForm`'s walk had no depth bound at all -- the only walk in the
-   * package without one, on the only path that runs server-side against a body
-   * somebody else chose the shape of. Nothing on that path calls
-   * `validateDocument`, so the gate that would have refused the document never
-   * runs. Every fixture in this file was two or three levels deep, so
-   * `submittedData`'s bound at the equivalent line had never been executed
-   * either: deleting it left the whole suite green.
-   *
-   * Built with a loop; building it recursively would overflow before the
-   * assertion could run.
-   */
   const nested = (n: number): ComponentNode => {
     let node: ComponentNode = {
       key: 'buried',
@@ -1991,35 +1607,14 @@ describe('a document nested deeper than the tree bound', () => {
   })
 
   it('refuses rather than passing, because a subtree nobody checked is not a subtree that passed', () => {
-    /*
-     * The direction, pinned. Returning silently past the bound would be the
-     * cheaper fix and it is the wrong one: the buried field is `required` and
-     * unanswered, so a silent stop answers "valid" for a form with a missing
-     * required answer -- on the server. `TOO_MANY_ROWS` refuses the identical
-     * shape twenty lines up in the source and says why in the same words.
-     *
-     * Asserted as "not empty" rather than by address, because the address the
-     * refusal lands on is the walk's stopping point and pinning it here would
-     * make this test about the bound's exact value.
-     */
+    // Not by address: that is the walk's stopping point, which depends on the
+    // bound's exact value.
     expect(validateForm(nested(MAX_TREE_DEPTH * 2), {})).not.toEqual({})
   })
 
   it('and the projection stops instead, which is the documented disagreement', () => {
-    /*
-     * The two answer differently past the bound, deliberately. `submittedData`
-     * submits what was asked and given, and past the bound nothing was asked --
-     * so it drops the subtree rather than inventing an error in a payload. The
-     * form has already refused, so there is no submit for the projection to be
-     * wrong about.
-     *
-     * Asserted by *answering* the buried field and watching the answer not come
-     * back, rather than by `not.toThrow()`. That was the first version of this
-     * test and it proved nothing: a thousand-deep tree does not overflow the
-     * stack, so it passed with `validation.ts`'s bound deleted -- which is
-     * exactly the "never been executed" state the review found the guard in.
-     * Measured: with the bound removed, `buried` is present here.
-     */
+    // Asserted by answering the buried field: this depth does not overflow, so
+    // `not.toThrow()` would pass with the bound deleted.
     const deep = nested(MAX_TREE_DEPTH * 2)
 
     expect(submittedData(deep, { buried: 'an answer' })).toEqual({})
@@ -2027,12 +1622,8 @@ describe('a document nested deeper than the tree bound', () => {
   })
 
   /**
-   * A chain of visible containers with one hidden node at the far end.
-   *
-   * `at` is the depth the hidden node lands on, counting the root as 0. The two
-   * orderings only ever disagree here: anywhere shallower, `isVisible` returns
-   * before the depth check is reached under either order, and anywhere deeper
-   * the walk has already stopped.
+   * `at` is the hidden node's depth, root 0. Checking visibility or depth first
+   * gives different answers only at `MAX_TREE_DEPTH + 1`.
    */
   const hiddenAt = (at: number): ComponentNode => {
     let node: ComponentNode = {
@@ -2056,31 +1647,14 @@ describe('a document nested deeper than the tree bound', () => {
   }
 
   it('does not refuse a submit over a subtree past the bound that nobody can see', () => {
-    /*
-     * The bound asks after visibility, not before it.
-     *
-     * With the order reversed, the node at depth 501 was refused with TOO_DEEP
-     * before anything asked whether it was on screen -- although this
-     * function's docblock says hidden components are skipped and so is
-     * everything beneath them. Nothing visible needed checking and the submit
-     * was refused anyway.
-     *
-     * The window is exactly one level wide, which is why the first version of
-     * this test did not catch it: a hidden branch at depth 1 returns before the
-     * depth check under either order, so it passed with the mutation applied.
-     * Caught in review on PR #35; the vacuous first draft was mine.
-     */
     expect(validateForm(hiddenAt(MAX_TREE_DEPTH + 1), {})).toEqual({})
   })
 
   it('still refuses when the node past the bound is one somebody can see', () => {
-    // The control. Reordering must not turn the bound off, only ask it second.
     expect(Object.values(validateForm(nested(MAX_TREE_DEPTH * 2), {}))).toContain(TOO_DEEP)
   })
 
   it('still validates a form nobody would call deep', () => {
-    // The control. A bound low enough to catch real authoring would be worse
-    // than the crash -- fields would silently stop being checked.
     const errors = validateForm(nested(20), {})
 
     expect(errors).toEqual({ buried: DEFAULT_MESSAGES.required })
@@ -2088,19 +1662,6 @@ describe('a document nested deeper than the tree bound', () => {
 })
 
 describe('a document the submit path cannot read', () => {
-  /*
-   * The malformed-shape rows the two functions a server calls did not have.
-   *
-   * Every neighbouring walker carries them -- `context.test.ts:481`,
-   * `css.test.ts:604-620`, `renderer.test.tsx:1649` -- and the two on the
-   * submit path did not, in a package whose comments repeatedly name an
-   * unhandled 500 as the failure to avoid. No source change was needed for any
-   * of these to throw; `children: 7` is not nullish, so `for...of 7` threw
-   * `TypeError` straight out of a route handler.
-   *
-   * Nothing on the validate path calls `validateDocument`, so none of these
-   * shapes is filtered before it arrives.
-   */
   const withChildren = (children: unknown): ComponentNode =>
     ({ key: 'root', type: 'Screen', props: {}, children }) as unknown as ComponentNode
 
@@ -2121,11 +1682,6 @@ describe('a document the submit path cannot read', () => {
   })
 
   it('still walks the children a real document has', () => {
-    /*
-     * The control. Guarding by returning nothing would pass every row above
-     * while quietly validating no form at all -- which is the permissive
-     * failure, not a fix for it.
-     */
     const root = withChildren([
       {
         key: 'name',
@@ -2139,13 +1695,6 @@ describe('a document the submit path cannot read', () => {
   })
 
   it('reports a validations entry that is not a rule rather than throwing', () => {
-    /*
-     * `applyRule` read `rule.when` before checking it was a rule, so
-     * `"validations": [null]` was a TypeError out of validateForm, on the
-     * server, per submit. `validationsOf` only checks the array is an array,
-     * and both `isRequired` and `context.ts` read rules with `rule?.`, so a
-     * nullish entry was already known to be reachable.
-     */
     const root = withChildren([
       {
         key: 'name',
@@ -2160,8 +1709,6 @@ describe('a document the submit path cannot read', () => {
   })
 
   it('does not let an unreadable rule pass as satisfied', () => {
-    // The direction. Skipping it would turn a field with one junk rule into a
-    // field with no rules, which is what the surrounding code refuses to do.
     const root = withChildren([
       { key: 'name', type: 'Field', props: {}, schema: { type: 'string', validations: [null] } },
     ])
@@ -2171,19 +1718,6 @@ describe('a document the submit path cannot read', () => {
 })
 
 describe('a rule with no value to check against', () => {
-  /*
-   * The four measuring rules, driven with the bound missing.
-   *
-   * `lengthOf(value) < rule.value` and `held < rule.value` are both false when
-   * `rule.value` is undefined -- every comparison against undefined is -- so
-   * the rule silently *passed* and the field was unconstrained on the server
-   * while the Rules tab still listed it. The `pattern` case one line below got
-   * an explicit guard with a comment saying a valueless rule "reaches here from
-   * a paste"; the same paste reaches these four.
-   *
-   * `{ key: 'min' }` with no value is a shape `validateDocument` reports, and
-   * nothing on the validate path calls it.
-   */
   const VALUELESS: [string, unknown][] = [
     ['absent', undefined],
     ['null', null],
@@ -2191,20 +1725,8 @@ describe('a rule with no value to check against', () => {
     ['NaN', Number.NaN],
   ]
 
-  /*
-   * A value each rule would otherwise accept, which is the whole point of the
-   * row.
-   *
-   * The first version passed one non-numeric string to all four, and for
-   * `min`/`max` that makes `comparableNumber(value)` return undefined -- so
-   * those rows failed on the *value* and would have failed with the new bound
-   * check deleted. They proved nothing about a missing bound. Raised in review
-   * on PR #39.
-   *
-   * A number satisfies a real `min`/`max`; a four-character string satisfies a
-   * real `minLength: 3` / `maxLength: 9`. So a row that still reports can only
-   * be reporting because the bound itself was unusable.
-   */
+  // Each value satisfies its rule under a usable bound, so a row can only fail
+  // because the bound is unusable.
   const SATISFYING: Record<string, JsonValue> = {
     minLength: 'abcd',
     maxLength: 'abcd',
@@ -2226,11 +1748,6 @@ describe('a rule with no value to check against', () => {
   )
 
   it('and each of those values really does satisfy the rule when the bound is usable', () => {
-    /*
-     * The control for the control. Without it the rows above could still be
-     * reporting for a reason with nothing to do with the bound -- which is
-     * exactly the defect they were rewritten for.
-     */
     expect(applyRule({ key: 'minLength', value: 3 }, SATISFYING['minLength'], {})).toBeUndefined()
     expect(applyRule({ key: 'maxLength', value: 9 }, SATISFYING['maxLength'], {})).toBeUndefined()
     expect(applyRule({ key: 'minItems', value: 1 }, SATISFYING['minItems'], {})).toBeUndefined()
@@ -2240,10 +1757,6 @@ describe('a rule with no value to check against', () => {
   })
 
   it('still applies each of them when the bound is a real number', () => {
-    /*
-     * The control, and it is not decoration: failing unconditionally would pass
-     * every row above while breaking every form that uses these four rules.
-     */
     expect(applyRule({ key: 'minLength', value: 3 }, 'abcd', {})).toBeUndefined()
     expect(applyRule({ key: 'minLength', value: 5 }, 'abcd', {})).toBeDefined()
     expect(applyRule({ key: 'maxLength', value: 3 }, 'ab', {})).toBeUndefined()
@@ -2253,8 +1766,6 @@ describe('a rule with no value to check against', () => {
   })
 
   it('leaves an empty value alone, because that is invariant 5', () => {
-    // Only `required` fails on an empty value. A valueless bound must not turn
-    // these four into a second rule that does.
     for (const key of MEASURING) {
       const rule = { key } as unknown as ValidationRule
 
@@ -2265,14 +1776,6 @@ describe('a rule with no value to check against', () => {
 })
 
 describe('the row cap on the projection', () => {
-  /*
-   * `submittedData`'s own row cap, which had never been executed.
-   *
-   * The cap is pinned for `validateForm` and the docblock says the bounds are
-   * duplicated here precisely because a host may project before it validates --
-   * which the signature invites, since neither function needs the other. No
-   * test drove it, so deleting the line left the suite green.
-   */
   const repeater: ComponentNode = {
     key: 'addressList',
     dataKey: 'addresses',
@@ -2293,8 +1796,6 @@ describe('the row cap on the projection', () => {
   })
 
   it('still projects a list under the cap', () => {
-    // The control. Dropping every repeater would pass the row above while
-    // silently emptying every payload this function exists to build.
     const under = { addresses: [{ line1: 'x' }, { line1: 'y' }] }
 
     expect(submittedData(root, under)).toEqual(under)
@@ -2302,20 +1803,6 @@ describe('the row cap on the projection', () => {
 })
 
 describe('submittedAcross and a key that lives on Object.prototype', () => {
-  /*
-   * The twin of the block above, and it had no test of any kind.
-   *
-   * That block drives `validateAcross` only. `submittedAcross` has the same
-   * hazard by the same mechanism -- `merged[key] ??= value` reads before it
-   * writes -- and it is the function that builds the *payload*. Change
-   * `validation.ts`'s `Object.create(null)` to `{}` here and every answer
-   * submitted under a data key of `toString`, `valueOf`, `constructor`,
-   * `hasOwnProperty` or `isPrototypeOf` disappears from the projection, on the
-   * submit path, with nothing failing.
-   *
-   * Nothing has to be bypassed to reach it: all five pass `KEY_PATTERN`, and
-   * nothing on the render or validate path calls `validateDocument`.
-   */
   const PROTOTYPE_KEYS = ['toString', 'valueOf', 'constructor', 'hasOwnProperty', 'isPrototypeOf']
 
   const field = (key: string): ComponentNode => ({
@@ -2340,11 +1827,8 @@ describe('submittedAcross and a key that lives on Object.prototype', () => {
     children,
   })
 
-  /*
-   * Two scopes, so the coalescing branch is what runs rather than a single pass
-   * that never merges anything. One prototype-named field per step, so the
-   * merge has to carry a name from each.
-   */
+  // Two scopes, each with prototype-named fields, so the merge coalesces names
+  // from both.
   const root: ComponentNode = {
     key: 'root',
     type: 'Screen',
@@ -2369,13 +1853,8 @@ describe('submittedAcross and a key that lives on Object.prototype', () => {
   })
 
   it('hands back a plain object rather than a null-prototype one', () => {
-    /*
-     * The other half of the same decision. `submittedData` spreads back to a
-     * plain object deliberately, "so a host does not receive something
-     * surprising back from a function it will hand straight to
-     * `JSON.stringify`" -- and a host calling `payload.hasOwnProperty(...)` on
-     * a null-prototype object throws.
-     */
+    // A host calling `payload.hasOwnProperty(...)` on a null-prototype object
+    // throws.
     const payload = submittedAcross(root, answers, scopes)
 
     expect(Object.getPrototypeOf(payload)).toBe(Object.prototype)
@@ -2383,8 +1862,6 @@ describe('submittedAcross and a key that lives on Object.prototype', () => {
   })
 
   it('still submits an ordinary answer, and only what the form asked', () => {
-    // The control. Returning everything unfiltered would pass both rows above
-    // while defeating the whole point of the projection.
     const plain: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -2401,16 +1878,6 @@ describe('submittedAcross and a key that lives on Object.prototype', () => {
 })
 
 describe('a repeater whose own rule fails while its answer is the wrong shape', () => {
-  /*
-   * `NOT_A_LIST` overwrote the repeater's own rule failure, which is the
-   * mistake the `TOO_MANY_ROWS` branch twenty lines below it was fixed for --
-   * that one guards with `if (!Object.hasOwn(errors, at))` and explains that
-   * clobbering "los[es] the message a person can act on".
-   *
-   * The same argument applies here and the guard was not copied: an author
-   * reading "This list was not sent as a list" learns nothing they can act on,
-   * where "This field is required" is a sentence about their form.
-   */
   const list: ComponentNode = {
     key: 'addressList',
     dataKey: 'addresses',
@@ -2425,20 +1892,14 @@ describe('a repeater whose own rule fails while its answer is the wrong shape', 
   const root: ComponentNode = { key: 'root', type: 'Screen', props: {}, children: [list] }
 
   it('keeps the message a person can act on', () => {
-    /*
-     * An empty string, not `'nope'`. Both are "not a list", but only one also
-     * fails `required` -- a non-empty string satisfies it, so the first draft
-     * of this test had no prior error for `NOT_A_LIST` to clobber and was
-     * asserting against a case that could not distinguish the two.
-     */
+    // An empty string, because a non-empty one satisfies `required` and leaves
+    // no prior error for `NOT_A_LIST` to overwrite.
     const errors = validateForm(root, { addresses: '' })
 
     expect(errors['addressList']).toBe(DEFAULT_MESSAGES.required)
   })
 
   it('still reports the shape when no rule of its own failed', () => {
-    // The control. Never reporting NOT_A_LIST would pass the row above while
-    // turning every required field inside the repeater optional again.
     const optional: ComponentNode = {
       ...root,
       children: [{ ...list, schema: { type: 'array', validations: [] } }],

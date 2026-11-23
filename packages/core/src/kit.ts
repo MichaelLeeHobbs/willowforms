@@ -1,13 +1,3 @@
-/**
- * The kit registry contract.
- *
- * This is the seam the whole product is built on: the designer knows about
- * ComponentDef metadata and nothing about MUI, shadcn, or any other library.
- * A kit contributes palette entries and property schemas here; it contributes
- * React components in @willowforms/renderer. Keeping the two apart is what lets
- * @willowforms/core run in Node for server-side validation.
- */
-
 import type { EventName, FieldSchema, JsonValue, PropValue } from './types.js'
 
 export type PaletteGroup =
@@ -130,7 +120,7 @@ export interface ComponentDef {
    * The document root. Exactly one component per kit declares this, and it is
    * the type `emptyRoot()` produces. It is never offered in the palette: the
    * root already exists, and dropping a second one nests a screen inside a
-   * screen. It used to appear there, because the palette showed everything.
+   * screen.
    */
   root?: boolean
   /** Participates in form data and therefore gets a schema. */
@@ -157,12 +147,8 @@ function componentsOf(kit: Kit): ComponentDef[] {
       Boolean(component) &&
       typeof component === 'object' &&
       typeof component.type === 'string' &&
-      /*
-       * Non-empty, and that matters rather than being tidiness: `instantiate`
-       * refuses a definition whose `type` is the empty string, so without this
-       * the palette can offer an entry that does nothing when dropped. A
-       * control that is visible and inert is worse than one that is absent.
-       */
+      // `instantiate` refuses an empty `type`, so the palette would offer an
+      // entry that does nothing when dropped.
       component.type.length > 0,
   )
 }

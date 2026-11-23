@@ -1,17 +1,11 @@
 /**
- * The outcome of one clipboard write.
- *
- * - `copied`: the browser accepted the text.
- * - `unavailable`: there is no clipboard API here, as on a page that is not a
- *   secure origin or in some embedded webviews.
+ * - `unavailable`: no clipboard API, as outside a secure context or in some
+ *   embedded webviews.
  * - `refused`: the API exists but the write failed, usually a denied permission.
  */
 export type CopyOutcome = 'copied' | 'unavailable' | 'refused'
 
-/**
- * Writes text to the system clipboard. Never throws or rejects: every failure
- * is reported as an outcome so each caller can explain it in its own words.
- */
+/** Never throws or rejects; every failure is an outcome for the caller to explain. */
 export async function copyText(text: string): Promise<CopyOutcome> {
   // `navigator.clipboard` is typed as always present, but browsers omit it
   // outside secure contexts.

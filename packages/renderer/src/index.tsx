@@ -1,12 +1,3 @@
-/**
- * The runtime renderer.
- *
- * Ships independently of the designer, because most consumers embed a form
- * without ever embedding the builder. It knows how to walk a document and
- * resolve property bindings; it knows nothing about which component library
- * draws the result. That comes in as a RendererKit.
- */
-
 import {
   Component,
   createContext,
@@ -126,10 +117,9 @@ export interface NodeAttributes {
   /**
    * Which row of which repeater this element is in: `addresses[1]`.
    *
-   * Absent outside a repeater, so every existing selector matches exactly what
-   * it matched before. Separate from `data-fs-key` on purpose, because the two
-   * are wanted in opposite directions: per-component CSS is authored once and
-   * has to reach every row, while a click has to land on one.
+   * Absent outside a repeater. Separate from `data-fs-key` on purpose, because
+   * the two are wanted in opposite directions: per-component CSS is authored
+   * once and has to reach every row, while a click has to land on one.
    */
   'data-fs-row'?: string
 }
@@ -151,49 +141,27 @@ interface RenderContext {
   data: FormData
   errors: FormErrors
   translations: Record<string, string>
-  /*
-   * The evaluator and the host's context travel together, because every call
-   * that needs one needs the other: a computed binding is handed the context
-   * too, and a condition reads it without an evaluator at all.
-   */
   options: EvalOptions
   navigation: ReadonlyMap<string, NodeNavigation>
   dispatch: (node: ComponentNode, event: EventName, address: string, value?: JsonValue) => void
   onChange: (address: string, value: JsonValue) => void
-  /** Told when a node's render threw, so a host can put it in its own telemetry. */
   onError: ((error: Error, key: string) => void) | undefined
 }
 
 const Ctx = createContext<RenderContext | null>(null)
 const DensityCtx = createContext<FormDensity | undefined>(undefined)
 
-/*
- * Shared empty objects, so an absent `errors` prop or a language with no
- * translations does not allocate a fresh literal on every render. A new object
- * identity there would change the context value every render and make the
- * useMemo below do nothing at all, re-rendering every node in the form.
- */
+// Shared so their identity holds across renders; a fresh literal would defeat
+// the context and props memos and re-render every node.
 const NO_ERRORS: FormErrors = Object.freeze({})
 const NO_TRANSLATIONS: Record<string, string> = Object.freeze({})
 const NO_NAVIGATION: ReadonlyMap<string, NodeNavigation> = new Map()
-
-/*
- * One frozen empty object, for every node whose props read no answers.
- *
- * Frozen so nothing can write into the shared instance, and shared so its
- * identity holds across renders -- which is the whole point, since the identity
- * is what lets a props memo survive a keystroke.
- */
 const NO_DATA: FormData = Object.freeze({})
 
 /**
- * Whether resolving this node's props needs to look at the form's answers.
- *
- * `static` and `i18n` resolve from the node and the translation bundle alone.
- * `computed` and `condition` read `data`, and so does anything this does not
- * recognise -- the pessimistic direction on purpose, because being wrong the
- * other way resolves a prop against an empty form. A missed memo costs a
- * render; a prop resolved against nothing is a wrong label on screen.
+ * Anything other than `static` and `i18n` counts as reading `data`, unknown
+ * kinds included: a wrong guess that way costs a memo, the other way a prop
+ * resolved against an empty form.
  */
 function readsData(node: ComponentNode): boolean {
   const props: unknown = node.props
@@ -206,7 +174,6 @@ function readsData(node: ComponentNode): boolean {
   })
 }
 
-/** Stable content used to retry a failed renderer after the document changes. */
 function signatureOf(node: ComponentNode): string {
   try {
     return JSON.stringify(node) ?? ''
@@ -234,27 +201,12 @@ export function resolveProp(
     case 'static':
       return value.value
     case 'i18n':
-      /*
-       * An own-property read. A plain lookup finds `Object.prototype`, so an
-       * `i18n` key of `toString` resolved to a *function* — which React renders
-       * as nothing, so the label silently disappeared. The same rule `valueOf`
-       * and `readPath` follow everywhere else in this project.
-       */
       return Object.hasOwn(translations, value.key)
         ? (translations[value.key] ?? value.key)
         : value.key
-    /*
-     * Resolves to a boolean. Meant for renderWhen, and harmless anywhere else.
-     *
-     * `options.row` is passed, and used not to be — so a prop bound to a
-     * condition could not read its own row while `renderWhen` could. That makes
-     * `rowScopeProblems`' advice, "set the test to read this row", work for one
-     * and silently do nothing for the other.
-     */
     case 'condition':
       return evaluateCondition(value.condition, data, options.context, options.row)
     case 'computed':
-      // No sandbox means no evaluation. Render the field rather than crash the form.
       if (!options.evaluate) return null
 
       try {
@@ -264,16 +216,6 @@ export function resolveProp(
         return null
       }
 
-    /*
-     * A kind this code does not have. `null` rather than falling off the end
-     * returning `undefined`, so a kit reading this prop gets a JSON value like
-     * every other branch does — and, more to the point, so the compiler keeps
-     * checking this switch. Without the `default` the closed union is what made
-     * the missing tail legal, and a document is not a value the compiler made.
-     *
-     * `validateDocument` refuses such a document up front. This is what happens
-     * to the one that never went through it.
-     */
     default:
       return unreadableTag(value, null)
   }
@@ -287,11 +229,6 @@ function resolveProps(
 ): Record<string, JsonValue> {
   const out: Record<string, JsonValue> = {}
 
-  /*
-   * Guarded, because this is the only layer that was not total over an
-   * untrusted document. `Object.entries(5)` is `[]` but `Object.entries(null)`
-   * throws, and one node missing `props` used to take the whole form with it.
-   */
   const props =
     node.props && typeof node.props === 'object' && !Array.isArray(node.props) ? node.props : {}
 
@@ -302,13 +239,8 @@ function resolveProps(
 }
 
 /**
- * Drawn when a document names a component type the kit does not have.
- *
- * It carries the error, and that is not decoration. `validateForm` validates a
- * node whatever its type, so a document naming a missing type still produces
- * errors for it — and a required one blocks the submit. Without this the person
- * filling in the form gets a rejected submit and nothing on screen that says
- * which field, which is the failure this project treats as the worst.
+ * Shows the node's error: `validateForm` still validates a node of unknown
+ * type, so a required one can block the submit.
  */
 function MissingType({ node, nodeProps, error }: NodeRendererProps): ReactNode {
   return (
@@ -323,12 +255,6 @@ function MissingType({ node, nodeProps, error }: NodeRendererProps): ReactNode {
   )
 }
 
-/**
- * The row the nodes beneath it are being drawn in.
- *
- * A repeater provides one per row. Nothing else touches it, so a form with no
- * repeater never leaves the default and behaves exactly as it did.
- */
 const RowCtx = createContext<RowContext | undefined>(undefined)
 
 interface NodeBoundaryProps {
@@ -337,13 +263,6 @@ interface NodeBoundaryProps {
   scope: string
 
   row: string | undefined
-  /**
-   * Whether the node it wraps is one `renderWhen` hides, drawn anyway.
-   *
-   * The same reason as `row` above: the canvas selects by these attributes, and
-   * `[data-fs-hidden]` is how it tells a revealed node from an ordinary one. A
-   * fallback without it reads as a component the form is really asking for.
-   */
   hidden: boolean
   onError: ((error: Error, key: string) => void) | undefined
   children: ReactNode
@@ -356,17 +275,14 @@ type BoundaryState = {
 }
 
 class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
-  // `null` is "no failure to compare against yet", not a signature. The
-  // signature is only read while failed, so computing one here would be work
-  // for nothing -- and `getDerivedStateFromError` has no props to compute it
-  // from, which is why the first failed render records it instead.
+  // `signature` stays `null` until the render after a throw records it:
+  // `getDerivedStateFromError` has no props to compute it from.
   override state: BoundaryState = { failed: false, signature: null, runtime: null }
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true }
   }
 
-  /** Retry after either document content or runtime inputs change. */
   static getDerivedStateFromProps(
     props: NodeBoundaryProps,
     state: BoundaryState,
@@ -374,8 +290,6 @@ class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
     if (!state.failed) return null
 
     const signature = signatureOf(props.node)
-    // The render right after the throw. Record what failed; do not read the
-    // fallback as a repair.
     if (state.signature === null) {
       return { failed: true, signature, runtime: props.runtime }
     }
@@ -384,11 +298,7 @@ class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
   }
 
   override componentDidCatch(error: Error, _info: ErrorInfo): void {
-    /*
-     * Reported rather than logged. A host that is watching wants this in its own
-     * telemetry, and React has already written its own copy to the console — so
-     * swallowing it here would hide it and logging it again would double it.
-     */
+    // Reported, not logged: React already writes caught errors to the console.
     this.props.onError?.(error, this.props.node.key)
   }
 
@@ -404,19 +314,8 @@ class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
         {...(this.props.row === undefined ? {} : { 'data-fs-row': this.props.row })}
         {...(this.props.hidden ? { 'data-fs-hidden': 'true' } : {})}
         /*
-         * And a mark saying it is the fallback, which the three attributes above
-         * cannot say.
-         *
-         * They exist so a broken component stays selectable, and that is right.
-         * The cost is that every one of them is also emitted by a component that
-         * did not render: `test/kit-contract.test.tsx` read `data-fs-key`,
-         * `data-fs-type` and `data-fs-scope` to prove a kit spreads `nodeProps`,
-         * and a kit renderer replaced by `throw new Error()` satisfied all three
-         * from here. Two contract rules could not fail, and nobody noticed
-         * because they had been green since before this class existed.
-         *
-         * So the fallback says which one it is. An assertion that a kit rendered
-         * something can now check it is not this.
+         * The attributes above keep a broken node selectable, so they do not
+         * prove a kit rendered; an assertion that one did must check this too.
          */
         data-fs-failed=""
         style={{ padding: 8, border: '1px dashed currentColor', opacity: 0.7 }}
@@ -428,13 +327,6 @@ class NodeBoundary extends Component<NodeBoundaryProps, BoundaryState> {
   }
 }
 
-/**
- * One error, read as an own property.
- *
- * A node keyed `constructor` made `errors['constructor']` a function, so `error`
- * was truthy: the kit put the field into an error state and drew a message that
- * renders as nothing. A red field with no text and no way to clear it.
- */
 function errorAt(errors: FormErrors, address: string): string | undefined {
   return Object.hasOwn(errors, address) ? errors[address] : undefined
 }
@@ -460,24 +352,7 @@ function Row({
   return <RowCtx.Provider value={context}>{children}</RowCtx.Provider>
 }
 
-/**
- * A node's children, whatever the document put there.
- *
- * `node.children?.map(...)` assumed an array, while core guards the identical
- * shape everywhere it walks a document -- `Array.isArray(node.children)` appears
- * in `rows.ts`, `context.ts` and `tree.ts`. A document is data, so `children`
- * can be a string, and `.map` on one throws during render.
- *
- * The elements are checked too, and that is a blast-radius question rather than
- * a crash one. Guarding only the array left a `null` element to throw at
- * `child.key` inside `RenderNodeBody` -- above every child's own boundary, so
- * the *parent's* caught it and one bad entry replaced the whole container and
- * every sibling under it. The boundary is per node on purpose; a junk element
- * should cost the junk element.
- *
- * Dropped rather than rendered as a fallback box, because there is no node to
- * describe: an entry with no `key` cannot be named, addressed or selected.
- */
+// Junk entries are dropped, not drawn as a fallback: without a `key` one cannot be named or selected.
 function childrenOf(node: ComponentNode): ComponentNode[] {
   if (!Array.isArray(node.children)) return []
   return node.children.filter(
@@ -531,29 +406,10 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
     [options, row],
   )
 
-  /*
-   * Shared with validateForm, so a hidden field is never validated behind the
-   * user's back. Computed up here because the node's attributes depend on it.
-   */
   const visible = isVisible(node, data, scoped)
 
-  /*
-   * `data` only when a prop actually reads it.
-   *
-   * The memo's dependency list held `data`, which is a new object on every
-   * keystroke, so for the case that matters it could never hit: a repeater near
-   * the `MAX_ROWS` cap re-ran `resolveProps` and allocated a fresh props
-   * identity for every node under every row on each keystroke, defeating
-   * exactly the identity comparison a memoising kit component does.
-   *
-   * `static` and `i18n` props resolve without looking at `data` at all, and
-   * that is most props in most documents. For those this passes a frozen empty
-   * object whose identity never changes, and the memo holds across a keystroke.
-   *
-   * `readsData` is deliberately pessimistic -- anything it does not recognise
-   * counts as reading -- so the failure it can have is a missed memo rather
-   * than a prop resolved against the wrong data.
-   */
+  // `data` is a new object on every keystroke; passing it only to props that
+  // read it keeps the props memo, and a memoising kit component, from rerunning.
   const forProps = readsData(node) ? data : NO_DATA
   const props = useMemo(
     () => resolveProps(node, translations, forProps, scoped),
@@ -564,15 +420,9 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
       ? props['density']
       : inheritedDensity
 
-  // On the derived string, not on the node. Depending on the node re-creates
-  // this on any edit to it, which defeats memoisation in every kit component
-  // that compares props by identity.
+  // `address` memoises on this string, not on `node`: depending on the node
+  // gives `handleChange` a new identity on any edit to it.
   const dataKey = dataKeyOf(node)
-  /*
-   * An address, not a bare key. Outside a repeater the two are the same string,
-   * so a host that never adds one sees no change; inside one it names the row,
-   * and `applyChange` in core is the writer that places it.
-   */
   const address = useMemo(() => addressOf(row?.path ?? NO_ROWS, dataKey), [row, dataKey])
   const handleChange = useCallback(
     (value: JsonValue) => onChange(address, value),
@@ -605,48 +455,14 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 
   /* Rows are keyed by address index because submitted data has no stable row id. */
 
-  /*
-   * Computed only for a repeater, which is what asks for it. Every node in the
-   * document used to read its own value out of the data and build a row list
-   * from it, on every render, to answer a question only a row scope asks.
-   */
   const repeats = isRowScope(node)
-  /*
-   * The same cap `validateForm` applies, and for the same reason one layer over.
-   *
-   * Validation refuses a repeater past `MAX_ROWS` rather than checking a prefix,
-   * because a row nobody checked passing silently is the permissive failure this
-   * project is organised against. The renderer had no cap at all, so a body with
-   * a hundred thousand rows drew a hundred thousand subtrees -- the browser tab
-   * rather than the server, and from the same request.
-   *
-   * Sliced rather than refused, because a renderer's job is to stay on screen:
-   * the rows past the cap are the ones validation has already declined to check.
-   */
   const all = repeats ? rowsOf(valueOf(row?.values ?? data, dataKey)) : EMPTY_ROWS
   const rows = all.length > MAX_ROWS ? all.slice(0, MAX_ROWS) : all
-  /*
-   * `AUTHORED_ROW`, not a fresh `[{}]`.
-   *
-   * A new array holding a new object on every render is a new `value` for
-   * `Row`, whose `useMemo` lists it -- so the memo that exists to stop
-   * `isVisible` and `resolveProps` running for every node beneath a row on
-   * every keystroke never held for the one row an empty repeater draws on the
-   * canvas, which is the row an author is looking at while they type.
-   */
   const drawn = revealHidden && repeats && rows.length === 0 ? AUTHORED_ROW : rows
 
   const children = repeats
     ? drawn.map((value, index) => (
-        <Row
-          key={index}
-          path={row?.path ?? NO_ROWS}
-          // The same `dataKey` computed above, not a second call: two readings
-          // of one node's name are two things that can drift.
-          name={dataKey}
-          index={index}
-          value={value}
-        >
+        <Row key={index} path={row?.path ?? NO_ROWS} name={dataKey} index={index} value={value}>
           {childrenOf(node).map((child) => (
             <RenderNode key={child.key} node={child} />
           ))}
@@ -662,8 +478,6 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
           node={node}
           props={props}
           nodeProps={nodeProps}
-          // Value by data key, error by node key. Two components may share a data
-          // key; they can still fail for different reasons.
           value={valueOf(row?.values ?? data, dataKey)}
           error={errorAt(errors, addressOf(row?.path ?? NO_ROWS, node.key))}
           required={isRequired(node, data, scoped)}
@@ -680,25 +494,15 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 }
 
 /**
- * One node's blast radius, and it now covers the whole node.
+ * One node inside its own error boundary, so a throw while rendering it,
+ * the document root included, replaces only that node with a notice.
  *
- * Almost nothing here can throw for a reason a document controls: it reads a
- * context and returns a boundary, and `RenderNodeBody` does the work inside it.
- * Not a guarantee this code enforces, though -- `encodeRow`, `isVisible` and
- * `NodeBoundary`'s own construction all run out here. Each is total against a
- * document today, and each is a line that could stop being.
- *
- * This is also what gives the document root a boundary. `FormRenderer` renders
- * `<RenderNode node={document.root} />` with nothing above it, so a throw at the
- * root unmounted the whole tree -- a blank page in whatever host embedded the
- * form, which is the one outcome the boundary exists to prevent, at the one node
- * it did not cover.
+ * Code outside the boundary (`encodeRow`, `isVisible`, the boundary's own
+ * props) must not throw for any document.
  */
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const runtime = useRenderContext()
   const { scope, onError, data, options, revealHidden } = runtime
-  // The same coordinate the body puts on `nodeProps`, so a fallback is findable
-  // in the row that broke rather than in whichever row drew first.
   const row = useContext(RowCtx)
 
   return (
@@ -707,14 +511,8 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       runtime={runtime}
       scope={scope}
       row={row ? encodeRow(row.path) : undefined}
-      /*
-       * Evaluated here and again in `RenderNodeBody`, but only on the canvas.
-       * `revealHidden` short-circuits first, so a host renderer calls
-       * `isVisible` once per node; the designer pays twice to draw the node it
-       * is about to mark hidden, which is the price of the boundary owning the
-       * attribute rather than the body that would otherwise have to hoist it
-       * out through a context.
-       */
+      // Evaluated again in `RenderNodeBody`; `revealHidden` short-circuits, so
+      // only the canvas pays twice.
       hidden={revealHidden && !isVisible(node, data, { ...options, ...(row ? { row } : {}) })}
       onError={onError}
     >
@@ -723,15 +521,9 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   )
 }
 
-/** Shared, so a node that is not a repeater allocates no row list at all. */
 const EMPTY_ROWS: FormData[] = []
 
-/**
- * The one row an empty repeater draws while it is being authored.
- *
- * Shared for the same reason as `EMPTY_ROWS`, and it matters more: this one is
- * a `value` a memo compares by identity.
- */
+/** The row an empty repeater draws while authored. Shared: `Row` memoises on it by identity. */
 const AUTHORED_ROW: FormData[] = [{}]
 
 export interface FormNavigation {
@@ -873,10 +665,8 @@ export interface FormRendererProps {
   /**
    * One field changed, reported at an address.
    *
-   * Outside a repeater the address is the bare key, which is why this went
-   * unnoticed. Inside one it carries the row: `addresses[1].line1`. The
-   * parameter is named `address` rather than `key` because the old name is an
-   * invitation to write `{ ...data, [key]: value }`, which then creates a
+   * Outside a repeater the address is the bare key. Inside one it carries the
+   * row: `addresses[1].line1`. Writing `{ ...data, [address]: value }` creates a
    * property called `addresses[1].line1` and silently drops every answer in the
    * repeater. Write it with `applyChange` from `@willowforms/core`.
    */
@@ -992,13 +782,7 @@ export function FormRenderer({
     ],
   )
 
-  /*
-   * One stylesheet for the whole document rather than a style attribute per
-   * node: a kit owns its components' `style`, and writing there would fight it.
-   * Every rule is scoped to a `data-fs-key`, which every renderer already
-   * spreads, so this reaches exactly the elements the document names.
-   */
-
+  // One stylesheet, not a `style` attribute per node: a kit owns its components' `style`.
   const root: unknown = document.root
   const rooted =
     Boolean(root) && typeof root === 'object' && typeof (root as { key?: unknown }).key === 'string'
@@ -1018,13 +802,7 @@ export function FormRenderer({
 
   return (
     <Ctx.Provider value={ctx}>
-      {/*
-       * `nonce`, because a host with `style-src 'self'` drops this element and
-       * every per-component style with it -- silently, since a blocked style is
-       * not an error anybody sees. There is no default: a nonce this library
-       * invented would not match the header the host sent, and pretending
-       * otherwise is worse than saying nothing.
-       */}
+      {/* No default nonce: one this library made up would not match the host's CSP header. */}
       {sheet && <style {...(nonce === undefined ? {} : { nonce })}>{sheet}</style>}
       <DensityCtx.Provider value={undefined}>
         <RenderNode node={document.root} />

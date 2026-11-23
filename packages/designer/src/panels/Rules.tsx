@@ -8,14 +8,12 @@ import type { DesignerApi } from '../store.js'
 import { TranslationEditor, translationKey } from './Binding.js'
 import { ConditionEditor, emptyCondition } from './ConditionEditor.js'
 
-/** What each rule needs from the author beyond a message. */
 type Parameter = 'none' | 'number' | 'text' | 'expression' | 'field'
 
 interface RuleDef {
   key: ValidationKey
   label: string
   parameter: Parameter
-  /** Placeholder or hint for the parameter input. */
   hint?: string
 }
 
@@ -53,7 +51,6 @@ const FIELD_TYPES: FieldSchema['type'][] = [
   'file',
 ]
 
-/** A rule of this kind, with a parameter the type demands. */
 function makeRule(key: ValidationKey): ValidationRule {
   switch (key) {
     case 'minLength':
@@ -79,13 +76,7 @@ export interface RulesProps {
   api: DesignerApi
 }
 
-/**
- * Every rule key this panel knows how to draw a row for.
- *
- * Taken from `DEFAULT_MESSAGES`, which is core's own list and the one
- * `validateForm` answers `UNREADABLE_RULE` against. Two lists would agree until
- * somebody added a rule to one.
- */
+// Core's own rule list, the one `validateForm` checks, so the two cannot drift.
 const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
 
 function usable(rule: unknown): rule is ValidationRule {
@@ -122,27 +113,14 @@ export function Rules({ api }: RulesProps): ReactNode {
     )
   }
 
-  /*
-   * Guarded, because a document is data. `validateDocument` refuses a schema
-   * with non-array validations now, and nothing on the path from a paste to
-   * this panel runs it — a pasted `"schema": {"type":"string"}` rendered fine
-   * on the canvas and took the whole designer down the moment this tab opened.
-   * The panel is where somebody goes to repair such a document.
-   */
-
+  // Guarded: a host's document reaches this panel even when `validateDocument`
+  // rejects it (see `store.ts`).
   const rules = (Array.isArray(schema.validations) ? schema.validations : []).filter(usable)
   const write = (next: Partial<FieldSchema>): void =>
     api.setFieldSchema(node.key, { ...schema, ...next })
 
-  /*
-   * Whether changing the data type would stop this component repeating.
-   *
-   * Core recognises a repeater from the node — `schema.type === 'array'` plus
-   * children — so this select quietly decides whether a container draws its
-   * subtree once or once per row. Changing it away from `array` stops the rows
-   * being drawn and makes every row-scoped condition inside read nothing, and
-   * the control gives no sign that it does anything but name a type.
-   */
+  // Core treats an `array` schema with children as a repeater, so changing the
+  // type silently stops the rows and empties every row-scoped condition inside.
   const repeats = schema.type === 'array' && Array.isArray(node.children)
   const scopes = keyScopesFor(api.document.root, node.key)
 
@@ -288,18 +266,8 @@ interface RuleRowProps {
 }
 
 /**
- * A rule's numeric parameter, held as a draft and committed on blur.
- *
- * Written straight through, `Number('')` is `0`: backspacing the last digit of a
- * `minLength` set the rule to 0 -- a rule that passes everything, written by
- * somebody halfway through typing a different number. Refusing the empty string
- * instead is no better, because the input is controlled: the old value snaps
- * back and the box cannot be cleared to retype at all, which is the same trap
- * `KeyField` documents.
- *
- * So: type freely, commit on blur or Enter, revert on Escape, and an empty box
- * or an unreadable one commits nothing. The fourth editor in this repository
- * with this shape, and the last of them.
+ * A draft committed on blur: written straight through, `Number('')` is 0, and
+ * refusing `''` would stop the controlled box from being cleared to retype.
  */
 function NumberField({
   id,
@@ -314,8 +282,7 @@ function NumberField({
   const [draft, setDraft] = useState(text)
   const [committed, setCommitted] = useState(text)
 
-  // Re-sync when the document changes underneath: undo, redo, or a document
-  // swapped in from the JSON dialog.
+  // Re-sync on outside changes: undo, redo, or the JSON dialog.
   if (text !== committed) {
     setCommitted(text)
     setDraft(text)
@@ -384,10 +351,8 @@ function RuleRow({
       </div>
 
       {/*
-        Narrowed on `rule.key`, the union's discriminant, rather than on the
-        descriptor's `parameter`. TypeScript cannot connect the two, so spreading
-        a rule narrowed only by the descriptor would let a string land in a
-        numeric `value`.
+        Narrowed on `rule.key`, not the descriptor's `parameter`: TypeScript
+        cannot connect the two, so a string could land in a numeric `value`.
       */}
       {isNumeric(rule) && (
         <div className="fs-prop-row">

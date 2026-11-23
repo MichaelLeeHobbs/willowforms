@@ -3,32 +3,11 @@
  */
 
 /**
- * A document's style value cannot author a rule, in either kit.
- *
- * `background` on `Box` is the only free-form CSS style value either kit has,
- * and a document is data. That sentence is checked rather than remembered --
- * see the first test below, which reads it back off `kit.components`. The two kits reach the page by different routes, so
- * the obligation is one sentence with two sinks:
- *
- * - `@willowforms/kit-mui` puts the value in `sx`, which emotion concatenates
- *   into stylesheet text. A `}` there ends the class block and everything after
- *   it is a new top-level rule against the whole page.
- * - `@willowforms/kit-html` puts it in a React `style` object. On the client CSSOM
- *   drops a malformed value, which is why this kit was reported safe. It is not:
- *   React's server renderer does no CSS validation at all and writes the string
- *   into the attribute verbatim, and MUI's dominant deployment is Next.js.
- *
- * So the MUI half is asserted against the emitted stylesheet and the HTML half
- * against server-rendered markup. Neither reads CSSOM, deliberately: jsdom's CSS
- * parser is a subset of a browser's and rejects values Chromium accepts, so an
- * assertion routed through it agrees with the right answer for the wrong reason.
- *
- * Which is also why each kit is checked on one path rather than both. The other
- * path for `kit-html` is the client, where React writes the value through
- * `el.style` and jsdom's parser decides what survives -- the browser's decision,
- * not this kit's. The other path for MUI is the server, where the stylesheet
- * does not exist in the markup at all: emotion hands it to a host-side extractor
- * this suite does not run. Both would be assertions about somebody else's code.
+ * kit-mui puts a style value in `sx`, which emotion concatenates into
+ * stylesheet text, so a `}` ends the class block. kit-html puts it in a `style`
+ * object, which React's server renderer writes verbatim. So MUI is checked on
+ * the emitted stylesheet and HTML on server markup. Neither goes through CSSOM:
+ * jsdom's CSS parser rejects values a browser accepts.
  */
 
 import type { ReactElement } from 'react'
@@ -42,15 +21,9 @@ import type { RendererKit } from '@willowforms/renderer'
 import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
 import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
-/** The payload from the report, which emitted a second top-level rule. */
 const INJECTION = 'red}html{display:none}.x{'
 
-/**
- * A value that fetches. The rendering shape does not stop this one in either
- * kit — measured with request interception, the outbound request fires
- * identically from an inline attribute and from an emotion class — and on a
- * page collecting answers a fetch keyed off a field is exfiltration.
- */
+/** Fetches from an inline style and from an emotion class alike. */
 const EXFILTRATION = 'url(https://evil.example/p.png)'
 
 function documentOf(root: ComponentNode): FormDocument {
@@ -86,12 +59,7 @@ function formOf(kit: RendererKit, background: string, padding = 2): ReactElement
   )
 }
 
-/**
- * Top-level blocks in a stylesheet, as selector and body.
- *
- * A brace-depth walk rather than CSSOM, for the reason in the file comment: the
- * question is what text this kit put on the page, not what jsdom will parse.
- */
+/** A brace-depth walk, not CSSOM, for the reason in the file comment. */
 function rulesIn(sheet: string): { selector: string; body: string }[] {
   const rules: { selector: string; body: string }[] = []
   let depth = 0
@@ -120,19 +88,9 @@ function rulesIn(sheet: string): { selector: string; body: string }[] {
 }
 
 /**
- * Every rule emotion emitted for this render, in document order.
- *
- * `padding` is per case and it is not decoration. Emotion caches by content
- * hash and will not re-insert a rule it believes is already on the page, and
- * `safeStyleValue` refuses both hostile backgrounds identically -- so the
- * sanitised `sx` for the injection case and the exfiltration case were the same
- * bytes, the second render inserted nothing, and `beforeEach` had already
- * removed the tag the first one left. The exfiltration assertion then read an
- * empty string and passed having seen no CSS at all, which is exactly the shape
- * of guard this file exists to catch.
- *
- * A different padding gives each case its own hash, so every case produces its
- * own rule and the assertions below can insist on finding one.
+ * Give each case its own `padding`: emotion does not re-insert a rule with a
+ * content hash it has seen, and both hostile backgrounds sanitise to the same
+ * bytes.
  */
 function emittedRules(background: string, padding = 2): { selector: string; body: string }[] {
   render(formOf(muiRendererKit, background, padding))
@@ -142,14 +100,8 @@ function emittedRules(background: string, padding = 2): { selector: string; body
 }
 
 /**
- * The `style` attribute the server renderer wrote onto the Box.
- *
- * With the floor its MUI sibling already had. Every assertion downstream is a
- * `not`, and `''` satisfies all of them: an attribute that never rendered, a
- * regex that stopped matching, a renamed key -- each of those would have turned
- * this whole describe green while reading nothing. So the read has to prove it
- * found something first, and `padding` is the declaration that is always there
- * and never the thing under test.
+ * Requires a `padding` declaration first: callers assert with `not`, which an
+ * empty string passes.
  */
 function serverStyleAttribute(kit: RendererKit, background: string): string {
   const markup = renderToStaticMarkup(formOf(kit, background))
@@ -163,7 +115,6 @@ function serverStyleAttribute(kit: RendererKit, background: string): string {
 // Image sources use their own allowlist and inline-style path, covered in e2e/image-backgrounds.spec.ts.
 const CONSTRAINED = new Set(['number', 'select', 'boolean', 'image'])
 
-/** Every style prop in a kit whose value a document writes as it likes. */
 function freeStyleValues(kit: {
   components: readonly {
     type: string
@@ -202,8 +153,7 @@ describe('a document CSS value cannot author a rule', () => {
   )
 
   beforeEach(() => {
-    // Emotion caches by content hash across renders in one file, and a stale
-    // tag from an earlier case would be counted as this case's output.
+    // A stale tag from an earlier case would count as this case's output.
     for (const tag of Array.from(document.querySelectorAll('style'))) tag.remove()
   })
 
@@ -226,8 +176,7 @@ describe('a document CSS value cannot author a rule', () => {
     it('refuses a value that fetches', () => {
       const rules = emittedRules(EXFILTRATION, 4)
 
-      // The floor its sibling above has and this one did not. Without it,
-      // "sanitised" and "nothing was emitted" are the same green.
+      // Without these, "sanitised" and "nothing was emitted" look the same.
       expect(rules).toHaveLength(1)
       expect(rules[0]?.body).toContain('padding')
       expect(rules.map((rule) => rule.body).join('')).not.toContain('evil.example')

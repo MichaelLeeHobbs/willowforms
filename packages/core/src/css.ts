@@ -1,19 +1,8 @@
 /**
- * Per-component styling, turned into a stylesheet.
- *
- * `ComponentNode.css` is raw CSS text per breakpoint, and it comes from a
- * document, which is data: authored by one person, deployed by another, and
- * hand-editable in between. So the text is **declarations only**, and anything
- * that could leave the block it is placed in is refused rather than escaped.
- *
- * That is the same boundary the rest of the project draws. The designer's own
- * stylesheet is forbidden from reaching into a kit's components by a test that
- * parses it; a Style tab that let an author write `input { padding: 0 }` would
- * hand every author the ability to make that mistake one form at a time.
- *
- * Keys are escaped rather than refused, because unlike the declarations they
- * are not something an author is writing here. Refusing one would break a
- * document that already renders, over a character in a name.
+ * `ComponentNode.css` comes from a document, which is data, so it must be
+ * declarations only: anything that could leave its block is refused, not
+ * escaped. Keys are escaped rather than refused, because refusing one would
+ * break a document that already renders.
  */
 
 import type { ComponentNode, Device } from './types.js'
@@ -49,7 +38,6 @@ export const DEVICE_QUERY: Record<Exclude<Device, 'any'>, string> = {
 /** Tokens that can escape, obscure, or extend the generated declaration block. */
 const FORBIDDEN = /[{}<@\\]|\/\*|\*\//
 
-/** True when neither quote style is left open. */
 function quotesBalanced(text: string): boolean {
   let single = 0
   let double = 0
@@ -80,24 +68,14 @@ export function safeDeclarations(text: string | undefined): string | undefined {
   if (!trimmed) return undefined
   if (FORBIDDEN.test(trimmed)) return undefined
   if (!quotesBalanced(trimmed)) return undefined
-  // Authored styles cannot initiate resource requests.
   if (FETCHING.test(trimmed)) return undefined
   return trimmed
 }
 
 /**
- * Characters that would let a single value stop being a single value.
- *
- * A superset of `FORBIDDEN`, and deliberately not the same regex. That one
- * judges a declaration *list*, where `;` separates and a `data:` URI needs one
- * in the middle of it. This one judges one value on one prop, where `;` starts a
- * second declaration the author did not write and nothing legitimate needs it.
- * Two sinks, two grammars.
- *
- * `!` goes with them because `!important` on a value the author did not mark is
- * a document overriding the page, and `/*` because a comment can swallow the
- * rest of the block. Control characters end a CSS string, and a backslash is how
- * `url(` is written as `\75 rl(` without the letters ever appearing.
+ * Stricter than `FORBIDDEN` because it judges one value, not a list: `;` would
+ * start a second declaration, `!` an unasked `!important`, a control character
+ * ends a CSS string, and a backslash can spell `url(` as `\75 rl(`.
  */
 // eslint-disable-next-line no-control-regex
 const FORBIDDEN_VALUE = /[{}<@;!\\]|\/\*|[\u0000-\u001f\u007f]/
@@ -126,11 +104,9 @@ export function safeStyleValue(value: string | undefined): string | undefined {
   return trimmed
 }
 
-/** Encode an external key as a CSS string using fixed-width hexadecimal escapes. */
 function escapeKey(key: string): string {
   return key.replace(
-    // The control range is the point, not an accident: a raw newline or a NUL
-    // inside a CSS string ends it, and a key can hold either.
+    // Control characters on purpose: a raw newline inside a CSS string ends it.
     // eslint-disable-next-line no-control-regex
     /["\\<]|[\u0000-\u001f\u007f]/g,
     (ch) => '\\' + (ch.codePointAt(0) ?? 0).toString(16).padStart(6, '0') + ' ',
@@ -138,13 +114,8 @@ function escapeKey(key: string): string {
 }
 
 /**
- * A selector for one node, optionally confined to one rendered form.
- *
- * A key is unique inside a document and nowhere else. Two forms on one page
- * both have a `root`, and usually an `email`, so with no scope the first form's
- * stylesheet reaches into the second. The scope is a compound rather than a
- * descendant selector so that it also matches the root node, which carries both
- * attributes itself.
+ * The scope is a compound, not a descendant, selector so it also matches the
+ * root node, which carries both attributes.
  */
 function selectorFor(key: string, scope: string | undefined): string {
   const within = scope === undefined ? '' : '[data-fs-scope="' + escapeKey(scope) + '"]'
@@ -184,12 +155,6 @@ export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = 
       const declarations = safeDeclarations(css[name])
       if (!declarations) continue
 
-      /*
-       * A simulated device emits only its own rules, after the base, so the
-       * cascade order on the canvas is the order they appear. Two device
-       * entries never apply at once, so nothing has to be resolved between
-       * them.
-       */
       if (device) {
         if (name === device) base.push(selector + '{' + declarations + '}')
         continue
@@ -218,28 +183,15 @@ export function parseDeclarations(text: string | undefined): [string, string][] 
 }
 
 /**
- * A property name, folded to lower case unless it is a custom property.
- *
- * CSS property names are case-insensitive, so a control looking for `padding`
- * has to find `PADDING` — which is why this folded everything. Custom property
- * names are **not**: `--brandColor` and `--brandcolor` are two different
- * properties. Folding them meant that touching any structured control rewrote
- * the name, and the `var()` that read it stopped matching. Silently, because the
- * declaration is still there and still valid CSS.
+ * CSS property names are case-insensitive, but custom property names are not:
+ * `--brandColor` and `--brandcolor` are different properties.
  */
 function normaliseName(name: string | undefined): string {
   const trimmed = name?.trim() ?? ''
   return trimmed.startsWith('--') ? trimmed : trimmed.toLowerCase()
 }
 
-/**
- * Split on a separator, ignoring any that is inside quotes or parentheses.
- *
- * `limit` caps the number of splits, not the number of pieces, so a value
- * holding its own `:` survives: `background: url(a:b)` splits once and the rest
- * stays in the value. Escapes are honoured inside strings, because `"\""` is a
- * quote that does not close the string.
- */
+/** `limit` caps the number of splits, not pieces, so a value keeps its own `:`. */
 function splitTop(text: string, separator: string, limit = Infinity): string[] {
   const parts: string[] = []
   let start = 0
@@ -254,11 +206,7 @@ function splitTop(text: string, separator: string, limit = Infinity): string[] {
       else if (ch === quote) quote = undefined
       continue
     }
-    /*
-     * Outside a string as well. A backslash escapes the next character wherever
-     * it appears in CSS, and this honoured one only inside quotes -- so an
-     * escaped separator split a declaration that CSS reads as a single one.
-     */
+    // A backslash escapes the next character anywhere in CSS, not only in strings.
     if (ch === '\\') i += 1
     else if (ch === '"' || ch === "'") quote = ch
     else if (ch === '(') depth += 1

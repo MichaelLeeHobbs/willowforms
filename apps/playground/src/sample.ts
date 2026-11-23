@@ -47,7 +47,6 @@ export const SAMPLE_DOCUMENT: FormDocument = {
         key: 'website',
         type: 'TextField',
         props: { label: prop('Website') },
-        // Optional, but must be a URL when supplied.
         schema: { type: 'string', validations: [{ key: 'url' }] },
       },
       {

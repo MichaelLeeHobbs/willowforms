@@ -30,7 +30,6 @@ const PALETTES = {
   desert: 'Desert Willow — AZT Bi-Color',
 }
 
-/** Read a saved selector choice, accepting it only when it names an own entry of `registry`. */
 export function loadChoice<K extends string>(
   key: string,
   registry: Record<K, unknown>,
@@ -86,7 +85,6 @@ function loadDraft(id: string): Draft {
 
 const theme = createTheme({ colorSchemes: { dark: true } })
 
-/** Keep the host-owned MUI palette aligned with the designer's view preference. */
 function ThemeModeSync({ mode }: { mode: DesignerTheme }): null {
   const { setMode } = useColorScheme()
 

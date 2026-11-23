@@ -2,18 +2,7 @@
  * @vitest-environment jsdom
  */
 
-/**
- * The kit contract, as an executable spec.
- *
- * Every rule here is run against every kit in the repo. That is the point of
- * having a second one: until `@willowforms/kit-html` existed, "adding a kit is a
- * new package, not a rewrite" was a claim in a design document, and the contract
- * it rests on was whatever `@willowforms/kit-mui` happened to do.
- *
- * A third kit should be added to KITS below and nothing else. If it passes, it
- * works in the designer; if it fails, the message says which obligation it
- * missed.
- */
+/** The kit contract. A new kit is added to KITS below and nothing else. */
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps, ReactElement } from 'react'
@@ -43,18 +32,9 @@ const KITS: { name: string; kit: Kit; renderers: RendererKit }[] = [
 ]
 
 /**
- * Every error the renderer's boundary caught during the test that just ran.
- *
- * This file could not fail on a kit that throws. Two of its rules read
- * `data-fs-key`, `data-fs-type` and `data-fs-scope` off the rendered element to
- * prove a kit spreads `nodeProps` -- and the boundary's fallback emits all three,
- * so a kit renderer replaced by `throw new Error()` satisfied both. A third
- * asserted `expect(render).not.toThrow()`, which a boundary guarantees by
- * existing. Three contract rules, green since before the boundary was written,
- * checking nothing.
- *
- * The boundary is right and stays. What was missing is that nothing in this file
- * ever asked whether it had fired.
+ * Errors the renderer's boundary caught. Its fallback also emits `data-fs-key`,
+ * `data-fs-type` and `data-fs-scope`, so without this a kit that throws passes
+ * the rules that read them.
  */
 const caught: { key: string; error: Error }[] = []
 
@@ -64,14 +44,8 @@ beforeEach(() => {
 
 afterEach(() => {
   if (caught.length === 0) return
-  /*
-   * Thrown rather than asserted, for two reasons. `expect` outside a test block
-   * is what `vitest/no-standalone-expect` exists to stop, and it is right to:
-   * this runs after the test, so an assertion here reads as belonging to a test
-   * that has finished. And the message matters more than the matcher -- naming
-   * the component and what it threw is the difference between a report and
-   * `1 !== 0`.
-   */
+  // Thrown, not asserted: `vitest/no-standalone-expect`, and the message names
+  // what threw.
   throw new Error(
     'The renderer caught an error, so a kit renderer did not render. Whatever this test ' +
       'asserted about the DOM, it was reading the fallback. ' +
@@ -80,15 +54,8 @@ afterEach(() => {
 })
 
 /**
- * `FormRenderer` with the trap already wired.
- *
- * Every render in this file goes through this rather than `FormRenderer`, and
- * that is the mechanism: a new rule written here inherits the check instead of
- * having to remember it. Wiring `onError` per test is what would rot, because
- * the rule that needs it most is the one somebody adds in a hurry.
- *
- * A caller's own `onError` is still called. One test passes a spy and asserts it
- * was not called, which is the same claim from the other end.
+ * Render through this, not `FormRenderer`, so a new rule inherits the boundary
+ * check. A caller's own `onError` is still called.
  */
 function FormUnderTest(props: ComponentProps<typeof FormRenderer>): ReactElement {
   const { onError, ...rest } = props
@@ -110,11 +77,8 @@ function documentOf(root: ComponentNode): FormDocument {
     name: 'Contract',
     root,
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US` as `createDocument` makes it: without a dialect, a bundle keyed by
+    // tag and one keyed by bare code look the same.
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -242,52 +206,19 @@ function BranchingSteps({ renderers }: { renderers: RendererKit }): ReactElement
 }
 
 /*
- * The two kits in this repository deliberately share component types, so a
- * document authored against one renders against the other and the playground
- * can switch between them live. Nothing in the contract requires that of a
- * third-party kit; it is a courtesy these two keep, and 03-components.md says
- * "Built means both kits implement it".
- *
- * A courtesy nothing checks is a courtesy that lapses. These two had already
- * drifted once: kit-mui carried icon names kit-html did not, and no palette
- * drew either, so nobody noticed until the vocabulary was closed.
+ * The two kits here share component types so a document moves between them
+ * (`03-components.md`: "Built means both kits implement it"). The contract does
+ * not ask that of a third-party kit.
  */
 /**
- * Where the two kits deliberately, or at least knowingly, do not agree.
- *
- * `Button.variant` offers contained/outlined/text in MUI and solid/outline/plain
- * in the HTML kit, so a document authored against one carries a variant the
- * other has never heard of. That is a real gap in the claim that a document
- * travels between kits, it is bigger than a test, and it is written up in the
- * run's `found.md` rather than papered over here.
- *
- * Named so the comparison stays strict everywhere else, and checked below so an
- * entry cannot outlive the divergence it excuses.
+ * Known gaps in that agreement, named so the comparison stays strict everywhere
+ * else.
  */
 const DIVERGENT_VOCABULARY = new Set(['Button.variant'])
 
 /**
- * The component types this file's rules are written against.
- *
- * Four rules here used to open with a bare `return` when the kit did not offer
- * the component they drive, and two `it.each` tables were built by filtering a
- * hard-coded type list against what the kits declare -- and vitest 2.1.9
- * implements `each` as `cases.forEach(...)`, with no guard for an empty array.
- * So renaming `Select` in both kits, or narrowing `Text.variant` to one option,
- * turned obligations off rather than failing them, and the file reported green
- * having registered fewer tests than it has rules.
- *
- * That is the pattern this suite already rejects for `RadioGroup` in its own
- * words: "this used to return quietly ... which is the one thing a contract
- * suite must never let a kit do". The list is here so the turning-off is a
- * failure with a name, in one place, rather than four quiet exits.
- */
-/*
- * Types alone were not enough. A rule drives a component *through a property*,
- * and a renamed property turns the rule off as quietly as a renamed type did:
- * the fixture still sets `variant` on the node, because a node's props are free
- * form, and the kit simply stops reading it. So each entry names the properties
- * its rules depend on, and both halves are asserted together.
+ * Components this suite drives, and the props it drives them through. A renamed
+ * type or prop would turn a rule off rather than fail it, so both are asserted.
  */
 const DRIVEN: Record<string, readonly string[]> = {
   Alert: ['severity'],
@@ -302,10 +233,8 @@ const DRIVEN: Record<string, readonly string[]> = {
 }
 
 /**
- * Ask before driving a component, and fail rather than skip when it is missing.
- *
- * Returns whether the kit offers it, so a caller can stop before producing a
- * second, more confusing failure out of the same cause.
+ * Returns whether the kit offers it, so a caller can stop before a second
+ * failure from the same cause.
  */
 function requires(kit: Kit, type: string): boolean {
   const offered = kit.components.some((def) => def.type === type)
@@ -316,10 +245,6 @@ function requires(kit: Kit, type: string): boolean {
   return offered
 }
 
-/**
- * `instantiate`, narrowed. It answers `undefined` for a definition with no
- * usable `type`, which no fixture here supplies.
- */
 const made = (def: ComponentDef, root: ComponentNode): ComponentNode => {
   const node = instantiate(def, root)
   if (!node) throw new Error('instantiate refused a definition this test expects it to accept')
@@ -327,31 +252,11 @@ const made = (def: ComponentDef, root: ComponentNode): ComponentNode => {
 }
 
 /**
- * The properties whose values are CSS pixels in both kits.
- *
- * Read by two describes: the pixels rule inside the per-kit block derives its
- * rows from these, and `a length means the same number of pixels in both kits`
- * compares the defaults. Declared here, above both, rather than beside the
- * second one. It used to sit below the first, which worked only because this
- * runner invokes a `describe` callback after the module has finished
- * evaluating; a runner that invokes it during evaluation would have hit the
- * temporal dead zone and failed to load the file at all.
- *
- * The agreement rules leave `defaultProps` alone, on the ground that a kit is
- * entitled to its own sensible default. That is true of a prop nobody sees in
- * the document and false of a length: `02-kit-contract.md` says a length in a
- * document is CSS pixels, and a kit built on a design system with its own
- * spacing scale "converts at its edge".
- *
- * So the defaults rule is equality, not merely agreement about the unit. A
- * `defaultProps` value is written into every node the designer creates, before
- * any renderer fallback is consulted, so it leaves with the document -- and the
- * catalogue's promise is that a document authored against one kit renders
- * against the other. A kit that wants a roomier form changes what it renders,
- * not the number it writes into somebody else's document.
- *
- * Named rather than inferred from the editor, because `columns`, `index` and
- * `maxLength` are numbers too and none of them is a length.
+ * Props whose values are CSS pixels (`02-kit-contract.md`). Their defaults must
+ * be equal across kits, not just agree on the unit: `defaultProps` is written
+ * into every node the designer creates and leaves with the document. Named
+ * rather than inferred from the editor, because `columns`, `index` and
+ * `maxLength` are numbers too.
  */
 const LENGTHS = ['gap', 'padding', 'radius', 'maxWidth', 'width', 'minColumnWidth', 'inputWidth']
 
@@ -408,10 +313,8 @@ describe('the two kits in this repository agree', () => {
       expect(b, type + ' is missing from @willowforms/kit-mui').toBeDefined()
       if (!a || !b) return
 
-      // Everything a form author sees or a document stores. Not defaultProps
-      // wholesale -- a kit is entitled to a different sensible default -- but
-      // the lengths among them are checked separately below, because their
-      // unit belongs to the contract rather than to the kit.
+      // Not `defaultProps`: a kit may pick its own defaults, except lengths,
+      // which are checked below.
       expect(a.label).toBe(b.label)
       expect(a.icon).toBe(b.icon)
       expect(a.group).toBe(b.group)
@@ -419,16 +322,8 @@ describe('the two kits in this repository agree', () => {
       expect(a.root ?? false).toBe(b.root ?? false)
       expect(a.dataBound ?? false).toBe(b.dataBound ?? false)
       expect(a.dataType).toBe(b.dataType)
-      /*
-       * Every field of a property, not just its name and editor.
-       *
-       * `localizable` is what decides whether an author can bind a label to a
-       * translation at all, `conditional` whether they can bind it to a
-       * condition, and `section` which tab the row appears on. Two kits could
-       * disagree about all six and this said they were described identically --
-       * a document authored against one kit would then offer bindings the other
-       * refuses, which is the drift the whole describe exists to catch.
-       */
+      // Every field of a property: `localizable`, `conditional` and `section`
+      // decide which bindings and which tab an author gets.
       const described = (def: ComponentDef): unknown[] =>
         def.props.map((prop) => ({
           name: prop.name,
@@ -451,19 +346,8 @@ describe('the two kits in this repository agree', () => {
 })
 
 /**
- * A length authored once means the same number of pixels in every kit.
- *
- * This is the divergence the `Grid` comment two functions above `Box` was
- * written to prevent, sitting undetected below it. `borderRadius` in an MUI `sx`
- * block is multiplied by `theme.shape.borderRadius`, which defaults to 4, while
- * the kit divided by 8: an authored `radius: 24` rendered 12px in MUI against
- * 24px in the HTML kit. Nothing caught it because no test rendered one document
- * through both kits and compared what came out.
- *
- * The declarations are read out of what each kit emitted rather than out of
- * `getComputedStyle`. jsdom has no cascade worth trusting and no layout engine,
- * so the question here is deliberately the narrower one it can answer: what CSS
- * did this kit write.
+ * MUI multiplies a numeric `sx` `borderRadius` by `theme.shape.borderRadius`.
+ * Reads the CSS each kit wrote, not `getComputedStyle`: jsdom has no layout.
  */
 describe('a length means the same thing in both kits', () => {
   const box = (): ComponentNode => ({
@@ -485,22 +369,17 @@ describe('a length means the same thing in both kits', () => {
     )
   }
 
-  /** The declarations one kit wrote for the Box, whichever sink it used. */
   function declarationsFor(renderers: RendererKit): string {
     /*
-     * Nothing is cleared between renders, deliberately. Emotion caches by
-     * content hash and will not re-insert a rule it believes is already on the
-     * page, so removing its style tags makes the *next* render emit nothing and
-     * the reading come back empty. The sheets are matched by the element's own
-     * class instead, which is exact and does not care what else is mounted.
+     * Style tags are not cleared between renders: emotion does not re-insert a
+     * rule it has seen, so the next render would emit nothing. Sheets are
+     * matched by the element's own class instead.
      */
     const { container } = render(formOf(renderers))
 
     const el = container.querySelector('[data-fs-key="target"]')
     if (!el) throw new Error('the Box did not render')
 
-    // The HTML kit writes a style attribute; the MUI kit writes an emotion rule
-    // for the class it put on the element.
     const inline = el.getAttribute('style') ?? ''
     const classes = (el.getAttribute('class') ?? '')
       .split(/\s+/)
@@ -513,7 +392,6 @@ describe('a length means the same thing in both kits', () => {
     return (inline + ';' + sheets).replace(/\s+/g, '')
   }
 
-  /** One declaration's value, normalised, or nothing if the kit did not write it. */
   function valueOfDeclaration(css: string, name: string): string | undefined {
     return new RegExp('[;{]' + name + ':([^;}]+)').exec(';' + css)?.[1]
   }
@@ -535,48 +413,9 @@ describe('a length means the same thing in both kits', () => {
   })
 })
 
-/**
- * A list of options is a document's list, and a document is data.
- *
- * Every kit maps over `props.options` and reads `.value` off each entry. A
- * `null` in that array threw during render — and core has `optionValue`
- * precisely because these entries cannot be trusted, so the guard existed one
- * layer down and was not used here.
- *
- * The error boundary added for theme 3 keeps a throw inside its own node now, so
- * this is a lost control rather than a lost page. A lost control is still the
- * question the form was asking.
- */
-/**
- * A list of options is a document's list, and a document is data.
- *
- * Every kit mapped over `props.options` and read `.value` off each entry, so a
- * `null` in that array threw during render — in four places across two kits.
- * Core has `optionValue` precisely because these entries cannot be trusted, so
- * the guarded read existed one layer down and was not the one the controls used
- * to draw. They share `optionEntry` now, which is `optionValue`'s inverse.
- *
- * The error boundary added for theme 3 keeps a throw inside its own node, so
- * this is a lost control rather than a lost page. A lost control is still the
- * question the form was asking.
- */
-/**
- * A document's string does not become a class name, a variant, or a URL.
- *
- * Every one of these is a value a kit interpolated or trusted because its own
- * `defaultProps` only ever holds sensible ones. A document is data, and the same
- * file already narrows some of them — `Text.align` has a comment saying exactly
- * why — so what is here is the ones that were missed rather than a new rule.
- */
-/**
- * Three obligations every kit already had, that nothing ran.
- */
 describe('what a data-bound control has to say about itself', () => {
-  /*
-   * Data-bound and not a container. A repeater is data-bound — its value is the
-   * list of rows — but it is not a control anybody types into, and marking a
-   * container invalid or required says nothing a screen reader can use.
-   */
+  // Not containers: a repeater is data-bound, but marking a container invalid
+  // or required says nothing a screen reader can use.
   function bound(kit: Kit): { type: string; def: ComponentDef }[] {
     return kit.components
       .filter((def) => def.dataBound && !def.container)
@@ -610,13 +449,8 @@ describe('what a data-bound control has to say about itself', () => {
   }
 
   /**
-   * The control inside a component, whatever element the kit chose for it.
-   *
-   * The ARIA widget roles are here because a kit is not obliged to use a native
-   * element: a combobox built from a `div` is a control, and looking only for
-   * `input, select, textarea` would find nothing and hand it to the fallback
-   * below, which used to pass it. Every role listed supports `aria-invalid` and
-   * `aria-required`.
+   * ARIA widget roles too, because a kit need not use a native element. Every
+   * role listed supports `aria-invalid` and `aria-required`.
    */
   const WIDGET =
     'input, select, textarea, [role="combobox"], [role="textbox"], [role="listbox"],' +
@@ -627,12 +461,6 @@ describe('what a data-bound control has to say about itself', () => {
   }
 
   it.each(KITS)('$name marks a failing control invalid', ({ kit, renderers }) => {
-    /*
-     * A stated obligation of the contract, and one the contract test
-     * deliberately did not cover — so three MUI components never set it while
-     * the HTML kit set it on all three. A control that looks wrong and does not
-     * say so is announced to a screen reader as fine.
-     */
     const missing = bound(kit)
       .filter(({ def }) => {
         const element = drawField(renderers, def, {
@@ -640,20 +468,7 @@ describe('what a data-bound control has to say about itself', () => {
         })
         const target = control(element)
 
-        /*
-         * A data-bound, non-container component with no widget in it at all.
-         *
-         * This used to be satisfied by finding any `role="alert"` inside the
-         * component -- which every data-bound component is separately required
-         * to have, a few rules down, so the obligation was discharged by
-         * something already mandatory elsewhere. A kit whose control is a
-         * `div[role="combobox"]` passed without ever setting `aria-invalid`.
-         *
-         * The roles are part of `WIDGET` now, so a non-native control is found
-         * and held to the same rule, and reaching here means the component
-         * collects an answer through nothing a screen reader can be told about.
-         * That is reported, not excused.
-         */
+        // No widget at all: nothing can tell a screen reader it is invalid.
         if (!target) return true
 
         return (
@@ -667,12 +482,7 @@ describe('what a data-bound control has to say about itself', () => {
   })
 
   it.each(KITS)('$name marks a required control required', ({ kit, renderers }) => {
-    /*
-     * WCAG 3.3.2. `node` is on `NodeRendererProps` and no renderer read it, in
-     * either kit — so a required field was required in `validateForm` and
-     * ordinary in the accessibility tree, and the first anybody heard of it was
-     * a rejected submit.
-     */
+    // WCAG 3.3.2.
     const missing = bound(kit)
       .filter(({ def }) => {
         const element = drawField(renderers, def, {
@@ -691,8 +501,6 @@ describe('what a data-bound control has to say about itself', () => {
   })
 
   it.each(KITS)('$name leaves an unrequired control unmarked', ({ kit, renderers }) => {
-    // The control. Marking everything required would pass the test above and
-    // announce every field as mandatory.
     const wrong = bound(kit)
       .filter(({ def }) => {
         const element = drawField(renderers, def, {
@@ -708,42 +516,17 @@ describe('what a data-bound control has to say about itself', () => {
 })
 
 /**
- * Whether a kit hands the answer back at all.
- *
- * Everything above this asks how a kit *draws*. Nothing asked whether it
- * *collects*, and the gap was total: this file imported `fireEvent` once and
- * used it once, for a radio click, while `onChange={() => undefined}` appeared
- * eighteen times. Replacing every real `onChange` in a kit with a no-op left the
- * whole suite green bar one rule. A kit that draws every control, labels it,
- * announces its errors and drops every keystroke was a conforming kit.
- *
- * The rules below drive each data-bound control the way a person would and
- * assert the value reached `onChange`. Two things keep them honest. Every driver
- * throws when it cannot find something to drive, because a driver that silently
- * does nothing turns this into eighteen more tests that pass on silence. And the
- * last rule runs the same code against a deliberately deaf kit and requires it to
- * report nothing, so the failure path these rules exist for runs on every suite
- * rather than having been checked once by whoever wrote them.
+ * A driver must throw when it finds nothing to drive, or its rule passes on
+ * silence. The last rule runs the drivers against a kit that drops the answer.
  */
 describe('a data-bound control hands back what the person entered', () => {
   const OPTIONS: JsonValue = [
     { label: 'One', value: 1 },
-    // A number, not a string. The value a kit reports has to survive the round
-    // trip through `optionValue`, and a string-valued fixture cannot tell the
-    // declared value apart from the DOM string that stands in for it.
+    // A number, so a kit reporting the DOM string instead of the declared value
+    // fails.
     { label: 'Two', value: 2 },
   ]
 
-  /*
-   * The element a driver is about to act on, or a loud failure.
-   *
-   * Answers `HTMLElement` rather than a type the caller names. The first version
-   * took a generic and ended in `as unknown as T`, which is a claim rather than
-   * a check: `'input, textarea'` was asked for as an `HTMLInputElement` and
-   * answers a `<textarea>` for both kits' `TextArea`. `fireEvent` takes an
-   * `Element`, so nothing here needed the narrower type and the cast bought only
-   * the chance to be wrong about it.
-   */
   function must(element: HTMLElement, selector: string, what: string): HTMLElement {
     const hit = element.matches(selector) ? element : element.querySelector<HTMLElement>(selector)
     if (!hit) {
@@ -768,7 +551,6 @@ describe('a data-bound control hands back what the person entered', () => {
     fireEvent.click(must(element, 'input[type="checkbox"]', 'checkbox'))
   }
 
-  /* Native `select` in one kit, a combobox opening a listbox in the other. */
   const chooseTwo = (element: HTMLElement): void => {
     const native = element.querySelector<HTMLSelectElement>('select')
     if (native) {
@@ -804,7 +586,6 @@ describe('a data-bound control hands back what the person entered', () => {
     RadioGroup: { props: { options: OPTIONS }, enter: pickTwo, is: 2 },
   }
 
-  /** Every value the kit reported for `target`, in order. */
   function reported(renderers: RendererKit, def: ComponentDef, entry: Entry): JsonValue[] {
     const base = made(def, { key: 'r', type: 'r', props: {} })
     const node: ComponentNode = {
@@ -835,19 +616,9 @@ describe('a data-bound control hands back what the person entered', () => {
   }
 
   /*
-   * Data-bound, and answered by a person rather than assembled by the form.
-   *
-   * The aria rules above filter on `dataBound && !container`, which is right for
-   * them and wrong here. `RadioGroup` is a container, because it holds
-   * `RadioItem`s, and it is also the control somebody picks an answer in, so
-   * that filter would drop the one component whose collection this file already
-   * half-covered: the single `fireEvent` call in the whole suite before this
-   * describe existed was a radio click.
-   *
-   * `Repeater` is the genuine exclusion. It is data-bound because its value is
-   * the list of rows, and nobody enters that value; the form builds it from the
-   * rows beneath. Anything else data-bound needs a driver, and the rule below
-   * fails until it has one, so a tenth control cannot join by being forgotten.
+   * Containers count here, unlike in the aria rules: `RadioGroup` holds
+   * `RadioItem`s and is still answered. `Repeater` is out because the form
+   * builds its value from its rows.
    */
   const NOT_ENTERED = new Set(['Repeater'])
   const answered = (kit: Kit): ComponentDef[] =>
@@ -883,13 +654,6 @@ describe('a data-bound control hands back what the person entered', () => {
   )
 
   it('reports nothing for a kit that drops the answer, which is what the rules above rest on', () => {
-    /*
-     * The proof, checked in rather than performed once. This is the exact kit
-     * the eighteen `onChange={() => undefined}` renders could not tell from a
-     * working one: it draws the control and never calls `onChange`. The rules
-     * above run this same function and require a value; this one requires
-     * silence, so both directions of the check execute on every run.
-     */
     const deaf: RendererKit = {
       ...htmlRendererKit,
       renderers: {
@@ -923,12 +687,8 @@ describe('a control holding a value that is not a string', () => {
     schema: { type: dataType as 'string', validations: [] },
   })
 
-  /*
-   * Not `DatePicker`: a `type="date"` input refuses a value that is not a date
-   * and clears itself, whatever the kit hands it, so the assertion would be
-   * about the browser rather than about the kit. It reads its value the same
-   * way as its neighbours; there is just no way to see that here.
-   */
+  // Not `DatePicker`: a `type="date"` input clears a value that is not a date,
+  // whatever the kit hands it.
   const TEXTUAL = ['TextField', 'TextArea', 'NumberField']
 
   const VALUE_CASES = KITS.flatMap(({ name, kit, renderers }) =>
@@ -938,7 +698,7 @@ describe('a control holding a value that is not a string', () => {
   )
 
   it('drives every value-holding control in every kit', () => {
-    // As above: an empty table is a green file that ran no rule at all.
+    // An `it.each` over an empty table registers no tests and passes.
     expect(VALUE_CASES).toHaveLength(KITS.length * TEXTUAL.length)
   })
 
@@ -984,12 +744,8 @@ describe('a document value a kit puts somewhere structural', () => {
   }
 
   /**
-   * An element's markup with the per-render scope replaced by a fixed token.
-   *
-   * `data-fs-scope` is a `useId` value, so it differs between any two renders,
-   * and every `id` and `aria-*` attribute built from it differs with it. That
-   * makes raw `outerHTML` unequal for two renders of the *same* component, which
-   * is why the variant control below could not fail.
+   * `data-fs-scope` is a `useId` value, so it and every `id` and `aria-*` built
+   * from it differ between two renders of the same component.
    */
   function withoutScope(element: HTMLElement): string {
     const scope = element.getAttribute('data-fs-scope')
@@ -998,12 +754,8 @@ describe('a document value a kit puts somewhere structural', () => {
   }
 
   it.each(KITS)('$name does not let a Text variant add classes of its own', ({ renderers }) => {
-    /*
-     * `'fsh-text fsh-text--' + variant` with an unnarrowed variant. React
-     * escapes the attribute, so this is not XSS — but on a host using a utility
-     * CSS framework, `variant: "body fixed inset-0 z-50"` is an element covering
-     * the viewport, over the real form.
-     */
+    // React escapes the attribute, but under a utility CSS framework these
+    // classes cover the viewport.
     const element = draw(
       renderers,
       nodeWith('Text', { text: 'hello', variant: 'body fixed inset-0 z-50' }),
@@ -1013,25 +765,12 @@ describe('a document value a kit puts somewhere structural', () => {
   })
 
   it.each(KITS)('$name still tells its own variants apart', ({ kit, renderers }) => {
-    /*
-     * The control. Narrowing to nothing would collapse every variant to the
-     * default and pass the test above. Two declared variants have to produce
-     * two different results — which is checkable without knowing how a kit
-     * spells them, and MUI spells them as its own class names rather than as
-     * the authored word.
-     */
+    // Compares output, not class names: MUI spells variants as its own classes.
     const declared = (
       kit.components.find((def) => def.type === 'Text')?.props.find((p) => p.name === 'variant')
         ?.options ?? []
     ).map((option) => (typeof option.value === 'string' ? option.value : ''))
 
-    /*
-     * Two, not one. With a single declared variant this rule used to return
-     * quietly, and the narrowing test it is the control for would then pass
-     * because every variant collapses to the default and there is nowhere else
-     * to collapse to. `supplies options for every select prop` only asks for
-     * one, so nothing else here would notice.
-     */
     expect(
       declared.length,
       'Text.variant needs two declared options, or telling variants apart proves nothing',
@@ -1041,54 +780,21 @@ describe('a document value a kit puts somewhere structural', () => {
     const a = draw(renderers, nodeWith('Text', { text: 'hello', variant: first }))
     const b = draw(renderers, nodeWith('Text', { text: 'hello', variant: second }))
 
-    /*
-     * Compared with the scope taken out, because comparing raw `outerHTML` made
-     * this control unable to fail. `data-fs-scope` is a `useId` value
-     * (`renderer/index.tsx`), so two renders never agree on it and the
-     * inequality below held whatever the kit drew. Measured by collapsing
-     * `kit-html`'s `Text` variant to the default: both this rule and the
-     * narrowing rule it is the control for stayed green.
-     *
-     * The scope also appears inside `id` and the `aria-*` attributes built from
-     * it, so replacing the value everywhere is what makes the two comparable
-     * rather than deleting the one attribute.
-     */
     expect(withoutScope(a), 'two declared variants drew the same thing').not.toBe(withoutScope(b))
   })
 
   it.each(KITS)('$name gives an unrecognised Alert severity a role anyway', ({ renderers }) => {
-    /*
-     * An unnarrowed severity also withheld `role="alert"`, because the check is
-     * `severity === 'error'`. So a document with a typo in the severity of its
-     * error banner drew the banner and announced nothing.
-     */
     const element = draw(
       renderers,
       nodeWith('Alert', { text: 'Something failed', severity: 'eror' }),
     )
 
-    // Either it is treated as the default severity, or it is announced. What it
-    // must not do is silently become a class name of its own.
     expect(element.className).not.toContain('eror')
-    /*
-     * And the role, which is the thing this rule is named after and never
-     * checked. Its only expectation was the class-name spelling above, so a kit
-     * that narrowed the severity and then announced nothing passed.
-     *
-     * `note` rather than `alert`, and that is the point: an unrecognised
-     * severity narrows to `info`, and only an error interrupts. Asserting the
-     * exact role rather than "some role" is what tells a narrowed alert from a
-     * kit that gave up and announced everything.
-     */
+    // An unrecognised severity narrows to `info`, and only an error interrupts.
     expect(element.getAttribute('role')).toBe('note')
   })
 
   it.each(KITS)('$name still announces an Alert that really is an error', ({ renderers }) => {
-    /*
-     * The control for the rule above. A kit that answered `note` for everything
-     * would pass it, and a form whose error banner does not interrupt is the
-     * failure both rules exist to stop.
-     */
     const element = draw(
       renderers,
       nodeWith('Alert', { text: 'Something failed', severity: 'error' }),
@@ -1098,16 +804,6 @@ describe('a document value a kit puts somewhere structural', () => {
   })
 
   it.each(KITS)('$name does not put an arbitrary scheme in an image src', ({ renderers }) => {
-    /*
-     * `LinkNode` runs `href` through `safeHref`; `Image` put `src` straight
-     * into the DOM. Not script execution, but an outbound request with a
-     * referrer on every render, to an address the document chose.
-     *
-     * Every scheme `safeHref` refuses, not just `javascript:`. The assertion
-     * was `not.toContain('javascript:')`, which is a denylist of one string in
-     * a rule whose name says "arbitrary scheme" -- a kit that stripped that one
-     * word and passed `data:text/html,...` through would have satisfied it.
-     */
     const refused = [
       'javascript:alert(1)',
       'data:text/html,<script>alert(1)</script>',
@@ -1150,7 +846,6 @@ describe('a document value a kit puts somewhere structural', () => {
 })
 
 describe('a component whose options a document got wrong', () => {
-  /** Everything a hand-edited document has plausibly been seen to hold. */
   const RUBBISH: unknown[] = [null, undefined, 'a bare string', 42, [], { label: 'fine', value: 7 }]
 
   function listNode(type: string, propName: string): ComponentNode {
@@ -1162,7 +857,6 @@ describe('a component whose options a document got wrong', () => {
     }
   }
 
-  /** The type each kit gives its list to, and the prop that list arrives on. */
   const LISTY: [string, string][] = [
     ['Select', 'options'],
     ['RadioGroup', 'options'],
@@ -1176,8 +870,7 @@ describe('a component whose options a document got wrong', () => {
   )
 
   it('drives every listy component in every kit', () => {
-    // An `it.each` over an empty table registers no tests and reports green, so
-    // the table's size is asserted rather than assumed. See `DRIVEN`.
+    // An `it.each` over an empty table registers no tests and passes.
     expect(LIST_CASES).toHaveLength(KITS.length * LISTY.length)
   })
 
@@ -1195,8 +888,7 @@ describe('a component whose options a document got wrong', () => {
       />,
     )
 
-    // Not merely "the page survived" — the boundary would give us that. The
-    // component itself has to still be the component.
+    // The boundary alone keeps the page alive; the component itself must render.
     expect(onError).not.toHaveBeenCalled()
     expect(container.querySelector('[data-fs-key="target"]')?.getAttribute('role')).not.toBe(
       'alert',
@@ -1204,11 +896,6 @@ describe('a component whose options a document got wrong', () => {
   })
 
   it.each(KITS)('$name still shows an option it can read', ({ kit, renderers }) => {
-    /*
-     * The control. Dropping every entry would pass the test above and leave a
-     * select with nothing in it, which is the same lost question by a quieter
-     * route.
-     */
     if (!requires(kit, 'Select')) return
 
     const { container } = render(
@@ -1226,14 +913,8 @@ describe('a component whose options a document got wrong', () => {
 })
 
 /**
- * The chosen option, however this kit chooses to draw one.
- *
- * The HTML kit renders a native `<select>`, whose options are in the document
- * and whose selection is `selectedOptions`. MUI renders a combobox and keeps
- * its options in a menu that is not open, so the only thing on the page is the
- * label of whatever is selected. Reading `container.textContent` finds the
- * options in one kit and nothing in the other, which is how a cross-kit
- * assertion ends up measuring two different things.
+ * Not `container.textContent`: a native `<select>` holds every option, while
+ * MUI keeps them in a closed menu and shows only the selected label.
  */
 function chosenText(container: HTMLElement): string {
   const combobox = container.querySelector('[role="combobox"]')
@@ -1286,7 +967,6 @@ describe('a select holding a number', () => {
   })
 
   it.each(KITS)('$name shows nothing when the data names no option', ({ kit, renderers }) => {
-    // The control: "shows Two" must not be something it would say regardless.
     if (!requires(kit, 'Select')) return
 
     const { container } = render(
@@ -1304,14 +984,6 @@ describe('a select holding a number', () => {
 })
 
 describe.each(KITS)('$name', ({ kit, renderers }) => {
-  /**
-   * Three things a kit was doing to the accessibility tree.
-   *
-   * All three passed the contract suite, which is the point: it looks for an
-   * attribute *somewhere inside* the component, and none of these is about whether
-   * the attribute exists. They are about whether it reaches anybody.
-   */
-
   const drawn = (node: ComponentNode): HTMLElement => {
     const { container } = render(
       <FormUnderTest
@@ -1328,12 +1000,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   }
 
   it('puts a radio group role on the element carrying its group state', () => {
-    /*
-     * A `<fieldset>` maps to `group`, which supports neither `aria-invalid` nor
-     * `aria-required` -- so both were set on an element that has no such state
-     * and neither reached a screen reader. `kit-html`'s comment claimed
-     * `role="radiogroup"` was implicit here. It is not.
-     */
+    // A `<fieldset>` maps to `group`, which supports neither `aria-invalid` nor
+    // `aria-required`.
     const element = drawn({
       key: 'target',
       type: 'RadioGroup',
@@ -1352,12 +1020,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   })
 
   it('marks a required select on an element a screen reader reads', () => {
-    /*
-     * MUI's `select` renders a hidden native input plus a `div[role=button]`,
-     * and the required marking landed on the hidden one -- which is
-     * `aria-hidden`, so it reached nobody. The contract rule passed because it
-     * asked whether the attribute was anywhere in the component.
-     */
+    // MUI's select renders an `aria-hidden` native input beside the control a
+    // screen reader reads.
     const element = drawn({
       key: 'target',
       type: 'Select',
@@ -1376,11 +1040,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   })
 
   it('does not report a progress value that is not a number', () => {
-    /*
-     * `NaN` is a number, and `JsonValue` admits one, so a bare
-     * `typeof raw === 'number'` let it through as a determinate value and the
-     * bar reported `aria-valuenow="NaN"`.
-     */
+    // `NaN` is a number, so a bare `typeof` check lets it through.
     const element = drawn({
       key: 'target',
       type: 'Progress',
@@ -1397,7 +1057,6 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   })
 
   it('still reports a progress value that is one', () => {
-    // The control. A bar that never reported a value would pass the row above.
     const element = drawn({ key: 'target', type: 'Progress', props: { value: prop(40) } })
     const bar =
       element.getAttribute('role') === 'progressbar'
@@ -1407,24 +1066,9 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     expect(bar?.getAttribute('aria-valuenow')).toBe('40')
   })
 
-  /**
-   * What unit a length-valued prop carries.
-   *
-   * The contract says a document authored against one kit renders against the
-   * other, and it never said what a number means. So `gap` was CSS pixels in
-   * `@willowforms/kit-html` and multiples of `theme.spacing` in
-   * `@willowforms/kit-mui` -- eight times apart for the same document -- and pixels
-   * again on `kit-mui`'s own `Grid`, so that kit disagreed with itself as well.
-   * Neither kit was wrong, because nothing had decided.
-   *
-   * `docs/spec/02-kit-contract.md` decides: **a length-valued prop is CSS
-   * pixels.** This is the rule, run against every kit.
-   *
-   * `getComputedStyle` rather than a measured rectangle, deliberately. Nothing
-   * here asks the browser to lay anything out -- `gap` is not computed from
-   * layout, and what is read back is the declaration the kit emitted, resolved
-   * through the cascade. jsdom does that part faithfully, which the probe that
-   * found this defect confirmed: 32px against 4px for the same authored 4.
+  /*
+   * `docs/spec/02-kit-contract.md`: a length-valued prop is CSS pixels. Read
+   * with `getComputedStyle`, which resolves the declaration without layout.
    */
 
   const drawWith = (type: string, props: Record<string, JsonValue>): HTMLElement => {
@@ -1451,28 +1095,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   const has = (type: string, name: string): boolean =>
     kit.components.some((def) => def.type === type && def.props.some((p) => p.name === name))
 
-  /*
-   * One row per length-valued prop either kit declares, found by reading the
-   * definitions rather than by remembering. A kit that does not have one skips
-   * its row rather than failing, because which components a kit ships is its own
-   * business; what a number means is not.
-   */
-  /*
-   * The CSS property each length-valued prop has to read back as.
-   *
-   * The rows below used to be hand-written, and a hand-written list of
-   * obligations is a list of the ones somebody remembered. It carried a
-   * `Container` row for a type neither kit ships, so `has()` answered false, the
-   * body returned, and vitest reported a passing test that asserted nothing --
-   * twice, once per kit. It also missed `Screen.maxWidth`, `Screen.gap`,
-   * `Step.gap`, `Repeater.gap` and `Image.width`, which escaped by not being
-   * listed rather than by any decision.
-   *
-   * So the rows are derived from what the kit declares, and this map is the only
-   * thing maintained by hand. A length-valued prop that is neither mapped here
-   * nor excluded below fails the completeness rule, which is the point: a new one
-   * cannot join by being forgotten.
-   */
+  // Rows come from what the kit declares: which components a kit ships is its
+  // own business, but what a number means is not.
   const PIXEL_PROPERTY: Record<string, string> = {
     gap: 'gap',
     padding: 'padding-top',
@@ -1516,19 +1140,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   it.each(PIXEL_CASES)('$what is in CSS pixels', ({ what, type, name, css, value }) => {
     const element = drawWith(type, { [name]: value })
 
-    /*
-     * Anywhere in the component, not on the keyed element specifically. The
-     * obligation is that the number means CSS pixels, and a kit is free to put
-     * the property on whatever element it composes the component from:
-     * `kit-html`'s `Repeater` sets `gap` on an inner stack and `kit-mui`'s
-     * `Screen` on the layout it wraps, both correctly in pixels. Requiring the
-     * keyed element would have failed both for a divergence in structure, which
-     * a different rule owns.
-     *
-     * Still a strong claim, because each row uses a different number: a kit
-     * hardcoding one cannot answer two, and a spacing-scale multiplier reads
-     * back as 8x the number rather than the number.
-     */
+    // Anywhere in the component: a kit may put the property on any element it
+    // composes the component from.
     const wanted = String(value) + 'px'
     const carries = (node: Element): boolean =>
       getComputedStyle(node).getPropertyValue(css) === wanted
@@ -1538,23 +1151,10 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   })
 
   it('found lengths to drive at all', () => {
-    /*
-     * The rows are derived now, so an empty derivation would report a clean
-     * sweep having rendered nothing. This is the same guard the sibling describe
-     * carries for its own table.
-     *
-     * `> 0`, matching what this rule and its row in `02-kit-contract.md` both
-     * claim. An earlier `> 4` was a floor nobody had stated, so it would have
-     * failed a kit that legitimately declares fewer lengths for a reason the
-     * message does not mention. The narrower question, whether the derivation
-     * still sees everything the kit declares, is the completeness rule above,
-     * and that one fails on a single missed prop rather than on a count.
-     */
     expect(PIXEL_CASES.length, 'no length-valued props were found to drive').toBeGreaterThan(0)
   })
 
   it('reads a different number differently, so the rows above are not a fixed value', () => {
-    // The control. A kit hardcoding 4px would pass a `Stack.gap` row exactly.
     expect(has('Stack', 'gap'), 'Stack.gap is the control for the rows above').toBe(true)
 
     expect(getComputedStyle(drawWith('Stack', { gap: 24 })).gap).toBe('24px')
@@ -1621,14 +1221,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         const node = made(def, root ?? { key: 'r', type: 'r', props: {} })
         node.key = 'target'
 
-        /*
-         * `revealHidden`, because this asks whether the renderer spreads
-         * nodeProps, which has nothing to do with whether a condition shows the
-         * node. A kit may ship a component that is conditional the moment it is
-         * dropped — `Step` is one, hidden until `context.step` names it — and
-         * without this the contract would be unsatisfiable for that whole class
-         * of component rather than merely unmet.
-         */
+        // `revealHidden`: a component such as `Step` is hidden by a condition the
+        // moment it is dropped.
         const { container: dom } = render(
           <FormUnderTest
             document={documentOf(node)}
@@ -1645,17 +1239,6 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
           `${type} does not put data-fs-key in the DOM, so the designer cannot select it. ` +
             'Spread nodeProps onto the outermost element.',
         ).not.toBeNull()
-        /*
-         * And it has to be the kit's element rather than the boundary's.
-         *
-         * The fallback emits `data-fs-key` and `data-fs-type` too, deliberately,
-         * so a component that broke stays selectable. That made this rule
-         * unfailable: a renderer replaced by `throw new Error()` satisfied both
-         * assertions above from the fallback. The `afterEach` at the top of this
-         * file now catches that for every rule at once; this says it here as
-         * well, because a rule that can only fail through a file-wide net is one
-         * somebody will move to another file.
-         */
         expect(
           element?.hasAttribute('data-fs-failed'),
           `${type} threw, and the boundary's fallback answered for it`,
@@ -1667,12 +1250,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     it.each(kit.components.map((c) => [c.type, c] as const))(
       '%s carries the scope of the form it was rendered in',
       (type, def) => {
-        /*
-         * Separate from the nodeProps check above, because it fails separately:
-         * a kit that picks the attributes out by name instead of spreading gets
-         * `data-fs-key` right, passes that test, and silently drops this one.
-         * The cost is two forms on a page sharing each other's styling.
-         */
+        // A kit that picks attributes by name instead of spreading passes the
+        // check above and fails this one.
         const node = made(def, root ?? { key: 'r', type: 'r', props: {} })
         node.key = 'target'
 
@@ -1687,8 +1266,6 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         )
 
         const element = dom.querySelector('[data-fs-key="target"]')
-        // The boundary's fallback carries `data-fs-scope` as well, so reading it
-        // off whatever is in the DOM proved nothing about the kit.
         expect(
           element?.hasAttribute('data-fs-failed'),
           `${type} threw, and the boundary's fallback answered for it`,
@@ -1734,16 +1311,6 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     })
 
     it('renders a data-bound component without crashing on an absent value', () => {
-      /*
-       * A freshly dropped field has no data yet. Any renderer that assumes one
-       * takes the whole canvas down the moment it is added.
-       *
-       * This was `expect(render).not.toThrow()`, which the boundary guarantees by
-       * existing: it catches, so `render` returns normally whatever the kit did.
-       * The rule had no way to fail. What it actually means is that the kit drew
-       * the component, so that is what it asks now -- the boundary did not fire,
-       * and the element in the DOM is the kit's rather than the fallback's.
-       */
       for (const def of kit.components.filter((c) => c.dataBound)) {
         const node = made(def, { key: 'r', type: 'r', props: {} })
         node.key = 'target'
@@ -1792,12 +1359,6 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
       }
     })
 
-    /*
-     * The two rules below were written down as kit obligations long before
-     * anything ran them, and @willowforms/kit-mui had never satisfied either.
-     * A contract nothing executes is a wish.
-     */
-
     it('marks the message as an alert when it holds an error', () => {
       for (const def of kit.components.filter((c) => c.dataBound)) {
         const node = made(def, { key: 'r', type: 'r', props: {} })
@@ -1827,9 +1388,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         const node = made(def, { key: 'r', type: 'r', props: {} })
         node.key = 'field'
 
-        // No error. The element still has to be there, or the description is
-        // attached only at the moment it changes and is announced twice or not
-        // at all depending on the screen reader.
+        // No error yet: a description attached only when it changes is announced
+        // twice or not at all, depending on the screen reader.
         const { container: dom } = render(
           <FormUnderTest
             document={documentOf(node)}
@@ -1839,12 +1399,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
           />,
         )
 
-        /*
-         * Every element that describes itself, not the first one found. A
-         * component can hold more than one control -- a radio group is a list of
-         * inputs, a file upload is an input beside a summary -- and checking the
-         * first meant the rest could point anywhere at all.
-         */
+        // Every describer, not the first: a component can hold several controls.
         const host = dom.querySelector('[data-fs-key="field"]')
         const describers = [
           ...(host?.matches('[aria-describedby]') ? [host] : []),
@@ -1869,20 +1424,15 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   })
 
   it('gives every palette entry an icon', () => {
-    /*
-     * `ComponentDef.icon` is optional in the type, because a kit is allowed to
-     * ship without one. It is required of the kits in this repository, because
-     * these two are what a kit author copies: a palette of unadorned text is
-     * the thing the vocabulary exists to fix, and half a palette with icons
-     * looks like a bug rather than a choice.
-     */
+    // `ComponentDef.icon` is optional, but the kits here are what a kit author
+    // copies, so they carry one.
     const bare = kit.components.filter((c) => !c.icon).map((c) => c.type)
     expect(bare).toEqual([])
   })
 
   it('declares exactly one root component and keeps it out of the palette', () => {
-    // The root already exists in every document. Offering it in the palette
-    // let a screen be dropped inside a screen, which it did until this ran.
+    // The root exists in every document; offering it would let a screen be
+    // dropped inside a screen.
     const roots = kit.components.filter((c) => c.root === true)
     expect(
       roots.map((c) => c.type),
@@ -1896,25 +1446,10 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   })
 
   it('lets a RadioItem child take part in its group', () => {
-    /*
-     * 03-components.md says a RadioGroup "also accepts RadioItem children, for
-     * the case where an option needs its own layout". Both kits shipped that
-     * child wired to nothing, so it looked exactly like an option and did
-     * nothing when clicked, which is the failure this project treats as worst.
-     */
+    // `03-components.md`: a RadioGroup "also accepts RadioItem children".
     const group = kit.components.find((c) => c.type === 'RadioGroup')
     const item = kit.components.find((c) => c.type === 'RadioItem')
 
-    /*
-     * A kit need not offer a radio group at all, and this used to return
-     * quietly whenever either piece was missing -- so deleting `RadioItem`
-     * turned the obligation off instead of failing it, which is the one thing a
-     * contract suite must never let a kit do.
-     *
-     * Offering the group is the commitment. Offering the child without the
-     * group is a palette entry with nothing to join, which is worth failing on
-     * its own.
-     */
     expect(
       { group: Boolean(group), item: Boolean(item) },
       'a RadioGroup and its RadioItem ship together or not at all',
@@ -1980,7 +1515,6 @@ describe('a default copied between kits', () => {
   })
 })
 
-// Heading rank must agree across kits, including documents that omit it.
 describe('a heading whose document names no rank', () => {
   it.each(KITS)('$name renders it at the same rank as the other kit', ({ renderers }) => {
     const node: ComponentNode = { key: 'target', type: 'Heading', props: { text: prop('Title') } }
@@ -2005,14 +1539,8 @@ describe('a heading whose document names no rank', () => {
 })
 
 /**
- * Every icon a kit declares reaches a glyph the designer can draw.
- *
- * The vocabulary is a union in core and `GLYPHS` is a `Record<IconName, …>`, so
- * a missing glyph is a compile error and a kit's `icon:` field is type-checked
- * against the same union. What neither of those can say is that the glyph
- * *draws* -- an entry mapped to an empty fragment satisfies both -- and the
- * designer cannot check it against a kit, because invariant 2 forbids it from
- * importing one. This file imports both.
+ * Types make a glyph exist for every icon name, not draw something. Checked here
+ * because the designer may not import a kit (invariant 2).
  */
 describe('the icons the kits ask for', () => {
   it.each(KITS)('$name declares only icons that draw something', ({ kit }) => {
@@ -2030,22 +1558,6 @@ describe('the icons the kits ask for', () => {
 })
 
 describe('a length means the same number of pixels in both kits', () => {
-  /*
-   * `kit-mui` defaulted `gap` to 2 on `Screen`, `Stack`, `Step` and `Repeater`
-   * while `kit-html` defaulted it to 16, and `Grid` in the same MUI file said
-   * 16 -- so the kit disagreed with itself as well as with the other one. The
-   * numbers were MUI spacing units left behind when `renderers.tsx` moved gaps
-   * to pixels: `theme.spacing` is 8, so every new layout component the designer
-   * created came out eight times tighter than the same document on `kit-html`.
-   *
-   * The rule above could not see it. It compares what a form author is shown
-   * and skips `defaultProps` on the stated ground that a kit may choose its own
-   * -- true of the number and false of the unit, which is the distinction this
-   * describe adds. `docs/spec/02-kit-contract.md` claimed the defaults were
-   * unchanged and "a form that never set a gap looks identical", which was true
-   * of the renderer's fallback and false of the kit, because `defaultProps` is
-   * written into every node before the fallback is ever consulted.
-   */
   const html = new Map(htmlKit.components.map((c) => [c.type, c]))
   const mui = new Map(muiKit.components.map((c) => [c.type, c]))
   const shared = [...html.keys()].filter((type) => mui.has(type)).sort()
@@ -2061,12 +1573,7 @@ describe('a length means the same number of pixels in both kits', () => {
   }
 
   it('found lengths to compare at all', () => {
-    /*
-     * Without this the `it.each` below could compare `{}` to `{}` for every
-     * component -- a renamed prop, a `defaultProps` that stopped being read --
-     * and report success having looked at nothing. This is the shape the rest
-     * of this file already refuses.
-     */
+    // Otherwise the `it.each` below could compare `{}` to `{}` for every type.
     const counted = shared.reduce(
       (total, type) => total + Object.keys(lengthsOf(html.get(type))).length,
       0,
@@ -2076,7 +1583,6 @@ describe('a length means the same number of pixels in both kits', () => {
       'no component defaults any length, so nothing below compares anything',
     ).toBeGreaterThan(4)
 
-    // And `gap` specifically, since it is the one that drifted.
     expect(shared.filter((type) => 'gap' in lengthsOf(mui.get(type))).length).toBeGreaterThan(3)
   })
 
@@ -2086,22 +1592,9 @@ describe('a length means the same number of pixels in both kits', () => {
 
   it.each(shared)('%s defaults no length to a spacing-scale number', (type) => {
     /*
-     * The failure with its own name. Agreement alone would be satisfied by both
-     * kits saying 2, which is 2px and not what either author meant. Anything
-     * under 4px is a spacing unit that escaped a conversion rather than a
-     * deliberate hairline: nothing in either kit wants a 2px gap between form
-     * fields.
-     *
-     * Both kits, which is the point and which this checked in one of them --
-     * the case the comment above describes, both kits saying 2, is exactly the
-     * one a `kit-mui`-only loop cannot see. It is reachable: the two kits are
-     * separate packages and a spacing unit escaping a conversion is a mistake
-     * either author can make on their own.
-     *
-     * And the type first. `02-kit-contract.md` says a length-valued default is
-     * a number of CSS pixels, so `'8px'` or `'1rem'` is a contract violation on
-     * its own -- and it slipped through this rule silently, because a string is
-     * not `< 4`. A value that cannot be judged has to fail rather than pass.
+     * Under 4px is a spacing unit that escaped a conversion, not a hairline. The
+     * type is checked first: a string breaks `02-kit-contract.md` and is never
+     * `< 4`.
      */
     for (const [kit, def] of [
       ['kit-mui', mui.get(type)],
@@ -2123,13 +1616,8 @@ describe('a length means the same number of pixels in both kits', () => {
 })
 
 /**
- * Every kit crossed with the field components whose seam element is checked.
- *
- * Named, like `LIST_CASES` and `VALUE_CASES`, rather than built inline: the
- * counter in `test/docs.test.ts` recognises a per-kit rule by
- * `it.each(KITS)` or `it.each(SOMETHING_CASES)`, so a rule written as
- * `it.each(KITS.flatMap(...))` is an obligation the spec's own table never
- * counts. That is the gap the counter's docblock is about.
+ * Named `*_CASES`, not built inline: `test/docs.test.ts` counts a per-kit rule
+ * only as `it.each(KITS)` or `it.each(SOMETHING_CASES)`.
  */
 const SEAM_CASES = KITS.flatMap(({ name, kit, renderers }) =>
   [
@@ -2151,22 +1639,9 @@ const SEAM_CASES = KITS.flatMap(({ name, kit, renderers }) =>
 
 describe('the seam a document is addressed through', () => {
   /*
-   * `nodeProps` is how everything outside a kit finds a component: the
-   * designer's canvas selection, the per-node stylesheet the renderer emits
-   * against `data-fs-key`, and every end-to-end selector. A kit's one
-   * obligation is to spread it onto a root element -- and `kit-html` had two
-   * answers to what that element is. Seven of its nine field renderers spread it
-   * onto an unclassed wrapper `<div>` with `.fsh-field` one level in, while
-   * `SwitchNode` and `RadioGroupNode` spread it onto `.fsh-field` itself.
-   *
-   * The visible cost was `min-width: 0` in `kit-html.css`, written on
-   * `.fsh-field` and inert for the seven, because the flex item was the wrapper
-   * and the rule was on its child. The deeper cost is that a rule anybody writes
-   * against the seam has two shapes to cover in one kit.
-   *
-   * Pinned as a shape rather than as a class name, so it holds for a kit that
-   * names its classes anything: the element carrying `data-fs-key` must be the
-   * element the kit styles, which means it carries a class of its own.
+   * The element carrying `data-fs-key` must be the one the kit styles, so CSS
+   * written against the seam has one shape. Pinned as a shape, not a class name,
+   * so it holds whatever a kit calls its classes.
    */
   it.each(SEAM_CASES)(
     '$name puts $type on one element, not on a wrapper around it',
@@ -2190,11 +1665,6 @@ describe('the seam a document is addressed through', () => {
       const seam = container.querySelector('[data-fs-key="' + node.key + '"]')
       expect(seam, type + ' rendered nothing carrying data-fs-key').not.toBeNull()
 
-      /*
-       * The seam element is the kit's own element. A bare wrapper -- an element
-       * with the seam attributes, no class of its own and exactly one child that
-       * carries all the styling -- is the shape this rules out.
-       */
       const bare =
         (seam?.getAttribute('class') ?? '') === '' &&
         seam?.children.length === 1 &&
@@ -2361,20 +1831,6 @@ describe.each(KITS)('$name action events', ({ kit, renderers }) => {
 })
 
 describe('a breadcrumb landmark in the form language', () => {
-  /*
-   * `kit-html`'s `BreadcrumbsNode` read `props['label']` for the landmark's
-   * accessible name, with a comment saying the English word "Breadcrumb" on a
-   * component whose every other string is translatable was the defect being
-   * fixed. Neither kit *declared* a `label` property, so `Properties.tsx` --
-   * which builds the panel from `def?.props ?? []` -- rendered no editor for
-   * it, and with no declared property there was no i18n binding mode either.
-   * The fix was unreachable from the designer, and `kit-mui` still hard-coded
-   * the English word.
-   *
-   * Three things had to move together: both kits' definitions, `kit-mui`'s
-   * renderer, and `03-components.md`'s table, which `test/docs.test.ts` checks
-   * against what the kits declare.
-   */
   const crumbs = (label: PropValue | undefined): ComponentNode => ({
     key: 'trail',
     type: 'Breadcrumbs',
@@ -2404,7 +1860,7 @@ describe('a breadcrumb landmark in the form language', () => {
 
     const label = def?.props.find((each) => each.name === 'label')
     expect(label, 'the renderer reads a label the kit does not declare').toBeDefined()
-    // Localizable, or the translation the whole finding is about is impossible.
+    // Localizable, or the landmark name cannot be translated.
     expect(label?.localizable).toBe(true)
   })
 
@@ -2414,8 +1870,6 @@ describe('a breadcrumb landmark in the form language', () => {
   })
 
   it.each(KITS)('$name falls back when the document says nothing', ({ renderers }) => {
-    // The control: reading the prop must not cost the default, which is what a
-    // form that never sets one still needs.
     const root = emptyRoot()
     expect(landmarkIn(renderers, crumbs(undefined), root)).toBe('Breadcrumb')
   })

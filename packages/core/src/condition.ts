@@ -1,18 +1,4 @@
-/**
- * Structured conditions, evaluated without a sandbox.
- *
- * `renderWhen` could only be an expression, and an expression needs the
- * host-injected evaluator, so conditional visibility — the most common dynamic
- * behaviour a form has — required a JavaScript sandbox and a hand-edited
- * document. A form that cannot show its second field without a sandbox needed
- * one long before anyone pressed a button.
- *
- * This is a closed vocabulary, not a language. The comparisons a form author
- * actually writes are few and finite, so they can be enumerated, given a picker
- * in the panel, and evaluated here in plain TypeScript. The moment it grows
- * arithmetic it has become a language, and expressions already are one: they
- * stay the evaluator's job, as the escape hatch rather than the only door.
- */
+/** A closed vocabulary, not a language: see docs/spec/01-document-model.md#conditions. */
 
 import { isEmpty, readPath, valueOf } from './json.js'
 import type { RowContext } from './rows.js'
@@ -27,20 +13,11 @@ export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth =
 
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
-    // `depth + 1`, like the object branch below. This dropped it, so the bound
-    // above counted only the levels reached through objects and a list nested
-    // inside a list inside a list recursed without one.
     return a.every((item, i) => same(item, b[i], depth + 1))
   }
 
   const keys = Object.keys(a)
   if (keys.length !== Object.keys(b).length) return false
-  /*
-   * `Object.hasOwn`, not `in`: `in` counts inherited properties, so an object
-   * that merely inherits the key it is missing would compare equal to one that
-   * really holds it. The same own-property rule `valueOf` follows, and missed
-   * here when that one was written.
-   */
   return keys.every((key) => Object.hasOwn(b, key) && same(a[key], b[key], depth + 1))
 }
 
@@ -96,13 +73,8 @@ function operand(
     return valueOf(data, value.dataKey)
   }
   /*
-   * A context the host never supplied reads the same as a context that has no
-   * such key, and that is deliberate. Core cannot usefully tell "you forgot to
-   * wire this up" from "there is no such key" here, and guessing would make one
-   * of them behave differently for no reason a form author could see.
-   *
-   * Wiring is a boot-time question, so it gets a boot-time answer: `contextKeys`
-   * names every path a document reads, and a host asserts against it once.
+   * An unsupplied context reads like a missing key, deliberately: core cannot
+   * tell the two apart. `contextKeys` is the boot-time check for wiring.
    */
   if (value.kind === 'context') {
     if (typeof value.path !== 'string') return UNREADABLE
@@ -111,23 +83,7 @@ function operand(
   return UNREADABLE
 }
 
-/**
- * Ordering, for the four comparisons that need it.
- *
- * Numbers compare numerically and strings lexicographically, which is what
- * makes an ISO date work without a date type: `2026-01-31` sorts correctly as
- * text, and that is why the date components store ISO strings.
- *
- * Anything else is unordered and the comparison is false rather than coerced.
- * `'10' > 9` has no answer a form author would predict, so it does not get one.
- */
 function order(a: JsonValue | undefined, b: JsonValue | undefined): number | undefined {
-  /*
-   * Compared, not subtracted. `Infinity - Infinity` is `NaN`, so every
-   * comparison between two infinities answered false and `gte` on a pair of
-   * equal values hid the component -- and `JsonValue` admits an infinity
-   * because a host can hand one over as a context value.
-   */
   if (typeof a === 'number' && typeof b === 'number') {
     if (Number.isNaN(a) || Number.isNaN(b)) return undefined
     return a < b ? -1 : a > b ? 1 : 0
@@ -168,9 +124,8 @@ function evaluate(
   const read = (value: Operand | undefined): Reading => operand(value, data, context, row)
 
   /*
-   * Every branch below asks this before it answers. An operand nobody can read
-   * makes the whole condition unreadable, which the boundary turns into false
-   * and `not` passes through rather than inverting.
+   * An unreadable operand makes the whole condition unreadable: false at the
+   * boundary, and passed through rather than inverted by `not`.
    */
   const unreadable = (...readings: Reading[]): boolean =>
     readings.some((reading) => reading === UNREADABLE)
@@ -209,11 +164,6 @@ function evaluate(
       return condition.op === 'empty' ? empty : !empty
     }
 
-    /*
-     * JavaScript truthiness, deliberately, because that is what an author who
-     * ticks a checkbox expects. It is not the same as `notEmpty`: an empty
-     * string is falsy and empty, but `0` is falsy and an answer.
-     */
     case 'truthy':
     case 'falsy': {
       const value = read(condition.value)
@@ -221,58 +171,21 @@ function evaluate(
       return condition.op === 'truthy' ? Boolean(value) : !value
     }
 
-    /*
-     * An empty list is a real answer: nothing is in it, and everything is not
-     * in it. A list that is not a list is malformed, and malformed is false in
-     * both directions, or a broken `notIn` would show the component.
-     */
     case 'in':
     case 'notIn': {
-      /*
-       * Unreadable, not false. Every other branch here answers `undefined` for a
-       * shape it cannot read, and `not` passes that through rather than
-       * inverting it -- which is the whole reason the distinction exists, three
-       * comments up. This one answered `false`, so `not(in(x, "oops"))` was
-       * `true` and a component whose rule nobody can read was *shown*.
-       */
       if (!Array.isArray(condition.options)) return undefined
       const value = read(condition.value)
       if (unreadable(value)) return undefined
-      /*
-       * Read once. It was read inside `.some()`, so a context operand walked
-       * `readPath` again for every option in the list.
-       */
       const held = condition.options.some((option) => same(value as JsonValue | undefined, option))
       return condition.op === 'in' ? held : !held
     }
 
-    /*
-     * An empty `and` is true and an empty `or` is false, which is what those
-     * operations mean over no arguments, and it means a half-built condition in
-     * the panel behaves predictably rather than throwing.
-     *
-     * A `conditions` that is not a list at all is a different thing, and it has
-     * to be told apart: routing it through an empty array would make `and` true
-     * and show a component whose visibility rule is broken.
-     */
     case 'and':
     case 'or': {
       if (!Array.isArray(condition.conditions)) return undefined
-      // `depth + 1`, like `not` below. This dropped it, so `MAX_CONDITION_DEPTH` bounded
-      // only chains of `not` -- and `and` and `or` are the two an author's
-      // nesting actually goes through, because they are the ones the panel
-      // draws a group for.
       /*
-       * Every branch, and no short-circuit. That is load-bearing rather than
-       * an oversight.
-       *
-       * An unreadable branch anywhere makes the whole condition unreadable,
-       * which is the line below -- and short-circuiting would skip it:
-       * `or(true, <broken>)` would answer `true` and *show* a component whose
-       * rule nobody can read, which is the permissive direction this whole
-       * module is organised against. The cost is walking branches whose answer
-       * cannot change the result, on a structure an author nests by hand in a
-       * 288px panel.
+       * No short-circuit: an unreadable branch anywhere must make the group
+       * unreadable, or `or(true, <broken>)` would show the component.
        */
       const answers = condition.conditions.map((inner) =>
         evaluate(inner, data, context, row, depth + 1),

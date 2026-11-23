@@ -1,12 +1,7 @@
 /**
- * Where a drop lands.
- *
- * Deliberately pure: it takes measured rectangles and a point, and returns a
- * parent key and an index. No DOM, no React, no events. That is not tidiness for
- * its own sake, it is the only way this logic gets tested at all, because jsdom
- * has no layout engine and every `getBoundingClientRect` there returns zeros.
- * The DOM half stays thin enough to check by eye in a browser; the arithmetic
- * that decides where a component actually goes is checked here.
+ * Pure arithmetic over measured rectangles, with no DOM access: jsdom has no
+ * layout engine, so this is the only way drop placement can be tested. See
+ * docs/spec/05-canvas.md, "Resolving a drop on the canvas".
  */
 
 import type { Candidate, Rect } from './geometry.js'
@@ -16,29 +11,24 @@ export type Axis = 'row' | 'column'
 export interface DropTarget {
   parentKey: string
   index: number
-  /** Thin rectangle marking the insertion point, in surface coordinates. */
+  /** In surface coordinates. */
   indicator: Rect
   /** A horizontal bar sits between stacked children; a vertical one between columns. */
   orientation: Axis
-  /** True when the parent has no children yet and the whole box is the target. */
+  /** The parent has no children, and `indicator` outlines the whole box. */
   empty: boolean
 }
 
 const contains = (rect: Rect, x: number, y: number): boolean =>
   x >= rect.left && x <= rect.left + rect.width && y >= rect.top && y <= rect.top + rect.height
 
-/** Thickness of the insertion bar, and the inset of an empty-container outline. */
 const BAR = 2
 const EMPTY_INSET = 4
 
 /**
- * Which way a container lays its children out, inferred from where they ended up
- * rather than from a prop name.
- *
- * A kit is free to call its direction prop anything, or to lay out with a grid
- * and no prop at all, so reading geometry keeps this working for kits that do not
- * exist yet. With fewer than two children there is nothing to infer and stacked
- * is the safe default, because that is what a column of form fields is.
+ * Read from geometry rather than a prop: a kit may name its direction prop
+ * anything, or lay out with a grid and no prop. Fewer than two children default
+ * to 'column', the shape of a stack of form fields.
  */
 export function inferAxis(children: Candidate[]): Axis {
   if (children.length < 2) return 'column'
@@ -55,10 +45,6 @@ export function inferAxis(children: Candidate[]): Axis {
   return horizontal > vertical ? 'row' : 'column'
 }
 
-/**
- * The keys that a drag of `key` must not land inside: itself and everything
- * below it. Dropping a subtree into its own descendant detaches the tree.
- */
 export function forbiddenKeys(candidates: Candidate[], key: string | undefined): Set<string> {
   return closure(candidates, key)
 }
@@ -83,8 +69,6 @@ function closure(
   }
   return forbidden
 }
-
-/** The innermost container under the point that the drag is allowed to enter. */
 
 function inOneRow(children: Candidate[], x: number, y: number): Candidate[] {
   const rows = new Map<string, Candidate[]>()
@@ -120,16 +104,12 @@ function inOneRow(children: Candidate[], x: number, y: number): Candidate[] {
 }
 
 /**
- * Children banded into the visual rows they occupy, in document order.
+ * Children grouped into the visual lines a wrapping container puts them on.
+ * Unlike `inOneRow`, which groups by repeater data row, this is pure geometry.
  *
- * Distinct from `inOneRow`, which groups by a repeater's *data* row address.
- * This one is geometry: a wrapping container puts siblings on several lines
- * with no data rows involved at all.
- *
- * Two children share a band when their vertical centres are within half the
- * shorter one's height of each other. Comparing centres rather than edges keeps
- * a tall child and a short one on the same line together, and the half-height
- * tolerance stops a column of stacked fields banding into one.
+ * Centres within half the shorter child's height share a line: comparing centres
+ * keeps a tall and a short child together, and the half-height tolerance keeps
+ * stacked fields apart.
  */
 function visualRows(children: Candidate[]): Candidate[][] {
   const bands: Candidate[][] = []
@@ -150,13 +130,7 @@ function visualRows(children: Candidate[]): Candidate[][] {
   return bands
 }
 
-/**
- * The band a pointer is in, or the nearest one.
- *
- * Nearest by vertical distance for the reason `inOneRow` gives: a pointer in
- * the gap between two rows still has to get an answer, and the gap belongs to
- * whichever row it is closer to.
- */
+/** A pointer in the gap between lines belongs to the nearer one. */
 function bandAt(bands: Candidate[][], y: number): Candidate[] {
   const containing = bands.find((band) =>
     band.some((child) => y >= child.rect.top && y <= child.rect.top + child.rect.height),
@@ -199,12 +173,7 @@ function parentAt(
 }
 
 /**
- * Resolve a pointer position to an insertion point.
- *
- * The innermost container under the pointer becomes the parent. The index comes
- * from comparing the pointer against the midpoints of that container's children
- * along whichever axis they are laid out on. Returns undefined when the pointer
- * is over nothing droppable, which is the caller's cue to show no indicator and
+ * Undefined when nothing droppable is under the pointer: show no indicator and
  * treat a release as a cancel.
  */
 export function resolveDrop(
@@ -224,16 +193,8 @@ export function resolveDrop(
     y,
   ).sort((a, b) => a.index - b.index)
 
-  /*
-   * The axis is read from every child, including the one being dragged.
-   *
-   * How a container lays out is a fact about the container. Reading it from the
-   * remainder meant that moving one of exactly two children of a row left a
-   * single child, `inferAxis` fell back to `column`, and the drop then compared
-   * the pointer's Y against a row of components -- so dragging the left field of
-   * a two-field row past its neighbour landed it back where it started, every
-   * time, in the smallest row anybody builds.
-   */
+  // The axis is read from every child, including the dragged one: without it, a
+  // two-child row leaves one child and `inferAxis` falls back to 'column'.
   const siblings = inOneRow(
     candidates.filter((c) => c.parentKey === parent.key),
     x,
@@ -262,19 +223,9 @@ export function resolveDrop(
 
   let slot = children.length
   /*
-   * The bar, drawn in the band the pointer is in rather than across the whole
-   * container.
-   *
-   * `barFor` averages the neighbours either side of the slot, so on the full
-   * children list a slot at a band boundary averages the last child of one row
-   * and the first of the next -- putting the bar between two columns, in the
-   * gap between rows, nowhere near the pointer. The slot is right and the
-   * drawing is wrong, which is the worst combination: the drop lands where the
-   * author meant and the preview said somewhere else.
-   *
-   * A band is a row by construction, so it is measured as one whatever the
-   * container's inferred axis is, and `spanOf` over the band gives the bar the
-   * row's own height instead of the container's.
+   * When wrapping, the bar is drawn within the pointer's line: across the full
+   * list, a slot at a line boundary averages the last child of one line and the
+   * first of the next, and draws the bar nowhere near the pointer.
    */
   let indicator: Rect | undefined
 
@@ -284,10 +235,6 @@ export function resolveDrop(
     if (before) {
       slot = children.indexOf(before)
     } else {
-      /*
-       * Past every child in this band: the slot is after the band's last
-       * member, which in reading order is where the next band begins.
-       */
       const last = band[band.length - 1]
       slot = last ? children.indexOf(last) + 1 : children.length
     }
@@ -337,31 +284,19 @@ function documentIndex(
   return dragged.index < target ? target - 1 : target
 }
 
-/** The document index a new node takes when inserted at `slot`. */
 function indexInParent(filtered: Candidate[], slot: number): number {
   const before = filtered[slot - 1]
   if (!before) return 0
   return before.index + 1
 }
 
-/**
- * The extent the insertion bar runs across: the parent's rectangle, unless the
- * children sit in a different repeater row from the parent, in which case the
- * rectangle those children occupy.
- */
 function spanOf(parent: Candidate, children: Candidate[]): Rect {
   const first = children[0]
   if (!first || first.row === parent.row) return parent.rect
   return boxOf(children) ?? parent.rect
 }
 
-/**
- * The rectangle a group of children occupies, or nothing for an empty group.
- *
- * `spanOf` cannot answer this: it short-circuits to the parent's rectangle when
- * the children share the parent's repeater row, which ordinary children always
- * do. This is the geometry question on its own.
- */
+/** Unlike `spanOf`, never falls back to the parent's rectangle. */
 function boxOf(children: Candidate[]): Rect | undefined {
   const first = children[0]
   if (!first) return undefined
@@ -379,7 +314,6 @@ function boxOf(children: Candidate[]): Rect | undefined {
   return { top, left, width: right - left, height: bottom - top }
 }
 
-/** The insertion bar: a thin rect on the boundary between two children. */
 function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Axis): Rect {
   const last = children[children.length - 1]
   const at = children[slot]
@@ -389,8 +323,6 @@ function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Ax
   if (axis === 'row') {
     const top = span.top
     const height = span.height
-    // Midway between the neighbours, so the bar sits in the gap rather than on
-    // top of a component's edge.
     const left = at
       ? previous
         ? (previous.rect.left + previous.rect.width + at.rect.left) / 2
@@ -410,9 +342,8 @@ function barFor(parent: Candidate, children: Candidate[], slot: number, axis: Ax
 }
 
 /**
- * A visible tree row. Unlike a canvas box, a row's rectangle covers only the row
- * itself, never its descendants, so "innermost container under the pointer" does
- * not work here and the tree needs its own resolution.
+ * A tree row's rectangle never covers its descendants, so the canvas's
+ * innermost-container rule cannot apply here.
  */
 export interface TreeRow {
   key: string
@@ -425,9 +356,7 @@ export interface TreeRow {
 export interface TreeDropTarget {
   parentKey: string
   index: number
-  /** Draw a line between rows, or outline the row itself when dropping inside. */
   mode: 'before' | 'after' | 'inside'
-  /** The row the indicator attaches to. */
   rowKey: string
 }
 
@@ -435,12 +364,8 @@ export interface TreeDropTarget {
 const EDGE = 0.3
 
 /**
- * Resolve a pointer position over the tree to an insertion point.
- *
- * A row's top and bottom bands reorder it among its siblings. The middle band
- * drops into the row when it is a container, and otherwise falls back to the
- * nearer edge, so a leaf row never swallows a drop and leaves the user with no
- * feedback about where the component went.
+ * A leaf row's middle band falls back to the nearer edge rather than refusing
+ * the drop. See docs/spec/05-canvas.md, "Resolving a drop on the tree".
  */
 export function resolveTreeDrop(
   rows: TreeRow[],
@@ -454,7 +379,6 @@ export function resolveTreeDrop(
 
   const offset = (y - row.rect.top) / Math.max(1, row.rect.height)
 
-  // The root has no siblings to sit beside, so every drop on it goes inside.
   if (!row.parentKey) {
     return { parentKey: row.key, index: 0, mode: 'inside', rowKey: row.key }
   }
@@ -465,12 +389,8 @@ export function resolveTreeDrop(
 
   const after = offset > 0.5
 
-  /*
-   * `moveNode` removes the node before inserting it, so the index has to be
-   * measured against the siblings that remain. Measuring it against the list
-   * that still contains the dragged node put a downward reorder one place too
-   * far: dragging the first of [a, b, c] below b produced [b, c, a].
-   */
+  // `moveNode` removes before inserting, so the index counts only the siblings
+  // that remain.
   const siblings = rows.filter((r) => r.parentKey === row.parentKey && r.key !== draggedKey)
   const anchor = siblings.findIndex((r) => r.key === row.key)
   const slot = anchor === -1 ? row.index : anchor + (after ? 1 : 0)
@@ -483,7 +403,6 @@ export function resolveTreeDrop(
   }
 }
 
-/** The dragged row and everything under it, which it cannot be dropped into. */
 function treeForbidden(rows: TreeRow[], key: string | undefined): Set<string> {
   return closure(rows, key)
 }

@@ -2,20 +2,11 @@
  * @vitest-environment jsdom
  */
 
-/**
- * A length the document authored is not the host theme's to rescale.
- *
- * MUI's `sx` reads a bare number as a multiple of a theme value: `padding` goes
- * through `theme.spacing` and `borderRadius` through `theme.shape.borderRadius`.
- * So the kit divided by the scale to get back to pixels — and the point of MUI
- * is that a host replaces its theme, which makes that conversion round-trip only
- * under the defaults it was written against. One of the two divisions was
- * against the wrong default and was wrong even there: `borderRadius` divided by
- * 8 where MUI multiplies by 4, so an authored `radius: 24` drew at 12px.
- *
- * The cross-kit half of this is in `test/kit-contract.test.tsx`, which cannot
- * live here because it needs both kits, and the theme half cannot live there
- * because only this package depends on MUI.
+/*
+ * MUI's `sx` multiplies a bare number by a theme value (`padding` by
+ * `theme.spacing`, `borderRadius` by `theme.shape.borderRadius`), so an
+ * authored length must reach it as pixels. The cross-kit half is in
+ * `test/kit-contract.test.tsx`.
  */
 
 import { fireEvent, render } from '@testing-library/react'
@@ -34,11 +25,8 @@ function documentOf(root: ComponentNode): FormDocument {
     name: 'Scale',
     root,
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US`, as `createDocument` produces: without a dialect, a bundle keyed
+    // by tag and one keyed by bare code are the same string.
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -54,17 +42,8 @@ const box: ComponentNode = {
 }
 
 /**
- * Does this stylesheet carry a rule for exactly this class?
- *
- * `text.includes('.' + name)` is the substring trap the write-tests skill
- * names. Emotion class names are hashes and one is freely a prefix of another,
- * so `.css-1ab` matches the rule written for `.css-1abc` and the assertion
- * reads a rule belonging to some other element on the page. Every test below
- * renders several styled components into one document and reads one of them,
- * which is the arrangement where that goes wrong quietly.
- *
- * The name has to end where the selector ends: anything but another name
- * character after it.
+ * Not `text.includes('.' + name)`: one Emotion class name can prefix another
+ * (`.css-1ab`, `.css-1abc`), so the name must end where the selector ends.
  */
 function carriesRule(text: string, className: string): boolean {
   const needle = '.' + className
@@ -75,7 +54,6 @@ function carriesRule(text: string, className: string): boolean {
   return false
 }
 
-/** The emotion rule this render emitted for the Box, whitespace removed. */
 function ruleFor(theme: ReturnType<typeof createTheme> | undefined): string {
   const form = (
     <FormRenderer
@@ -94,12 +72,8 @@ function ruleFor(theme: ReturnType<typeof createTheme> | undefined): string {
   const classes = (el.getAttribute('class') ?? '').split(/\s+/).filter((c) => c.startsWith('css-'))
   expect(classes.length, 'the Box carries no emotion class').toBeGreaterThan(0)
 
-  /*
-   * Matched by the element's own class rather than by clearing the page first.
-   * Emotion caches by content hash and will not re-insert a rule it believes is
-   * already there, so removing its style tags makes the next render emit
-   * nothing and the reading come back empty.
-   */
+  // Matched by the element's own class, not by clearing style tags first:
+  // Emotion will not re-insert a rule it has cached.
   return Array.from(document.querySelectorAll('style'))
     .map((tag) => tag.textContent ?? '')
     .filter((text) => classes.some((c) => carriesRule(text, c)))
@@ -107,7 +81,6 @@ function ruleFor(theme: ReturnType<typeof createTheme> | undefined): string {
     .replace(/\s+/g, '')
 }
 
-/** Whatever the emotion rules for this element say, whitespace removed. */
 function rulesFor(container: HTMLElement, key: string): string {
   const el = container.querySelector('[data-fs-key="' + key + '"]')
   if (!el) throw new Error('no element rendered for ' + key)
@@ -154,20 +127,6 @@ describe('the screen surface', () => {
 })
 
 describe('an unanswered radio group', () => {
-  /*
-   * Every `RadioItem` child rendered pre-checked, and all of them at once.
-   *
-   * `RadioItem` ships with `value: ''` from the palette, an unanswered group's
-   * value is `''`, and MUI's `Radio` reads `useRadioGroup()` from context and
-   * compares the two -- so `'' === ''` checked every item. `kit-html` fixed
-   * exactly this and its comment says so; the comment here claimed the item was
-   * "deliberately not wired to the group's value", which was false and is
-   * plausibly why the guard was never written.
-   *
-   * The contract suite's "A RadioItem child can be selected in its group" rule
-   * did not catch it: selecting one works either way, and nothing asked what
-   * the group looked like before anybody selected anything.
-   */
   const group = (values: string[]): ComponentNode => ({
     key: 'colour',
     type: 'RadioGroup',
@@ -196,17 +155,6 @@ describe('an unanswered radio group', () => {
   })
 
   it('lets an item outside a group be checked, because nothing forbids one', () => {
-    /*
-     * The guard's other edge. Fixing the pre-checked group by writing
-     * `checked={group ? ... : false}` made a `RadioItem` with no group above it
-     * a controlled input whose value never moves: permanently unchecked, and a
-     * click does nothing.
-     *
-     * Reachable, because `ComponentDef` has no way to say a type may only
-     * appear under another -- the palette will drop a `RadioItem` anywhere, so
-     * that document is one somebody can author. Uncontrolled is the honest
-     * answer when there is no group to hold the answer.
-     */
     const container = draw({
       key: 'lonely',
       type: 'RadioItem',
@@ -223,19 +171,12 @@ describe('an unanswered radio group', () => {
   })
 
   it('has nothing checked when the items do carry values', () => {
-    // The ordinary case, and the control: an unanswered group is unanswered
-    // whatever its options are called.
     const container = draw(group(['red', 'green']))
 
     expect(checkedIn(container)).toEqual([])
   })
 
   it('checks the one item whose value the group holds', () => {
-    /*
-     * And the guard has to leave selection working. Refusing every item would
-     * satisfy both tests above and break the component, which is the failure
-     * mode a "nothing is checked" assertion invites.
-     */
     const root = group(['red', 'green'])
     const form = (
       <FormRenderer
@@ -253,13 +194,7 @@ describe('an unanswered radio group', () => {
 })
 
 describe('a length the host theme must not rescale', () => {
-  /*
-   * `Screen.maxWidth` was the one length in the kit that skipped `px()`, and
-   * MUI's sizing transform reads a bare number at or below 1 as a *percentage*
-   * -- which `ImageNode`'s own comment already documents as the reason `width`
-   * converts. So `maxWidth: 1` was 100% here and 1px on `kit-html`: one
-   * document, two layouts, from the value a slider lands on at its floor.
-   */
+  // MUI's sizing transform reads a bare number at or below 1 as a percentage.
   const screen = (maxWidth: number): ComponentNode => ({
     key: 'screen',
     type: 'Screen',
@@ -276,18 +211,10 @@ describe('a length the host theme must not rescale', () => {
   })
 
   it('does not read a small number as a percentage', () => {
-    // The failure with its own name, so a regression says what it was.
     expect(rulesFor(draw(screen(1)), 'screen')).not.toContain('max-width:100%')
   })
 
   it('keeps a button group gap out of the theme spacing scale', () => {
-    /*
-     * `ButtonGroup` passed `gap={1}`, a bare number, which MUI resolves
-     * through `theme.spacing`. A host that set spacing to 3 got a 3px gap
-     * where the default theme drew 8px, from a document that said nothing at
-     * all. This file's stated rule was tested on `Box.padding` and
-     * `Box.radius` only, and this is the length it missed.
-     */
     const buttons: ComponentNode = {
       key: 'actions',
       type: 'ButtonGroup',
@@ -303,32 +230,8 @@ describe('a length the host theme must not rescale', () => {
   })
 })
 
-/*
- * `ImageNode`'s refused `src` is deliberately not tested here, and that is a
- * gap rather than an oversight.
- *
- * The finding was that `src={safeHref(props['src']) ?? ''}` renders
- * `<img src="">`, a request for the current page in several browsers, while
- * `LinkNode` reads the same allowlist and degrades a refusal to plain text.
- * Building the test showed the DOM outcome does not happen: React refuses an
- * empty `src` and leaves the attribute off, so `hasAttribute('src')` is `false`
- * whichever way the line is written and every assertion about the markup passes
- * against the defect.
- *
- * React does warn -- "An empty string ("") was passed to the src attribute" --
- * and asserting on that was the second attempt. It fires when the whole file
- * runs and not when the test runs alone, so a gate built on it would be a gate
- * that depends on what else is in the suite. That is worse than no gate.
- *
- * The line is still written to omit the attribute, because that is what it
- * means and it is what stops the warning. It is unguarded, and
- * `docs/build-out/found.md` records it beside the two other checks this run
- * could not make fail.
- */
-
 describe('a Box under a host theme', () => {
   it('draws the authored radius under the default theme', () => {
-    // The defect. Divided by 8 and multiplied by 4, an authored 24 drew at 12.
     expect(ruleFor(undefined)).toContain('border-radius:24px')
   })
 

@@ -1,20 +1,9 @@
 import { backgroundImageProps, backgroundImageDefaults } from '@willowforms/core'
-/**
- * Palette metadata for the Material UI kit.
- *
- * This half of a kit has no React import, so the designer can list a palette and
- * build a properties panel without loading any component library.
- *
- * Data with one exception, and the exception is deliberate: `defaultRenderWhen`
- * is a function, because a `Step`'s condition names the node's own key and the
- * key is not known until the node is made. So a `Kit` does not round-trip
- * through JSON, and nothing here relies on it doing so -- a kit is code a host
- * imports, not a document it stores.
- */
+// No React or MUI import: the designer loads this half to build its palette
+// without a component library.
 
 import type { Kit, PropSchema } from '@willowforms/core'
 
-/** Every user-facing string is localizable; that is the whole reason it is a prop. */
 const label: PropSchema = {
   name: 'label',
   label: 'Label',
@@ -197,15 +186,6 @@ export const muiKit: Kit = {
           editor: 'options',
           hint: 'Labels are displayed; values are saved with the answer.',
         },
-        /*
-         * The empty choice, and the reason it is a property.
-         *
-         * One kit hardcoded the English "Choose…" and the other drew no empty
-         * option at all, so a MUI select could not be returned to unanswered
-         * once somebody had picked something -- and neither string could be
-         * translated, on a builder whose whole point is that user-facing copy is
-         * a localizable prop.
-         */
         {
           name: 'placeholder',
           label: 'Placeholder',
@@ -277,13 +257,6 @@ export const muiKit: Kit = {
       icon: 'box',
       group: 'layout',
       container: true,
-      /*
-       * A step is a container shown when `context.step` equals its own key.
-       * That condition is the whole difference between a step and a box, so it
-       * is stated here rather than left for every author to write by hand and
-       * get the path right. It is a starting value: the Rules tab edits it
-       * afterwards like any other visibility rule.
-       */
       defaultRenderWhen: (key) => ({
         kind: 'condition',
         condition: {
@@ -292,10 +265,7 @@ export const muiKit: Kit = {
           right: { kind: 'literal', value: key },
         },
       }),
-      // Pixels, like Screen, Stack and Grid. The comment here used to say "MUI's
-      // spacing scale ... 16 here would be 128px", which stopped being true when
-      // `renderers.tsx` moved gaps to pixels and left every default eight times
-      // too tight.
+      // Pixels, not MUI spacing units, like Screen, Stack and Grid.
       defaultProps: { ...backgroundImageDefaults, density: 'inherit', gap: 16 },
       props: [
         ...backgroundImageProps,
@@ -310,16 +280,8 @@ export const muiKit: Kit = {
       icon: 'repeat',
       group: 'layout',
       container: true,
-      /*
-       * Data-bound *and* an array, which is the pairing core recognises -- so it
-       * never has to learn the type string `Repeater`.
-       *
-       * Not the only data-bound container: `RadioGroup` is one too, and it stays
-       * out of `isRowScope` because its `dataType` is a string rather than by
-       * anything about the pairing. Read that as the rule it is: a container
-       * whose answer is a list *is* a repeater, whatever it is called, and a kit
-       * adding one has declared repetition whether or not it meant to.
-       */
+      // Core's `isRowScope` makes any container whose answer is an array a
+      // repeater, whatever its type is called.
       dataBound: true,
       dataType: 'array',
       defaultProps: {

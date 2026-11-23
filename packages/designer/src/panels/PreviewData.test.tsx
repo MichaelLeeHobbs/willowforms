@@ -2,13 +2,6 @@
  * @vitest-environment jsdom
  */
 
-/**
- * The Preview form data dialog's Copy JSON button.
- *
- * A missing clipboard API and a refused write need different advice, and on
- * either failure the JSON is left selected so a keyboard copy is one step.
- */
-
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -45,11 +38,7 @@ afterEach(() => {
 const data = { name: 'Mira', count: 0, addresses: [{ street: '12 Oak Lane' }] }
 const json = JSON.stringify(data, null, 2)
 
-/**
- * Opens the dialog with the given clipboard, presses Copy JSON, and returns the
- * settled note and editor. The clipboard is set after `userEvent.setup()`,
- * which installs a clipboard stub of its own.
- */
+// The clipboard is set after `userEvent.setup()`, which installs its own stub.
 async function copyAndRead(
   clipboard: unknown,
 ): Promise<{ note: string; editor: HTMLTextAreaElement; unmount: () => void }> {

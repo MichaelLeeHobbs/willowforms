@@ -1,11 +1,3 @@
-/**
- * The rendering half of the Material UI kit.
- *
- * Each renderer takes resolved props and maps them onto a MUI component. Nothing
- * here imports from the designer, so a consumer who only wants the runtime pays
- * for the renderer and MUI, and nothing else.
- */
-
 import Alert from '@mui/material/Alert'
 import AlertTitle from '@mui/material/AlertTitle'
 import Box from '@mui/material/Box'
@@ -56,15 +48,9 @@ const px = (value: number): string => String(value) + 'px'
 
 const GAP = 16
 
-/*
- * The message a field is described by.
- *
- * MUI only wires `aria-describedby` when the field has an explicit `id` and
- * renders helper text, so an empty helper meant no description at all and a
- * field that gained one only when it failed. A non-breaking space keeps the
- * element in the DOM, which is what the kit contract asks for, and it reserves
- * the line so nothing shifts when an error appears.
- */
+// MUI wires `aria-describedby` only when the field has an `id` and helper text,
+// so an empty helper becomes a non-breaking space. It also reserves the line
+// for an error.
 const message = (error: string | undefined, helper: string): string => error ?? (helper || ' ')
 
 const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
@@ -177,7 +163,6 @@ function RepeaterNode({
       direction="column"
       gap={px(num(props['gap'], GAP))}
     >
-      {/* Group-level help and errors describe the list independently of its rows. */}
       <Stack
         role="group"
         aria-label={name}
@@ -252,14 +237,9 @@ function StepNode({ props, nodeProps, children, navigation }: NodeRendererProps)
 
 function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
   const LEVELS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const
-  /*
-   * `h2` when the document names no rank, which is what the HTML kit answers.
-   *
-   * This fell back to `h5`, so a hand-written document with no `level` rendered
-   * at a different rank depending on which kit drew it -- and a heading's rank
-   * is the document outline a screen reader navigates by. The palette still
-   * starts a *new* heading at `h5`, which is this kit's own call about size.
-   */
+  // `h2` when the document names no rank, as in kit-html: rank is the outline a
+  // screen reader navigates, so both kits must agree. The palette's `h5` for a
+  // new heading is a separate choice about size.
   const asked = str(props['level'], 'h2')
   const level: Variant = (LEVELS as readonly string[]).includes(asked) ? (asked as Variant) : 'h2'
   return (
@@ -345,9 +325,6 @@ function CheckboxNode({
   onChange,
   events,
 }: NodeRendererProps): ReactNode {
-  // Every other field in this kit shows its error. This one used to drop it on
-  // the floor, so a required checkbox failed a submit while saying nothing. The
-  // kit contract test caught it.
   const messageId = useId()
   return (
     <FormControl {...nodeProps} error={Boolean(error)} disabled={bool(props['disabled'])}>
@@ -360,12 +337,8 @@ function CheckboxNode({
             slotProps={{
               input: {
                 'aria-describedby': messageId,
-                /*
-                 * Stated on the input, because that is what a screen reader
-                 * announces. `FormControl error` colours the label and says
-                 * nothing to anybody not looking at it — which is why this was
-                 * missing here and present on all three in the HTML kit.
-                 */
+                // On the input, which is what a screen reader announces;
+                // `FormControl error` only colours the label.
                 ...(error ? { 'aria-invalid': true } : {}),
                 ...requiredProps(required),
               },
@@ -416,11 +389,8 @@ function SelectNode({
       {}
       <MenuItem value="">{str(props['placeholder'], 'Choose…')}</MenuItem>
       {options.map((option, i) => {
-        /*
-         * `optionEntry` in core, which is `optionValue`'s inverse: the two have
-         * to agree on what an entry means or a choice cannot round-trip. Read
-         * inline here, it also threw on a `null` in the array.
-         */
+        // `optionEntry` is `optionValue`'s inverse; reading an entry any other
+        // way breaks the round trip.
         const { value: v, label } = optionEntry(option, i, options)
         return (
           <MenuItem key={String(i) + ':' + v} value={v}>
@@ -639,8 +609,8 @@ function SwitchNode({
         control={
           <Switch
             checked={bool(value)}
-            // `slotProps.input`, for the reason on the Checkbox above. This is
-            // the control that lost every attribute on MUI 7.
+            // `slotProps.input`: on MUI 7 this control drops input attributes
+            // passed any other way.
             slotProps={{
               input: {
                 'aria-describedby': messageId,
@@ -682,7 +652,6 @@ function RadioGroupNode({
       error={Boolean(error)}
       disabled={bool(props['disabled'])}
     >
-      {/* A legend, not a label: one question, many answers. */}
       <FormLabel component="legend" id={messageId + '-label'}>
         {str(props['label'])}
       </FormLabel>
@@ -700,7 +669,7 @@ function RadioGroupNode({
           return (
             <FormControlLabel
               // Position first, so two options sharing a value are still two
-              // keys. React drops one of a duplicated pair without a word.
+              // keys.
               key={String(i) + ':' + v}
               value={v}
               control={<Radio />}
@@ -708,7 +677,6 @@ function RadioGroupNode({
             />
           )
         })}
-        {/* Children are RadioItems, for options that need their own layout. */}
         {children}
       </RadioGroup>
       <FormHelperText id={messageId} {...alertWhenError(error)}>
@@ -726,30 +694,9 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <Box {...nodeProps}>
       <FormControlLabel
         value={value}
-        /*
-         * Controlled only under a group, because only a group has an answer.
-         *
-         * `checked={false}` outside one made a standalone item permanently
-         * unchecked: a controlled input whose value never moves, so clicking it
-         * does nothing. Nothing stops that structure -- `ComponentDef` has no
-         * way to say a type may only appear under another -- so a `RadioItem`
-         * dropped on its own is a document somebody can author, and it should
-         * behave like a radio rather than like a disabled one.
-         *
-         * Omitting the prop leaves it uncontrolled, which is the platform's own
-         * behaviour and the honest answer when there is no group to be the
-         * source of truth.
-         */
         {...(group ? { checked: value !== '' && group.value === value } : {})}
-        /*
-         * Only when the document says so.
-         *
-         * `bool()` answers `false` for an absent prop, and an explicit
-         * `disabled={false}` blocks MUI's inheritance chain -- so a `RadioItem`
-         * inside a disabled `RadioGroup` re-enabled itself, which is the
-         * opposite of what disabling the group means. Omitting the prop is how
-         * a component says "inherit".
-         */
+        // Omitted unless the document sets it: an explicit `disabled={false}`
+        // stops MUI inheriting a disabled RadioGroup.
         {...(props['disabled'] === undefined ? {} : { disabled: bool(props['disabled']) })}
         control={<Radio />}
         label={str(props['label'])}
@@ -769,11 +716,8 @@ function DatePickerNode({
   events,
 }: NodeRendererProps): ReactNode {
   const id = useId()
-  /*
-   * A native date input, not MUI's DatePicker: that lives in @mui/x-date-pickers
-   * and needs a date library alongside it. A kit is meant to be cheap to write,
-   * and two dependencies for one component is not cheap.
-   */
+  // A native date input: MUI's DatePicker needs @mui/x-date-pickers and a date
+  // library.
   return (
     <TextField
       {...nodeProps}
@@ -806,11 +750,8 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const severity =
     raw === 'success' || raw === 'warning' || raw === 'error' ? raw : ('info' as const)
   const title = str(props['title'])
-  /*
-   * Only an error announces itself. This component is authored into the form,
-   * so it is on screen from the first paint; role="alert" on all four would
-   * have a screen reader read every notice before the form itself.
-   */
+  // Only an error is `role="alert"`: an authored alert is on screen from first
+  // paint, and announcing them all would read every notice before the form.
   return (
     <Alert {...nodeProps} severity={severity} {...(severity === 'error' ? {} : { role: 'note' })}>
       {title && <AlertTitle>{title}</AlertTitle>}
@@ -843,10 +784,8 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 function LinkNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const href = safeHref(props['href'])
   const blank = props['target'] === 'blank'
-  /*
-   * A refused address renders as text, not as a dead link. A link that looks
-   * like one and does nothing is the failure this project treats as worst.
-   */
+  // A refused address renders as text: a link that does nothing is worse than
+  // none.
   if (!href) {
     return (
       <Typography {...nodeProps} component="span">
@@ -874,16 +813,11 @@ function BreadcrumbsNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   return (
     <Breadcrumbs {...nodeProps} aria-label={str(props['label'], 'Breadcrumb')}>
       {items.map((item, i) => {
-        /*
-         * Guarded like an option, and for the same reason: a crumb comes out of
-         * a document. Reading `.label` off a `null` threw during render, and the
-         * HTML kit had the identical line — one shared test found both.
-         */
+        // A crumb is document data and can be anything, `null` included.
         const entry =
           item !== null && typeof item === 'object' && !Array.isArray(item) ? item : undefined
         const text = typeof entry?.['label'] === 'string' ? entry['label'] : String(i + 1)
         const href = safeHref(entry?.['href'])
-        // The last crumb is where you are, so it is text and says so.
         return i === last || !href ? (
           <Typography
             key={text + ':' + String(i)}

@@ -1,13 +1,6 @@
 /**
- * Document-level settings: the form's name and its languages.
- *
- * Languages need a home somewhere, because a translation binding is only useful
- * once there is more than one language to translate into, and editing the
- * document JSON by hand to add one is not an answer.
- *
  * Removing a language deliberately leaves its translation bundle in the
- * document. Dropping the text along with the language would make an accidental
- * removal unrecoverable except through undo, and the bundle costs nothing.
+ * document, so an accidental removal stays recoverable without undo.
  */
 
 import { useId, useState } from 'react'
@@ -143,11 +136,8 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
     const language: Language = {
       code: primary.toLowerCase(),
       ...(region ? { dialect: region.toUpperCase() } : {}),
-      /*
-       * The typed name, or none. It fell back to the raw code, so a language
-       * added without a name displayed as "pt-BR pt-BR" -- the tag twice. The
-       * list draws the tag on its own when there is no name.
-       */
+      // No fallback to the code: the list draws the tag alone when there is no
+      // name, and a fallback would draw it twice.
       name: name.trim(),
       bidi: 'ltr',
     }
@@ -163,14 +153,7 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
     setError('')
   }
 
-  /*
-   * Removed by position, not by tag.
-   *
-   * A tag is not unique: nothing stops a document holding `en` twice, and a
-   * hand-edited one can, so filtering by tag deleted both entries for one click
-   * -- and with a translation bundle keyed by that tag, the author had no way to
-   * tell which of the two they had lost.
-   */
+  // By position, not by tag: a document can hold one tag twice.
   const remove = (at: number): void => {
     if (languages.length === 1) return
     api.setLanguages(languages.filter((_, index) => index !== at))
@@ -208,11 +191,7 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
       )}
 
       <h3 className="fs-rules__heading">
-        {/*
-          The count of what this panel can draw, not of what the array holds.
-          A document with three entries and one usable one said "3" over a list
-          of one, which reads as a panel that lost something.
-        */}
+        {/* The count of what this panel draws, not of what the array holds. */}
         Languages <span className="fs-rules__count">{languages.length}</span>
       </h3>
 
@@ -225,11 +204,6 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
             // a duplicated React key drops a row without a word.
             <li key={String(at) + ':' + tag} className="fs-languages__item">
               <span className="fs-languages__name">
-                {/*
-                 * The tag when there is no name. It fell back to the raw code,
-                 * which for `pt-BR` produced "pt-BR pt-BR" -- the same string
-                 * twice, reading as though something had gone wrong.
-                 */}
                 {nameOf(language) ? (
                   <>
                     {language.name} <code>{tag}</code>
@@ -245,8 +219,7 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
                     type="radio"
                     name="fs-default-language"
                     checked={isDefault}
-                    // The guarded list, like every write in this panel. See
-                    // `languages` above for why an edit writes what was drawn.
+                    // Writes the `languagesOf` list, as every write here does.
                     onChange={() => api.setLanguages(languages, tag)}
                   />
                   Default
@@ -294,12 +267,8 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
             type="text"
             placeholder="fr"
             value={code}
-            /*
-             * Flagged and described, the way `KeyField` does it. `role="alert"`
-             * reads the refusal once as it appears and then it is gone: a
-             * screen-reader user who tabbed back to the box had no way to hear
-             * why the code was refused, or to know that it was.
-             */
+            // `role="alert"` announces once; the description lets a returning
+            // screen-reader user hear the refusal.
             aria-invalid={error ? true : undefined}
             {...(error ? { 'aria-describedby': idBase + '-fs-language-error' } : {})}
 
@@ -307,13 +276,8 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
               setCode(e.target.value)
               setError('')
             }}
-            /*
-             * Enter adds the language, the way Enter commits every other field
-             * in this panel. This block is not a `<form>` -- it sits inside the
-             * designer's own markup, and a nested form in a host's page is a
-             * submit nobody asked for -- so the key is handled here instead of
-             * by the browser.
-             */
+            // Not a `<form>`: the designer can sit inside a host's form, and a
+            // nested one would submit it. Enter is handled here instead.
             onKeyDown={(e) => {
               if (e.key !== 'Enter') return
               e.preventDefault()

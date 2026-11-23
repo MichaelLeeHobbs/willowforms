@@ -32,11 +32,6 @@ describe('safeDeclarations', () => {
   })
 
   it('refuses text that could close the block and start a new rule', () => {
-    /*
-     * This is the whole reason the function exists. A document is data, so an
-     * author can write anything here, and `}` is how one component's styling
-     * reaches the entire page.
-     */
     expect(safeDeclarations('color: red } body { display: none')).toBeUndefined()
     expect(safeDeclarations('a { color: red }')).toBeUndefined()
   })
@@ -82,24 +77,11 @@ describe('styleSheetFor', () => {
     ['tablet', '(min-width: 768px) and (max-width: 1023px)'],
     ['desktop', '(min-width: 1024px)'],
   ])('turns %s into its own query', (device, query) => {
-    /*
-     * All three breakpoints, not just mobile. The other two could have moved --
-     * a tablet rule that starts at 640px, a desktop one that overlaps it -- and
-     * the only test here asserted the mobile query, so the two that decide
-     * whether a rule reaches the screen at all were unpinned.
-     */
     const sheet = styleSheetFor(root([node('card', { [device]: 'padding: 4px' })]))
     expect(sheet).toBe('@media ' + query + '{[data-fs-key="card"]{padding: 4px}}')
   })
 
   it('escapes the scope, not only the key', () => {
-    /*
-     * `escapeKey` is applied to both and only one was ever given anything to
-     * escape. A scope is a `useId` value today, so nothing in it needs escaping
-     * -- and it is a string this library accepts from a caller, which is the
-     * definition of a value not to trust: a scope holding a quote would close
-     * the attribute selector and start a different one.
-     */
     const sheet = styleSheetFor(root([node('card', { any: 'padding: 4px' })]), {
       scope: 'a"] , body [x="',
     })
@@ -116,10 +98,6 @@ describe('styleSheetFor', () => {
   })
 
   it('emits only the simulated device, flat, with no query', () => {
-    /*
-     * The canvas simulates a device by sizing a frame, so a media query would
-     * answer about the browser window and the frame would be ignored.
-     */
     const css = { any: 'padding: 8px', mobile: 'padding: 4px', tablet: 'padding: 6px' }
     const sheet = styleSheetFor(root([node('card', css)]), { device: 'mobile' })
 
@@ -140,13 +118,6 @@ describe('styleSheetFor', () => {
   it.each(['any', 'mobile', 'tablet', 'desktop'] as const)(
     'leaves out a declaration it refused on the %s layer rather than emitting a broken rule',
     (layer) => {
-      /*
-       * Every layer, not only `any`. The refusal was tested on one of four, and
-       * the other three go through a different branch of `styleSheetFor` -- the
-       * one that wraps the block in a media query, where an escaped brace does
-       * not merely add a rule, it closes the `@media` and everything after it is
-       * top-level.
-       */
       const sheet = styleSheetFor(
         root([node('card', { [layer]: 'color: red } body { display: none' })]),
       )
@@ -157,8 +128,6 @@ describe('styleSheetFor', () => {
   )
 
   it('still emits a legitimate declaration on every layer', () => {
-    // The control. A `styleSheetFor` that emitted nothing at all would pass
-    // every row above.
     for (const layer of ['any', 'mobile', 'tablet', 'desktop'] as const) {
       expect(
         styleSheetFor(root([node('card', { [layer]: 'color: red' })])),
@@ -168,30 +137,18 @@ describe('styleSheetFor', () => {
   })
 
   it('escapes a key that would otherwise break out of the selector', () => {
-    // Keys are author-controlled, so one holding a quote must not end the
-    // attribute selector and start a different one.
     const sheet = styleSheetFor(root([node('a"] , body [x="', { any: 'color: red' })]))
     expect(sheet).toBe('[data-fs-key="a\\000022 ] , body [x=\\000022 "]{color: red}')
   })
 
   it('terminates an escape so it cannot eat the character after it', () => {
-    /*
-     * A CSS parser reads at most six hex digits and then swallows one following
-     * whitespace as the terminator. With no space of ours it ate the author's:
-     * a key of `" b` produced an escape immediately followed by the real space,
-     * which parses as `"b` -- a selector naming a string no element carries, so
-     * the component's styling silently applied to nothing.
-     */
+    // A CSS escape takes at most six hex digits and then swallows one
+    // whitespace, so the escape must bring its own space.
     const sheet = styleSheetFor(root([node('" b', { any: 'color: red' })]))
     expect(sheet).toBe('[data-fs-key="\\000022  b"]{color: red}')
   })
 
   it('escapes a key that would otherwise break out of the style element', () => {
-    /*
-     * Worse than a broken selector, and it survives every defence aimed at CSS,
-     * because it never has to be valid CSS. This text is placed inside a
-     * `<style>` element, and `</style>` closes one wherever it appears.
-     */
     const sheet = styleSheetFor(
       root([node('a</style><script>x()</script>', { any: 'color: red' })]),
     )
@@ -200,24 +157,12 @@ describe('styleSheetFor', () => {
   })
 
   it('escapes a backslash, which would otherwise escape the quote that follows it', () => {
-    /*
-     * The last member of the escape class with no fixture: the keys used across
-     * this file cover the quote, the `<` and the control range, and never a
-     * backslash. Drop it from the class and a node keyed `a\` emits
-     * `[data-fs-key="a\"]{…}`, where `\"` is an escaped quote rather than the
-     * end of the string -- so the attribute value runs on past the closing
-     * bracket and swallows the next rule's selector and declarations. One
-     * node's styling lands under another's, which is the failure the header of
-     * this module describes.
-     */
     const sheet = styleSheetFor(
       root([node('a\\', { any: 'color: red' }), node('b', { any: 'color: blue' })]),
     )
 
     expect(sheet).toContain('[data-fs-key="a\\00005c "]{color: red}')
     expect(sheet).toContain('[data-fs-key="b"]{color: blue}')
-    // And nowhere is there a backslash sitting immediately before the quote
-    // that is supposed to close the attribute value.
     expect(sheet).not.toContain('\\"')
   })
 
@@ -227,11 +172,6 @@ describe('styleSheetFor', () => {
   })
 
   it('confines every rule to one rendered form when given a scope', () => {
-    /*
-     * Keys are unique inside a document, not inside a page. Two forms rendered
-     * together both have a `root`, so an unscoped sheet from the first styles
-     * the second.
-     */
     const sheet = styleSheetFor(
       root([node('card', { any: 'color: red', mobile: 'color: blue' })]),
       {
@@ -255,7 +195,6 @@ describe('styleSheetFor', () => {
 
 describe('printDeclarations', () => {
   it('writes one declaration per line, so the raw field stays readable', () => {
-    // Its own contract, which was only ever checked through `setDeclaration`.
     expect(
       printDeclarations([
         ['padding', '8px'],
@@ -301,23 +240,12 @@ describe('declarations round-trip, so two editors can share one string', () => {
   })
 
   it('leaves declarations it has no control for alone', () => {
-    /*
-     * The property that lets a structured control and a raw field edit one
-     * string: a control only ever touches its own line, so anything typed by
-     * hand survives being near a widget.
-     */
     const text = 'grid-template-areas: "a b"; padding: 8px'
     const next = setDeclaration(text, 'padding', '16px')
     expect(readDeclaration(next, 'grid-template-areas')).toBe('"a b"')
   })
 
   it('keeps a semicolon that belongs to a value', () => {
-    /*
-     * A data URI has a `;` in the middle of it. Splitting on every `;` cut the
-     * value in half, and because a structured control rewrites the whole string
-     * when it is touched, adjusting the padding would have destroyed a
-     * background nobody was editing.
-     */
     const text = 'background: url(data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=); padding: 8px'
 
     expect(parseDeclarations(text)).toEqual([
@@ -340,7 +268,6 @@ describe('declarations round-trip, so two editors can share one string', () => {
   })
 
   it('keeps a colon that belongs to the value rather than the name', () => {
-    // Splitting on the first colon is right; splitting on every one is not.
     expect(parseDeclarations('background: url(https://x/y.png)')).toEqual([
       ['background', 'url(https://x/y.png)'],
     ])
@@ -354,18 +281,11 @@ describe('declarations round-trip, so two editors can share one string', () => {
   })
 
   it('is not confused by an escaped separator outside a string either', () => {
-    /*
-     * The other escape branch. A backslash escapes the next character wherever
-     * it appears in CSS, and only the in-quote branch had a test -- so the
-     * out-of-quote one could be deleted while an escaped `;` or `:` split a
-     * declaration CSS reads as one.
-     */
     expect(parseDeclarations('content: a\\; b; padding: 8px')).toEqual([
       ['content', 'a\\; b'],
       ['padding', '8px'],
     ])
 
-    // And the same for the name/value split, which walks with the same reader.
     expect(parseDeclarations('grid-template: a\\: b')).toEqual([['grid-template', 'a\\: b']])
   })
 
@@ -382,9 +302,7 @@ describe('declarations round-trip, so two editors can share one string', () => {
 
 describe('safeStyleValue', () => {
   it('refuses a value that closes its block and opens a rule of its own', () => {
-    // The CRITICAL. A `Box`'s `background` reaches emotion, which concatenates
-    // it into stylesheet text, so a value holding a brace authors a second
-    // top-level rule against the whole page.
+    // A `Box`'s `background` reaches emotion, which writes it into stylesheet text.
     expect(safeStyleValue('red}html{display:none}.x{')).toBeUndefined()
   })
 
@@ -448,18 +366,8 @@ describe('safeStyleValue', () => {
 })
 
 /**
- * A comment is a way out of a declaration too.
- *
- * `FORBIDDEN` covers `{`, `}`, `<` and `@` — everything that ends the block.
- * It did not cover `/*`, which does not end the block so much as swallow it:
- * `color: red /*` on one node and `*` + `/ ; outline: none` on another are
- * concatenated into one stylesheet, and everything between them disappears
- * inside the comment. A third node's rule is deleted, and one node's
- * declaration lands under another node's selector.
- *
- * It cannot reach outside the form, so this is not the injection the value
- * refusal is for. What it breaks is the sentence this file opens with: a
- * component's styling affects that component.
+ * Every node's rules share one stylesheet, so a comment opened in one node and
+ * closed in another hides every rule between them.
  */
 describe('safeDeclarations and comments', () => {
   it('refuses an unterminated comment', () => {
@@ -467,35 +375,22 @@ describe('safeDeclarations and comments', () => {
   })
 
   it('refuses a comment that closes, because the pair is what does the damage', () => {
-    // Refused as a set rather than balanced, for the reason the braces are:
-    // deciding which comment is safe invites an argument this does not need.
     expect(safeDeclarations('color: red /* a note */')).toBeUndefined()
     expect(safeDeclarations('*/ ; outline: none')).toBeUndefined()
   })
 
   it('keeps declarations that merely contain a slash or a star', () => {
-    // The control. Refusing either character alone would take out real values.
     expect(safeDeclarations('font: 12px/1.5 sans-serif')).toBe('font: 12px/1.5 sans-serif')
     expect(safeDeclarations('grid-area: 1 / 2 / 3 / 4')).toBe('grid-area: 1 / 2 / 3 / 4')
   })
 })
 
-/**
- * A custom property's name is case-sensitive; a CSS property's is not.
- *
- * `parseDeclarations` lowercased every name, and `setDeclaration` wrote the
- * lowercased form back — so `--brandColor` became `--brandcolor` the first time
- * any structured control was touched, and stopped matching the `var()` that
- * read it. Silently: the declaration is still there and still valid.
- */
 describe('declaration names and case', () => {
   it('keeps a custom property spelled the way it was written', () => {
     expect(parseDeclarations('--brandColor: red')).toEqual([['--brandColor', 'red']])
   })
 
   it('still matches an ordinary property however it was capitalised', () => {
-    // The control, and why the lowercasing was there: CSS property names are
-    // case-insensitive, and a control looking for `padding` has to find it.
     expect(parseDeclarations('PADDING: 8px')).toEqual([['padding', '8px']])
     expect(readDeclaration('Padding: 8px', 'padding')).toBe('8px')
   })
@@ -513,36 +408,18 @@ describe('declaration names and case', () => {
   })
 })
 
-/**
- * Three ways a declaration block reached the page unchecked.
- *
- * `safeDeclarations` refuses a literal brace, a comment marker and an at-rule,
- * and its whole purpose is that a component's styling affects that component.
- * Three shapes walked past it.
- */
 describe('a raw declaration block this will not emit', () => {
   it.each([
     ['an unterminated double quote', 'content: "'],
     ['an unterminated single quote', "content: '"],
     ['a quote that hides a brace', 'content: "} body { display: none'],
   ])('refuses %s', (_what, text) => {
-    /*
-     * `FORBIDDEN` cannot see a `}` inside an unterminated string, and the
-     * browser can: the block swallows its own closing brace and every rule after
-     * it until the next quote, so a third component's declarations land under
-     * this one's selector. The same breakage the brace check exists to stop,
-     * arriving by a route it does not look at.
-     */
+    // The sheet has no newlines, so an unterminated string runs past the
+    // block's closing brace to the next quote, taking later rules with it.
     expect(safeDeclarations(text)).toBeUndefined()
   })
 
   it('refuses a block that fetches, which the single-value sink already refused', () => {
-    /*
-     * `safeStyleValue` refuses `url(...)` by name and calls it an exfiltration
-     * channel: a request keyed off a field, from a page collecting answers, to
-     * an address the document chose. There are two sinks for author-supplied CSS
-     * and only one of them was asked.
-     */
     expect(safeDeclarations('background: url(https://evil.example/p.png)')).toBeUndefined()
     expect(safeDeclarations('background-image: image-set("https://evil.example/p.png" 1x)')).toBe(
       undefined,
@@ -550,16 +427,12 @@ describe('a raw declaration block this will not emit', () => {
   })
 
   it('refuses an entry that is not text at all', () => {
-    // A document is data, so `css.mobile` can be a number. `.trim()` on one
-    // throws out of `styleSheetFor`, which the renderer calls during render.
     expect(safeDeclarations(7 as unknown as string)).toBeUndefined()
     expect(safeDeclarations({ colour: 'red' } as unknown as string)).toBeUndefined()
     expect(() => styleSheetFor(root([node('card', { any: 7 as unknown as string })]))).not.toThrow()
   })
 
   it('still emits an ordinary block, including one with a balanced quote', () => {
-    // The controls. A check that refused everything would pass every row above,
-    // and a quoted string is legitimate CSS.
     expect(safeDeclarations('color: red')).toBe('color: red')
     expect(safeDeclarations('content: "hello"')).toBe('content: "hello"')
     expect(safeDeclarations("font-family: 'Segoe UI'")).toBe("font-family: 'Segoe UI'")
@@ -575,7 +448,6 @@ describe('a raw declaration block this will not emit', () => {
  * properties overlap, the cascade with it.
  */
 describe('setDeclaration and the order of a block', () => {
-  /** How `printDeclarations` joins, kept in one place rather than escaped inline. */
   const SEP = ';' + String.fromCharCode(10)
 
   it('replaces a declaration in place', () => {
@@ -599,15 +471,6 @@ describe('setDeclaration and the order of a block', () => {
   })
 })
 
-/**
- * A stylesheet built from a document nobody gated.
- *
- * `styleSheetFor` walks the tree with `walk`, which was neither total nor
- * bounded: a `children` that is an object threw "is not iterable", and a tree
- * nested past the stack threw `RangeError`. The renderer hardened its own layer
- * for exactly this -- "one node missing `props` used to take the whole form
- * with it" -- and this path, which also runs during render, was left.
- */
 describe('styleSheetFor on a malformed tree', () => {
   it.each([
     ['an object', { nope: true }],
@@ -623,7 +486,6 @@ describe('styleSheetFor on a malformed tree', () => {
     } as never
 
     expect(() => styleSheetFor(broken)).not.toThrow()
-    // And it still emits what it could read, which is the root's own rule.
     expect(styleSheetFor(broken)).toContain('color: red')
   })
 
@@ -637,7 +499,6 @@ describe('styleSheetFor on a malformed tree', () => {
   })
 
   it('still emits a rule for a node a person would author', () => {
-    // The control: a walk that gave up on everything would pass all four above.
     const fine: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -650,21 +511,6 @@ describe('styleSheetFor on a malformed tree', () => {
 })
 
 describe('the backslash, which one of the two grammars did not treat as significant', () => {
-  /*
-   * The escape bypass, driven at the sink it reached.
-   *
-   * `FORBIDDEN` was `/[{}<@]|\/\*|\*\//` and did not name the backslash, so the
-   * `FETCHING` refusal below it was one escape away from silent: CSS consumes
-   * escapes while building an identifier, so `\75 rl(` tokenises as the `url(`
-   * function with none of its letters ever appearing, and `FETCHING` matches
-   * letters.
-   *
-   * `FORBIDDEN_VALUE`, the grammar for the *other* sink, has carried `\\` for a
-   * while under a comment naming this exact technique. No fixture in this file
-   * ever put a backslash inside a declaration block, and the escape tests
-   * elsewhere in it exercise `splitTop`, a different reader -- which is easy to
-   * mistake for coverage of this one.
-   */
   const ESCAPED_URL: [string, string][] = [
     ['hex escape with a space terminator', 'background:\\75 rl(https://evil.example/beacon)'],
     ['hex escape, zero padded', 'background:\\000075rl(https://evil.example/beacon)'],
@@ -678,23 +524,10 @@ describe('the backslash, which one of the two grammars did not treat as signific
   })
 
   it('refuses a trailing backslash, which swallows the closing brace', () => {
-    /*
-     * The second consequence of the same root cause. `quotesBalanced` skipped
-     * the character after a backslash, so `color:red\` counted as balanced and
-     * `styleSheetFor` emitted `…{color:red\}` -- where `\}` is a valid escape
-     * inside the value token and the block is never closed. One component with
-     * a trailing backslash silently deleted every rule after it and absorbed
-     * the following components' declarations.
-     */
     expect(safeDeclarations('color:red\\')).toBeUndefined()
   })
 
   it('does not delete the rules that follow such a component', () => {
-    /*
-     * Asserted through the sheet rather than through the guard, because the
-     * damage is to the emitted stylesheet: the point is that a later
-     * component's rule survives.
-     */
     const root: ComponentNode = {
       key: 'root',
       type: 'Screen',
@@ -714,11 +547,7 @@ describe('the backslash, which one of the two grammars did not treat as signific
   })
 
   it('still accepts the declarations an author actually writes', () => {
-    /*
-     * The control, and it carries the weight here: refusing every block would
-     * pass every row above while making the Style tab inert. None of these
-     * needs a backslash, which is the argument for refusing it outright.
-     */
+    // None of these needs a backslash, which is why it is refused outright.
     expect(safeDeclarations('color:red')).toContain('color:red')
     expect(safeDeclarations('padding:8px 12px')).toContain('padding')
     expect(safeDeclarations("font-family:'Helvetica Neue', Arial, sans-serif")).toContain('Arial')
@@ -727,17 +556,6 @@ describe('the backslash, which one of the two grammars did not treat as signific
 })
 
 describe('a node whose key is not a string', () => {
-  /*
-   * The argument that actually throws, which the malformed-tree block in this
-   * file does not vary: it varies `children` only.
-   *
-   * `styleSheetFor` reaches `selectorFor(node.key, scope)` for any node
-   * carrying `css`, and `escapeKey` calls `key.replace`. That shape is one this
-   * repository already treats as real -- `context.ts` handles it explicitly and
-   * `context.test.ts` tests it -- and this walk runs inside the renderer's
-   * `useMemo`, so the throw takes the whole form off screen for somebody who
-   * cannot edit the document.
-   */
   const withKey = (key: unknown): ComponentNode =>
     ({
       key: 'root',
@@ -756,18 +574,11 @@ describe('a node whose key is not a string', () => {
   })
 
   it('still emits the rule for a node whose key is a string', () => {
-    // The control. Skipping every node would pass all four rows above while
-    // emitting an empty stylesheet for every real document.
     expect(styleSheetFor(withKey('field'), { scope: 'scope' })).toContain('color:red')
   })
 })
 
 describe('the case of a fetching function', () => {
-  /*
-   * `FETCHING` carries the `i` flag and every refusal fixture in this file is
-   * lower case, so the flag was unasserted in either sink: a case-sensitive
-   * regex would have let both of these through and no row would have failed.
-   */
   it.each([
     ['URL', 'background:URL(https://evil.example/x)'],
     ['Image-Set', 'background:Image-Set("https://evil.example/x" 1x)'],

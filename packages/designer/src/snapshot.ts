@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 
 export interface DragSnapshot<T> {
   snapshot: T | undefined
-  /** Measure now and keep the result; a failed measurement keeps the previous snapshot. */
+  /** A failed measurement keeps the previous snapshot. */
   takeSnapshot: (dragId: number) => void
   clearSnapshot: () => void
 }

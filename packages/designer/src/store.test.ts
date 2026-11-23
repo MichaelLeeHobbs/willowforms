@@ -22,11 +22,8 @@ describe('historyOps.commit', () => {
 
   it('leaves the history it was handed alone', () => {
     /*
-     * Invariant 4's caller-visible half. Every test in this file threads the
-     * returned history forward, so a `commit` that pushed onto `history.past`
-     * in place would satisfy all of them -- and undo holds references to prior
-     * documents, so a mutation here is the redo stack of a session changing
-     * under a component that already rendered from it.
+     * Invariant 4. The other tests thread the returned history forward, so only
+     * this one catches a `commit` that pushes onto `history.past` in place.
      */
     const start = seed()
     const past = start.past
@@ -52,30 +49,16 @@ describe('historyOps.commit', () => {
   })
 
   it('folds a run of edits carrying the same label into one entry', () => {
-    /*
-     * The whole reason `commit` takes a label. Typing a thirteen-character
-     * label used to spend thirteen of the hundred slots and push the real edits
-     * out of reach, so the panel passes one label per property per component and
-     * a run of keystrokes replaces the version on top rather than stacking on
-     * it.
-     *
-     * Never called with a label from this file, so the branch that does the
-     * folding had no unit test at all: the only coverage was one end-to-end
-     * test, in a browser, which is a slow place to find out.
-     */
     let h = historyOps.commit(seed(), doc('b'), 'label:email')
     h = historyOps.commit(h, doc('be'), 'label:email')
     h = historyOps.commit(h, doc('bee'), 'label:email')
 
     expect(h.past, 'a run of keystrokes became a run of undo steps').toHaveLength(1)
     expect(h.present.name).toBe('bee')
-    // And one undo takes back the whole run, which is the behaviour people see.
     expect(historyOps.undo(h).present.name).toBe('a')
   })
 
   it('breaks the run when the label changes', () => {
-    // A different property, a different component, or a structural edit. Each
-    // is its own undo step, which is what makes the fold safe.
     let h = historyOps.commit(seed(), doc('b'), 'label:email')
     h = historyOps.commit(h, doc('c'), 'label:message')
 
@@ -84,15 +67,9 @@ describe('historyOps.commit', () => {
   })
 
   it('starts a new entry after an undo, rather than overwriting the restored one', () => {
-    /*
-     * `undo` deliberately drops the label. Without that, typing after an undo
-     * replaced the version the undo had just restored, and the edit before it
-     * became unreachable -- an undo stack that eats its own history.
-     */
     let h = historyOps.commit(seed(), doc('b'), 'label:message')
     h = historyOps.commit(h, doc('c'), 'label:email')
     h = historyOps.commit(h, doc('ce'), 'label:email')
-    // past: [a, b], present ce, and the label on top is still label:email.
     h = historyOps.undo(h)
     h = historyOps.commit(h, doc('cx'), 'label:email')
 
@@ -101,7 +78,6 @@ describe('historyOps.commit', () => {
   })
 
   it('stacks an unlabelled edit even on an identical one', () => {
-    // No label means no run: two structural edits in a row are two steps.
     let h = historyOps.commit(seed(), doc('b'))
     h = historyOps.commit(h, doc('c'))
     expect(h.past).toHaveLength(2)
@@ -111,7 +87,6 @@ describe('historyOps.commit', () => {
     let h = seed()
     for (let i = 0; i < MAX_HISTORY + 25; i += 1) h = historyOps.commit(h, doc('v' + i))
     expect(h.past).toHaveLength(MAX_HISTORY)
-    // The oldest surviving entry is not the original document.
     expect(h.past[0]?.name).not.toBe('a')
   })
 })

@@ -1,5 +1,3 @@
-/* Host-overridable chrome tokens. Kit surfaces and typography remain independent. */
-
 .fs-shell {
   --fs-bg-app: #e4e6e5;
   --fs-bg-panel: #eceeed;
@@ -43,7 +41,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  /* `:where()`, for the reason the HTML kit's own dark block gives. */
+  /* `:where()` keeps this at (0,1,0), so a host's `.fs-shell` overrides still win. */
   .fs-shell:where(:not([data-fs-theme='light'])) {
     --fs-bg-app: #18231f;
     --fs-bg-panel: #202e27;
@@ -250,8 +248,6 @@
   color: var(--fs-text-muted);
 }
 
-/* Scope control rules to chrome regions to preserve kit styling. */
-
 :where(.fs-toolbar, .fs-panel, .fs-canvas__bar, .fs-mobile-panels) button {
   font: inherit;
   color: inherit;
@@ -276,7 +272,6 @@
   cursor: not-allowed;
 }
 
-/* `:where()` for the reason given above the button base. */
 :where(.fs-panel) input,
 :where(.fs-panel) select,
 :where(.fs-panel) textarea,
@@ -375,11 +370,7 @@
   color: var(--fs-primary);
 }
 
-/*
- * The glyph must not shrink when the label wraps: a two-column palette at 288px
- * puts "Number field" on two lines, and a flex child with no floor squashes the
- * icon into a sliver rather than letting the text wrap around it.
- */
+/* No shrink: a wrapping label would squash the glyph to a sliver. */
 .fs-icon {
   flex: 0 0 auto;
   color: var(--fs-text-muted);
@@ -483,11 +474,6 @@
   background: var(--fs-primary-hover);
 }
 
-/*
- * The step switcher, shown only when the document declares more than one step.
- * Scoped to the bar, which is designer chrome, so this never reaches a kit
- * component on the canvas.
- */
 .fs-canvas__step {
   display: inline-flex;
   align-items: center;
@@ -505,18 +491,6 @@
   padding: 40px 24px 24px;
 }
 
-/*
- * Selection overlay.
- *
- * These rules style only the designer's own frame divs. Nothing here is a
- * descendant selector over the surface, because the surface hosts the kit's
- * components and a rule like `.fs-canvas__surface input` would reach straight
- * into them. See the CSS isolation note in ARCHITECTURE.md.
- */
-/*
- * Inspector tabs. A real tablist, so the roving tabindex and arrow keys in
- * Inspector.tsx have something to move between.
- */
 .fs-inspector {
   display: flex;
   flex-direction: column;
@@ -568,21 +542,11 @@
   padding-block-start: 16px;
 }
 
-/*
- * The tab, not the panel. `Tabs` renders the tabpanel with no `tabIndex` and
- * explains why, so `.fs-tabs__panel:focus-visible` could never match -- a rule
- * that reads as though the panel takes focus, in a file whose own guard is
- * about selectors meaning what they say.
- */
 .fs-tabs__tab:focus-visible {
   outline: 2px solid var(--fs-primary);
   outline-offset: -2px;
 }
 
-/*
- * The JSON dialog. A native <dialog>, so focus trapping, Escape, the inert
- * background, and the backdrop all come from the browser.
- */
 .fs-dialog {
   width: min(880px, 92vw);
   max-height: 86vh;
@@ -635,7 +599,7 @@
 .fs-dialog__errors {
   margin-block-start: 8px;
   padding: 8px;
-  /* The bullet indent, and the only reason this box is not padded evenly. */
+  /* Room for the list bullets. */
   padding-inline-start: 24px;
   color: var(--fs-danger);
   background: var(--fs-bg-well);
@@ -658,12 +622,7 @@
   color: inherit;
   padding: 5px 10px;
   background: var(--fs-bg-panel);
-  /*
-   * `--fs-control-border`, which exists for exactly this. These rules kept
-   * `--fs-border`, the panel divider, at 1.39:1 -- so the dialog's buttons and
-   * the language form's had no boundary a viewer could see, while the
-   * identically-shaped buttons in the toolbar and the panels did.
-   */
+  /* Not `--fs-border`: a divider is too faint for a control boundary (WCAG 1.4.11). */
   border: 1px solid var(--fs-control-border);
   border-radius: var(--fs-radius);
   cursor: pointer;
@@ -696,7 +655,6 @@
   outline-offset: 2px;
 }
 
-/* Binding editors: expressions and translations. */
 .fs-prop-row.is-binding {
   padding: 8px;
   border: 1px solid var(--fs-border);
@@ -753,7 +711,6 @@
   color: var(--fs-accent);
 }
 
-/* Form settings: name and languages. */
 .fs-languages {
   display: flex;
   flex-direction: column;
@@ -800,7 +757,6 @@
   color: var(--fs-danger);
 }
 
-/* Validation rules. */
 .fs-rules__heading {
   display: flex;
   align-items: center;
@@ -923,18 +879,8 @@
 }
 
 /*
- * Drop indicators and the label that follows a drag.
- *
- * Same discipline as the selection frames: absolutely positioned siblings that
- * never wrap a component, so a drag cannot disturb the kit's layout.
- */
-/*
- * Above the kit's output, whatever the kit thinks its own z-index is.
- *
- * These sat at 2 and 3, in the same stacking context as the rendered form, so a
- * component that raises itself drew over them: MUI's `AppBar` defaults to 1100
- * and hid the drop indicator entirely, which is a drag with no visible target.
- * The designer's overlays are chrome about the form and belong over all of it.
+ * Above anything the kit raises itself to (MUI's `AppBar` is 1100): these share
+ * the rendered form's stacking context.
  */
 .fs-drop {
   position: absolute;
@@ -971,10 +917,6 @@
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
 }
 
-/*
- * Tree drop feedback. A line above or below the row for a reorder, and a filled
- * outline when the drop goes inside a container.
- */
 .fs-tree__row.is-drop-before::before,
 .fs-tree__row.is-drop-after::before {
   content: '';
@@ -996,19 +938,6 @@
   outline: 2px dashed var(--fs-accent);
   outline-offset: -2px;
 }
-
-/*
- * The device frame.
- *
- * A designer-owned box around the form, never a wrapper the kit can see. At
- * desktop it has no width and the form keeps whatever its own Screen maxWidth
- * gives it; at tablet and mobile the width comes from the component, so the
- * margins either side stop being wasted space and start being the device.
- *
- * The border and background appear only when a device is being simulated. A
- * frame drawn around a desktop canvas would be a picture of a monitor, which
- * tells the author nothing they cannot already see.
- */
 
 .fs-canvas__frame {
   position: relative;
@@ -1061,13 +990,7 @@
   box-shadow: 0 1px 12px rgb(0 0 0 / 12%);
 }
 
-/*
- * The pane grips.
- *
- * Outside the pane they control, so a collapsed pane can still be reopened.
- * They are full-height strips rather than small buttons because the edge of a
- * pane is a large, easy target and a 16px handle in the middle of it is not.
- */
+/* Full-height strips: the whole pane edge is the target, not a small handle. */
 .fs-pane-handle {
   box-sizing: border-box;
   display: flex;
@@ -1148,22 +1071,15 @@
   box-shadow: inset 0 0 0 1px var(--fs-primary);
 }
 
-/*
- * The glyph inherits the token above, so an active toggle does not keep the
- * muted colour .fs-icon sets and vanish into its own background.
- */
+/* Overrides the muted `.fs-icon` colour, which vanishes on the active background. */
 .fs-toolbar__toggle.is-active .fs-icon {
   color: inherit;
 }
 
 /*
- * Scrollbars.
- *
- * A dark designer showed the platform's light scrollbars, because nothing here
- * styled one. The track stays transparent so the thumb is measured against
- * whichever surface it is drawn over, and every one of those clears 3:1 in
- * test/contrast.test.ts. `thin` is the standard keyword; the -webkit- rules say
- * the same thing to browsers that never implemented it.
+ * Transparent track, so the thumb sits on the surfaces test/contrast.test.ts
+ * measures it against. The -webkit- rules are for browsers without
+ * `scrollbar-width`.
  */
 .fs-panel,
 .fs-tabs__panel,
@@ -1199,14 +1115,9 @@
 }
 
 /*
- * The second rule that touches a kit component, and it exists to stop the
- * designer touching one. `scrollbar-color` and `scrollbar-width` inherit, so
- * styling the canvas surface would push the designer's chrome scrollbars into
- * any scrollable region the kit renders inside the form. A dark builder around
- * a light form would have given that form dark scrollbars.
- *
- * This hands them back to the platform. Like the rule below it, it sets nothing
- * a kit did not already have.
+ * A sanctioned reach into kit components. `scrollbar-*` inherit, so without
+ * this the surface's chrome scrollbars would reach scrollable regions the kit
+ * renders. It hands them back to the platform and sets nothing visual.
  */
 .fs-canvas__surface [data-fs-key] {
   scrollbar-color: auto;
@@ -1235,14 +1146,8 @@
 }
 
 /*
- * The hover outline, at full strength.
- *
- * `opacity: 0.7` composited `--fs-primary` against the canvas at roughly
- * 2.93:1, marginally under the 3:1 WCAG 1.4.11 asks of a user interface
- * component -- and `test/contrast.test.ts` measures tokens, so a ratio built by
- * compositing is one no assertion in this repository can see. Dashed and thin
- * is what distinguishes it from the selection frame; the transparency was
- * doing the same job twice.
+ * No opacity: compositing drops `--fs-primary` under the 3:1 WCAG 1.4.11 asks,
+ * and test/contrast.test.ts measures only tokens.
  */
 .fs-selection--hover {
   outline: 1px dashed var(--fs-primary);
@@ -1254,14 +1159,7 @@
   outline-offset: 2px;
 }
 
-/*
- * The selection toolbar.
- *
- * The frame it sits on is pointer-events: none, so a click meant for the
- * component underneath passes through it. The toolbar has to opt back in or its
- * own buttons are unclickable, which is the sort of thing that looks like a
- * dead control rather than a CSS mistake.
- */
+/* Opts back in to pointer events: the frame it sits on has `pointer-events: none`. */
 .fs-selection__toolbar {
   position: absolute;
   inset-block-end: 100%;
@@ -1337,14 +1235,8 @@
 }
 
 /*
- * Label, control, and whatever sits after it. Two flexible things in one row at
- * 288px is one too many: the grid was `108px 1fr auto`, which gave the binding
- * mode picker the flexible column and the actual control its natural width, so
- * the picker collapsed to about 38px and clipped "Value" to nothing. A working
- * control that reads as an empty box is worse than one that is obviously absent.
- *
- * The picker now shares a cell with the control and sits above it, which is
- * what its own bottom margin always assumed.
+ * One flexible column: at 288px a second one starves the control. The binding
+ * mode picker sits in the control cell, above the control.
  */
 .fs-prop-row {
   display: grid;
@@ -1387,14 +1279,6 @@
   background: var(--fs-accent);
 }
 
-/*
- * The label a condition-bound row keeps.
- *
- * `Properties.tsx` renders this for every row whose value is a condition -- the
- * `<label>` is gone in that state, because there is no single control to point
- * at -- and the stylesheet had no rule for it, so it rendered at body size in
- * body colour where a label had been.
- */
 .fs-prop-row__caption {
   font-size: 12px;
   color: var(--fs-text-muted);
@@ -1412,13 +1296,6 @@
   font-size: 12px;
 }
 
-/*
- * The colour, icon and code editors.
- *
- * All three sit in the control cell of a property row, which is about 139px
- * wide, so every one of them is built to be legible at that size rather than
- * to look good in a screenshot of a wider panel.
- */
 .fs-color {
   display: flex;
   align-items: center;
@@ -1430,10 +1307,7 @@
   min-width: 0;
 }
 
-/*
- * The swatch keeps its size. It is the one control here that cannot usefully
- * shrink: below about 28px a colour well is a coloured line.
- */
+/* Fixed size: below about 28px a colour well reads as a line. */
 .fs-color__swatch {
   flex: 0 0 auto;
   inline-size: 28px;
@@ -1485,13 +1359,7 @@
   text-align: end;
 }
 
-/*
- * The condition editor.
- *
- * Stacked, not tabular. A comparison is three or four controls and the pane is
- * 288px, so a row would clip every one of them; the same arithmetic that put
- * the binding mode picker above its control rather than beside it.
- */
+/* Stacked: a three- or four-control comparison does not fit a row at 288px. */
 .fs-condition {
   display: flex;
   flex-direction: column;
@@ -1521,10 +1389,6 @@
   align-self: start;
 }
 
-/*
- * Nesting is shown by an indent and a rule, because a 288px pane cannot draw a
- * tree and a half-drawn one is worse than an honest indent.
- */
 .fs-condition__nested {
   display: flex;
   flex-direction: column;
@@ -1549,7 +1413,6 @@
   padding: 2px 6px;
 }
 
-/* The Style tab. */
 .fs-style__heading {
   margin: 12px 0 8px;
   color: var(--fs-text);
@@ -1645,11 +1508,6 @@
   margin-block-end: 10px;
 }
 
-/*
- * Advanced properties, folded away. They are the ones an author changes rarely,
- * and giving them the same weight as `label` is what made the panel a flat list
- * where nothing stood out.
- */
 .fs-advanced {
   margin-block-end: 10px;
 }

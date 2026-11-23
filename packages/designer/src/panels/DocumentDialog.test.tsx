@@ -2,15 +2,6 @@
  * @vitest-environment jsdom
  */
 
-/**
- * The JSON dialog.
- *
- * The interesting cases are the ones where a user hands the designer something
- * broken. Pasted JSON is untrusted input, and replacing the document with
- * something malformed would take the whole builder down, so every refusal below
- * is a real guard rather than a formality.
- */
-
 import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -65,11 +56,8 @@ function makeDocument(): FormDocument {
       ],
     },
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US`, as `createDocument` ships: a dialect-free fixture hides tag and
+    // code mix-ups (write-tests skill, Trap 5).
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -79,10 +67,9 @@ function makeDocument(): FormDocument {
 
 beforeAll(() => {
   /*
-   * jsdom implements neither of these, and the dialog needs both. Typed as
-   * optional properties rather than methods so assigning them is not an unbound
-   * method read. This is a jsdom gap, not a behaviour under test: focus trapping
-   * and the backdrop are the browser's job and cannot be checked here.
+   * jsdom implements neither. Typed as optional properties so assigning them is
+   * not an unbound method read. Focus trapping and the backdrop cannot be
+   * checked here.
    */
   const proto = HTMLDialogElement.prototype as {
     showModal?: () => void
@@ -163,7 +150,6 @@ describe('the JSON dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }))
 
     expect(latest().name).toBe('Renamed form')
-    // Applying closes, so the editor is gone.
     expect(screen.queryByLabelText('Form document JSON')).toBeNull()
   })
 
@@ -208,7 +194,6 @@ describe('the JSON dialog', () => {
     const { user, open, editor, latest } = setup()
 
     await open()
-    // Well-formed and correctly shaped, but two components share a key.
     const clashing = makeDocument()
     clashing.root.children = [
       { key: 'same', type: 'Field', props: {} },
@@ -233,15 +218,6 @@ describe('the JSON dialog', () => {
   })
 
   it('takes the errors back with the draft they were about', async () => {
-    /*
-     * The test above reverts a draft that was never applied, so there was
-     * nothing on screen for Revert to leave behind. Apply first and there is:
-     * `setDraft(documentJson)` put the stored document in the editor and left
-     * the `role="alert"` list naming problems with a draft that is no longer
-     * there -- complaints about a document the box no longer holds, and no way
-     * to clear them short of closing the dialog. `onFile` had always cleared
-     * both, which is what made this one look deliberate.
-     */
     const { user, open, editor } = setup()
 
     await open()
@@ -255,14 +231,6 @@ describe('the JSON dialog', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  /**
-   * Importing a file, which is the half of "import and export" nothing drove.
-   *
-   * Every other test in this file reaches the editor by typing into it. The
-   * file input has its own path -- read the text, load it rather than apply it,
-   * say what happened -- plus a failure branch and a reset whose comment records
-   * a bug that had already been fixed once.
-   */
   const chooseFile = async (
     user: ReturnType<typeof userEvent.setup>,
     file: File,
@@ -387,12 +355,7 @@ describe('the JSON dialog', () => {
   })
 
   it('clears the file input, so the same file can be imported twice', async () => {
-    /*
-     * A file input fires nothing when the chosen file has not changed, so
-     * re-importing after editing it on disk did nothing at all -- no note, no
-     * error, a button that had stopped working. The reset that fixed it had no
-     * test, which is what this is.
-     */
+    // A file input fires no change event when the same file is chosen again.
     const { user, open, editor } = setup()
     await open()
 
@@ -400,8 +363,6 @@ describe('the JSON dialog', () => {
     const input = await chooseFile(user, asFile('form.json', JSON.stringify(first)))
     expect(input.value).toBe('')
 
-    // The same file name again, with different content, which is what editing
-    // it on disk looks like from here.
     const second = { ...first, name: 'Second read' }
     await chooseFile(user, asFile('form.json', JSON.stringify(second)))
 
@@ -469,14 +430,6 @@ describe('the JSON dialog', () => {
   })
 
   it('exposes its views as a real tablist', async () => {
-    /*
-     * This was a hand-rolled strip -- a roving `tabIndex` with no arrow keys, no
-     * `aria-controls` and no tabpanel -- so the JSON Schema view could not be
-     * reached from the keyboard at all, and nothing in this file ever asked. It
-     * uses the shared `Tabs` now, and this is the check that says so: the same
-     * pattern `Rules.test.tsx` pins for the inspector, applied to the other
-     * tablist in the product.
-     */
     const { open } = setup()
     await open()
 
@@ -493,11 +446,7 @@ describe('the JSON dialog', () => {
   })
 
   it('puts one tab in the tab order and moves between them with the arrows', async () => {
-    /*
-     * A roving tabindex is only half a tab pattern: without arrow keys the tabs
-     * that are not selected are unreachable by any means at all, which is the
-     * exact state this dialog shipped in.
-     */
+    // With a roving tabindex and no arrow keys, unselected tabs are unreachable.
     const { user, open } = setup()
     await open()
 
@@ -519,9 +468,7 @@ describe('the JSON dialog', () => {
     await user.click(screen.getByRole('tab', { name: 'JSON Schema' }))
 
     const schema = JSON.parse(
-      // The textarea, not the tabpanel: the panel is labelled by its own tab, so
-      // "JSON Schema" now names two elements. Trap 4, arriving the moment the
-      // dialog gained the tabpanel it was missing.
+      // The textarea, not the tabpanel: its tab also names the panel "JSON Schema".
       screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'JSON Schema' }).value,
     ) as JsonSchema
     expect(schema.type).toBe('object')
@@ -540,15 +487,7 @@ describe('the JSON dialog', () => {
     )
   })
 
-  /**
-   * A clipboard for one test, put back afterwards.
-   *
-   * `Object.defineProperty(navigator, 'clipboard', ...)` with no restore is a
-   * change to the environment every later test in the file inherits. It was
-   * harmless only because nothing after it clicked Copy -- and the day
-   * something does, it reads as a product bug in whatever test happens to run
-   * next. There are three Copy tests now, each needing a different clipboard.
-   */
+  // A clipboard for one test, restored so later tests do not inherit it.
   const clipboard = (
     writeText: (text: string) => Promise<void>,
   ): { calls: string[]; restore: () => void } => {
@@ -596,8 +535,6 @@ describe('the JSON dialog', () => {
   })
 
   it('copies the draft and says it did', async () => {
-    // The other branch, which nothing drove: a Copy that works has to say so,
-    // or a user cannot tell it from a Copy that silently did nothing.
     const { user, open, editor } = setup()
     const allowed = clipboard(() => Promise.resolve())
 
@@ -620,12 +557,7 @@ describe('the JSON dialog', () => {
   })
 
   it('says so when the browser offers no clipboard at all', async () => {
-    /*
-     * Any page not on a secure origin, which includes a plain-HTTP host and
-     * some embedded webviews. The optional chain that used to be here made the
-     * button do nothing at all in that case, which is the one outcome the
-     * comment beside it ruled out.
-     */
+    // `navigator.clipboard` is undefined on an insecure origin, such as plain HTTP.
     const { user, open } = setup()
     const before = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
@@ -662,14 +594,12 @@ describe('the JSON dialog', () => {
  * anything was selected — so the dialog took two presses to close.
  */
 describe('shell shortcuts while the dialog is open', () => {
-  /** The tree row for a node, which is what selects it. */
   function treeRow(key: string): HTMLElement {
     const row = globalThis.document.querySelector<HTMLElement>('[data-fs-tree-row="' + key + '"]')
     if (!row) throw new Error('no tree row for ' + key)
     return row
   }
 
-  /** Select a component, then open the dialog over it. */
   async function selectedThenOpen(harness: Harness): Promise<void> {
     fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
     await harness.user.click(treeRow('email'))
@@ -699,13 +629,8 @@ describe('shell shortcuts while the dialog is open', () => {
   })
 
   it('leaves Escape to the dialog rather than cancelling it', async () => {
-    /*
-     * The shell called `preventDefault()` on Escape whenever anything was
-     * selected, which cancels the native `<dialog>` close request — so the first
-     * press did nothing visible and the second closed it. jsdom has no close
-     * watcher, so what is checked here is the half that is checkable: the shell
-     * does not claim the event.
-     */
+    // `preventDefault` would cancel the native `<dialog>` close. jsdom has no
+    // close watcher, so this checks only that the shell leaves Escape alone.
     const harness = setup()
     await selectedThenOpen(harness)
 
@@ -724,11 +649,7 @@ describe('shell shortcuts while the dialog is open', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
     await harness.user.click(treeRow('email'))
 
-    /*
-     * Dispatched on the shell, because that is where the shortcuts live now.
-     * They used to be on `window`, which meant the designer claimed Delete,
-     * Backspace, Escape and Ctrl+Z for the whole host page.
-     */
+    // Dispatched on the shell, where the shortcuts are bound, not on `window`.
     const shell = globalThis.document.querySelector('.fs-shell')
     if (!shell) throw new Error('no shell')
     fireEvent.keyDown(shell, { key: 'Delete' })
@@ -737,18 +658,7 @@ describe('shell shortcuts while the dialog is open', () => {
   })
 })
 
-/**
- * The dialog's two views are tabs, and tabs have a keyboard.
- *
- * This dialog hand-rolled its own tablist: a roving `tabIndex` with no arrow
- * handler, no `aria-controls`, and no `tabpanel` anywhere. A roving tabindex
- * means exactly one tab is in the tab order, so with no arrow keys the JSON
- * Schema view could not be reached from the keyboard at all.
- *
- * `Tabs.tsx` already implements this, and its own comment says two copies was
- * the mistake it was avoiding. Axe passes either way — no rule requires arrow
- * keys — which is why a passing accessibility suite said nothing about it.
- */
+// No axe rule requires arrow keys on tabs, so only these tests catch their loss.
 describe('the dialog view tabs', () => {
   async function openTabs(): Promise<Harness> {
     const harness = setup()
@@ -782,19 +692,13 @@ describe('the dialog view tabs', () => {
   it('gives the selected tab a panel that exists', async () => {
     await openTabs()
 
-    /*
-     * Scoped to the dialog. The left pane has tabs of its own, so an unscoped
-     * `getByRole('tab')` matches both and the query that was meant to check one
-     * thing silently measures another — Trap 4, and the reason the same query
-     * became ambiguous the moment the left pane grew tabs.
-     */
+    // Scoped to the dialog: the left pane has tabs of its own.
     const dialog = within(screen.getByRole('dialog'))
     const selected = dialog.getByRole('tab', { selected: true })
     const panelId = selected.getAttribute('aria-controls')
 
     expect(panelId, 'the selected tab controls nothing').toBeTruthy()
-    // An unresolved IDREF is not an axe violation, which is how the inspector
-    // shipped two of them for months.
+    // An unresolved IDREF is not an axe violation, so it is checked here.
     expect(globalThis.document.getElementById(panelId ?? '')).toBeTruthy()
     expect(dialog.getByRole('tabpanel')).toBeTruthy()
   })

@@ -2,15 +2,7 @@
  * @vitest-environment jsdom
  */
 
-/**
- * Tree keyboard navigation and the live region.
- *
- * The arithmetic behind the moves lives in keyboard.ts and is tested there.
- * What matters here is the wiring a keyboard user actually meets: one tab stop
- * for the whole tree, arrows that move focus, Alt with arrows that move the
- * component, and something said out loud when the document changes underneath
- * a focus that has not moved.
- */
+// Move arithmetic is tested in keyboard.test.ts; this file tests the wiring.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { act, fireEvent, render, screen } from '@testing-library/react'
@@ -57,13 +49,6 @@ const kit: Kit = {
   ],
 }
 
-/**
- * root
- *   heading
- *   stack     (container)
- *     first
- *   footer    (holds form data)
- */
 function makeDocument(): FormDocument {
   return {
     version: '1',
@@ -81,21 +66,13 @@ function makeDocument(): FormDocument {
           props: {},
           children: [{ key: 'first', type: 'Field', props: {} }],
         },
-        /*
-         * `footer` holds form data, so the Rules tab has something to build
-         * controls from. Without a schema anywhere in this fixture, the "on the
-         * Rules tab" state below swept a panel showing one sentence and no
-         * controls at all -- the state named in the label never existed.
-         */
+        // Holds form data, so the Rules tab has controls to sweep.
         { key: 'footer', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
       ],
     },
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
+    // `en-US`, as `createDocument` produces: without a dialect, a bundle keyed
+    // by tag and one keyed by bare code are the same string.
     languages: [{ code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' }],
     defaultLanguage: 'en-US',
     translations: {},
@@ -127,8 +104,6 @@ function setup(): Harness {
     />,
   )
 
-  // The structure tree is behind a tab in the left pane. Opened here so every
-  // test starts where it used to, rather than repeating the click in each.
   fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))
 
   const row = (key: string): HTMLElement => {
@@ -157,12 +132,10 @@ function setup(): Harness {
   }
 }
 
-/** The key of a node's parent in the current document. */
 function parentOf(doc: FormDocument, key: string): string | undefined {
   return flatten(doc.root).find((r) => r.node.key === key)?.parentKey
 }
 
-/** The keys of a node's children, in order. */
 function childrenOf(doc: FormDocument, key: string): string[] {
   const node = flatten(doc.root).find((r) => r.node.key === key)?.node
   return (node?.children ?? []).map((c) => c.key)
@@ -274,7 +247,6 @@ describe('moving a component from the keyboard', () => {
     await user.keyboard('{Alt>}{ArrowLeft}{/Alt}')
 
     expect(parentOf(latest(), 'first')).toBe('root')
-    // Immediately after the stack it came out of, not at the end.
     expect(childrenOf(latest(), 'root')).toEqual(['heading', 'stack', 'first', 'footer'])
   })
 
@@ -307,16 +279,6 @@ describe('moving a component from the keyboard', () => {
     expect(live()).toMatch(/footer removed/)
   })
 
-  /**
-   * Where focus lands after a delete, which is the half nothing checked.
-   *
-   * `Tree.tsx` measures the neighbouring row *before* the removal and focuses
-   * it in a frame, and its comment says why: deleting from the keyboard used to
-   * drop focus onto `document.body`, so every subsequent arrow key went
-   * nowhere and the tree had to be tabbed back into. The test above asserts the
-   * document and the announcement, and `e2e/keyboard.spec.ts` asserts the same
-   * two, so deleting the restoration was caught by nothing in either suite.
-   */
   const nextFrame = async (): Promise<void> => {
     await act(async () => {
       await new Promise<void>((resolve) => {
@@ -347,10 +309,6 @@ describe('moving a component from the keyboard', () => {
   })
 
   it('keeps focus somewhere in the tree, never on the body', async () => {
-    /*
-     * The claim in the source, stated as itself. A restoration that focused the
-     * wrong row would still be better than this, and this is what shipped.
-     */
     const { user, row } = setup()
 
     row('heading').focus()
@@ -387,8 +345,6 @@ describe('the live region', () => {
     row('root').focus()
     await user.keyboard('{ArrowDown}')
 
-    // Focus landed on the row, so the row is announced by the browser. A second
-    // announcement here would say everything twice.
     expect(live()).toBe('')
   })
 
@@ -413,8 +369,7 @@ describe('the live region', () => {
     row('footer').focus()
     await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
 
-    // Identical text would not change the node, and an unchanged live region is
-    // never read out. The second move must still be announced.
+    // An unchanged live region is never read out.
     expect(region()).not.toBe(first)
     expect(region().replace(new RegExp(String.fromCharCode(0x200b), 'g'), '')).toMatch(
       /footer moved up/,
@@ -424,7 +379,6 @@ describe('the live region', () => {
   it('announces a palette addition', async () => {
     const { user, live } = setup()
 
-    // Back to the palette: setup() opens the Tree tab, which most tests want.
     await user.click(screen.getByRole('tab', { name: 'Components' }))
     await user.click(screen.getByTitle('Add Field, or drag it onto the canvas'))
 
@@ -442,17 +396,6 @@ describe('landmarks and names', () => {
     expect(screen.getByRole('complementary', { name: 'Component properties' })).toBeTruthy()
   })
 
-  /*
-   * Both sweeps below used to run against one state: the Tree tab, with nothing
-   * selected. That is the toolbar and five rows, and it is not where controls
-   * come from -- the Style tab has seven inputs, the condition editor has a
-   * select and a Remove button per row, and the Rules tab builds its controls
-   * from whatever rule was added. None of them was ever swept.
-   *
-   * So each state is driven, then swept. The drivers are ordinary interactions
-   * rather than fixtures, because a panel that renders nothing would otherwise
-   * pass every sweep in this file.
-   */
   const STATES: [string, (harness: Harness) => Promise<void>][] = [
     ['at rest', (): Promise<void> => Promise.resolve()],
     [
@@ -471,15 +414,6 @@ describe('landmarks and names', () => {
     [
       'on the Rules tab, with a rule on the field',
       async ({ user, row }) => {
-        /*
-         * `footer`, which holds form data, and a rule actually added.
-         *
-         * This drove `heading`, which has no schema, so the Rules panel showed
-         * one sentence and no controls -- the state in the label never existed,
-         * and the rule editors it claims to sweep were never rendered. The
-         * comment above says the tab "builds its controls from whatever rule was
-         * added", so a state that adds none is a state with nothing to sweep.
-         */
         await user.click(row('footer'))
         await user.click(screen.getByRole('tab', { name: 'Rules' }))
         await user.selectOptions(screen.getByLabelText('Add a rule'), 'pattern')
@@ -517,22 +451,14 @@ describe('landmarks and names', () => {
       },
     )
 
-    // The study in docs/prior-art counted 30 unnamed buttons in the product
-    // this project studied. Zero is the bar.
     expect(unnamed.map((b) => b.outerHTML)).toEqual([])
   })
 
-  /** Every form control the shell is currently rendering. */
   const controlsIn = (harness: Harness): Element[] =>
     Array.from(harness.view.container.querySelectorAll('input, select, textarea'))
 
-  /**
-   * How many controls the shell renders having done nothing.
-   *
-   * Measured with its own mount, taken down again before the state under test
-   * is driven: two designers in one document make every `screen` query
-   * ambiguous, and the drivers all use `screen`.
-   */
+  // Unmounted before the state under test mounts: two designers make every
+  // `screen` query ambiguous.
   const atRestCount = (): number => {
     const harness = setup()
     const count = controlsIn(harness).length
@@ -548,18 +474,8 @@ describe('landmarks and names', () => {
 
     const controls = controlsIn(harness)
 
-    /*
-     * More than the toolbar, for a state that claims to have opened something.
-     *
-     * The guard here was `controls.length > 0`, which cannot fail: the toolbar
-     * renders the theme `<select>` in every state, whatever the driver did or
-     * did not do. It reported green for a driver that navigated nowhere, which
-     * is the shape it was written to prevent -- and it was: the Rules state
-     * above rendered no controls at all and this said the sweep was fine.
-     *
-     * The baseline is measured rather than written down, so a control moving
-     * into or out of the toolbar does not turn this into a wrong number.
-     */
+    // A measured floor, not `> 0`: the toolbar renders a `<select>` in every
+    // state.
     const floor = label === 'at rest' ? 0 : atRest
     expect(
       controls.length,
@@ -597,7 +513,6 @@ describe('landmarks and names', () => {
  * rows of a list, which is a different word wearing the same spelling.
  */
 describe('the tree rows and the canvas rows are told apart', () => {
-  /** A document with a repeater, so both attributes are in the DOM at once. */
   function withRepeater(): FormDocument {
     return {
       ...makeDocument(),
@@ -655,17 +570,6 @@ describe('the tree rows and the canvas rows are told apart', () => {
   })
 
   it('is never written by the designer, which owns only the tree one', () => {
-    /*
-     * The runtime check above needs a repeater in the fixture to see anything.
-     * This one needs nothing: `data-fs-row` belongs to the renderer and is part
-     * of the `NodeAttributes` a kit spreads, so the designer must never *write*
-     * one — a second author of the same attribute is how it came to mean two
-     * things in the first place.
-     *
-     * Reading one is a different matter and is now how the selection frame finds
-     * the row an author clicked in, so the check is for a JSX attribute rather
-     * than for any mention of the name.
-     */
     // From the repository root: this file runs under jsdom, where
     // `import.meta.url` is not a file URL and cannot be resolved against.
     const src = process.cwd() + '/packages/designer/src/'
@@ -679,33 +583,13 @@ describe('the tree rows and the canvas rows are told apart', () => {
           continue
         }
         if (!/\.tsx?$/.test(entry.name)) continue
-        /*
-         * Source only. A test reads the attribute to assert on it -- that is
-         * this file doing its job, not a second author writing it -- and the
-         * widened pattern below matches a quoted string, so without this the
-         * guard reports its own suite.
-         */
+        // Source only: tests read the attribute to assert on it.
         if (/\.test\.tsx?$/.test(entry.name)) continue
-        /*
-         * `data-fs-row` and nothing longer: `data-fs-tree-row` is this panel's.
-         *
-         * Any spelling of the attribute, not only a JSX expression. This
-         * matched `/data-fs-row=\{/`, so it saw `data-fs-row={...}` and nothing
-         * else -- a string literal `data-fs-row="addresses[0]"` passed it, and
-         * so did the attribute arriving through a spread, while re-introducing
-         * the two-authors-of-one-attribute collision this whole describe is
-         * about.
-         *
-         * Three shapes now: the JSX expression, a quoted literal, and a
-         * property named in an object that is about to be spread.
-         */
+        // Three write shapes: a JSX expression, a quoted literal, and an object
+        // key about to be spread.
         const source = readFileSync(path, 'utf8')
-        /*
-         * A write, not a read. `(?<!\[)` excludes an attribute *selector* --
-         * `[data-fs-row="..."]` -- which is how `geometry.ts` legitimately
-         * finds a row it did not write. Everything else that assigns the
-         * attribute is a second author for it.
-         */
+        // `(?<!\[)` lets an attribute selector through: `geometry.ts` reads rows
+        // it did not write.
         const writes =
           /(?<!\[)data-fs-row\s*=\s*[{'"`]/.test(source) || /['"`]data-fs-row['"`]\s*:/.test(source)
         if (writes) offenders.push(entry.name)
@@ -719,7 +603,6 @@ describe('the tree rows and the canvas rows are told apart', () => {
   it('gives the canvas a coordinate and the tree a key', () => {
     const view = renderBoth()
 
-    // The canvas says which row of which answer. The tree says which node.
     const canvas = Array.from(view.container.querySelectorAll('[data-fs-row]')).map((el) =>
       el.getAttribute('data-fs-row'),
     )
@@ -734,17 +617,9 @@ describe('the tree rows and the canvas rows are told apart', () => {
   })
 })
 
-/**
- * The button a tree row's drag is armed by.
- *
- * `Canvas.tsx` and `Palette.tsx` both guard `event.button !== 0`, and both carry
- * a comment saying why: a right-press and a small movement relocated the
- * component under its own context menu -- the menu opens, the component has
- * already moved, and nothing about the gesture said it would. The tree armed a
- * drag for any button at all. Three call sites, two comments, one missing guard.
- *
- * Four pixels is all it takes. The threshold that separates a click from a drag
- * is smaller than the wander of a trackpad right-click.
+/*
+ * The 4px drag threshold is smaller than a trackpad right-click's wander, so an
+ * armed right-press would move the component under its own context menu.
  */
 describe('a right-press on a tree row', () => {
   it('does not arm a drag, so the tree is unchanged', () => {
@@ -758,13 +633,8 @@ describe('a right-press on a tree row', () => {
       )
     })
 
-    /*
-     * The drag label, not the document. jsdom has no layout engine, so a drop
-     * resolves nowhere and the tree is unchanged whether or not the gesture was
-     * armed -- trap 6, and the first version of this test asserted exactly that
-     * and proved nothing. The label is rendered from `drag.state`, which is what
-     * says the controller took the gesture.
-     */
+    // The drag label, not the document: jsdom has no layout, so the drop
+    // resolves nowhere either way.
     expect(
       harness.view.container.querySelector('.fs-drag-label'),
       'a right-press armed a drag',
@@ -779,13 +649,6 @@ describe('a right-press on a tree row', () => {
   })
 
   it('still arms one for the primary button', () => {
-    /*
-     * The control. A guard that refused every button would make the tree
-     * undraggable, which is the only thing rows are dragged for -- and jsdom has
-     * no layout, so the drop resolves nowhere and the document is unchanged
-     * either way. What is asserted is that the gesture reached the controller at
-     * all, which the drag label shows.
-     */
     const harness = setup()
 
     act(() => {
@@ -805,14 +668,9 @@ describe('a right-press on a tree row', () => {
   })
 })
 
-/**
- * Backspace is not Delete.
- *
- * Delete is unambiguous. Backspace is what somebody presses expecting to correct
- * a typo, and in some browser settings it is the back gesture -- and this fired
- * whenever focus was on *any* chrome button. Tabbing to Undo and pressing
- * Backspace deleted the selected component: a destructive edit from a key nobody
- * aimed at the canvas.
+/*
+ * Backspace is a typo correction, and in some browsers the back gesture, so it
+ * deletes only where nothing else can be meant.
  */
 describe('Backspace and where it is aimed', () => {
   it('does not delete when focus is on a toolbar button', () => {
@@ -830,8 +688,6 @@ describe('Backspace and where it is aimed', () => {
   })
 
   it('still deletes from a tree row, where it can only mean one thing', () => {
-    // The control, and the gesture this shortcut exists for. A tree row takes no
-    // text and is about the selection, so Backspace there is unambiguous.
     const harness = setup()
 
     const row = harness.row('first')
@@ -844,8 +700,6 @@ describe('Backspace and where it is aimed', () => {
   })
 
   it('still deletes with Delete from a toolbar button', () => {
-    // The other control: only Backspace is ambiguous, and only Backspace is
-    // narrowed.
     const harness = setup()
 
     fireEvent.click(harness.row('first'))
@@ -860,14 +714,6 @@ describe('Backspace and where it is aimed', () => {
 })
 
 describe('what a row promises the keyboard', () => {
-  /*
-   * `aria-expanded` is asserted nowhere, though `keyboard.ts:38-53` states that
-   * Right stepping into the first child depends on every node being expanded
-   * and names this attribute as "the other half of this promise".
-   *
-   * A tree that never collapses has to say so, or a screen-reader user is told
-   * a row might be closed and given no way to open it.
-   */
   it('marks every row that has children as expanded', async () => {
     const { user, view } = setup()
     await user.click(screen.getByRole('tab', { name: 'Tree' }))
@@ -886,10 +732,6 @@ describe('what a row promises the keyboard', () => {
   })
 
   it('does not claim expandability on a row with no children', async () => {
-    /*
-     * The other half: `aria-expanded` on a leaf tells a screen reader there is
-     * something to open, and there is not.
-     */
     const { user, view } = setup()
     await user.click(screen.getByRole('tab', { name: 'Tree' }))
 
@@ -900,18 +742,8 @@ describe('what a row promises the keyboard', () => {
 })
 
 describe('a keyboard move the tree refuses', () => {
-  /*
-   * `Tree.tsx` called `onMove` and then announced unconditionally, while the
-   * toolbar and the canvas were already gated on the same boolean -- so a
-   * refused move still told a screen-reader user the component had moved. Worse
-   * than silence: it is the only feedback they get, and it was wrong.
-   *
-   * Driven against `Tree` rather than through `Designer`, because the seam is
-   * `onMove`'s answer and this is the component that decides what to say about
-   * it. Reproducing a refusal through the whole builder needs a kit whose
-   * container declaration disagrees with the node it describes -- a real case,
-   * and one whose setup would be most of the test.
-   */
+  // Driven against `Tree`, not `Designer`: a refusal through the whole builder
+  // needs a kit whose container flag disagrees with the node.
   function drawTree(onMove: (key: string, parentKey: string, index: number) => boolean): {
     user: ReturnType<typeof userEvent.setup>
     row: (key: string) => HTMLElement
@@ -962,10 +794,6 @@ describe('a keyboard move the tree refuses', () => {
   })
 
   it('still announces a move that does happen', async () => {
-    /*
-     * The control, and the reason it is needed: gating on a boolean that is
-     * always false would satisfy the row above while silencing every real move.
-     */
     const { user, row, said } = drawTree(() => true)
 
     row('footer').focus()
@@ -975,8 +803,6 @@ describe('a keyboard move the tree refuses', () => {
   })
 
   it('asks before it announces, with the target the keyboard chose', async () => {
-    // And the two are about the same move: a panel that announced a refusal for
-    // every key press would pass the first row.
     const asked: [string, string, number][] = []
     const { user, row } = drawTree((key, parentKey, index) => {
       asked.push([key, parentKey, index])

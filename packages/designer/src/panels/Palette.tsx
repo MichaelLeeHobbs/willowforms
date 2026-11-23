@@ -19,10 +19,10 @@ const GROUP_LABELS: Record<PaletteGroup, string> = {
 
 export interface PaletteProps {
   kit: Kit
-  /** Click. Adds under the current selection, which is the no-aim path. */
+  /** Click: adds under the current selection. */
   onAdd: (def: ComponentDef) => void
   onAddPreset?: (preset: AuthoringPreset) => void
-  /** Press and move. The drag controller decides which of the two happened. */
+  /** Press. The drag controller decides whether it was a click or a drag. */
   onDragStart: (def: ComponentDef, event: ReactPointerEvent) => void
 
   consumeClick: () => boolean

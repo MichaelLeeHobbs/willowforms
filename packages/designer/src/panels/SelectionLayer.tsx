@@ -1,12 +1,6 @@
 /**
- * The canvas selection overlay.
- *
- * The canvas draws real kit components, so there is no designer-owned DOM to
- * hang a selection frame on. Instead every renderer spreads `nodeProps` onto its
- * root element, which puts `data-fs-key` in the DOM; this layer looks the
- * element up by key, measures it, and draws a frame in a sibling div. The frames
- * are `pointer-events: none` and never wrap the component, so nothing here can
- * disturb the kit's layout.
+ * Frames are drawn in a sibling overlay, found by `data-fs-key` and measured,
+ * never wrapped around a kit component, so the kit's layout is untouched.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -29,20 +23,12 @@ function measure(surface: HTMLElement, key: string | undefined, row?: string): R
   return measureIn(surface, element)
 }
 
-/** Two rectangles a viewer could not tell apart. */
 function samePlace(a: Rect | undefined, b: Rect | undefined): boolean {
   if (!a || !b) return a === b
   return a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height
 }
 
-/**
- * Keep the previous object when nothing moved.
- *
- * `measure` returns a fresh object every call and the results feed `useState`,
- * so a scroll event that moved nothing -- which is most of them, since the
- * overlay is positioned in the surface's own scrolling space -- still set state
- * and re-rendered the whole layer at scroll frequency.
- */
+/** Keeps the previous object so a scroll that moved nothing does not re-render the layer. */
 function keepIfSame(previous: Rect | undefined, next: Rect | undefined): Rect | undefined {
   return samePlace(previous, next) ? previous : next
 }
@@ -57,22 +43,14 @@ export interface SelectionLayerProps {
   document: FormDocument
   selectedKey: string | undefined
   /**
-   * Which drawn copy of the selected node the author pointed at.
-   *
-   * A repeater draws one subtree per row, so a key is not unique in the DOM and
-   * the first match is row 0. Absent outside a repeater, and absent for a
-   * selection made from the tree, which names a node and no row.
+   * Which drawn copy was pointed at: a repeater repeats keys in the DOM. Absent
+   * outside a repeater and for a selection made in the tree.
    */
   selectedRow?: string
-  /** Which drawn copy the pointer is over, when it is over one inside a repeater. */
   hoverRow?: string
-  /** Component type of the selection, shown on the frame's label. */
   selectedType: string | undefined
   hoverKey: string | undefined
-  /**
-   * Actions for the selection frame's own toolbar. Omitted for the root, which
-   * cannot be duplicated, removed, or given a sibling.
-   */
+  /** Omitted for the root, which cannot be duplicated, removed, or given a sibling. */
   actions?: SelectionActions
 }
 
@@ -111,12 +89,8 @@ export function SelectionLayer({
     setSelectedHidden(
       Boolean(key && nodeElement(surface, key, row)?.closest('[data-fs-hidden="true"]')),
     )
-    /*
-     * One frame is enough when the pointer is over the selection already, and
-     * "already" now means the same drawn copy rather than the same node: inside
-     * a repeater, hovering row 1 of the component selected in row 0 is two
-     * different rectangles and needs both frames.
-     */
+    // Same copy, not just same node: another repeater row of the selection
+    // still needs its own hover frame.
     const sameCopy = hovered === key && hoveredRow === row
     const nextHover = measure(surface, sameCopy ? undefined : hovered, hoveredRow)
 
@@ -124,12 +98,8 @@ export function SelectionLayer({
     setHover((current) => keepIfSame(current, nextHover))
   }, [surfaceRef])
 
-  /*
-   * On every change to what is selected or hovered, as well as to the document.
-   * The ref is written here rather than in its own effect, because a layout
-   * effect runs before an ordinary one — so the first measure after a selection
-   * would have read the previous one and drawn no frame at all.
-   */
+  // The ref is written here, not in its own effect: a layout effect runs before
+  // a plain one, so `remeasure` would read the previous selection.
   useLayoutEffect(() => {
     what.current = { selectedKey, selectedRow, hoverKey, hoverRow }
     remeasure()
@@ -141,15 +111,9 @@ export function SelectionLayer({
 
     const observer = new ResizeObserver(remeasure)
     observer.observe(surface)
-    /*
-     * The form root, not every frame: observing our own output would loop.
-     *
-     * Re-resolved whenever the document changes, because React replaces this
-     * element when the root's type or key does -- switching kits, or applying a
-     * pasted document -- and the observer would then be watching a detached
-     * node while the new one resized unwatched. The effect lists `document` for
-     * that reason and for no other.
-     */
+    // The form root, not the frames: observing our own output would loop.
+    // `document` is a dependency because React replaces this element when the
+    // root's type or key changes.
     const root = surface.querySelector('[data-fs-key]')
     if (root) observer.observe(root)
 
@@ -163,22 +127,13 @@ export function SelectionLayer({
     }
   }, [surfaceRef, remeasure, document])
 
-  // Selecting in the tree should bring the component into view on the canvas.
   useLayoutEffect(() => {
     const surface = surfaceRef.current
     if (!surface || !selectedKey) return
     const element = nodeElement(surface, selectedKey, selectedRow)
     if (!element) return
 
-    /*
-     * The canvas scrolls; the page does not.
-     *
-     * `scrollIntoView` walks every scrollable ancestor, so selecting a component
-     * from the tree scrolled the host's own page as well -- a form builder
-     * embedded halfway down an admin screen jumped that screen every time
-     * somebody clicked a tree row. This moves the surface's own scroll offset
-     * and touches nothing above it.
-     */
+    // Not `scrollIntoView`, which also scrolls every ancestor, the host page included.
     const box = element.getBoundingClientRect()
     const view = surface.getBoundingClientRect()
 
@@ -199,11 +154,6 @@ export function SelectionLayer({
             {selectedHidden ? ' · Hidden in preview' : ''}
           </span>
 
-          {/*
-           * The frame is pointer-events: none so it cannot swallow a click meant
-           * for the component underneath. The toolbar has to opt back in, or its
-           * own buttons would be unclickable.
-           */}
           {actions && (
             <div className="fs-selection__toolbar">
               <button

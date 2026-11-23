@@ -58,8 +58,7 @@ export type Operand =
        * Which answer this names when it is evaluated inside a repeater's row.
        *
        * `form` reads the top level and `row` reads the enclosing row. Absent
-       * means `form`, which is what every `ref` written before repeaters existed
-       * already meant, so no document has to change.
+       * means `form`.
        *
        * A discriminant rather than a path grammar in the document. Once a name
        * could mean either, something has to decide which, and every mechanism
@@ -117,9 +116,7 @@ export interface FieldSchema {
  *
  * A discriminated union rather than an untyped `{ key, message? }`: the latter
  * cannot say that `minLength` has a number and `required` has nothing, so the
- * parameter travels in a side channel and every reader guesses. The comparison
- * that motivated this is in `docs/prior-art`, which is where competitive
- * material belongs; this is a public type in an MIT package.
+ * parameter travels in a side channel and every reader guesses.
  */
 export type ValidationRule =
   | { key: 'required'; message?: string | PropValue; when?: PropValue }
@@ -196,12 +193,10 @@ export interface FormDocument {
 /**
  * Runtime form data, keyed by **data key**.
  *
- * `dataKeyOf(node)`, which is `node.dataKey ?? node.key` -- so a field the
- * author renamed is read and submitted under the name they chose, and two
- * fields deliberately sharing a data key are one answer. Errors are the other
- * way round and stay keyed by component key, for the reason `dataKey`'s own
- * comment gives; this line said "component key" and a host reading only it
- * writes `data[node.key]` and silently misses every renamed field.
+ * Read a node's value at `dataKeyOf(node)`, which is `node.dataKey ?? node.key`,
+ * not at `node.key`: a field the author renamed is read and submitted under the
+ * name they chose, and two fields sharing a data key are one answer. Errors stay
+ * keyed by component key, for the reason `ComponentNode.dataKey` gives.
  *
  * Inside a repeater the keys are the row's, not the form's: a row is a
  * `FormData` of its own, nested under the repeater's data key.

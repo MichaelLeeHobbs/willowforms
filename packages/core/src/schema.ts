@@ -1,16 +1,6 @@
 /**
- * JSON Schema export.
- *
- * JSON Schema is an export format here, never storage. It cannot express layout
- * or nesting, and layout is half of what a visual builder produces, so the tree
- * stays the source of truth and this is a one-way projection of it. See
+ * A one-way projection of the submitted data, never storage. See
  * docs/ARCHITECTURE.md.
- *
- * What comes out describes the submitted data: `FormData` is flat, keyed by
- * data key -- `dataKeyOf(node)`, which is `node.dataKey ?? node.key` -- so the
- * schema is a flat object of the names an answer is submitted under, regardless
- * of how deeply the components nest. A repeater is the one nesting that
- * survives, because its rows are.
  */
 
 import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, flatten, validationsOf, walk } from './tree.js'
@@ -85,7 +75,6 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
 
   walk(document.root, (node) => {
     for (const rule of validationsOf(node)) {
-      // Arbitrary JavaScript has no declarative equivalent at all.
       if (rule.key === 'custom' || rule.key === 'matches' || rule.key === 'after') {
         lossy.push({ key: node.key, rule: rule.key })
         continue
@@ -136,26 +125,15 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
       }
     }
 
-    /*
-     * Two format rules on one field collapse, one level down. `email`, `url`
-     * and `uuid` each write `format`, and a property has one, so a field
-     * carrying two of them exported only the last -- silently, while the dialog
-     * called the export lossless. Which of two formats an answer really has is
-     * not a question this can answer.
-     */
+    // `email`, `url` and `uuid` each write `format`, and a property has one, so
+    // all but the last are lost.
     const formats = validationsOf(node).filter((rule) => FORMAT_RULES.has(rule.key))
     for (const rule of formats.slice(0, -1)) {
       lossy.push({ key: node.key, rule: rule.key })
     }
 
-    /*
-     * Two components submitting one answer collapse in the export, and the
-     * collapse is silent. Sharing a `dataKey` is deliberate and documented --
-     * two fields behind opposite guards write one answer -- but a JSON Schema
-     * property is one property, so the last one visited wins and the first's
-     * type, format and constraints are discarded. Reported rather than
-     * resolved, for the same reason.
-     */
+    // Sharing a `dataKey` is legal (opposite guards writing one answer), but a
+    // JSON Schema property is one property, so the last one visited wins.
     if (!node.schema) return
     const name = dataKeyOf(node)
     if (claimed.has(name)) lossy.push({ key: node.key, rule: 'a schema for ' + name })
@@ -165,7 +143,6 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
   return lossy
 }
 
-/** The JSON Schema type and format for a field's declared data type. */
 function baseType(type: FieldSchema['type']): JsonSchemaProperty {
   switch (type) {
     case 'number':
@@ -186,13 +163,8 @@ function baseType(type: FieldSchema['type']): JsonSchemaProperty {
 }
 
 /**
- * Fold one rule into the property it constrains.
- *
- * `minLength` and `maxLength` are the two whose keyword depends on what the
- * field holds. `lengthOf` in `validation.ts` counts an array's items, so a
- * multi-select with `minLength: 2` means two choices — but `minLength` on an
- * `array` is ignored by every JSON Schema validator, which drops a constraint
- * the form does enforce. The keyword for a list is `minItems`.
+ * `lengthOf` in `validation.ts` counts an array's items, and JSON Schema ignores
+ * `minLength` on an array, so a length rule on a list becomes `minItems`.
  */
 function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchemaProperty {
   const counting = property.type === 'array'
@@ -230,8 +202,7 @@ function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchem
       return { ...property, format: 'uri' }
     case 'uuid':
       return { ...property, format: 'uuid' }
-    // `required` is a keyword on the parent object, not the property, and
-    // `custom` has no declarative equivalent at all.
+    // `required` belongs to the parent object; the others have no keyword.
     case 'required':
     case 'matches':
     case 'after':
@@ -241,20 +212,12 @@ function withRule(property: JsonSchemaProperty, rule: ValidationRule): JsonSchem
   }
 }
 
-/** A component's static `label`, if it has one, for the property title. */
 function titleOf(node: ComponentNode): string | undefined {
   const props: unknown = node.props
   if (!props || typeof props !== 'object' || Array.isArray(props)) return undefined
 
-  /*
-   * Own properties only, the way `valueOf` and `readPath` read a document.
-   *
-   * A plain lookup finds the prototype: `props` arriving with a non-null
-   * prototype that carries `label`, or an application that has polluted
-   * `Object.prototype.label`, gave every untitled field the same inherited
-   * title in the export. This function's whole job is hardening against a
-   * `props` that is not what it claims.
-   */
+  // Own properties only, as `valueOf` and `readPath` read: a polluted or
+  // non-null prototype must not supply a `label`.
   const held = props as Record<string, PropValue | undefined>
   const own = (name: string): PropValue | undefined =>
     Object.hasOwn(held, name) ? held[name] : undefined
@@ -293,17 +256,8 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
 }
 
 /**
- * One object's worth of the projection: a form, or one row of a repeater.
- *
- * Nesting is layout and does not reach the payload, so a `Stack` contributes
- * its children flat. Repetition is cardinality, which is the one structural
- * thing JSON Schema does express, so a repeater contributes an `array` whose
- * `items` is the object its own children describe — and its rows' `required`
- * lands inside `items`, never on the document.
- *
- * Getting this wrong is silent. The flat projection named a repeater's fields
- * at the top level, so a server validating a real payload against the exported
- * schema would reject every submission or accept anything.
+ * One object of the projection: a form, or one row of a repeater. A row's
+ * `required` belongs inside its `items`, never on the document.
  */
 function objectFor(
   root: ComponentNode,
@@ -321,13 +275,9 @@ function objectFor(
   const required: string[] = []
 
   const visit = (node: ComponentNode, depth: number): void => {
-    // The same bound `validateDocument` walks a tree with. An export runs on a
-    // document a host may never have gated, and a `RangeError` out of it is a
-    // 500 on a route whose whole job is to hand over a schema.
+    // The document may be ungated, so the walk is bounded like `validateDocument`.
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
 
-    // Only data-bound components carry a schema, and only they appear in the
-    // submitted data. Layout and display components are not in the projection.
     const field = node.schema
     if (!field) {
       for (const child of childNodesOf(node)) visit(child, depth + 1)
@@ -338,28 +288,16 @@ function objectFor(
     const title = titleOf(node)
     if (title) property = { ...property, title }
 
-    // The submitted name, which is the node's key unless the author renamed it.
     const name = dataKeyOf(node)
 
     /*
-     * A node the document can hide is a node whose rules apply only sometimes,
-     * which is the same fact a guarded rule states one level down. JSON Schema's
-     * `required` is unconditional, so exporting it rejects payloads the form
-     * itself accepts — `validateForm` does not require a field `isVisible` says
-     * is not on screen.
-     *
-     * Read from the node rather than from the rule, and `renderWhen` present at
-     * all is enough: a static `true` is a document that could hold anything
-     * tomorrow, and the export is not the place to start evaluating conditions.
+     * A guarded rule, or any rule on a node `renderWhen` can hide, applies only
+     * sometimes, and JSON Schema's `required` is unconditional. Any `renderWhen`
+     * counts, even a static `true`: the export does not evaluate conditions.
      */
     for (const rule of validationsOf(node)) {
       if (rule.when || conditional.has(node.key)) continue
       property = withRule(property, rule)
-      /*
-       * Only an unguarded `required` becomes a schema requirement. A guarded one
-       * applies sometimes, and JSON Schema's `required` is unconditional, so
-       * exporting it would reject payloads the form itself accepts.
-       */
       if (rule.key === 'required') {
         if (!required.includes(name)) required.push(name)
         if (property.type === 'boolean') property = { ...property, const: true }
@@ -375,16 +313,6 @@ function objectFor(
     }
 
     properties[name] = property
-    /*
-     * `depth + 1`, and it was `visit(child)` -- so on the schema-carrying
-     * branch the parameter fell back to its default of 0 and the bound reset to
-     * zero on every data-bound node. The sibling recursion twenty lines up
-     * passes it correctly, which is what made this hard to see: the bound was
-     * present, tested, and defeated on one of the two branches.
-     *
-     * The deep test in `schema.test.ts` used 50 000 nested `Box` nodes with no
-     * schema, which take the branch that always worked.
-     */
     for (const child of childNodesOf(node)) visit(child, depth + 1)
   }
 
@@ -396,8 +324,7 @@ function objectFor(
    * doubled the work and made the "two components claim one answer" check below
    * report a node as colliding with itself.
    */
-  // Seeded from the caller's depth, so a nested repeater's row object counts
-  // from where the outer walk had already reached rather than from zero.
+  // Seeded from the caller's depth so nested repeaters share one bound.
   if (root.schema && !isRowScope(root)) visit(root, from)
   else for (const child of childNodesOf(root)) visit(child, from)
 

@@ -1,12 +1,4 @@
-/**
- * Viewport simulation.
- *
- * The canvas puts the form inside a frame the designer owns. Everything
- * positional in this builder measures real rectangles, so narrowing that frame
- * is exactly the kind of change that works in jsdom, passes every unit test,
- * and breaks drop targeting in a browser. These check the arithmetic still
- * lands where the user aimed once the canvas is 390px wide.
- */
+// A narrowed canvas frame can break positional arithmetic that only a browser measures.
 
 import { dragOnto, expect, test } from './harness.js'
 
@@ -16,14 +8,7 @@ test('desktop is the default and constrains nothing', async ({ designer }) => {
   const box = designer.page.locator(frame)
   await expect(box).toHaveAttribute('data-fs-viewport', 'desktop')
 
-  /*
-   * The form keeps whatever width its own Screen gives it. A frame that narrowed
-   * the desktop canvas would be simulating a device nobody chose.
-   *
-   * The measured width as well as the inline style: a frame constrained by a
-   * class rather than by `style.width` passed a test named "constrains nothing"
-   * without constraining nothing at all.
-   */
+  // The measured width as well as the inline style: a class could constrain the frame too.
   expect((await box.evaluate((el) => el.style.width)) || '').toBe('')
 
   const frameBox = await box.boundingBox()
@@ -75,8 +60,7 @@ test('the selection frame is drawn over the component, not beside it', async ({ 
   const frameBox = await designer.page.locator('.fs-selection--active').boundingBox()
   if (!node || !frameBox) throw new Error('nothing to measure')
 
-  // The overlay measures against the surface, so a wrapper between the two is
-  // exactly what would push it out of place.
+  // The overlay measures against the surface, so a wrapper between them would offset it.
   expect(Math.abs(frameBox.x - node.x)).toBeLessThan(4)
   expect(Math.abs(frameBox.y - node.y)).toBeLessThan(4)
 })
@@ -88,23 +72,14 @@ test('a move still lands where the bar showed at mobile width', async ({ designe
   await dragOnto(designer.page, designer.node('heading'), designer.node('submit'), 'bottom')
 
   const after = await designer.rootChildren()
-  // Same components, reordered: heading has moved to the end.
   expect(after).toHaveLength(before.length)
   expect(after[after.length - 1]).toBe('heading')
 })
 
 test('a move at mobile width lands at the pointer rather than at the end', async ({ designer }) => {
   /*
-   * The test above is satisfied by a `resolveDrop` that ignores the pointer
-   * entirely: it drags the first component onto the last one's bottom edge, so
-   * "append whatever is dragged" produces exactly the asserted result. It is the
-   * only drop-targeting check at mobile width, and what it checks is that a drop
-   * happened.
-   *
-   * This one aims at a midpoint. `submit` is last, and dropping it above `email`
-   * has to put it immediately before `email` -- an append leaves it where it
-   * already was, and the assertion is on the neighbour rather than on the index,
-   * so it survives the fixture growing a component.
+   * The test above also passes if drops ignore the pointer and append. This asserts the
+   * neighbour rather than the index, so a growing fixture does not break it.
    */
   await designer.page.getByRole('button', { name: 'Mobile' }).click()
 

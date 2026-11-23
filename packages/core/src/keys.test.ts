@@ -10,11 +10,6 @@ describe('the key grammar', () => {
   })
 
   it('refuses a hyphen, because an expression would read it as a subtraction', () => {
-    /*
-     * The one an author will actually try. `computed` bindings are evaluated as
-     * host JavaScript, so `first-name` in an expression is `first` minus `name`
-     * — no error anywhere, just the wrong answer.
-     */
     const problem = keyProblem('first-name')
     expect(problem).toBeDefined()
     expect(problem).toContain('subtraction')
@@ -39,8 +34,8 @@ describe('the key grammar', () => {
   })
 
   it('leaves the path characters free on purpose', () => {
-    // Row addressing will need `.` and `[`, and settling this before repeated
-    // scope is the reason the key grammar comes first.
+    // Row addresses such as `addresses[1].street` parse only because a key
+    // cannot hold `.` or `[`.
     for (const key of ['a.b', 'a[0]']) {
       expect(KEY_PATTERN.test(key), key).toBe(false)
     }
@@ -50,7 +45,6 @@ describe('the key grammar', () => {
     for (const key of RESERVED_KEYS) {
       expect(keyProblem(key), key).toBeDefined()
     }
-    // `__proto__` passes the pattern, so the list is doing the work, not the regex.
     expect(KEY_PATTERN.test('__proto__')).toBe(true)
   })
 
@@ -62,12 +56,9 @@ describe('the key grammar', () => {
 
   it('refuses a key still wearing whitespace, because that is what got stored', () => {
     /*
-     * Trimming is an input convenience in the panel, which stores what it
-     * trimmed. A key reaching a document with spaces was never typed through
-     * the panel, and it is not the same string as its trimmed twin anywhere it
-     * is used: `data-fs-key=" email "` keeps the spaces while a rename of the
-     * same field would not. Two components could then hold what everything
-     * downstream treats as one name, and the duplicate check would not see it.
+     * A padded key is a different string from its trimmed twin everywhere it is
+     * used, so two components could hold what downstream code treats as one
+     * name without the duplicate check seeing it.
      */
     expect(keyProblem('  email  ')).toBeDefined()
     expect(keyProblem('email ')).toBeDefined()
@@ -80,12 +71,8 @@ describe('the key grammar', () => {
 })
 
 describe('the names that are refused by name', () => {
-  /*
-   * Written out rather than read from `RESERVED_KEYS`. The loop that iterates
-   * the list is vacuous if the list is emptied -- zero iterations, zero
-   * assertions, green -- so every name is also stated here, where deleting one
-   * from the source makes a test that names it go red.
-   */
+  // Written out rather than read from `RESERVED_KEYS`: a loop over an emptied
+  // list passes with zero assertions.
   it.each([
     '__defineGetter__',
     '__defineSetter__',
@@ -105,17 +92,6 @@ describe('the names that are refused by name', () => {
   })
 
   it('covers every own name the running engine puts on Object.prototype', () => {
-    /*
-     * The staleness guard for the decision above. `RESERVED_KEYS` is a written
-     * literal so that a document's validity does not depend on the engine
-     * reading it. But a literal can go stale, and the failure mode is silent: a
-     * new member of `Object.prototype` would be a key that passes the grammar
-     * and shadows a builtin, exactly the class this list closes.
-     *
-     * So the engine is the oracle and the literal is the contract. If they ever
-     * disagree this goes red and a person decides whether to widen the format,
-     * rather than the format widening itself on whichever Node happens to run.
-     */
     const missing = Object.getOwnPropertyNames(Object.prototype).filter(
       (name) => !RESERVED_KEYS.includes(name),
     )
@@ -124,11 +100,6 @@ describe('the names that are refused by name', () => {
   })
 
   it('reserves nothing the grammar already refuses, so every entry does work', () => {
-    /*
-     * The other half. An entry the pattern rejects anyway would be a line that
-     * looks like protection and provides none, and the loop over
-     * `RESERVED_KEYS` above could not tell the difference.
-     */
     for (const key of RESERVED_KEYS) {
       expect(KEY_PATTERN.test(key), key).toBe(true)
     }
@@ -139,36 +110,18 @@ describe('the names that are refused by name', () => {
   })
 
   it('accepts a name that merely contains one of them', () => {
-    // The control: the rule is the whole key, not a substring, or `constructorName`
-    // would be refused for no reason.
     expect(keyProblem('constructorName')).toBeUndefined()
     expect(keyProblem('myPrototype')).toBeUndefined()
   })
 
   it('refuses a padded reserved name as reserved, not as a spacing mistake', () => {
-    /*
-     * Both rules apply to ` __proto__ ` and which message a caller shows was
-     * unpinned. The reserved check reads the trimmed key and comes first, which
-     * is the right way round: "that name is reserved" tells the author to pick
-     * another one, where "remove the spaces" invites them to try again with a
-     * key that will be refused for a second reason.
-     */
+    // "That name is reserved" tells the author to pick another; "remove the
+    // spaces" leads to a second refusal.
     expect(keyProblem(' __proto__ ')).toMatch(/reserved/i)
-    // And a padded ordinary name is still refused, for the spacing.
     expect(keyProblem(' email ')).toMatch(/letters, numbers and underscores/)
   })
 })
 
-/**
- * How long a key may be.
- *
- * The grammar bounded the characters and not the length, so a megabyte-long
- * `dataKey` in an imported document passed every gate and then appeared in
- * `data-fs-key`, in a CSS selector, in `FormData` and as a property name in the
- * exported JSON Schema. Nothing breaks -- the pattern is linear -- but a
- * grammar is where a bound belongs, and this file is the one place a key
- * grammar is decided.
- */
 describe('a key longer than anything a person types', () => {
   it('refuses a key past the bound, and says what the bound is', () => {
     const problem = keyProblem('a'.repeat(MAX_KEY_LENGTH + 1))
@@ -178,17 +131,10 @@ describe('a key longer than anything a person types', () => {
   })
 
   it('accepts one exactly at it', () => {
-    // The boundary, and the control: a bound that refused the length it names
-    // would be off by one in the direction that rejects real documents.
     expect(keyProblem('a'.repeat(MAX_KEY_LENGTH))).toBeUndefined()
   })
 
   it('says it is too long rather than blaming the characters', () => {
-    /*
-     * The message a person reads. Every character in this key is legal, so
-     * reporting the grammar would send them looking for a typo that is not
-     * there.
-     */
     expect(keyProblem('a'.repeat(MAX_KEY_LENGTH + 1))).not.toContain('must start with')
   })
 })

@@ -1,5 +1,3 @@
-/** Constructors for the common cases, so callers do not hand-assemble literals. */
-
 import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument, JsonValue, PropValue } from './types.js'
 import { generateKey } from './tree.js'
@@ -65,13 +63,9 @@ export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNo
   if (def.dataBound) node.schema = { type: def.dataType ?? 'string', validations: [] }
 
   /*
-   * After the key, because a rule that names the node needs one to name.
-   *
-   * And in a `try`, for the same reason as the loop above: this is a function a
-   * kit supplies, so "it will not throw" is not a property this can rely on.
-   * A kit whose default condition throws gets a component with no condition,
-   * which is the shape every other component has, rather than a palette entry
-   * that takes the designer down when it is dragged.
+   * After the key, because the rule may name the node. In a `try` because a kit
+   * supplies this function: one that throws yields a component with no
+   * condition rather than taking the designer down on drop.
    */
   if (def.defaultRenderWhen) {
     try {

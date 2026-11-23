@@ -1,18 +1,15 @@
-/** The stated grammar. Anything outside it was working by accident. */
+/** The stated grammar. */
 export const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 /**
  * How long a key may be.
  *
- * The grammar bounds the characters and not the length, so a megabyte-long
- * `dataKey` in an imported document passed every gate and then appeared in
+ * `KEY_PATTERN` bounds the characters, not the length, and a key appears in
  * `data-fs-key`, in a CSS selector, in `FormData`, and as a property name in
- * the exported JSON Schema. Nothing breaks -- the regex is linear and has no
- * nested quantifier -- but nothing a person types is anywhere near this, and a
- * grammar is the place a bound belongs.
+ * the exported JSON Schema.
  *
- * 128, which is longer than any name in this repository's own fixtures by an
- * order of magnitude and shorter than anything that reads as an attack.
+ * 128 is an order of magnitude longer than any name in this repository's own
+ * fixtures.
  */
 export const MAX_KEY_LENGTH = 128
 
@@ -23,13 +20,9 @@ export const MAX_KEY_LENGTH = 128
  * property, it sets the prototype, so an answer under that key vanishes from the
  * payload and the payload inherits whatever it pointed at.
  *
- * The rest of `Object.prototype` is the same hazard one notch quieter, and the
- * second-pass review found it live: `validateAcross` merged with
- * `merged[key] ??= message`, so a required field keyed `toString` had its error
- * compared against `Object.prototype.toString`, found not nullish, and dropped —
- * a form with a missing required answer submitting clean. `toString`, `valueOf`,
- * `hasOwnProperty`, `constructor` and `isPrototypeOf` all pass `KEY_PATTERN`, so
- * nothing had to be bypassed to author one.
+ * The rest of `Object.prototype` is the same hazard one notch quieter: on a plain
+ * object, `merged[key] ??= message` for a key `toString` finds the inherited
+ * function and drops the error. All of these pass `KEY_PATTERN`.
  *
  * **This list is the second lock, never the first.** Nothing on the render or
  * validate path calls `validateDocument`, so a document carrying one of these
@@ -37,13 +30,10 @@ export const MAX_KEY_LENGTH = 128
  * null prototype at the accumulator; this list only stops an author creating the
  * document by hand.
  *
- * Written out rather than derived from `Object.getOwnPropertyNames`. Which keys
- * a document may use is part of the format, and a format whose validity depends
- * on the JavaScript engine running it is not one — a document authored on Node
- * 22 must not become invalid on Node 30. `keys.test.ts` asserts this literal
- * covers the running engine's `Object.prototype`, so the day an engine grows a
- * member the suite goes red and a person decides, rather than the format
- * changing under everyone silently.
+ * Written out rather than derived from `Object.getOwnPropertyNames`, so a
+ * document's validity does not depend on the engine running it. `keys.test.ts`
+ * asserts this literal covers the running engine's `Object.prototype`, so a new
+ * member fails the suite and a person decides whether the format changes.
  *
  * `prototype` is not on `Object.prototype` at all. It is refused for being
  * confusing next to the others.

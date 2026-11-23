@@ -41,15 +41,6 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
   const main = props.filter((prop) => (prop.section ?? 'main') === 'main')
   const advanced = props.filter((prop) => prop.section === 'advanced')
 
-  /*
-   * Every data key a condition on this node may name, split by where it lives.
-   * Taken from the tree rather than the kit, because a data key is a property of
-   * the document and may have been renamed away from its node key.
-   *
-   * `form` and `row` are separate lists because the same name can be two
-   * different answers, and a ref that names the wrong one fails silently. Core
-   * owns the split — the panel only draws it.
-   */
   const scopes = keyScopesFor(api.document.root, node.key)
 
   return (
@@ -59,10 +50,7 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
       {}
       <KeyField value={node.key} onRename={(next) => api.renameKey(node.key, next)} />
 
-      {/*
-       * Only where there is a value to name. A layout component submits
-       * nothing, so a data key on one would be a control with no effect.
-       */}
+      {/* A layout component submits nothing, so a data key there has no effect. */}
       {node.schema && (
         <DataKeyField
           key={node.key + ':dataKey'}
@@ -73,22 +61,9 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
         />
       )}
 
-      {/*
-       * Visibility is a property of the node rather than an entry in `props`,
-       * so it gets its own row rather than coming from the kit's schema. It was
-       * authorable only by editing the document JSON until the condition
-       * vocabulary existed to give it a picker.
-       */}
       <VisibilityRow
         key={node.key + ':renderWhen'}
         value={node.renderWhen}
-        /*
-         * A component cannot test its own field, because hiding it on its own
-         * emptiness removes the control that would fill it. Only a component
-         * that has a field, though: `dataKeyOf` falls back to the node key, so
-         * filtering unconditionally hid a real field from a container that
-         * happened to share its name.
-         */
         dataKeys={withoutOwn(scopes.form, node)}
         {...(scopes.row ? { rowDataKeys: withoutOwn(scopes.row, node) } : {})}
         onChange={(next) => api.setRenderWhen(node.key, next)}
@@ -96,12 +71,7 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
 
       {!def && <p className="fs-empty">Type {node.type} is not in the active kit.</p>}
 
-      {/*
-       * `section` routes a property to where it belongs. `style` is not here at
-       * all: it lives on the Style tab, beside the CSS it competes with, so an
-       * author choosing between a Stack's gap and a hand-written margin sees
-       * both at once.
-       */}
+      {/* `section: 'style'` props render on the Style tab, beside the CSS they compete with. */}
       <PropRows api={api} node={node} schemas={main} scopes={scopes} defaults={def?.defaultProps} />
 
       {advanced.length > 0 && (
@@ -121,15 +91,8 @@ export function Properties({ api, kit }: PropertiesProps): ReactNode {
 }
 
 /**
- * The name the component's value is submitted under.
- *
- * Separate from the key because the two answer different questions: the key is
- * identity and has to be unique, while this is what the payload calls the
- * answer and is allowed to repeat. Two fields behind opposite `renderWhen`
- * guards writing one value is the case that needs it.
- *
- * Clearing it, or typing the component's own key, removes the override rather
- * than storing a second copy of the key that then has to be kept in step.
+ * Unlike the key, a data key may repeat: two fields behind opposite
+ * `renderWhen` guards can write one value.
  */
 function DataKeyField({
   nodeKey,
@@ -153,20 +116,9 @@ function DataKeyField({
   }
 
   const commit = (): void => {
-    /*
-     * Normalised first, then compared. Comparing the trimmed draft while
-     * leaving the field untrimmed meant typing " email " over `email` stored
-     * nothing and displayed the padded string, so the panel showed a value the
-     * document did not have.
-     */
     const trimmed = draft.trim()
     if (trimmed !== draft) setDraft(trimmed)
     if (trimmed === value) return
-    /*
-     * Refused rather than stored, and the reason shown, which is the bargain
-     * `KeyField` below already makes. A data key is judged by the same grammar
-     * as a key, and this field applied none of it.
-     */
     const result = onCommit(trimmed)
     if (!result.ok) {
       setError(result.reason)
@@ -217,13 +169,8 @@ function DataKeyField({
 }
 
 /**
- * The component key, committed on blur or Enter rather than on every keystroke.
- *
- * Renaming per character made every intermediate prefix a real document key with
- * its own undo entry, and made the field impossible to clear: the store refuses
- * an empty key, so the controlled input snapped straight back and you could
- * never backspace far enough to retype. A refusal now says why instead of
- * silently reverting.
+ * Committed on blur or Enter, not per keystroke: each rename is an undo entry,
+ * and the store refuses the empty key a cleared field passes through.
  */
 function KeyField({
   value,
@@ -312,29 +259,13 @@ function VisibilityRow({
   onChange: (next: PropValue | undefined) => void
 }): ReactNode {
   const idBase = useId()
-  /*
-   * Inside a row, a fresh condition starts on the row. Seeded on the form it
-   * would name a key the top level does not hold, so it would be false from the
-   * moment it was created and would hide the component it was authored on.
-   */
+  // Seeded on the row, as in `seedProps`.
   const inRow = rowDataKeys?.[0]
   const testable = (rowDataKeys?.length ?? 0) + dataKeys.length
   /*
-   * `renderWhen` is a `PropValue`, so a hand-edited document can hold a static
-   * boolean or a translation key as well as the two this row authors. Reading
-   * anything truthy as "a condition" left the select saying so while rendering
-   * no editor, which made those documents unfixable from the panel.
-   *
-   * A static false is the one that means something on its own: never shown.
-   * `isVisible` treats a static truthy and a translation key alike as no
-   * condition expressed, so both read as Always, which is what they do.
-   */
-  /*
-   * A `renderWhen` this row cannot author -- a translation key, or a static
-   * `true` -- reads as Always, because that is what it does. Naming it Always in
-   * the select made it unremovable: the select already showed Always, so
-   * choosing Always fired no change, and the stray value sat in the document
-   * with no way to clear it from the panel that displays it.
+   * A translation key or static truthy `renderWhen` behaves as Always but gets
+   * its own option: shown as Always, choosing Always would fire no change and
+   * the stray value could not be cleared.
    */
   const stray =
     value !== undefined &&
@@ -376,16 +307,8 @@ function VisibilityRow({
         >
           <option value="always">Always</option>
           <option value="never">Never</option>
-          {stray && (
-            // Only when the document holds one. Choosing anything else replaces
-            // it, which is the point: the row can now let go of it.
-            <option value="other">Always (unrecognised rule)</option>
-          )}
-          {/*
-            Disabled when there is nothing to test. A condition naming no field
-            evaluates to false, so choosing it would hide the component
-            immediately and offer no field that could bring it back.
-          */}
+          {stray && <option value="other">Always (unrecognised rule)</option>}
+          {/* A condition naming no field is false and would hide the component for good. */}
           <option value="condition" disabled={testable === 0}>
             A condition
           </option>
@@ -421,13 +344,6 @@ function VisibilityRow({
   )
 }
 
-/**
- * The rows for a set of property schemas.
- *
- * Shared, because the Style tab renders the same rows for the properties whose
- * section says they are styling. Two copies would drift on the binding modes,
- * the modified marker, and the row layout, all of which took several goes.
- */
 export function PropRows({
   api,
   node,
@@ -441,21 +357,15 @@ export function PropRows({
   scopes: KeyScopes
   defaults?: Record<string, JsonValue> | undefined
 }): ReactNode {
-  /*
-   * Unlike `renderWhen`, a property may test its own field: hiding a component
-   * on its own emptiness removes the control that would fill it, but disabling
-   * one on its own value is a real thing to want.
-   */
+  // Not `withoutOwn`: disabling a component on its own value is a real need.
   const dataKeys = scopes.form
 
   return (
     <>
       {schemas.map((schema) => (
         <PropRow
-          // Keyed by component as well as property. Keyed by property alone,
-          // two components of the same type shared one instance, so an
-          // uncontrolled editor kept the previous component's value and could
-          // write it onto the new one.
+          // Keyed by component too, or an uncontrolled editor carries one
+          // component's value onto another of the same type.
           key={node.key + ':' + schema.name}
           schema={schema}
           value={node.props[schema.name]}
@@ -476,24 +386,17 @@ export function PropRows({
 }
 
 /**
- * A list without the component's own answer.
- *
- * A component cannot test its own field: hiding it when its own value is empty
- * removes the only control that could fill it. Only where there is a field to
- * exclude, though — `dataKeyOf` falls back to the node key, so filtering
- * unconditionally hid a real field from a container that happened to share its
- * name.
+ * A component cannot test its own field: hiding it on its own emptiness removes
+ * the control that fills it. Only filtered when the node has a field, because
+ * `dataKeyOf` falls back to the node key, which a container may share.
  */
 function withoutOwn(keys: string[], node: ComponentNode): string[] {
   return node.schema ? keys.filter((key) => key !== dataKeyOf(node)) : keys
 }
 
 /**
- * The field a fresh condition starts on, and the scope that goes with it.
- *
- * The row wins wherever there is one. A seed at form scope inside a row names a
- * key the top level does not hold, so the condition is false from the moment it
- * exists and hides the component it was authored on.
+ * The row wins: a form-scope seed inside a row names a key the top level does
+ * not hold, so the new condition is false at once.
  */
 function seedProps(
   dataKeys: string[],
@@ -512,7 +415,6 @@ interface PropRowProps {
   componentKey: string
   /** Every data key in the document, so a condition can only name a real field. */
   dataKeys: string[]
-  /** The enclosing row's data keys, when this component sits inside a row. */
   rowDataKeys?: string[] | undefined
   languages: Language[]
   defaultLanguage: string
@@ -550,8 +452,6 @@ function PropRow({
     />
   )
 
-  // A binding is not text, so it gets its own editor rather than a box that
-  // would silently flatten it back to a string.
   if (value?.kind === 'computed') {
     return (
       <div className="fs-prop-row is-set is-binding">
@@ -589,13 +489,7 @@ function PropRow({
   if (value?.kind === 'condition') {
     return (
       <div className="fs-prop-row is-set is-binding">
-        {/*
-         * A caption, not a label. It pointed at the operator select inside the
-         * condition editor, which already has a hidden label of its own -- so
-         * that select announced itself as "Helper text Comparison", two labels
-         * concatenated, and the row's own name pointed at a control three levels
-         * down that it does not describe.
-         */}
+        {/* Not a label: the condition editor's controls carry their own. */}
         <span className="fs-prop-row__caption">{schema.label}</span>
         <div className="fs-prop-row__control">
           {mode}
@@ -626,12 +520,7 @@ function PropRow({
         {schema.label}
         {isSet && (
           <>
-            {/*
-              A bare span has no role, and ARIA prohibits aria-label there, so a
-              screen reader ignored it entirely: the marker looked handled and
-              announced nothing. The dot is decoration; the word is the message,
-              and it reads as part of the label.
-            */}
+            {/* ARIA prohibits aria-label on a span with no role, so the word is hidden text. */}
             <span className="fs-prop-row__dot" aria-hidden="true" />
             <span className="fs-visually-hidden"> (modified)</span>
           </>
@@ -642,11 +531,6 @@ function PropRow({
         {mode}
 
         {schema.editor === 'multiline' ? (
-          /*
-           * Declared in `PropEditor` from the first commit and never implemented,
-           * so a kit asking for it got the single-line fallback and no warning.
-           * Found by writing the specification down and checking it.
-           */
           <textarea
             id={id}
             rows={3}
@@ -666,13 +550,8 @@ function PropRow({
             type="number"
             value={typeof raw === 'number' ? raw : ''}
             onChange={(e) =>
-              /*
-               * A number, or nothing. `Number('1e999')` is `Infinity` and
-               * `Number('-')` is `NaN`, and neither is JSON -- so the document
-               * held a value `JSON.stringify` writes as `null` and the export
-               * and the payload disagreed about what the author typed. The
-               * Rules tab's own number field already refuses both.
-               */
+              // `Number('1e999')` is Infinity and `Number('-')` is NaN, and
+              // neither is JSON, so both clear the property.
               e.target.value === '' || !Number.isFinite(Number(e.target.value))
                 ? onChange(undefined)
                 : set(Number(e.target.value))
@@ -686,16 +565,7 @@ function PropRow({
             onChange={(e) =>
               e.target.value === ''
                 ? onChange(undefined)
-                : /*
-                   * The declared options, not their values.
-                   *
-                   * `optionValue` reads `option['value']` off each entry, so
-                   * `.map((o) => o.value)` unwrapped them before it could: the
-                   * declared-value pass matched nothing, the position pass
-                   * matched nothing, and the raw string fell out of the end. The
-                   * comment above this editor described the fix; the argument
-                   * stopped it happening.
-                   */
+                : // The options, not their values: `optionValue` reads `value` off each.
                   set(optionValue(schema.options ?? [], e.target.value))
             }
           >
@@ -763,8 +633,6 @@ function JsonEditor({
   const [committed, setCommitted] = useState(serialised)
   const [error, setError] = useState('')
 
-  // Re-sync when the document changes underneath, without losing an in-progress
-  // edit: only the version this editor last saw is replaced.
   if (serialised !== committed) {
     setCommitted(serialised)
     setDraft(serialised)
@@ -785,7 +653,6 @@ function JsonEditor({
         onBlur={() => {
           const text = draft.trim()
           if (!text) {
-            // Clearing the box clears the property, rather than doing nothing.
             setError('')
             onClear()
             return
@@ -840,13 +707,6 @@ function ColorEditor({
   )
 }
 
-/**
- * A name from the icon vocabulary, with the glyph beside it.
- *
- * A select rather than a grid of swatches: there are thirty names, the pane is
- * 288px wide, and a name is what actually gets stored. The preview is there so
- * the author does not have to know what `paragraph` looks like.
- */
 function IconEditor({
   id,
   value,
@@ -875,13 +735,8 @@ function IconEditor({
 }
 
 /**
- * Source, in a monospace box that counts its lines.
- *
- * No syntax highlighting and no language service. This is a property editor in
- * a 288px pane, not an IDE, and a half-working editor that lies about what it
- * understands is worse than a plain one. The line count is there because the
- * box is short and it is otherwise impossible to tell how much is scrolled out
- * of sight.
+ * Deliberately plain: no highlighting or language service in a 288px pane. The
+ * line count shows how much of the short box is scrolled out of sight.
  */
 function CodeEditor({
   id,

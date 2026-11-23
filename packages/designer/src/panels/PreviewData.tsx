@@ -24,7 +24,6 @@ export function PreviewData({ data }: { data: FormData }): ReactNode {
       setNote('Form data copied to the clipboard.')
       return
     }
-    // Either failure leaves the JSON selected so a keyboard copy is one step.
     editor.current?.focus()
     editor.current?.select()
     setNote(

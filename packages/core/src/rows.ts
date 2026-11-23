@@ -1,17 +1,9 @@
 /**
- * Where a rendered thing sits among repetitions.
+ * Rows never mint keys: a row exists in the DOM, `FormData` and `FormErrors`,
+ * never in the tree. See docs/spec/03-components.md, "Rows never mint keys".
  *
- * A `Repeater` draws one authored subtree once per row of data. **Rows never
- * mint keys.** The subtree exists once in the document; a row exists in the DOM,
- * in `FormData` and in `FormErrors`, and never in the tree. That prohibition is
- * what keeps `tree.ts` untouched: every way duplicate keys break it needs the
- * same key at three places in the tree, and it never is.
- *
- * Components store data keys; runtime addresses add row coordinates at the boundary.
- * Built-in action parameters can also name a concrete address to target a fixed row.
- *
- * The grammar parses unambiguously because `KEY_PATTERN` excludes `.`, `[` and
- * `]`. That is the return on holding them back when the key grammar landed.
+ * The coordinate grammar parses unambiguously only because `KEY_PATTERN`
+ * excludes `.`, `[` and `]`.
  */
 
 import { MAX_CONDITION_DEPTH } from './condition.js'
@@ -24,9 +16,7 @@ import type { ComponentNode, Condition, FormData, JsonValue } from './types.js'
  *
  * `key` is the repeater's **data** key, not its node key. The coordinate is
  * dereferenced in exactly one place — `applyChange` — and it is dereferenced as
- * data; everywhere else it is a label. Built from identity instead, a repeater
- * whose two names differ discarded every row edit, and could write an answer
- * into an unrelated list that happened to share the name.
+ * data; everywhere else it is a label.
  *
  * The **leaf** of an error key stays the node key. The prefix disambiguates
  * rows; the leaf carries identity, and two components may share a data key and
@@ -76,15 +66,6 @@ export function addressOf(path: RowPath, name: string): string {
   return prefix === '' ? name : prefix + '.' + name
 }
 
-/*
- * A coordinate segment: a name, then an index in brackets.
- *
- * The index is bounded at fifteen digits. Without a bound, `addresses[1e21]`
- * cannot be written -- but `addresses[1000000000000000000000]` can, and
- * `String(Number(...))` gives it back in exponential form, so a coordinate this
- * decoded no longer re-encoded to itself. Fifteen digits stays inside the
- * integers a double represents exactly, and a list that long is not a list.
- */
 const SEGMENT = /^([A-Za-z_][A-Za-z0-9_]*)\[(0|[1-9][0-9]{0,14})\]$/
 
 /**
@@ -103,12 +84,8 @@ export function decodeRow(text: string): RowPath | undefined {
     const match = SEGMENT.exec(part)
     if (!match) return undefined
 
-    /*
-     * Read, not asserted. `match[1] as string` and `Number(match[2])` are true
-     * of this regex today and they are the shape `noUncheckedIndexedAccess`
-     * exists to stop: `Number(undefined)` is `NaN`, and a frame with a `NaN`
-     * index re-encodes as `addresses[NaN]`, an address nothing can resolve.
-     */
+    // Checked, not asserted: `Number(undefined)` is `NaN`, which would re-encode
+    // as `addresses[NaN]`.
     const key = match[1]
     const index = match[2]
     if (key === undefined || index === undefined) return undefined
@@ -158,14 +135,8 @@ export interface KeyScopes {
 }
 
 /**
- * The data keys one row of this repeater holds, not counting the list itself.
- *
- * A nested repeater's own data key is counted, because the inner list is an
- * answer in this row; what is inside it is one row further down and is not.
- * Depth is counted from the repeater, and a node more than `MAX_TREE_DEPTH`
- * levels below it is not counted, the nested repeater's own key included.
- * `keyScopesFor` (the picker) and `rowScopeProblems` (validation) both read
- * this, so a key the picker offers as a row answer is one validation accepts.
+ * Shared by `keyScopesFor` (the picker) and `rowScopeProblems` (validation), so
+ * a key the picker offers as a row answer is one validation accepts.
  */
 function rowKeysOf(repeater: ComponentNode): Set<string> {
   const names = new Set<string>()
@@ -225,32 +196,16 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
 }
 
 /**
- * Refs that will read nothing, reported before anyone submits.
+ * Refs that read nothing because they name the wrong scope, reported at boot.
+ * Evaluation cannot tell them from a ref to a key the form does not hold.
  *
- * The failure this exists for is quiet and it is the one this codebase is
- * organised against. A condition authored inside a repeater names a field that
- * only exists in a row, and is left at the default form scope: the read is
- * `undefined`, the condition is false, the component is hidden, and
- * `validateForm` skips it. A required answer becomes advisory, on the server,
- * where nobody is looking.
- *
- * Nothing at evaluation time can fix it — a form-scoped ref to a key the form
- * genuinely does not hold is indistinguishable from this — so it takes the same
- * boot-time answer `missingContext` takes. Unlike context, this one is decidable
- * from the tree alone, so `validateDocument` reports it rather than a host.
- *
- * Total, like everything reachable from `validateDocument`: this walks a
- * document that has not been checked yet, so `children` can be a number and
- * `props` can be a string. Anything unreadable contributes nothing rather than
- * throwing, and the structural checks report the malformed shape.
+ * Total, like everything reachable from `validateDocument`: the document is
+ * unchecked here, so anything unreadable contributes nothing and the structural
+ * checks report the malformed shape.
  */
 export function rowScopeProblems(root: ComponentNode): { key: string; problem: string }[] {
   const problems: { key: string; problem: string }[] = []
 
-  /*
-   * Only the form-level answers. Which keys a given row holds is `rowKeysOf`'s
-   * question, asked per repeater.
-   */
   const formKeys = new Set<string>()
 
   const mark = (node: ComponentNode, repeating: boolean, depth: number): void => {
@@ -263,14 +218,8 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
   }
   mark(root, false, 0)
 
-  /*
-   * The refs at one scope, and a reported problem if the walk stopped short.
-   *
-   * A check that reports problems must never answer "no problem" when what
-   * happened was "did not look". Reported once per node, because all three
-   * branches below ask the same condition the same question and three identical
-   * lines about one component is noise.
-   */
+  // A truncated walk is reported, never passed as clean. Once per node, because
+  // the three branches below ask the same condition.
   const tooDeep = new Set<string>()
   const refsOf = (
     node: ComponentNode,
@@ -337,13 +286,6 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
       }
     }
 
-    /*
-     * The mirror case: a `scope: 'row'` ref on a node that is not inside any
-     * repeater. It always reads nothing — `operand` answers `undefined` when
-     * there is no row — so the condition is false and the component is hidden
-     * forever, with nothing about the document looking wrong. Dragging a
-     * conditional field out of a repeater produces exactly this.
-     */
     if (!enclosing) {
       const props =
         node.props && typeof node.props === 'object' && !Array.isArray(node.props)
@@ -445,8 +387,6 @@ function refsAtScope(
     if (!value || typeof value !== 'object') return
     const shape = value as { kind?: unknown; dataKey?: unknown; scope?: unknown }
     if (shape.kind !== 'ref' || typeof shape.dataKey !== 'string') return
-    // Absent means the form, which is what every ref written before repeaters
-    // existed already meant.
     const scope = shape.scope === 'row' ? 'row' : 'form'
     if (scope === wanted) refs.push(shape.dataKey)
   }
@@ -510,9 +450,7 @@ export function decodeAddress(address: string): ParsedAddress | undefined {
  * which keeps a hostile index from minting a sparse array.
  */
 export function applyChange(data: FormData, address: string, value: JsonValue): FormData {
-  // `decodeAddress` refuses a reserved or malformed name on both of its
-  // branches, so the name is already known good here. It used to be checked
-  // twice, which reads as though one of the two might not do it.
+  // `decodeAddress` has already refused a reserved or malformed name.
   const parsed = decodeAddress(address)
   if (!parsed) return data
 

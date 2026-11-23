@@ -8,18 +8,8 @@ export function jsonToString(value: JsonValue | undefined): string {
 }
 
 /**
- * A declared value, read as an own property.
- *
- * Own, not inherited: the rest of this package reads option fields with
- * `Object.hasOwn` for the reason `schema.ts` names -- "an application that has
- * polluted `Object.prototype.label`". A plain lookup meant a valueless option
- * resolved to the inherited value, so the control's submitted value stopped
- * being the inverse of what it rendered.
- *
- * A `null` declared value is *declared*, and distinct from absent. The old
- * `?? undefined` collapsed the two, so an option written `{ label: 'None',
- * value: null }` fell back to its position one line later and rendered a value
- * the author did not write.
+ * Own properties only, so a polluted `Object.prototype.value` cannot supply a
+ * value. A declared `null` is declared, distinct from absent.
  */
 const declaredOf = (option: unknown): { declared: JsonValue } | undefined => {
   if (typeof option === 'string' || typeof option === 'number' || typeof option === 'boolean') {
@@ -28,19 +18,7 @@ const declaredOf = (option: unknown): { declared: JsonValue } | undefined => {
   if (option === null || typeof option !== 'object' || Array.isArray(option)) return undefined
   if (!Object.hasOwn(option, 'value')) return undefined
 
-  /*
-   * An own `value: undefined` is absent, not declared.
-   *
-   * `Object.hasOwn` alone said `{ label: 'None', value: undefined }` declared
-   * one, so it rendered as the empty string instead of falling back to its
-   * position -- and `undefined` is not a `JsonValue`, so the key is one
-   * `JSON.parse` would never produce and one `JSON.stringify` drops. It comes
-   * from an object literal a caller built, which is exactly where a key spelled
-   * out and left unset comes from.
-   *
-   * `null` is still declared, which is the distinction this function exists for
-   * and the paragraph above is about.
-   */
+  // An own `value: undefined` is absent: `undefined` is not a `JsonValue`.
   const declared = (option as Record<string, JsonValue | undefined>)['value']
   return declared === undefined ? undefined : { declared }
 }
@@ -84,9 +62,8 @@ export function optionValues(options: readonly unknown[]): string[] {
 /**
  * The declared value behind a submitted option string.
  *
- * A `<select>` hands back `event.target.value`, which is always a string, so a
- * numeric option value came back as `"2"` and the form submitted a string where
- * the author had declared a number. Options are matched on the spelling
+ * A `<select>` hands back `event.target.value`, which is always a string.
+ * Options are matched on the spelling
  * `jsonToString` gave them, so this is the exact inverse of what the kit
  * rendered, and an option with no declared value keeps falling back to its
  * position.
@@ -100,36 +77,16 @@ export function optionValue(options: readonly unknown[], submitted: string): Jso
 
   if (at !== -1) {
     const entry = declaredOf(options[at])
-    /*
-     * A declared value is handed back as the author wrote it -- the number `0`
-     * rather than the string `'0'` -- because that is what the form is
-     * collecting. An option with no declared value has only its position, and
-     * the string the control put in the DOM is that position.
-     */
     return entry ? entry.declared : submitted
   }
 
-  /*
-   * A submitted string that matches no option at all is handed back unchanged.
-   * It is what a control put in the DOM, and inventing a value for it would be
-   * worse than passing it through.
-   */
   return submitted
 }
 
 /**
- * `optionValues` for one list, computed once however many options ask.
- *
- * `optionEntry` is called from inside `options.map(...)` in both kits, and it
- * called `optionValues(all)` on every one of those calls -- so a list of N
- * options walked the whole list N times and rendering a long select was
- * quadratic. The table is a property of the list, so it is cached against the
- * list.
- *
- * Keyed by identity in a `WeakMap`: a list is an array a document holds, so it
- * is stable across the map that renders it, and it is collected with the
- * document. Identity rather than contents on purpose -- hashing the list to
- * find the table would do the walk this exists to avoid.
+ * Kits call `optionEntry` once per option inside `options.map`, so the table is
+ * cached per list or rendering a select is quadratic. Keyed by identity: hashing
+ * the contents would repeat the walk.
  */
 const tables = new WeakMap<readonly unknown[], string[]>()
 
@@ -162,19 +119,7 @@ export function optionEntry(
   const value = all
     ? (valuesFor(all)[index] ?? String(index))
     : (() => {
-        /*
-         * `declaredOf`, not `record['value']`.
-         *
-         * The plain lookup read through the prototype chain, so an option
-         * object inheriting a `value` -- which is what a polluted
-         * `Object.prototype` gives every object literal in the process -- took
-         * a value nobody wrote. This branch exists only for a caller that does
-         * not pass the list, and a caller that has not been updated is the last
-         * one that should be reading through the prototype.
-         *
-         * `declaredOf` also settles `null` the same way here as it does above:
-         * declared, and distinct from absent.
-         */
+        // `declaredOf`, not `record['value']`, which reads through the prototype.
         const found = record ? declaredOf(record) : undefined
         const declared = record ? found?.declared : option
         return declared === undefined || declared === null ? String(index) : jsonToString(declared)
@@ -190,16 +135,9 @@ export function optionEntry(
 }
 
 /**
- * A link address that is safe to put in `href`, or undefined.
- *
- * A document is data, and a form author is not always the person deploying the
- * form. `javascript:` in an `href` runs on click with the page's full
- * privileges, which is the same code-execution boundary this project refuses to
- * cross anywhere else: core ships no evaluator, so it must not ship one by
- * accident in a URL.
- *
- * Allowed: http, https, mailto, tel, and anything relative. Relative addresses
- * cannot name a scheme, so they cannot smuggle one.
+ * A form author is not always the person deploying the form, and `javascript:`
+ * in an `href` runs on click with the page's privileges. Core ships no
+ * evaluator, so it must not ship one in a URL. See docs/THREAT_MODEL.md.
  */
 const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 
@@ -207,18 +145,14 @@ export function safeHref(value: JsonValue | undefined): string | undefined {
   const raw = jsonToString(value).trim()
   if (!raw) return undefined
 
-  /*
-   * A leading control character is stripped by the URL parser and by browsers,
-   * so "java\tscript:alert(1)" parses as javascript: after the fact. Rejecting
-   * them outright is simpler than reasoning about which ones survive.
-   */
+  // The URL parser strips control characters, so "java\tscript:" parses as
+  // `javascript:`. Rejecting them all is simpler than tracking which survive.
   // eslint-disable-next-line no-control-regex -- matching them is the point
   if (/[\u0000-\u001f\u007f]/.test(raw)) return undefined
 
   // Network-path references are not relative to the current origin.
   if (/^[/\\]{2}/.test(raw)) return undefined
 
-  // Relative: no scheme to borrow and no authority to name, so it stays here.
   if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return raw
 
   const parsed = URL.parse ? URL.parse(raw) : null

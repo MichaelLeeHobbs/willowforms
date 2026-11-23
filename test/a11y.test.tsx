@@ -3,23 +3,9 @@
  */
 
 /**
- * Automated accessibility audit.
- *
- * axe-core over the whole designer, in each of its states. It lives here rather
- * than in the designer package because it pairs the designer with a real kit,
- * and the designer is forbidden from importing one.
- *
- * Everything else in this repo's accessibility coverage is hand-written, which means it only checks
- * what somebody thought to check; axe brings the rules nobody remembered.
- *
- * What it cannot do here is anything needing layout. jsdom has no rendering
- * engine, so colour-contrast and target-size rules would report nothing useful
- * and are disabled by name rather than left to fail silently. Contrast is
- * covered properly in `test/contrast.test.ts`, which reads the stylesheets and
- * computes the ratios.
- *
- * This is a floor, not a certificate. No automated tool catches a confusing
- * reading order or a label that is technically present and useless.
+ * Lives here, not in the designer package, because it pairs the designer with a
+ * real kit and the designer may not import one. Rules needing layout are off
+ * because jsdom has none; contrast is checked in `test/contrast.test.ts`.
  */
 
 import { render, screen } from '@testing-library/react'
@@ -31,7 +17,6 @@ import { Designer } from '@willowforms/designer'
 import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
 import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
-/** Rules that need a layout engine, which jsdom does not have. */
 const NEEDS_LAYOUT = ['color-contrast', 'target-size', 'scrollable-region-focusable']
 
 function makeDocument(): FormDocument {
@@ -83,16 +68,9 @@ function makeDocument(): FormDocument {
       ],
     },
     actions: {},
-    // `en-US`, which is what `createDocument` produces. A dialect-free
-    // fixture makes a bundle keyed by tag and one keyed by bare code the
-    // same string, which is Trap 5 in the write-tests skill and the shape
-    // that made the language filter green here and broken for real
-    // documents.
-    /*
-     * Two languages, because the toolbar hides its language select below two --
-     * so with one the audited states never contained it, and the control most
-     * likely to be a bare unlabelled `<select>` was the one axe never saw.
-     */
+    // Two, so the toolbar shows its language select. `en-US` as `createDocument`
+    // makes it: without a dialect, a bundle keyed by tag and one keyed by bare
+    // code look the same.
     languages: [
       { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },
@@ -111,18 +89,10 @@ interface Violation {
 }
 
 async function audit(element: HTMLElement): Promise<Violation[]> {
-  /*
-   * Something was audited, and rules were applied to it.
-   *
-   * `results.violations` is empty for a designer that rendered nothing at all,
-   * so every state in this file passed for a container with no elements in it
-   * -- which is the shape a broken driver produces. axe reports what it
-   * checked; asking for that is what makes an empty answer mean "nothing was
-   * wrong" rather than "nothing was there".
-   */
+  // axe reports no violations for an empty subtree, so the checks below insist
+  // something was there and some rule ran.
   const results = await axe.run(element, {
-    // Only the rules an accessible result actually depends on. Best-practice
-    // rules are excluded so a failure here always means a real barrier.
+    // Best-practice rules are excluded so a failure always means a real barrier.
     runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
     rules: Object.fromEntries(NEEDS_LAYOUT.map((id) => [id, { enabled: false }])),
   })
@@ -169,16 +139,8 @@ beforeAll(() => {
 })
 
 /**
- * The state a case says it reached, before the state is audited.
- *
- * Four of these cases clicked a tab and then asserted only that axe found no
- * violations. `getByRole('tab', ...)` throws when the *tab* is missing and says
- * nothing about whether the panel rendered, so a regression that left a panel
- * unmounted would have re-audited the previous DOM under the new test's name
- * and reported it clean. An audit of the wrong tree is worse than no audit: it
- * is a green tick against a state nobody looked at.
- *
- * Each anchor is an element only that panel draws.
+ * Clicking a tab proves the tab exists, not that its panel rendered. Each id is
+ * an element only that panel draws.
  */
 function showing(id: string): HTMLElement {
   const element = document.querySelector<HTMLElement>(`[id$="${id}"]`)
@@ -216,7 +178,6 @@ describe('axe audit of the designer', () => {
     await user.click(row)
     await user.click(screen.getByRole('tab', { name: 'Rules' }))
 
-    // The Rules panel, not the Properties panel it replaced.
     showing('fs-field-type')
     expect(await audit(container)).toEqual([])
   }, 20000)
@@ -252,8 +213,7 @@ describe('axe audit of the designer', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }))
     await user.click(screen.getByRole('button', { name: 'Validate' }))
 
-    // Validated, so every required field is showing an error. Error wiring is
-    // exactly where form accessibility usually breaks.
+    // Validated, so every required field shows an error.
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -261,8 +221,6 @@ describe('axe audit of the designer', () => {
     const user = userEvent.setup()
     const container = renderDesigner()
 
-    // A collapsed pane is hidden, and hiding a region that still contains the
-    // focused element is one of the ways this goes wrong quietly.
     await user.click(screen.getByRole('button', { name: /Hide Components and structure/ }))
     await user.click(screen.getByRole('button', { name: /Hide Component properties/ }))
 
@@ -279,12 +237,6 @@ describe('axe audit of the designer', () => {
     await user.click(row)
     await user.click(screen.getByRole('tab', { name: 'Style' }))
 
-    /*
-     * One of the two most ARIA-dense panels in the designer and neither was
-     * audited: seven inputs, a colour swatch paired with a text box, a
-     * disclosure holding more of the same, and a warning that turns into
-     * `aria-invalid`. Every state axe knows how to fail lives here.
-     */
     showing('fs-style-device')
     expect(await audit(container)).toEqual([])
   }, 20000)
@@ -299,13 +251,6 @@ describe('axe audit of the designer', () => {
     await user.click(row)
     await user.selectOptions(screen.getByLabelText('Show when'), 'condition')
 
-    /*
-     * The other one. No audited state ever set a condition, so the editor's
-     * hidden labels, its operator selects and its nested Remove buttons were
-     * never seen by axe -- in the panel where a control is most likely to end
-     * up with no accessible name of its own, which is a defect this repository
-     * has already had twice.
-     */
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -323,7 +268,7 @@ describe('axe audit of the designer', () => {
      * inert background and no `::backdrop` here, so what
      * `docs/accessibility.md` credits to the browser -- focus trapping, Escape,
      * the background going inert -- is not what this audit is looking at.
-     * `e2e/dialog.spec.ts` is where that is checked, in a browser that has it.
+     * `e2e/document.spec.ts` is where that is checked, in a browser that has it.
      */
     const dialog = document.querySelector('dialog')
     expect(dialog?.open, 'the JSON dialog never opened').toBe(true)
@@ -334,21 +279,8 @@ describe('axe audit of the designer', () => {
 })
 
 /**
- * The same audit with the MUI kit drawing the form.
- *
- * `renderDesigner()` hard-coded the HTML kit, and nothing else in the repository
- * renders a MUI form under axe -- so the kit most consumers will actually use
- * was covered only by the hand-written rules in `test/kit-contract.test.tsx`,
- * which are by definition the ones somebody thought of. `02-kit-contract.md`
- * records that `kit-mui` had failed both of its written accessibility
- * obligations for as long as that file existed, which is the argument for not
- * taking this kit on trust.
- *
- * Two states rather than all nine: the designer's own chrome is identical
- * whichever kit is mounted, so what these add is the kit's markup at rest and
- * the kit's markup with every error showing. Error wiring is where form
- * accessibility usually breaks, and it is the state a kit has most of its own
- * say in.
+ * Two states, not all of them: the designer chrome is the same whichever kit is
+ * mounted, so only the kit's markup at rest and with errors adds coverage.
  */
 describe('axe audit with the MUI kit on the canvas', () => {
   it('has no violations at rest', async () => {
@@ -362,8 +294,7 @@ describe('axe audit with the MUI kit on the canvas', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }))
     await user.click(screen.getByRole('button', { name: 'Validate' }))
 
-    // The state that proves the kit is drawing, not merely that axe ran: an
-    // empty canvas has no violations either.
+    // Proves the kit drew: an empty canvas has no violations either.
     expect(container.querySelectorAll('[role="alert"]').length).toBeGreaterThan(0)
     expect(await audit(container)).toEqual([])
   }, 20000)

@@ -41,12 +41,8 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
     case 'static':
       return Boolean(when.value)
 
-    /*
-     * No evaluator means no answer, and the renderer already treats that as
-     * hidden: `resolveProp` returns null for a computed binding without a
-     * sandbox, and a null `renderWhen` renders nothing. Validation follows,
-     * because agreeing with what the user sees matters more than guessing.
-     */
+    // Hidden without an evaluator, to agree with the renderer: `resolveProp`
+    // gives a computed binding null, and a null `renderWhen` renders nothing.
     case 'computed':
       return options.evaluate ? runs(options.evaluate, when.expression, data, options) : false
 
@@ -58,25 +54,15 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
     case 'i18n':
       return true
 
-    /*
-     * The reason this kind exists. A structured condition needs no evaluator,
-     * so a form with conditional visibility works in a host that injected
-     * nothing at all.
-     */
     case 'condition':
       if (!when.condition) return true
       return evaluateCondition(when.condition, data, options.context, options.row)
 
     /*
-     * A kind this code does not have. Shown, which is the same answer `i18n`
-     * gets one case up and for the same reason: a tag that is not a condition
-     * expresses no condition, and the absence of a rule means shown.
-     *
-     * Not the answer `evaluateCondition` gives, and the two questions are
-     * different. That one is asked whether a condition *holds*, and an
-     * unreadable one does not hold. This one is asked whether a rule was
-     * expressed at all, and answering "hidden" to that takes the node and its
-     * whole subtree out of validation over a typo.
+     * An unreadable kind expresses no condition, so shown, as for `i18n`.
+     * `evaluateCondition` answers whether a condition holds; this answers
+     * whether one was expressed, and hiding would drop the subtree from
+     * validation over a typo.
      */
     default:
       return unreadableTag(when, true)

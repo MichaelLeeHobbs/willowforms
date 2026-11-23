@@ -22,11 +22,7 @@ const TABS: TabDef<TabId>[] = [
 export interface InspectorProps {
   api: DesignerApi
   kit: Kit
-  /**
-   * The breakpoint the Style tab edits, which is the device the canvas is
-   * simulating. Authoring a tablet rule with no way to see a tablet is writing
-   * blind, so the two are the same choice made in one place.
-   */
+  /** Both the breakpoint the Style tab edits and the device the canvas simulates. */
   device: Device
   onDevice: (next: Device) => void
 }
