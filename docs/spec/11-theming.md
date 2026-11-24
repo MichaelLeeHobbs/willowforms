@@ -73,12 +73,19 @@ fighting specificity.
 | `--fs-radius-sm`                         | Half of it, for chrome drawn over the form          |
 | `--fs-panel-width`                       | Side pane width                                     |
 | `--fs-scrollbar-thumb`                   | Scrollbar thumb; the track is transparent           |
+| `--fs-shadow-drag`                       | The shadow under the drag label                     |
+| `--fs-shadow-frame`                      | The shadow around a tablet or mobile canvas frame   |
+| `--fs-shadow-toolbar`                    | The shadow under the selection toolbar              |
+| `--fs-drop-ring`                         | The halo around the drop bar                        |
+| `--fs-backdrop`                          | The page behind an open dialog or drawer            |
 | `--fs-font`, `--fs-font-size`            | Type                                                |
 | `--fs-font-mono`                         | The JSON editor, the raw CSS box, the code editor   |
 
 `--fs-radius-sm` derives from `--fs-radius` rather than standing on its own, so overriding the one
 squares off the selection frame, the selection toolbar's buttons and the rule count badge along with
 everything else. Six radii used to be written as literals and ignored the override entirely.
+
+The dark palette deepens the three shadows and the backdrop, because a shadow dark enough to see on a light panel disappears on a dark one. `--fs-drop-ring` is the same in both: it is drawn over the form, whose colours belong to the host. Before Chrome 122 and Safari 17.4, `::backdrop` inherits no custom property, so those browsers draw the light backdrop in both palettes.
 
 ## HTML kit tokens
 
