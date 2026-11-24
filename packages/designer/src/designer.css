@@ -28,6 +28,13 @@
 
   --fs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
+  --fs-shadow-drag: 0 2px 8px rgb(0 0 0 / 25%);
+  --fs-shadow-frame: 0 1px 12px rgb(0 0 0 / 12%);
+  --fs-shadow-toolbar: 0 1px 6px rgb(0 0 0 / 22%);
+  --fs-backdrop: rgb(0 0 0 / 50%);
+  /* The same in both palettes: it is drawn over the form, which belongs to the host. */
+  --fs-drop-ring: 0 0 0 1px rgb(255 255 255 / 65%), 0 0 0 2px rgb(0 0 0 / 20%);
+
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -61,6 +68,10 @@
     --fs-danger: #ff9685;
     color-scheme: dark;
     --fs-scrollbar-thumb: #7f917f;
+    --fs-shadow-drag: 0 2px 10px rgb(0 0 0 / 55%);
+    --fs-shadow-frame: 0 1px 14px rgb(0 0 0 / 45%);
+    --fs-shadow-toolbar: 0 1px 8px rgb(0 0 0 / 55%);
+    --fs-backdrop: rgb(0 0 0 / 65%);
   }
 }
 
@@ -83,6 +94,10 @@
   --fs-accent: #d2ba80;
   --fs-scrollbar-thumb: #7f917f;
   --fs-danger: #ff9685;
+  --fs-shadow-drag: 0 2px 10px rgb(0 0 0 / 55%);
+  --fs-shadow-frame: 0 1px 14px rgb(0 0 0 / 45%);
+  --fs-shadow-toolbar: 0 1px 8px rgb(0 0 0 / 55%);
+  --fs-backdrop: rgb(0 0 0 / 65%);
 }
 
 .fs-visually-hidden {
@@ -557,7 +572,8 @@
 
 .fs-dialog::backdrop,
 .fs-drawer::backdrop {
-  background: rgb(0 0 0 / 0.5);
+  /* The fallback is for Chrome before 122 and Safari before 17.4, where this inherits no token. */
+  background: var(--fs-backdrop, rgb(0 0 0 / 50%));
 }
 
 .fs-dialog__close {
@@ -892,9 +908,7 @@
   background: var(--fs-accent);
   border-radius: 2px;
 
-  box-shadow:
-    0 0 0 1px rgb(255 255 255 / 65%),
-    0 0 0 2px rgb(0 0 0 / 20%);
+  box-shadow: var(--fs-drop-ring);
 }
 
 .fs-drop--empty {
@@ -914,7 +928,7 @@
   white-space: nowrap;
   color: var(--fs-primary-text);
   background: var(--fs-primary);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  box-shadow: var(--fs-shadow-drag);
 }
 
 .fs-tree__row.is-drop-before::before,
@@ -987,7 +1001,7 @@
 .fs-canvas__frame[data-fs-viewport='mobile'] {
   border: 1px solid var(--fs-border);
   border-radius: calc(var(--fs-radius) * 2);
-  box-shadow: 0 1px 12px rgb(0 0 0 / 12%);
+  box-shadow: var(--fs-shadow-frame);
 }
 
 /* Full-height strips: the whole pane edge is the target, not a small handle. */
@@ -1170,7 +1184,7 @@
   padding: 2px;
   border-radius: var(--fs-radius);
   background: var(--fs-bg-panel);
-  box-shadow: 0 1px 6px rgb(0 0 0 / 22%);
+  box-shadow: var(--fs-shadow-toolbar);
   pointer-events: auto;
 }
 
@@ -1568,7 +1582,7 @@
   min-height: 80px;
   border: 1px solid var(--fs-border);
   border-radius: 4px;
-  background: var(--fs-surface);
+  background: var(--fs-bg-well);
 }
 .fs-image-source__preview img {
   display: block;

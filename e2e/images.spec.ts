@@ -1,11 +1,7 @@
 import { expect, test } from '@playwright/test'
 import axe from 'axe-core'
 import { createDocument, prop } from '../packages/core/src/index.js'
-
-const png = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
-  'base64',
-)
+import { PIXEL_PNG } from './harness.js'
 
 for (const kit of ['html', 'mui']) {
   test(`${kit}: images and backgrounds load, fit, embed, clear, and undo`, async ({ page }) => {
@@ -53,7 +49,7 @@ for (const kit of ['html', 'mui']) {
     await page.getByRole('tab', { name: 'Properties', exact: true }).click()
     await panel
       .getByLabel('Embed an image')
-      .setInputFiles({ name: 'pixel.png', mimeType: 'image/png', buffer: png })
+      .setInputFiles({ name: 'pixel.png', mimeType: 'image/png', buffer: PIXEL_PNG })
     await expect(art).toHaveAttribute('src', /^data:image\/png;base64,/)
     await expect
       .poll(() => art.evaluate((element) => (element as HTMLImageElement).naturalWidth))
