@@ -1254,10 +1254,6 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
     expect(bad).toEqual([])
   })
 
-  it('has no character that was lost to a wrong encoding in its text', () => {
-    expect(JSON.stringify(kit)).not.toContain(String.fromCharCode(0xfffd))
-  })
-
   it('gives every prop schema a name and a label', () => {
     const bad = kit.components.flatMap((c) =>
       c.props.filter((p) => !p.name || !p.label).map((p) => c.type + '.' + p.name),

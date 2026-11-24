@@ -537,21 +537,50 @@ function isDatedRecord(file: string): boolean {
 }
 
 function markdownUnder(directory: string): string[] {
+  return filesUnder(directory, /\.md$/)
+}
+
+function filesUnder(directory: string, name: RegExp): string[] {
   const found: string[] = []
 
   const walk = (relative: string): void => {
     for (const entry of readdirSync(fileURLToPath(new URL(relative, root)), {
       withFileTypes: true,
     })) {
+      if (isFixture(entry.name)) continue
       const path = relative + '/' + entry.name
       if (entry.isDirectory()) walk(path)
-      else if (entry.name.endsWith('.md')) found.push(path)
+      else if (name.test(entry.name)) found.push(path)
     }
   }
 
   walk(directory)
   return found.sort()
 }
+
+describe('text saved in the wrong encoding', () => {
+  /** What a decoder leaves in place of bytes it cannot read. */
+  const LOST = String.fromCharCode(0xfffd)
+
+  const packages = readdirSync(fileURLToPath(new URL('packages', root)), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+  const files = [
+    'README.md',
+    ...markdownUnder('docs'),
+    ...packages.flatMap((name) => filesUnder('packages/' + name + '/src', /\.(?:tsx?|css)$/)),
+  ]
+
+  it('finds documents and sources to read', () => {
+    expect(files.filter((file) => file.startsWith('docs/')).length).toBeGreaterThan(10)
+    expect(files).toContain('packages/kit-mui/src/definitions.ts')
+    expect(files).toContain('packages/designer/src/designer.css')
+  })
+
+  it('is in none of them', () => {
+    expect(files.filter((file) => read(file).includes(LOST))).toEqual([])
+  })
+})
 
 describe('documentation links', () => {
   const files = [
