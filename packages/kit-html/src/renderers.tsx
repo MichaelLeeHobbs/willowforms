@@ -471,7 +471,7 @@ function boxBackground(props: NodeRendererProps['props']): CSSProperties {
   const image = backgroundImageStyle(props)
   if (!background) return image
   if (!('backgroundImage' in image)) return { background }
-  // Only a colour: the browser ignores anything else, which would leave the last colour behind.
+  // Not as a colour: the browser would ignore it, which leaves the last colour behind.
   if (/gradient\(|^none$/i.test(background)) return image
   return { backgroundColor: background, ...image }
 }

@@ -114,6 +114,7 @@ function serverStyleAttribute(kit: RendererKit, background: string, image = ''):
   expect(at, 'the Box did not render').toBeGreaterThanOrEqual(0)
   const style = /style="([^"]*)"/.exec(markup.slice(at))?.[1] ?? ''
   expect(style, 'the Box rendered no style attribute to inspect').toContain('padding')
+  expect(style, 'the image did not reach the style').toContain(image)
   return style
 }
 

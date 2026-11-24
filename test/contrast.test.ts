@@ -468,24 +468,22 @@ describe('no colour is written outside the token blocks', () => {
 })
 
 /** A `var()` naming a token nobody declares silently paints nothing. */
-describe('every token a stylesheet reads is declared in it', () => {
-  const undeclared = (css: string): string[] => {
+describe('every token a stylesheet reads is declared in its light palette', () => {
+  const undeclared = (css: string, base: string): string[] => {
     const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
-    const declared = new Set(
-      [...withoutComments.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((match) => match[1]),
-    )
+    const declared = tokensFrom(css, base)
     const read = [...withoutComments.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map(
       (match) => match[1] ?? '',
     )
     if (read.length === 0) throw new Error('no var() found, so this checked nothing')
-    return [...new Set(read)].filter((token) => !declared.has(token)).sort()
+    return [...new Set(read)].filter((token) => !(token in declared)).sort()
   }
 
   it('the designer stylesheet', () => {
-    expect(undeclared(designerCss)).toEqual([])
+    expect(undeclared(designerCss, '.fs-shell')).toEqual([])
   })
 
   it('the HTML kit stylesheet', () => {
-    expect(undeclared(kitCss)).toEqual([])
+    expect(undeclared(kitCss, '.fsh-screen')).toEqual([])
   })
 })
