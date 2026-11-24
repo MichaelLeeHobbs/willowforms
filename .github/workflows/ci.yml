@@ -80,13 +80,8 @@ jobs:
             test-results/
           retention-days: 7
 
-      # The playground, which is the only thing that imports the two stylesheets
-      # by their published subpaths -- `@willowforms/designer/styles.css` and
-      # `@willowforms/kit-html/styles.css`. `aliases.ts` resolves those with
-      # anchored regexes, and its own docblock records that a plain string alias
-      # rewrites them into the source directory and breaks the build. Nothing in
-      # CI ever ran that build, so the failure it describes would have reached a
-      # release rather than a run.
+      # Builds the playground with `--mode dist`, which skips `aliases.ts`, so the
+      # packages and their two stylesheets resolve through the published exports.
       - name: Production package smoke
         run: pnpm e2e:dist
 

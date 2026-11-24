@@ -570,12 +570,9 @@ const ACTION_REF_TYPE_LIST = ['code', 'builtin'] as const satisfies readonly Act
 
 const BIDI_LIST = ['ltr', 'rtl'] as const satisfies readonly Language['bidi'][]
 
-/*
- * `scope` has no name of its own in the type, so this one is spelled from the
- * member rather than from an alias. It is two strings and it is checked the
- * same way.
- */
-const ROW_SCOPE_LIST = ['form', 'row'] as const satisfies readonly ('form' | 'row')[]
+type RefScope = NonNullable<Extract<Operand, { kind: 'ref' }>['scope']>
+
+const ROW_SCOPE_LIST = ['form', 'row'] as const satisfies readonly RefScope[]
 
 const FIELD_TYPES_COVER_THE_UNION: Covers<FieldSchema['type'], (typeof FIELD_TYPE_LIST)[number]> =
   true
@@ -588,6 +585,7 @@ const ACTION_TYPES_COVER_THE_UNION: Covers<
   (typeof ACTION_REF_TYPE_LIST)[number]
 > = true
 const BIDI_COVERS_THE_UNION: Covers<Language['bidi'], (typeof BIDI_LIST)[number]> = true
+const ROW_SCOPES_COVER_THE_UNION: Covers<RefScope, (typeof ROW_SCOPE_LIST)[number]> = true
 
 void FIELD_TYPES_COVER_THE_UNION
 void DEVICES_COVER_THE_UNION
@@ -596,6 +594,7 @@ void OPS_COVER_THE_UNION
 void OPERANDS_COVER_THE_UNION
 void ACTION_TYPES_COVER_THE_UNION
 void BIDI_COVERS_THE_UNION
+void ROW_SCOPES_COVER_THE_UNION
 
 const FIELD_TYPES: ReadonlySet<string> = new Set(FIELD_TYPE_LIST)
 const DEVICES: ReadonlySet<string> = new Set(DEVICE_LIST)

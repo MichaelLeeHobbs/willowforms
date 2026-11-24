@@ -422,7 +422,7 @@ describe('designer.css isolation', () => {
       ['.fs-shell', 'the scope itself, which carries the theme tokens'],
       ['.fs-canvas__surface.is-preview', 'the same element, compounded'],
       ['.fs-toolbar button', 'chrome that is not on the canvas'],
-      ['.fs-canvas__bar button', 'chrome that is, and is named in CLAUDE.md'],
+      ['.fs-canvas__bar button', 'chrome that is, and is named in ARCHITECTURE.md'],
       ['.fs-panel .fs-prop-row', 'the designer styling its own markup'],
       ['.fs-canvas__frame .fs-drop', 'and doing it over the canvas'],
       ['.fs-shell:where(:not([data-fs-theme="light"]))', 'the scope, qualified, on its own'],
