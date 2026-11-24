@@ -333,16 +333,9 @@ describe('forbiddenKeys', () => {
 
   it('covers a subtree measured out of document order', () => {
     /*
-     * Every fixture in this file lists parents before children, and `dnd.ts`
-     * says in as many words that the loop exists because "a measurement that is
-     * not in document order -- a repeater's rows, a kit that renders children
-     * before their container -- would have made a single pass wrong".
-     *
-     * This is that order, and on its own it is not enough to prove the loop:
-     * the dragged key seeds the set, so one pass still catches its direct
-     * children whichever way round they are listed. What it does pin is that
-     * order does not matter, which is the claim being made. The test below is
-     * the one a single pass fails.
+     * Children listed before their parents, as a kit may measure them. One pass would
+     * still catch these, because the dragged key seeds the set; the test below is the
+     * one a single pass fails.
      */
     const upsideDown = [...nested()].reverse()
     expect(upsideDown.map((candidate) => candidate.key)).toEqual([
@@ -563,11 +556,8 @@ describe('a drop into the second row of a repeater', () => {
   ]
 
   it('places by the row the pointer is in, not by the first row measured', () => {
-    /*
-     * The same X in both, so only the row differs. Left of `street`'s midpoint
-     * in row 0 gives index 0; right of `town`'s midpoint in row 1 gives index 2.
-     * Interleaved, the two rows' rectangles produce neither.
-     */
+    // Left of `street`'s midpoint in row 0 gives index 0; right of `town`'s midpoint in
+    // row 1 gives index 2. Interleaved, the two rows' rectangles produce neither.
     const inRowZero = resolveDrop(twoRows(), 20, 30)
     const inRowOne = resolveDrop(twoRows(), 380, 130)
 

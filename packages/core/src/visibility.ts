@@ -4,18 +4,11 @@ import type { ComponentNode, FormData } from './types.js'
 import type { EvalOptions } from './validation.js'
 
 /**
- * A host's evaluator, run without letting it take the caller down.
+ * A host's evaluator, run without letting it take the caller down. The expression is
+ * authored a character at a time, so it throws for most of the time it is being typed.
  *
- * The evaluator is arbitrary JavaScript and the expression is authored a
- * character at a time, so it is a syntax error or a null dereference for most
- * of the time it is being typed. `matchesPattern` in `validation.ts` catches for
- * exactly this and its comment records the incident: an uncaught throw "took
- * Preview down in the browser and surfaced as an unhandled 500 on the server".
- * This called straight through.
- *
- * A throw reads as hidden, which is the answer a missing evaluator already gets
- * one case up — and this function's job is to agree with what the renderer
- * draws, which in both cases is nothing.
+ * A throw reads as hidden, which is the answer a missing evaluator gets and what the
+ * renderer draws: `resolveProp` gives null for both.
  */
 function runs(
   evaluate: NonNullable<EvalOptions['evaluate']>,

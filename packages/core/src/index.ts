@@ -47,13 +47,6 @@ export {
 
 export { MAX_CONDITION_DEPTH, evaluateCondition, same } from './condition.js'
 
-/*
- * `MAX_TREE_DEPTH`, whose sibling `MAX_CONDITION_DEPTH` is exported one line
- * up, and `validationsOf`, which `FieldSchema`'s own JSDoc names as the
- * prescribed way to read `validations` -- and that comment ships in the
- * published `.d.ts`, so a consumer following the type's own instruction got a
- * resolution error and hand-rolled the guard the helper exists to centralise.
- */
 export { MAX_TREE_DEPTH, validationsOf } from './tree.js'
 
 export { unreadableTag } from './exhaustive.js'

@@ -324,8 +324,7 @@ describe('where an added component lands', () => {
   })
 
   it('falls back to the root when the selection is not in the document', () => {
-    // Undo restores the document and not the selection, so `selectedKey` naming
-    // a node that no longer exists is an ordinary state rather than a rare one.
+    // A caller can hold a key the document no longer has.
     const { result } = renderHook(() => useDesigner(doc()))
 
     act(() => {
@@ -949,13 +948,6 @@ describe('a refusal that used to be announced as a success', () => {
   })
 
   it('inserts into the replacement rather than the document it replaced', () => {
-    /*
-     * The refusal that is still real, and the one the guard in `commitDecided`
-     * is for: a writer that does not go through it. `replaceDocument` sets the
-     * history directly, so an insert decided against the document before it is
-     * decided against a tree that no longer exists -- and its index means
-     * something else there.
-     */
     const { result } = renderHook(() => useDesigner(doc()))
 
     act(() => {

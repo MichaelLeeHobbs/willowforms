@@ -24,22 +24,16 @@ export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth =
 /**
  * How deep a stored structure this will walk before giving up.
  *
- * `evaluate` and `same` both recurse, in functions whose whole contract is that
- * they are total — and a document is data, so the nesting is whatever somebody
- * stored. A `RangeError` out of `isVisible` is an unhandled 500 on submit and a
- * blank form in the browser, which is the one outcome "total" exists to rule
- * out.
+ * `evaluate` and `same` both recurse, in functions whose whole contract is that they
+ * are total, and a document nests as deep as whoever stored it chose. A `RangeError`
+ * out of `isVisible` is an unhandled 500 on submit and a blank form in the browser.
  *
- * High enough that nothing a person authors can reach it: the panel draws
- * nesting by indentation in a 288px pane, and a hundred levels is already
- * unreadable. Low enough that the stack does not.
+ * High enough that nothing a person authors can reach it, low enough that the stack
+ * does not.
  *
- * Exported because four other walkers cross a condition and every one of them
- * has to stop where the evaluator stops. `validateDocument` bounded at 500
- * would pass a condition `evaluate` reads as unreadable at 200, so the gate
- * would accept documents the renderer cannot answer — which is the gate saying
- * the opposite of what it exists to say. One number, imported, rather than a
- * second one that agrees today.
+ * Exported because every walker that crosses a condition has to stop where the
+ * evaluator stops. A gate with a higher bound would accept documents the renderer
+ * cannot answer.
  */
 export const MAX_CONDITION_DEPTH = 200
 
@@ -63,10 +57,9 @@ function operand(
     if (typeof value.dataKey !== 'string') return UNREADABLE
 
     /*
-     * `row` reads the enclosing row and nothing else. There is deliberately no
-     * fallback to the form when the row has no such field: once a name can mean
-     * either, no caller can tell which one it got, and the fix is always another
-     * flavour of path. An unreadable ref is `undefined`, like every other one.
+     * `row` reads the enclosing row and never falls back to the form: once a name can
+     * mean either, no caller can tell which one it got. With no enclosing row it reads
+     * as unanswered.
      */
     if (value.scope === 'row') return row ? valueOf(row.values, value.dataKey) : undefined
 

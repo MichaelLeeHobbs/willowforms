@@ -494,23 +494,12 @@ describe('landmarks and names', () => {
 })
 
 /**
- * Two kinds of row, two attribute names.
+ * Two kinds of row, two attribute names. `data-fs-row` is a repeater coordinate on the
+ * canvas (`addresses[1]`), written by the renderer and part of the public
+ * `NodeAttributes`. `data-fs-tree-row` is the key of a row in this panel.
  *
- * `data-fs-tree-row` meant two different things in one DOM. On the canvas it is a
- * repeater coordinate — `addresses[1]`, written by the renderer and part of the
- * public `NodeAttributes` — and in this panel it was the key of a list row.
- * Neither name was wrong on its own; having one name was.
- *
- * The collision is not theoretical. `[data-fs-tree-row][tabindex="0"]` is how the
- * keyboard specs find the focused tree row, and `Canvas.test.tsx` reads
- * `[data-fs-tree-row]` specifically to get the tree's projection rather than the
- * canvas's — a distinction Trap 9 exists for. Both start matching canvas
- * elements the moment a document holds a repeater, and neither would fail
- * loudly: they would silently be measuring a longer list.
- *
- * The renderer keeps the name. It is the published one, it is in the type a kit
- * spreads, and there "row" means an actual row of data. The panel's rows are
- * rows of a list, which is a different word wearing the same spelling.
+ * Under one name, the queries that find tree rows would also match canvas elements once
+ * a document holds a repeater, and would measure a longer list without failing.
  */
 describe('the tree rows and the canvas rows are told apart', () => {
   function withRepeater(): FormDocument {

@@ -526,27 +526,10 @@ describe('form settings', () => {
   })
 })
 
-/**
- * Renaming a translation key, and opening a document that has no bundles.
- */
 describe('the translation key field', () => {
   it('carries the text with the key', async () => {
-    /*
-     * `en-US`, not `en`, and that is the whole point of this fixture.
-     *
-     * This was dialect-free, so `languageTag(language)` and `language.code`
-     * were the same string everywhere on the path under test -- and the carry
-     * reads its bundle by tag. Replace `languageTag(language)` with
-     * `language.code` at `Binding.tsx:260` and every assertion here stayed
-     * green, while a real document (`createDocument` ships `en-US`) renamed a
-     * key, the carry read bundle `en`, found nothing, and orphaned the text
-     * under the old key -- the exact defect this describe exists to prevent.
-     *
-     * This file already knows the trap: two other blocks switch to `en-US`
-     * specifically to make the tag/code distinction visible, and a comment says
-     * every dialect-free fixture is the unrealistic one. The rename path was
-     * left on the old one.
-     */
+    // `en-US`, not `en`: the carry reads its bundle by tag, and a dialect-free fixture
+    // cannot tell `languageTag(language)` from `language.code`.
     const { user, select, latest } = setup([
       { code: 'en', dialect: 'US', name: 'English', bidi: 'ltr' },
       { code: 'fr', name: 'French', bidi: 'ltr' },

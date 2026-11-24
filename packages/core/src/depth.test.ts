@@ -115,11 +115,9 @@ const WALKERS: Walker[] = [
         }),
       ),
     /*
-     * Both walkers report, under their own codes, which is what a caller
-     * branches on. `validateDocument` calls `rowScopeProblems`, so this one
-     * document drives two of the seven rows and neither may go quiet: a missing
-     * `row-scope` would mean the ref check answered "nothing wrong" when what
-     * happened was "did not look".
+     * `validateDocument` calls `rowScopeProblems`, so this document drives both
+     * walkers, and each reports under its own code. A missing `row-scope` would mean
+     * the ref check answered "nothing wrong" when it did not look.
      */
     read: (result) => {
       const errors = result as { code: string; message: string }[]

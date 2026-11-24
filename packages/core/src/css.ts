@@ -237,14 +237,8 @@ export function setDeclaration(
   const trimmed = value?.trim()
   const at = declarations.findIndex(([key]) => key === wanted)
 
-  /*
-   * In place, which is what this function's docblock already claimed.
-   *
-   * It filtered the property out and pushed it back on the end, so editing
-   * `color` in `color: red; padding: 8px` produced `padding: 8px; color: red` --
-   * every structured control in the Style tab reordering the raw text under the
-   * author's cursor, and the cascade with it where two properties overlap.
-   */
+  // In place. Appending instead would reorder the raw text under the author's cursor,
+  // and the cascade with it where two properties overlap.
   if (at === -1) {
     if (trimmed) declarations.push([wanted, trimmed])
   } else if (trimmed) {

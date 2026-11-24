@@ -215,14 +215,13 @@ test('the toolbar removes the selected component', async ({ designer }) => {
 
 test('a palette drag released off the canvas adds nothing', async ({ designer }) => {
   /*
-   * The half jsdom cannot check. `Canvas.test.tsx` drives this gesture and can
-   * only assert that the label appeared and went away again: every rectangle
-   * there is zero, so no point is inside anything and an unchanged document is
-   * also what a canvas with its whole release path deleted would produce.
+   * The half jsdom cannot check. `Canvas.test.tsx` drives this gesture and can only
+   * assert that the label appeared and went away again: every rectangle there is zero,
+   * so no point is inside anything and an unchanged document is also what a canvas with
+   * its whole release path deleted would produce.
    *
-   * Here the rectangles are real, so a release over the left pane is genuinely
-   * outside every drop zone the canvas offers -- and the document being
-   * unchanged means the drop was refused rather than unreachable.
+   * Here the rectangles are real, so a release over the toolbar is genuinely outside
+   * every drop zone, and an unchanged document means the drop was refused.
    */
   await designer.openTab('Components')
   const before = await designer.rootChildren()

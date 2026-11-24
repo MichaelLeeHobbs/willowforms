@@ -440,12 +440,8 @@ describe('a raw declaration block this will not emit', () => {
 })
 
 /**
- * Editing one declaration leaves the others where they were.
- *
- * `setDeclaration`'s own docblock says order is preserved. It filtered the
- * property out and pushed it back on the end, so every structured control in the
- * Style tab reordered the raw text under the author's cursor -- and where two
- * properties overlap, the cascade with it.
+ * Editing one declaration leaves the others where they were. Reordering would change
+ * the raw text under the author's cursor, and the cascade where two properties overlap.
  */
 describe('setDeclaration and the order of a block', () => {
   const SEP = ';' + String.fromCharCode(10)

@@ -136,11 +136,8 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
   )
 }
 
-/*
- * A repeater draws the rows it was handed and nothing else. The renderer has
- * already expanded them, so a kit never counts rows, never sees an index, and
- * never learns what an address is.
- */
+// The renderer has already expanded the rows, so a kit never learns what an address is.
+// It draws them, and adds or removes a row by writing the whole list.
 function RepeaterNode({
   node,
   itemLimits: limits = itemLimits(node),
@@ -271,9 +268,6 @@ function TextFieldNode({
       placeholder={str(props['placeholder'])}
       multiline={bool(props['multiline'])}
       disabled={bool(props['disabled'])}
-      // `jsonToString`, not `str`: a host seeding `{age: 30}` saw an empty
-      // field whose data was not empty, so `required` passed, the field looked
-      // unanswered, and the first keystroke overwrote an answer nobody saw.
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}
@@ -562,9 +556,6 @@ function TextAreaNode({
       label={str(props['label'])}
       placeholder={str(props['placeholder'])}
       disabled={bool(props['disabled'])}
-      // `jsonToString`, not `str`: a host seeding `{age: 30}` saw an empty
-      // field whose data was not empty, so `required` passed, the field looked
-      // unanswered, and the first keystroke overwrote an answer nobody saw.
       value={jsonToString(value)}
       error={Boolean(error)}
       helperText={message(error, str(props['helperText']))}

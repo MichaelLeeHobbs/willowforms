@@ -109,11 +109,8 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
     link.href = url
     link.download = filename
 
-    /*
-     * Attached before the click and revoked on a later task. A detached anchor
-     * and a URL revoked in the same tick are both long-standing ways to get a
-     * download that silently never starts in Firefox and Safari.
-     */
+    // Attached through the click and revoked on a later task, so neither is gone before
+    // the browser starts the download.
     link.style.display = 'none'
     window.document.body.appendChild(link)
     link.click()

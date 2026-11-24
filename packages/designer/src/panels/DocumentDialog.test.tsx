@@ -580,18 +580,9 @@ describe('the JSON dialog', () => {
 })
 
 /**
- * The shell's shortcuts, while the dialog is open.
- *
- * `showModal()` makes the background inert to *pointers*. It does nothing about
- * keys, and the shell binds Delete, Backspace, Escape and Ctrl+Z to `window`
- * with a guard that excludes only text fields. So Backspace on the dialog's own
- * Apply button deleted the component selected behind it, while the textarea in
- * front of you still showed the JSON from before the deletion.
- *
- * The guard is containment: an event from inside an open dialog is that
- * dialog's. It is also what lets Escape reach the native close watcher, which
- * the shell was cancelling with an unconditional `preventDefault` whenever
- * anything was selected — so the dialog took two presses to close.
+ * The dialog is inside the shell, so its keys bubble to the shell's shortcuts, and the
+ * shell ignores events from an open dialog. Otherwise Delete on the dialog's Apply
+ * button removes the component selected behind it, and Escape clears that selection.
  */
 describe('shell shortcuts while the dialog is open', () => {
   function treeRow(key: string): HTMLElement {
@@ -698,7 +689,6 @@ describe('the dialog view tabs', () => {
     const panelId = selected.getAttribute('aria-controls')
 
     expect(panelId, 'the selected tab controls nothing').toBeTruthy()
-    // An unresolved IDREF is not an axe violation, so it is checked here.
     expect(globalThis.document.getElementById(panelId ?? '')).toBeTruthy()
     expect(dialog.getByRole('tabpanel')).toBeTruthy()
   })

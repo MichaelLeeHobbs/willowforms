@@ -52,12 +52,8 @@ function fromPropValue(value: PropValue | undefined, out: Set<string>): void {
 export function contextKeys(root: ComponentNode): Set<string> {
   const keys = new Set<string>()
 
-  /*
-   * Walked here rather than through `flatten`, which assumes `children` is an
-   * array and throws when a document says otherwise. A host is told to call
-   * this at startup, which is before anything has had a chance to refuse the
-   * document — so throwing is the one thing it must not do.
-   */
+  // A host calls this at startup, before anything has refused the document, so it must
+  // not throw.
   const visit = (node: ComponentNode, depth = 0): void => {
     if (depth > MAX_TREE_DEPTH) return
     if (!node || typeof node !== 'object') return
@@ -221,11 +217,7 @@ export function contextValues(root: ComponentNode, path: string): JsonValue[] {
     visit(shape['condition'] as Condition | undefined, depth + 1)
   }
 
-  /*
-   * The same defensive walk `contextKeys` does, and for the same reason: this is
-   * called at a host's startup, before anything has refused the document, so
-   * `flatten` assuming `children` is an array is an assumption it cannot make.
-   */
+  // Called at a host's startup like `contextKeys`, so it must not throw either.
   const walkNode = (node: ComponentNode, depth = 0): void => {
     if (!node || typeof node !== 'object') return
     if (depth > MAX_TREE_DEPTH) return

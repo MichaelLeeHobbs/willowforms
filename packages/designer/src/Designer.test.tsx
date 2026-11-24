@@ -420,10 +420,8 @@ describe('collapsing a pane', () => {
   })
 
   it('names the pane it controls, in both states', async () => {
-    /*
-     * aria-expanded without aria-controls says something is expanded, not what.
-     * Checked by id here because axe may not flag an id that does not resolve.
-     */
+    // aria-expanded without aria-controls says something is expanded, not what. Checked
+    // by id because axe skips an unresolved `aria-controls` on a collapsed control.
     const { user, shell } = setup()
 
     for (const side of ['left', 'right'] as const) {

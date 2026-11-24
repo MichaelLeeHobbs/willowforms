@@ -238,14 +238,12 @@ function KeyField({
 /**
  * When a component is shown.
  *
- * Three modes rather than the usual four: a condition, an expression for what a
- * condition cannot say, and nothing at all. There is no static or translated
- * mode, because "always show this unless it says false" is what an absent
- * `renderWhen` already means, and a translation key is not a condition.
+ * Always stores nothing, which is what an absent `renderWhen` means, and Never stores
+ * static false. There is no translated mode, because a translation key is not a
+ * condition.
  *
- * A component cannot test its own field. Hiding a component when its own value
- * is empty hides the only control that could fill it, which reads as the form
- * being broken.
+ * A component cannot test its own field. Hiding a component when its own value is empty
+ * hides the only control that could fill it, which reads as the form being broken.
  */
 function VisibilityRow({
   value,
@@ -413,7 +411,7 @@ interface PropRowProps {
   value: PropValue | undefined
   defaultValue: JsonValue | undefined
   componentKey: string
-  /** Every data key in the document, so a condition can only name a real field. */
+  /** Form-scope data keys, so a condition can only name a real field. */
   dataKeys: string[]
   rowDataKeys?: string[] | undefined
   languages: Language[]

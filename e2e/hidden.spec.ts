@@ -41,12 +41,8 @@ test('something can still be dropped into a hidden container', async ({ designer
   await hide(designer)
 
   await designer.openTab('Components')
-  /*
-   * `stableBox` for both ends. `boundingBox()` reports coordinates for a
-   * palette entry below the fold as readily as for one on screen, and the
-   * press then lands outside the window -- Trap 13, and the incident this
-   * repository already had.
-   */
+  // `dragFrom` scrolls the palette entry into view. `boundingBox()` reports coordinates
+  // for one below the fold as readily, and the press then lands outside the window.
   const target = await stableBox(designer.node('firstName'))
   const start = await dragFrom(
     designer.page.getByRole('button', { name: 'Text field', exact: true }),

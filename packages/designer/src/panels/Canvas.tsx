@@ -79,7 +79,7 @@ const FRAME_WIDTH: Partial<Record<Viewport, number>> = {
   mobile: 390,
 }
 
-/** Everything a drag needs to know about the canvas, frozen when it starts. */
+/** What a drag knows about the canvas, measured again when it scrolls or resizes. */
 interface Snapshot {
   dragId: number
   candidates: Candidate[]

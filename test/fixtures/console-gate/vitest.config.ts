@@ -1,9 +1,8 @@
 import { defineConfig } from 'vitest/config'
 
 /**
- * Runs the deliberately-failing fixture beside this file, under the same setup
- * the real suite uses. No count reporter: the size this run reports is three,
- * which is not the number the documents quote.
+ * Runs the deliberately-failing fixture beside this file, under the same setup the real
+ * suite uses.
  */
 export default defineConfig({
   test: {

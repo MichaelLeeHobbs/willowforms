@@ -129,8 +129,8 @@ a subset is exactly the shape that makes a security test pass while the browser 
 executed them. `@willowforms/kit-mui` satisfied neither: no renderer set `role="alert"`, and its
 checkbox built the message element only once there was an error.
 
-Related: axe does not flag an `aria-controls` pointing at an id that is not in the document,
-so two of three inspector tabs did that for months under a passing accessibility suite.
+Related: axe does not flag an `aria-controls` on an unselected tab that points at an id not in
+the document, so two of three inspector tabs did that for months under a passing accessibility suite.
 
 **Rule:** if a document says a kit _must_ do something, there is a test in
 `test/kit-contract.test.tsx` that runs it against every kit, or the sentence is a wish. And

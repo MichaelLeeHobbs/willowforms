@@ -48,9 +48,8 @@ export interface DragController {
 }
 
 /**
- * `?? 0` because a synthesised event (jsdom's, or a hand-built fixture) has no
- * `pointerId`, and the spec's primary pointer is the one a mouse reports. Two
- * different real ids still differ.
+ * `?? 0` because a hand-built event may have no `pointerId`. Two different real ids
+ * still differ.
  */
 const pointerOf = (event: { pointerId?: number }): number => event.pointerId ?? 0
 

@@ -126,7 +126,7 @@ interface Harness {
   node: (key: string) => HTMLElement
   frame: () => HTMLElement | null
   hoverFrame: () => HTMLElement | null
-  /** Keys of the root's children, in document order. */
+  /** Keys of every component but the root, in tree order. */
   keys: () => string[]
   renders: () => number
 }
@@ -147,9 +147,9 @@ function setup(): Harness {
   const frame = (): HTMLElement | null => view.container.querySelector('.fs-selection--active')
   const hoverFrame = (): HTMLElement | null => view.container.querySelector('.fs-selection--hover')
   /*
-   * Reads the tree, and makes sure it is showing first. It has to be the tree
-   * rather than the canvas: a node hidden by `renderWhen` is a row here and no
-   * element there, so the two lists are not the same list.
+   * Reads the tree, and makes sure it is showing first. The canvas is not the same
+   * list: a kit that drops `nodeProps`, as `Silent` does, leaves a node with no element
+   * there.
    */
   const keys = (): string[] => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tree' }))

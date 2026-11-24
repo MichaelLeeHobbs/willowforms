@@ -98,7 +98,8 @@ function morph(current: Condition, op: Condition['op']): Condition {
 
 function asCondition(value: Condition | undefined): Condition {
   if (!value || typeof value !== 'object') return { op: 'truthy', value: literal('') }
-  // An op the picker has no option for would render the controlled select blank.
+  // For an op with no option, the select would show its first one, and no operand would
+  // be drawn.
   if (!(ORDER as string[]).includes(value.op)) return { op: 'truthy', value: literal('') }
   return value
 }
@@ -383,17 +384,6 @@ export interface ConditionEditorProps {
   dataKeys: string[]
   rowDataKeys?: string[] | undefined
   onChange: (next: Condition) => void
-  /**
-   * How deep this editor is nested, kept for the guard rather than for looks.
-   *
-   * The comment here said "for indentation only", and nothing indented by it:
-   * the attribute it rendered, `data-fs-depth`, appears in no stylesheet in the
-   * repository. What indents a nested group is the padding on
-   * `.fs-condition__group`. Kept because the value is what a bound would be
-   * measured against the day this editor stops drawing deeper than the engine
-   * will read -- see the note in `triage.md`.
-   */
-  depth?: number
 }
 
 export function ConditionEditor({
@@ -402,7 +392,6 @@ export function ConditionEditor({
   dataKeys,
   rowDataKeys,
   onChange,
-  depth = 0,
 }: ConditionEditorProps): ReactNode {
   const value = asCondition(raw)
   const hasLeft = 'left' in value
@@ -484,7 +473,6 @@ export function ConditionEditor({
                 value={inner}
                 dataKeys={dataKeys}
                 rowDataKeys={rowDataKeys}
-                depth={depth + 1}
                 onChange={(next) =>
                   onChange({
                     ...value,
@@ -535,7 +523,6 @@ export function ConditionEditor({
             value={value.condition}
             dataKeys={dataKeys}
             rowDataKeys={rowDataKeys}
-            depth={depth + 1}
             onChange={(condition) => onChange({ ...value, condition })}
           />
         </div>

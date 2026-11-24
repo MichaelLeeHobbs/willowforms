@@ -85,29 +85,10 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
         continue
       }
 
-      /*
-       * A measuring rule on a type whose keyword does not exist.
-       *
-       * `propertyFor` refuses `minLength`/`maxLength` on a type with no length
-       * and now refuses `min`/`max` on a type that is not a number -- because
-       * `minimum` and `maximum` are JSON Schema keywords for numbers only, so
-       * exporting one onto a string stated a constraint every validator
-       * ignores. Dropping it silently would be the same permissive failure one
-       * step later: the form enforces the rule and the schema does not, and the
-       * function whose whole job is to be believed about losses says nothing.
-       *
-       * Asked here rather than inside `propertyFor` so the two answers cannot
-       * drift: this is the list a reader is shown, and it has to name every
-       * rule that did not survive.
-       */
-      /*
-       * Asked on the *property* type, the way `propertyFor` asks it, not on the
-       * declared one. `date` and `file` are declared as themselves and export
-       * as `string`, so a question phrased on the declared type would report a
-       * loss `propertyFor` did not make -- the two answers have to come from
-       * one place or they drift, which is the whole shape this run keeps
-       * finding.
-       */
+      // A measuring rule on a type `withRule` exports no keyword for. The form still
+      // enforces it, so the loss has to be reported.
+      // Asked on the exported type, as `withRule` asks it: `date` and `file` export as
+      // `string`.
       const exported = node.schema ? baseType(node.schema.type).type : undefined
       const lengthy = exported === 'string' || exported === 'array'
       const numeric = exported === 'number'
@@ -316,14 +297,8 @@ function objectFor(
     for (const child of childNodesOf(node)) visit(child, depth + 1)
   }
 
-  /*
-   * Either the root is itself a field -- `validateForm(stepNode, data)` hands
-   * this a subtree, and that subtree can carry a schema -- or it is a container
-   * whose children are the fields. Visiting the root and then its children
-   * walked every child twice, once directly and once through the root, which
-   * doubled the work and made the "two components claim one answer" check below
-   * report a node as colliding with itself.
-   */
+  // The document's root can itself be a field. Visiting it and then its children too
+  // would walk every child twice.
   // Seeded from the caller's depth so nested repeaters share one bound.
   if (root.schema && !isRowScope(root)) visit(root, from)
   else for (const child of childNodesOf(root)) visit(child, from)

@@ -1,7 +1,6 @@
 /**
- * Pinned to eslint 9: eslint-plugin-react breaks on 10 ('contextOrFilename.getFilename
- * is not a function') and eslint-plugin-jsx-a11y does not claim support. Revisit once
- * both plugins support eslint 10.
+ * Pinned to eslint 9, the newest major that the peer ranges of eslint-plugin-react and
+ * eslint-plugin-jsx-a11y accept.
  */
 
 import js from '@eslint/js'

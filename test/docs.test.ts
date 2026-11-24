@@ -285,19 +285,13 @@ describe('the specification index', () => {
 const CONTRACT_RULES = 27
 
 /**
- * And how many are driven per kit from outside the per-kit block.
+ * And how many are driven per kit from outside the per-kit block, directly through
+ * `KITS` or through a table built from it. They are obligations too: each fails a kit
+ * by name.
  *
- * The guard below counted only the `describe.each(KITS)` block, on purpose --
- * the file also holds checks that are not obligations on a kit at all. But
- * twenty-one cases outside that block *are*: they run against every registered
- * kit -- directly through `KITS`, or through a table built from `KITS` and a
- * list of component types -- and fail a kit by name. They were written down
- * nowhere, so the spec presented the first table as the whole obligation set
- * while the suite ran nearly twice that.
- *
- * The `_CASES` naming is load-bearing, not a style: a rule written as
- * `it.each(KITS.flatMap(...))` inline matches neither half of the pattern
- * below, so it would be an obligation this count never sees.
+ * The `_CASES` naming matters: a rule written as `it.each(KITS.flatMap(...))` inline
+ * matches neither half of the pattern below, so it would be an obligation this count
+ * never sees.
  */
 const CONTRACT_RULES_PER_KIT = 23
 

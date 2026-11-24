@@ -137,7 +137,8 @@ describe('inspector tabs', () => {
   it('never points a tab at a panel that is not rendered', () => {
     const { view } = setup()
 
-    // An unresolved IDREF is not an axe violation, so only this catches it.
+    // axe does not flag an unresolved `aria-controls` on an unselected tab, so only
+    // this catches it.
     const tablist = screen.getByRole('tablist', { name: 'Component inspector' })
     for (const tab of within(tablist).getAllByRole('tab')) {
       const controls = tab.getAttribute('aria-controls')
@@ -184,15 +185,8 @@ describe('inspector tabs', () => {
   })
 
   it('leaves focus alone when the strip has nowhere to go', () => {
-    /*
-     * `preventDefault` used to run before the one-tab check, so on a strip with
-     * a single tab the four navigation keys were swallowed and did nothing at
-     * all -- Home and End included, which anywhere else on the page scroll. A
-     * component that takes a key and declines to act on it has to give it back.
-     *
-     * The JSON dialog's strip has two tabs and the inspector has three, so the
-     * one-tab case is checked through `Tabs` itself.
-     */
+    // A one-tab strip has nowhere to move focus, so it must leave the keys to the page.
+    // No strip in the designer has one tab, so this drives `Tabs` itself.
     const onSelect = vi.fn()
     render(
       <Tabs

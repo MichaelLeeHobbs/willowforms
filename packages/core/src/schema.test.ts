@@ -210,15 +210,8 @@ describe('toJsonSchema', () => {
   })
 
   it('exports a document whose props are not an object at all', () => {
-    /*
-     * `props` is required on `ComponentNode`, so only a cast reaches this, and
-     * a cast is exactly how it happens: the JSON dialog is where somebody looks
-     * at a pasted document, and a pasted document has been through no gate.
-     * `validateDocument` reports a malformed `props` and reporting is not
-     * refusing. Delete the guard at `schema.ts:204` and `toJsonSchema` throws a
-     * `TypeError` in the one place a person is deliberately holding something
-     * broken.
-     */
+    // `props` is required by the type, so only an unvalidated document reaches this.
+    // Without the guard in `titleOf`, `toJsonSchema` throws on it.
     for (const props of [null, 'nope', 42, ['label']]) {
       const node = { ...field('email', 'string'), props } as unknown as ComponentNode
       const schema = toJsonSchema(doc([node]))
@@ -270,17 +263,8 @@ describe('unexportableRules', () => {
   })
 
   it('reports the second of two format rules, which the export silently drops', () => {
-    /*
-     * `email`, `url` and `uuid` all write `format`, and a property has one, so
-     * a field carrying two of them exports only the last. Every fixture in this
-     * file put one format rule on a field, so the branch that reports the
-     * collapse was never executed: delete `schema.ts:111-117` and the suite
-     * stayed green while the dialog called a lossy export lossless, which is
-     * the single thing this function exists to prevent.
-     *
-     * The rule reported is the one being discarded -- the earlier one -- not
-     * the one that survives.
-     */
+    // `email`, `url` and `uuid` all write `format`, and a property has one, so only the
+    // last is exported. The rule reported is the earlier one, which is discarded.
     const document = doc([field('id', 'string', [{ key: 'email' }, { key: 'uuid' }])])
 
     expect(unexportableRules(document)).toEqual([{ key: 'id', rule: 'email' }])

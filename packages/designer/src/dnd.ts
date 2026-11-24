@@ -260,7 +260,7 @@ export function resolveDrop(
 
   return {
     parentKey: parent.key,
-    // Index in the real children list, which still includes the dragged node.
+    // As `moveNode` reads it: within one parent, with the dragged node already removed.
     index: documentIndex(candidates, parent.key, children, slot, draggedKey),
     indicator: indicator ?? barFor(parent, children, slot, axis),
     orientation: axis,
