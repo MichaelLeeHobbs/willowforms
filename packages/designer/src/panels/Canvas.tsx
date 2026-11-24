@@ -31,6 +31,7 @@ import {
 import { FormRenderer } from '@willowforms/renderer'
 import type { RendererKit } from '@willowforms/renderer'
 
+import { useAnnouncement } from '../announce.js'
 import { resolveDrop } from '../dnd.js'
 import type { DropTarget } from '../dnd.js'
 import type { DragController } from '../drag.js'
@@ -137,7 +138,7 @@ export function Canvas({
   }, [api.document.defaultLanguage, api.document.translations, language])
   const [data, setData] = useState<FormData>({})
   const [validated, setValidated] = useState(false)
-  const [actionNote, setActionNote] = useState('')
+  const [actionNote, setActionNote] = useAnnouncement()
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [hover, setHover] = useState<{ key: string | undefined; row: string | undefined }>({
     key: undefined,
@@ -214,11 +215,14 @@ export function Canvas({
     return shown ?? NO_ERRORS
   }, [preview, validated, api.document.root, data, touched, context, messages])
 
-  const onChange = useCallback((address: string, value: JsonValue) => {
-    setActionNote('')
-    setData((d) => applyChange(d, address, value))
-    setTouched((t) => (t.has(address) ? t : new Set(t).add(address)))
-  }, [])
+  const onChange = useCallback(
+    (address: string, value: JsonValue) => {
+      setActionNote('')
+      setData((d) => applyChange(d, address, value))
+      setTouched((t) => (t.has(address) ? t : new Set(t).add(address)))
+    },
+    [setActionNote],
+  )
 
   const onEffects = useCallback(
     (effects: Effect[]) => {
@@ -255,12 +259,15 @@ export function Canvas({
       }
       setActionNote(notes.join(' '))
     },
-    [preview, steps, context, api.document.root, data, messages],
+    [preview, steps, context, api.document.root, data, messages, setActionNote],
   )
 
-  const onActionError = useCallback((message: string) => {
-    setActionNote('Action could not run: ' + message)
-  }, [])
+  const onActionError = useCallback(
+    (message: string) => {
+      setActionNote('Action could not run: ' + message)
+    },
+    [setActionNote],
+  )
 
   const { select } = api
   const { state: dragState, begin, registerZone, consumeClick } = drag

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { FormDocument } from '@willowforms/core'
 import { loadDocument, toJsonSchema, unexportableRules } from '@willowforms/core'
 
+import { useAnnouncement } from '../announce.js'
 import { copyText } from '../clipboard.js'
 import { Tabs } from './Tabs.js'
 
@@ -63,7 +64,7 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   const [view, setView] = useState<View>('document')
   const [draft, setDraft] = useState(documentJson)
   const [errors, setErrors] = useState<string[]>([])
-  const [note, setNote] = useState('')
+  const [note, setNote] = useAnnouncement()
   const fileRead = useRef({ version: 0 })
   useEffect(() => {
     const pending = fileRead.current
@@ -92,16 +93,19 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
     setErrors([])
     onReplace(loaded.document)
     onClose()
-  }, [draft, onClose, onReplace])
+  }, [draft, onClose, onReplace, setNote])
 
-  const copy = useCallback((text: string, what: string) => {
-    void copyText(text).then((outcome) => {
-      if (outcome === 'copied') setNote(what + ' copied to the clipboard.')
-      else if (outcome === 'unavailable')
-        setNote('This browser offers no clipboard here. Select the text and copy it instead.')
-      else setNote('The browser refused clipboard access. Select the text and copy it instead.')
-    })
-  }, [])
+  const copy = useCallback(
+    (text: string, what: string) => {
+      void copyText(text).then((outcome) => {
+        if (outcome === 'copied') setNote(what + ' copied to the clipboard.')
+        else if (outcome === 'unavailable')
+          setNote('This browser offers no clipboard here. Select the text and copy it instead.')
+        else setNote('The browser refused clipboard access. Select the text and copy it instead.')
+      })
+    },
+    [setNote],
+  )
 
   const download = useCallback((text: string, filename: string) => {
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
@@ -118,32 +122,35 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }, [])
 
-  const onFile = useCallback((file: File | undefined) => {
-    if (!file) return
-    const version = ++fileRead.current.version
-    setNote('')
-    if (file.size > MAX_IMPORT) {
-      setErrors([
-        'That file is too large. JSON files must be 10 MiB or smaller. Use linked images to reduce file size.',
-      ])
-      return
-    }
-    setErrors([])
-    setNote('Reading ' + file.name + '…')
-    file
-      .text()
-      .then((text) => {
-        if (version !== fileRead.current.version) return
-        setDraft(text)
-        setErrors([])
-        setNote('Loaded ' + file.name + '. Review it, then apply.')
-      })
-      .catch(() => {
-        if (version !== fileRead.current.version) return
-        setNote('')
-        setErrors(['That file could not be read.'])
-      })
-  }, [])
+  const onFile = useCallback(
+    (file: File | undefined) => {
+      if (!file) return
+      const version = ++fileRead.current.version
+      setNote('')
+      if (file.size > MAX_IMPORT) {
+        setErrors([
+          'That file is too large. JSON files must be 10 MiB or smaller. Use linked images to reduce file size.',
+        ])
+        return
+      }
+      setErrors([])
+      setNote('Reading ' + file.name + '…')
+      file
+        .text()
+        .then((text) => {
+          if (version !== fileRead.current.version) return
+          setDraft(text)
+          setErrors([])
+          setNote('Loaded ' + file.name + '. Review it, then apply.')
+        })
+        .catch(() => {
+          if (version !== fileRead.current.version) return
+          setNote('')
+          setErrors(['That file could not be read.'])
+        })
+    },
+    [setNote],
+  )
 
   const slug = slugify(doc.name)
 
@@ -259,11 +266,10 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
           </>
         )}
 
-        {note && (
-          <p className="fs-dialog__note" role="status">
-            {note}
-          </p>
-        )}
+        {/* Always here: a live region inserted with its text is not reliably read out. */}
+        <p className="fs-dialog__note" role="status">
+          {note}
+        </p>
       </Tabs>
     </>
   )

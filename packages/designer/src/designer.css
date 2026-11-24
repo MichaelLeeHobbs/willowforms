@@ -646,6 +646,10 @@
   color: var(--fs-text-muted);
 }
 
+.fs-dialog__note:empty {
+  margin: 0;
+}
+
 .fs-dialog :focus-visible {
   outline: 2px solid var(--fs-primary);
   outline-offset: 2px;

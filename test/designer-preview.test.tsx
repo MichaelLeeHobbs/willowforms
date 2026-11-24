@@ -88,6 +88,29 @@ describe('beta authoring regressions', () => {
     expect(canvas.querySelector('[data-fs-key="step1"]')).toBeNull()
   })
 
+  it('changes the action note when the same action gives the same answer twice', () => {
+    open([
+      {
+        key: 'send',
+        type: 'Button',
+        props: { text: prop('Send') },
+        events: { onClick: [{ type: 'builtin', name: 'emit', params: { event: 'submit' } }] },
+      },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const canvas = within(screen.getByRole('main'))
+    const note = canvas.getByRole('status')
+    expect(note.textContent).toBe('')
+
+    fireEvent.click(canvas.getByRole('button', { name: 'Send' }))
+    const first = note.textContent
+    expect(first).toContain('Form is valid.')
+
+    fireEvent.click(canvas.getByRole('button', { name: 'Send' }))
+    expect(note.textContent).toContain('Form is valid.')
+    expect(note.textContent, 'an unchanged live region is never read out').not.toBe(first)
+  })
+
   it('shows guidance for an empty document only while editing', () => {
     open([])
     const canvas = within(screen.getByRole('main'))

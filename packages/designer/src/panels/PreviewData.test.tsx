@@ -4,46 +4,19 @@
 
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
+import { stubClipboard, stubClipboardWrites } from '../../../../test/clipboard.js'
 import { PreviewData } from './PreviewData.js'
-
-beforeAll(() => {
-  // jsdom implements neither; the dialog needs both to open and close.
-  const proto = HTMLDialogElement.prototype as {
-    showModal?: () => void
-    close?: () => void
-    open?: boolean
-  }
-  proto.showModal ??= function showModal(this: HTMLDialogElement): void {
-    this.open = true
-  }
-  proto.close ??= function close(this: HTMLDialogElement): void {
-    this.open = false
-    this.dispatchEvent(new Event('close'))
-  }
-})
-
-const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
-
-function setClipboard(value: unknown): void {
-  Object.defineProperty(navigator, 'clipboard', { configurable: true, value })
-}
-
-afterEach(() => {
-  if (original) Object.defineProperty(navigator, 'clipboard', original)
-  else delete (navigator as { clipboard?: unknown }).clipboard
-})
 
 const data = { name: 'Mira', count: 0, addresses: [{ street: '12 Oak Lane' }] }
 const json = JSON.stringify(data, null, 2)
 
-// The clipboard is set after `userEvent.setup()`, which installs its own stub.
 async function copyAndRead(
-  clipboard: unknown,
+  stub: () => void,
 ): Promise<{ note: string; editor: HTMLTextAreaElement; unmount: () => void }> {
   const user = userEvent.setup()
-  setClipboard(clipboard)
+  stub()
   const { unmount } = render(<PreviewData data={data} />)
   await user.click(screen.getByRole('button', { name: 'Form data JSON' }))
 
@@ -66,12 +39,14 @@ function expectSelected(editor: HTMLTextAreaElement): void {
 
 describe('PreviewData Copy JSON', () => {
   it('tells a missing clipboard from a refused one and selects the JSON for both', async () => {
-    const missing = await copyAndRead(undefined)
+    const missing = await copyAndRead(() => stubClipboard(undefined))
     expect(missing.note).toContain('offers no clipboard')
     expectSelected(missing.editor)
     missing.unmount()
 
-    const refused = await copyAndRead({ writeText: () => Promise.reject(new Error('denied')) })
+    const refused = await copyAndRead(() => {
+      stubClipboardWrites(() => Promise.reject(new Error('denied')))
+    })
     expect(refused.note).toContain('refused')
     expectSelected(refused.editor)
 
@@ -79,15 +54,31 @@ describe('PreviewData Copy JSON', () => {
   })
 
   it('copies the JSON and says so', async () => {
-    const written: string[] = []
-    const { note } = await copyAndRead({
-      writeText: (text: string) => {
-        written.push(text)
-        return Promise.resolve()
-      },
+    let written: string[] = []
+    const { note } = await copyAndRead(() => {
+      written = stubClipboardWrites()
     })
 
     expect(written).toEqual([json])
     expect(note).toBe('Form data copied to the clipboard.')
+  })
+
+  it('changes the note when the same copy is refused again, so it is read out again', async () => {
+    const user = userEvent.setup()
+    const written = stubClipboardWrites(() => Promise.reject(new Error('denied')))
+    render(<PreviewData data={data} />)
+    await user.click(screen.getByRole('button', { name: 'Form data JSON' }))
+    const dialog = screen.getByRole('dialog', { name: 'Form data' })
+    const copy = within(dialog).getByRole('button', { name: 'Copy JSON' })
+    const status = within(dialog).getByRole('status')
+
+    await user.click(copy)
+    await waitFor(() => expect(status.textContent).toContain('refused'))
+    const first = status.textContent
+
+    await user.click(copy)
+    await waitFor(() => expect(status.textContent).not.toBe(first))
+    expect(status.textContent).toContain('refused')
+    expect(written).toEqual([json, json])
   })
 })

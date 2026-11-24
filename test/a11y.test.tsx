@@ -11,7 +11,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { FormDocument } from '@willowforms/core'
 import { Designer } from '@willowforms/designer'
 import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
@@ -123,20 +123,6 @@ function renderDesigner(kit = htmlKit, rendererKit = htmlRendererKit): HTMLEleme
   )
   return container
 }
-
-beforeAll(() => {
-  const proto = HTMLDialogElement.prototype as {
-    showModal?: () => void
-    close?: () => void
-  }
-  proto.showModal ??= function showModal(this: HTMLDialogElement): void {
-    this.open = true
-  }
-  proto.close ??= function close(this: HTMLDialogElement): void {
-    this.open = false
-    this.dispatchEvent(new Event('close'))
-  }
-})
 
 /**
  * Clicking a tab proves the tab exists, not that its panel rendered. Each id is
@@ -263,7 +249,7 @@ describe('axe audit of the designer', () => {
     /*
      * The dialog is open and holds a tabpanel of its own.
      *
-     * Open, not modal: the `beforeAll` polyfill above defines `showModal()` as
+     * Open, not modal: `test/setup.ts` defines `showModal()` as
      * `this.open = true`, because jsdom has none. There is no top layer, no
      * inert background and no `::backdrop` here, so what
      * `docs/accessibility.md` credits to the browser -- focus trapping, Escape,

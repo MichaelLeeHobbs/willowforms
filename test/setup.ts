@@ -61,4 +61,17 @@ if (typeof document !== 'undefined') {
    */
   const elementProto = Element.prototype as { scrollIntoView?: Element['scrollIntoView'] }
   elementProto.scrollIntoView ??= function scrollIntoView(): void {}
+
+  // jsdom has no modal dialogs: no top layer, focus trap, backdrop or inert page here.
+  const dialogProto = HTMLDialogElement.prototype as {
+    showModal?: () => void
+    close?: () => void
+  }
+  dialogProto.showModal ??= function showModal(this: HTMLDialogElement): void {
+    this.open = true
+  }
+  dialogProto.close ??= function close(this: HTMLDialogElement): void {
+    this.open = false
+    this.dispatchEvent(new Event('close'))
+  }
 }
