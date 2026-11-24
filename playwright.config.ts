@@ -8,24 +8,23 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65_535) {
 }
 const baseURL = 'http://localhost:' + String(PORT)
 
-// Vite without pnpm in front, which can take a minute to start on Windows.
 const vite = 'node node_modules/vite/bin/vite.js'
 // Per port, so two suites in one checkout keep apart, and outside `dist`, which `e2e:dist` empties.
 const outDir = 'node_modules/.e2e/' + String(PORT)
 
 export default defineConfig({
   testDir: './e2e',
-  // Twice the default, for a machine that is also running something else.
+  // For a machine that is also running something else.
   timeout: 60_000,
   // Ends a run of hung tests before CI cancels the job, because a cancelled job uploads no traces.
   globalTimeout: process.env['CI'] ? 600_000 : 0,
   // The server only serves files and the document lives in each test's own browser storage, so no
-  // test can see another. Two workers, because a CI runner has two CPUs.
+  // test can see another.
   fullyParallel: true,
   workers: 2,
   forbidOnly: !!process.env['CI'],
-  // The second run exists to record a trace, which costs too much to record for every passing test.
-  // It never turns a failure into a pass: a flaky test is a bug to fix.
+  // The second run exists to record a trace. It never turns a failure into a pass: a flaky test is
+  // a bug to fix.
   retries: 1,
   failOnFlakyTests: true,
   reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],

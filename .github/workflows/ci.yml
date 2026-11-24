@@ -17,7 +17,6 @@ permissions:
 # Every action is pinned to a commit, because whoever owns the action can move a tag.
 # The comment after each pin names the version that commit was.
 
-# Two jobs of about the same length. Setting one up takes about 15 seconds.
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -47,7 +46,7 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      # Vitest leaves one CPU free by default, and the runner has two.
+      # Vitest leaves one CPU free by default.
       - name: Test
         run: pnpm test --maxWorkers=100%
 
@@ -75,8 +74,7 @@ jobs:
         run: node scripts/check-dist.mjs
 
       # Only chromium: the suite covers behaviour this project owns, not rendering differences
-      # between engines. No `--with-deps`: the runner image has every library chromium needs, and
-      # the flag then only downloads fonts, from a mirror that has taken five minutes.
+      # between engines. No `--with-deps`: the runner image has every library chromium needs.
       - name: Install the browser
         run: pnpm exec playwright install --only-shell chromium
 
