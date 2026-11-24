@@ -57,9 +57,9 @@ const declares = (names) =>
  * later flat-config block replaces an earlier block's options for the same rule.
  */
 const SHARED_HELPERS = {
-  selector: declares(['isRecord', 'paramsText', 'nameOf']),
+  selector: declares(['isRecord', 'expressionData', 'paramsText', 'nameOf']),
   message:
-    'Import the shared helper instead of redeclaring it: isRecord from core src/guards.ts (core-internal), paramsText from designer src/panels/text.ts, nameOf from designer src/language.ts.',
+    'Import the shared helper instead of redeclaring it: isRecord from core src/guards.ts (core-internal), expressionData from @willowforms/core, paramsText from designer src/panels/text.ts, nameOf from designer src/language.ts.',
 }
 
 /** Module scope only: the names are generic enough that a local `let changed` is not a copy. */

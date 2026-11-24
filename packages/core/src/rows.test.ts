@@ -16,6 +16,7 @@ import {
 import {
   DEFAULT_MESSAGES,
   NOT_A_LIST,
+  isRequired,
   isRowScope,
   submittedData,
   validateForm,
@@ -23,6 +24,7 @@ import {
 import { createDocument } from './factory.js'
 import { MAX_TREE_DEPTH, findNode, validateDocument } from './tree.js'
 import type { ComponentNode, FormData, FormDocument, JsonValue } from './types.js'
+import type { Evaluator } from './validation.js'
 
 describe('the row coordinate', () => {
   const path = pushRow(pushRow(NO_ROWS, { key: 'addresses', index: 1 }), {
@@ -710,6 +712,67 @@ describe('a rule guard inside a repeater', () => {
     }
 
     expect(validateDocument(withProp).map((e) => e.code)).toEqual(['row-scope'])
+  })
+})
+
+describe('a computed rule guard inside a repeater', () => {
+  const vat: ComponentNode = {
+    key: 'vatField',
+    dataKey: 'vat',
+    type: 'TextField',
+    props: {},
+    schema: {
+      type: 'string',
+      validations: [{ key: 'required', when: { kind: 'computed', expression: 'business' } }],
+    },
+  }
+
+  const root: ComponentNode = {
+    key: 'root',
+    type: 'Screen',
+    props: {},
+    children: [
+      {
+        key: 'orderList',
+        dataKey: 'orders',
+        type: 'Repeater',
+        props: {},
+        schema: { type: 'array', validations: [] },
+        children: [vat],
+      },
+    ],
+  }
+
+  // Reads the answer the expression names: a constant would answer the same for
+  // every row whether or not the row reached it.
+  const evaluate: Evaluator = (expression, data) => data[expression] === true
+
+  it('reads the row it guards', () => {
+    const data = { orders: [{ business: true }, { business: false }] }
+
+    expect(validateForm(root, data, { evaluate })).toEqual({
+      'orders[0].vatField': DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('still reads a form answer the row does not shadow', () => {
+    expect(validateForm(root, { business: true, orders: [{}] }, { evaluate })).toEqual({
+      'orders[0].vatField': DEFAULT_MESSAGES.required,
+    })
+  })
+
+  it('lets the row shadow a form answer of the same name', () => {
+    const data = { business: true, orders: [{ business: false }] }
+
+    expect(validateForm(root, data, { evaluate })).toEqual({})
+  })
+
+  it('marks the field required in the rows where the rule applies', () => {
+    const inRow = (values: FormData): boolean =>
+      isRequired(vat, {}, { evaluate, row: rowContext(NO_ROWS, values) })
+
+    expect(inRow({ business: true })).toBe(true)
+    expect(inRow({ business: false })).toBe(false)
   })
 })
 

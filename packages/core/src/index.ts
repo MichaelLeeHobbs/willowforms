@@ -82,6 +82,7 @@ export {
   decodeAddress,
   decodeRow,
   encodeRow,
+  expressionData,
   innermost,
   keyScopesFor,
   pushRow,

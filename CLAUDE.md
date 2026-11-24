@@ -76,6 +76,7 @@ Search for an existing helper by what it does before writing one. These each had
 
 - `isRecord` (core `src/guards.ts`, internal): true for non-null, non-array objects.
 - `jsonToString` (`@willowforms/core`): display text of a JSON value; `''` for null, undefined, objects and arrays.
+- `expressionData` (`@willowforms/core`, `src/rows.ts`): the answers a computed expression reads, with the enclosing row's over the form's.
 - `childNodesOf` (core `src/tree.ts`): a node's children that are objects.
 - `str`, `num`, `bool`, `changed`, `requiredProps` (`@willowforms/renderer`): kit prop readers.
 - `paramsText` (designer `src/panels/text.ts`), `nameOf` (designer `src/language.ts`), `copyText` (designer `src/clipboard.ts`): designer-internal.

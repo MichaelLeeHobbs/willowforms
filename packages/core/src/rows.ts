@@ -120,6 +120,15 @@ export function rowContext(path: RowPath, value: JsonValue | undefined): RowCont
   return { path, values }
 }
 
+/**
+ * What a computed expression reads: the form's answers, with the enclosing row's
+ * answers over them.
+ */
+// eslint-disable-next-line no-restricted-syntax -- the one definition; the rule refuses copies.
+export function expressionData(data: FormData, row: RowContext | undefined): FormData {
+  return row ? { ...data, ...row.values } : data
+}
+
 /** The two sets of data keys a condition authored on one node can name. */
 export interface KeyScopes {
   /** Every answer the top level holds, which is what an absent scope reads. */

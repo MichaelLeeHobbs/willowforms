@@ -1,5 +1,6 @@
 import { evaluateCondition } from './condition.js'
 import { unreadableTag } from './exhaustive.js'
+import { expressionData } from './rows.js'
 import type { ComponentNode, FormData } from './types.js'
 import type { EvalOptions } from './validation.js'
 
@@ -17,7 +18,7 @@ function runs(
   options: EvalOptions,
 ): boolean {
   try {
-    const scoped = options.row ? { ...data, ...options.row.values } : data
+    const scoped = expressionData(data, options.row)
     return Boolean(evaluate(expression, scoped, options.context))
   } catch {
     return false

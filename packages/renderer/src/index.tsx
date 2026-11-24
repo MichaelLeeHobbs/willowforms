@@ -17,6 +17,7 @@ import {
   dataKeyOf,
   encodeRow,
   evaluateCondition,
+  expressionData,
   isRowScope,
   isRequired,
   itemLimits,
@@ -210,7 +211,7 @@ export function resolveProp(
       if (!options.evaluate) return null
 
       try {
-        const scoped = options.row ? { ...data, ...options.row.values } : data
+        const scoped = expressionData(data, options.row)
         return options.evaluate(value.expression, scoped, options.context)
       } catch {
         return null
