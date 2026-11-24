@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import axe from 'axe-core'
+import { transitionsEnd } from './harness.js'
 
 const key = 'willowforms.designer.panel-widths.v1'
 const leftName = 'Resize Components and structure'
@@ -103,6 +104,7 @@ test('keyboard resizing, canceled drags, and default reset keep selection and ac
   await page.getByRole('tab', { name: 'Properties', exact: true }).press('Escape')
   for (const theme of ['light', 'dark']) {
     await page.getByLabel('Designer theme').selectOption(theme)
+    await transitionsEnd(page)
     await page.addScriptTag({ content: axe.source })
     const violations = await page.evaluate(async () =>
       (

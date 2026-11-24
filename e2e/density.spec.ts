@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import axe from 'axe-core'
 import { createDocument, prop } from '../packages/core/src/index.js'
 import type { ComponentNode } from '../packages/core/src/index.js'
+import { transitionsEnd } from './harness.js'
 
 for (const kit of ['html', 'mui']) {
   test(`${kit} imports density, inherits it, and keeps section overrides and errors usable`, async ({
@@ -66,6 +67,7 @@ for (const kit of ['html', 'mui']) {
     await expect(compact).not.toHaveAttribute('aria-invalid', 'true')
     for (const theme of ['light', 'dark']) {
       await page.getByLabel('Designer theme').selectOption(theme)
+      await transitionsEnd(page)
       await page.addScriptTag({ content: axe.source })
       const violations = await page.locator('[data-fs-key="root"]').evaluate(async (element) =>
         (
