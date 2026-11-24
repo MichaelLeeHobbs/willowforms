@@ -30,7 +30,7 @@ export function ImageSource({
     setDraft(value)
     setError('')
   }
-  const edited = draft !== value
+  const edited = draft.trim() !== value.trim()
   const embedded = /^data:/i.test(value) && !edited
   const source = safeImageSource(value)
   // The last two are about the stored address, so they go while another is being typed.
@@ -49,7 +49,8 @@ export function ImageSource({
       return
     }
     setError('')
-    if (draft.trim() !== value) setFailed('')
+    if (!edited) return
+    setFailed('')
     onChange(draft.trim())
   }
   return (

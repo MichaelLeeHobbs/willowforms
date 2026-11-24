@@ -83,13 +83,13 @@ describe('an image the field refuses', () => {
   })
 })
 
-describe('a field left without an edit', () => {
+describe('a field with nothing new in it', () => {
   it.each([
     ['no image', ''],
     ['an address', '/logo.png'],
     ['an address that is refused', 'ftp://example.com/logo.png'],
     ['an embedded image that is refused', 'data:image/svg+xml,<svg/>'],
-  ])('stores nothing and says nothing new when it holds %s', (_what, value) => {
+  ])('stores nothing and says nothing new when it is left holding %s', (_what, value) => {
     const { address, onChange } = setup(value)
     const before = screen.queryByRole('alert')?.textContent
 
@@ -97,6 +97,26 @@ describe('a field left without an edit', () => {
 
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.queryByRole('alert')?.textContent).toBe(before)
+  })
+
+  it.each(['', '/logo.png'])('stores nothing on Enter, holding "%s"', (value) => {
+    const { address, onChange } = setup(value)
+
+    fireEvent.keyDown(address, { key: 'Enter' })
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('takes spaces around the stored address for nothing new', () => {
+    const { address, onChange } = setup('/missing.png')
+    fireEvent.error(screen.getByAltText('Preview'))
+    const before = error()
+
+    type(address, ' /missing.png ')
+    fireEvent.blur(address)
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(error()).toBe(before)
   })
 })
 
