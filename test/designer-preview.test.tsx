@@ -111,6 +111,32 @@ describe('beta authoring regressions', () => {
     expect(note.textContent, 'an unchanged live region is never read out').not.toBe(first)
   })
 
+  it('changes the action note when a field action repeats it, though the change clears it first', () => {
+    open([
+      {
+        key: 'agree',
+        type: 'Checkbox',
+        props: { label: prop('Agree') },
+        schema: { type: 'boolean', validations: [] },
+        events: {
+          onChange: [{ type: 'builtin', name: 'announce', params: { message: 'Saved.' } }],
+        },
+      },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const canvas = within(screen.getByRole('main'))
+    const note = canvas.getByRole('status')
+    const agree = canvas.getByRole('checkbox', { name: 'Agree' })
+
+    fireEvent.click(agree)
+    const first = note.textContent
+    expect(first).toContain('Saved.')
+
+    fireEvent.click(agree)
+    expect(note.textContent).toContain('Saved.')
+    expect(note.textContent, 'an unchanged live region is never read out').not.toBe(first)
+  })
+
   it('shows guidance for an empty document only while editing', () => {
     open([])
     const canvas = within(screen.getByRole('main'))
