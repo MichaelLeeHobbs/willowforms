@@ -989,6 +989,83 @@ describe('the picker and validation agree on what a row holds at the depth bound
   })
 })
 
+describe('the picker and validation agree that a top-level repeater is a form answer', () => {
+  const field = (key: string, dataKey: string): ComponentNode => ({
+    key,
+    dataKey,
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+  })
+
+  type Target = Pick<ComponentNode, 'renderWhen' | 'schema'>
+
+  const doc = (sibling: ComponentNode, target: Target): FormDocument => ({
+    ...createDocument('Own key', 'own-key'),
+    root: {
+      key: 'root',
+      type: 'Screen',
+      props: {},
+      children: [
+        {
+          key: 'itemList',
+          dataKey: 'items',
+          type: 'Repeater',
+          props: {},
+          schema: { type: 'array', validations: [] },
+          children: [sibling, { ...field('targetField', 'target'), ...target }],
+        },
+      ],
+    },
+  })
+
+  const sameName = field('rowItems', 'items')
+  const otherName = field('streetField', 'street')
+
+  const tested = (scope: 'form' | 'row'): Target => ({
+    renderWhen: {
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey: 'items', scope } },
+    },
+  })
+
+  const compared = (scope: 'form' | 'row'): Target => ({
+    schema: { type: 'string', validations: [{ key: 'matches', field: 'items', scope }] },
+  })
+
+  describe.each([
+    ['a condition', tested],
+    ['a cross-field rule', compared],
+  ])('%s', (_what, target) => {
+    it('is accepted at the form scope the picker offers, though the row shares the name', () => {
+      const document = doc(sameName, target('form'))
+
+      expect(keyScopesFor(document.root, 'targetField').form).toEqual(['items'])
+      expect(validateDocument(document)).toEqual([])
+    })
+
+    it('is reported at the row scope the picker does not offer', () => {
+      const document = doc(otherName, target('row'))
+      const errors = validateDocument(document)
+
+      expect(keyScopesFor(document.root, 'targetField').row).toEqual(['street', 'target'])
+      expect(errors.map((error) => [error.code, error.key])).toEqual([['row-scope', 'targetField']])
+    })
+  })
+
+  it('evaluates the form scope against the list, so the accepted condition shows the field', () => {
+    const document = doc(sameName, {
+      ...tested('form'),
+      schema: { type: 'string', validations: [{ key: 'required' }] },
+    })
+
+    // The row's own `items` is empty, so only the list can make this true.
+    expect(validateForm(document.root, { items: [{ items: '' }] })).toEqual({
+      'items[0].targetField': DEFAULT_MESSAGES.required,
+    })
+  })
+})
+
 describe('the shape that told the two repeater predicates apart', () => {
   const odd = (children: unknown): ComponentNode =>
     ({

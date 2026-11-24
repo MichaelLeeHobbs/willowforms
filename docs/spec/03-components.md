@@ -263,6 +263,8 @@ meant, so no document migrates. `row` reads the enclosing row — and reads _onl
 deliberately no fallback to the form when the row has no such field: once a name can mean either, no
 caller can tell which one it got, and the fix is always another flavour of path.
 
+A repeater's own data key is an answer in the scope that holds the repeater: the form for a top-level repeater, the outer row for a nested one. It is not an answer in its own rows. A component inside a top-level `items` repeater reads the list as a form answer, and `scope: 'row'` finds `items` only if the row holds a component with that data key. The condition editor and `validateDocument` use the same names for each scope.
+
 That default carries the one real risk, so its mitigation shipped with it. A condition authored inside a
 row and left at form scope reads nothing, hides its component, and takes it out of validation — the quiet
 failure this project is organised against. `validateDocument` reports it, because unlike a missing
