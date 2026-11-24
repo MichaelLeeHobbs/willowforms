@@ -36,5 +36,7 @@ test('refreshes the drop indicator when the canvas scrolls beneath a stationary 
     })
     .toBeLessThan(2)
   await designer.page.mouse.up()
-  expect((await designer.rootChildren()).slice(0, 3)).toEqual(['field0', 'text', 'field1'])
+  await expect
+    .poll(async () => (await designer.rootChildren()).slice(0, 3))
+    .toEqual(['field0', 'text', 'field1'])
 })

@@ -116,8 +116,9 @@ Verification gaps remain even with a defined keyboard authoring path.
 - **The automated audit cannot see layout.** axe-core runs over the designer in twelve states: at rest,
   with a component selected, on the Rules, Settings and Style tabs, with a condition being edited, in
   validated preview, with both panes collapsed, and with the JSON dialog open. jsdom has no
-  rendering engine, so `color-contrast`, `target-size`, and `scrollable-region-focusable` are disabled by
-  name rather than reporting nothing useful. Contrast is covered separately by computing the ratios from
+  rendering engine and no canvas, so `color-contrast`, `target-size`, `scrollable-region-focusable` and
+  `label-content-name-mismatch` are disabled by name rather than reporting nothing useful. Any other rule
+  axe cannot decide fails the audit. Contrast is covered separately by computing the ratios from
   the stylesheets. The runtime catalogue now has a separate browser audit; the designer states still need equivalent browser coverage.
 - **No screen reader has actually been used.** Everything above is verified from the DOM and from the
   spec, which catches wiring mistakes but not awkward phrasing or a confusing reading order.

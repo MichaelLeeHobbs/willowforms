@@ -35,7 +35,17 @@ test('renaming to a key that is taken says so and changes nothing', async ({ des
     'website',
   )
   await expect(designer.row('website')).toHaveAttribute('aria-selected', 'true')
-  expect(await designer.rootChildren()).toContain('website')
+
+  // An edit that is accepted, saved after the refusal, so the keys below are not read too early.
+  await designer.page.getByRole('textbox', { name: /^Label/ }).fill('Homepage')
+  await expect
+    .poll(async () => {
+      const { root } = await designer.document()
+      return root.children?.find((child) => child.key === 'website')?.props['label']
+    })
+    .toEqual({ kind: 'static', value: 'Homepage' })
+  const keys = await designer.rootChildren()
+  expect(keys.filter((key) => key === 'email' || key === 'website')).toEqual(['email', 'website'])
 })
 
 test('renaming to a free key renames the component', async ({ designer }) => {
@@ -43,7 +53,7 @@ test('renaming to a free key renames the component', async ({ designer }) => {
   await designer.page.getByRole('textbox', { name: 'Key', exact: true }).fill('homepage')
   await designer.page.getByRole('textbox', { name: 'Key', exact: true }).press('Enter')
 
-  expect(await designer.rootChildren()).toContain('homepage')
+  await expect.poll(() => designer.rootChildren()).toContain('homepage')
   await expect(designer.row('homepage')).toHaveAttribute('aria-selected', 'true')
 })
 
@@ -107,8 +117,12 @@ test('a translated label reaches the canvas', async ({ designer }) => {
 
   await expect(designer.node('email').locator('label').first()).toHaveText(/Email address/)
 
-  const doc = await designer.document()
-  expect(doc.translations[doc.defaultLanguage]).toMatchObject({ email_label: 'Email address' })
+  await expect
+    .poll(async () => {
+      const doc = await designer.document()
+      return doc.translations[doc.defaultLanguage]
+    })
+    .toMatchObject({ email_label: 'Email address' })
 })
 
 test('adding a language leaves the document valid', async ({ designer }) => {
@@ -117,11 +131,12 @@ test('adding a language leaves the document valid', async ({ designer }) => {
   await designer.page.getByRole('textbox', { name: 'Name', exact: true }).fill('French')
   await designer.page.getByRole('button', { name: 'Add language' }).click()
 
-  const doc = await designer.document()
-  expect(doc.languages.map((language) => language.code)).toContain('fr')
-  expect(doc.languages.find((language) => language.code === 'fr')?.name).toBe('French')
-
-  expect(doc.defaultLanguage).toBe('en-US')
+  await expect
+    .poll(async () => {
+      const { languages, defaultLanguage } = await designer.document()
+      return { added: languages.find((language) => language.code === 'fr')?.name, defaultLanguage }
+    })
+    .toEqual({ added: 'French', defaultLanguage: 'en-US' })
 
   // Applying the JSON dialog unchanged runs the document through the import gate.
   await designer.page.getByRole('button', { name: 'JSON' }).click()

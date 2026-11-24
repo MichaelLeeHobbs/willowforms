@@ -9,8 +9,14 @@ export interface Designer {
   row: (key: string) => Locator
   /** A component as the kit actually rendered it on the canvas. */
   node: (key: string) => Locator
+  /*
+   * The next three read what the playground has saved, which it does from an effect after the
+   * gesture. Poll them: one read straight after a gesture can see the document from before it.
+   */
   rootChildren: () => Promise<string[]>
-  /** The whole document as the playground has persisted it. */
+  /** The keys inside one of the root's children, or none when the root has no such child. */
+  childrenOf: (key: string) => Promise<string[]>
+  /** The whole document. */
   document: () => Promise<FormDocumentShape>
   select: (key: string) => Promise<void>
   openTab: (
@@ -52,6 +58,9 @@ export const test = base.extend<{ designer: Designer }>({
     await page.getByRole('tab', { name: 'Tree' }).click()
     await expect(page.locator('[data-fs-tree-row="root"]')).toBeVisible()
 
+    const saved = (): Promise<string | null> =>
+      page.evaluate((key: string) => window.localStorage.getItem(key), STORAGE_KEY)
+
     const designer: Designer = {
       page,
       row: (key) => page.locator(`[data-fs-tree-row="${key}"]`),
@@ -62,20 +71,22 @@ export const test = base.extend<{ designer: Designer }>({
        * Throws rather than answering `[]`, so `toEqual(before)` cannot pass for a designer that
        * saved nothing.
        */
-      rootChildren: async () =>
-        page.evaluate((storageKey: string) => {
-          const raw = window.localStorage.getItem(storageKey)
-          if (!raw) throw new Error('The playground has not persisted a document yet.')
-          const doc = JSON.parse(raw) as FormDocumentShape
-          return (doc.root.children ?? []).map((child) => child.key)
-        }, STORAGE_KEY),
+      document: async () => {
+        const raw = await saved()
+        if (!raw) throw new Error('The playground has not persisted a document yet.')
+        return JSON.parse(raw) as FormDocumentShape
+      },
 
-      document: async () =>
-        page.evaluate((storageKey: string) => {
-          const raw = window.localStorage.getItem(storageKey)
-          if (!raw) throw new Error('The playground has not persisted a document yet.')
-          return JSON.parse(raw) as FormDocumentShape
-        }, STORAGE_KEY),
+      rootChildren: async () => {
+        const { root } = await designer.document()
+        return (root.children ?? []).map((child) => child.key)
+      },
+
+      childrenOf: async (key) => {
+        const { root } = await designer.document()
+        const parent = root.children?.find((child) => child.key === key)
+        return (parent?.children ?? []).map((child) => child.key)
+      },
 
       select: async (key) => {
         await designer.row(key).click()
@@ -83,12 +94,17 @@ export const test = base.extend<{ designer: Designer }>({
       },
 
       openTab: async (name) => {
-        await page.getByRole('tab', { name }).click()
-        await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true')
+        const tab = page.getByRole('tab', { name })
+        await tab.click()
+        await expect(tab).toHaveAttribute('aria-selected', 'true')
+        const panel = await tab.getAttribute('aria-controls')
+        await expect(page.locator(`[role="tabpanel"][id="${panel ?? ''}"]`)).toBeVisible()
       },
 
       undo: async () => {
+        const before = await saved()
         await page.getByRole('button', { name: 'Undo' }).click()
+        await expect.poll(saved).not.toBe(before)
       },
     }
 

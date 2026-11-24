@@ -56,8 +56,9 @@ test('Alt with the arrows reorders a component', async ({ designer }) => {
 
   await designer.page.keyboard.press('Alt+ArrowUp')
 
-  const after = await designer.rootChildren()
-  expect(after.indexOf('submit')).toBe(before.indexOf('submit') - 1)
+  await expect
+    .poll(async () => (await designer.rootChildren()).indexOf('submit'))
+    .toBe(before.indexOf('submit') - 1)
 })
 
 test('Alt with the arrows moves a component in and out of a container', async ({ designer }) => {
@@ -65,16 +66,13 @@ test('Alt with the arrows moves a component in and out of a container', async ({
   // `name` sits directly above `email` and takes children.
   await designer.page.keyboard.press('Alt+ArrowRight')
 
-  let doc = await designer.document()
-  let stack = doc.root.children?.find((child) => child.key === 'name')
-  expect(stack?.children?.map((child) => child.key)).toContain('email')
+  await expect.poll(() => designer.childrenOf('name')).toEqual(['firstName', 'lastName', 'email'])
+  expect(await designer.rootChildren()).not.toContain('email')
 
   await designer.row('email').focus()
   await designer.page.keyboard.press('Alt+ArrowLeft')
 
-  doc = await designer.document()
-  stack = doc.root.children?.find((child) => child.key === 'name')
-  expect(stack?.children?.map((child) => child.key)).not.toContain('email')
+  await expect.poll(() => designer.childrenOf('name')).toEqual(['firstName', 'lastName'])
   expect(await designer.rootChildren()).toContain('email')
 })
 
@@ -93,12 +91,12 @@ test('Delete removes once, and one undo brings it back', async ({ designer }) =>
   await designer.row('website').focus()
   await designer.page.keyboard.press('Delete')
 
-  expect(await designer.rootChildren()).not.toContain('website')
+  await expect.poll(() => designer.rootChildren()).not.toContain('website')
   await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/website removed/)
 
   await designer.undo()
 
-  expect(await designer.rootChildren()).toContain('website')
+  await expect.poll(() => designer.rootChildren()).toContain('website')
 })
 
 test('the inspector tabs are reachable and navigable by keyboard', async ({ designer }) => {
@@ -146,14 +144,14 @@ test('the JSON dialog traps focus and closes on Escape', async ({ designer }) =>
 test('Control+D duplicates a component beside itself and focuses the copy', async ({
   designer,
 }) => {
+  const before = await designer.rootChildren()
   await designer.row('website').focus()
   await designer.page.keyboard.press('Control+d')
+  await expect.poll(() => designer.rootChildren()).toHaveLength(before.length + 1)
 
   const children = await designer.rootChildren()
-  expect(children).toContain('website')
-  expect(children.filter((key) => key.startsWith('website'))).toHaveLength(2)
-
   const original = children.indexOf('website')
+  expect(original).toBe(before.indexOf('website'))
   expect(children[original + 1]).toMatch(/^website\d$/)
 
   await expect(designer.page.locator('[aria-live="polite"]')).toContainText(/website duplicated as/)
@@ -195,7 +193,7 @@ test('Delete removes a component selected by clicking a field on the canvas', as
 
   await designer.page.keyboard.press('Delete')
 
-  expect(await designer.rootChildren()).not.toContain('email')
+  await expect.poll(() => designer.rootChildren()).not.toContain('email')
 })
 
 test('Control+Z undoes after a click on the canvas', async ({ designer }) => {
@@ -205,7 +203,7 @@ test('Control+Z undoes after a click on the canvas', async ({ designer }) => {
 
   await designer.node('email').locator('input').click()
   await designer.page.keyboard.press('Delete')
-  expect(await designer.rootChildren()).not.toContain('email')
+  await expect.poll(() => designer.rootChildren()).not.toContain('email')
 
   await designer.page.keyboard.press('Control+z')
 

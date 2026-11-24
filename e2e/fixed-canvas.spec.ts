@@ -51,8 +51,12 @@ test('selection and dragging remain aligned on a paper canvas', async ({ designe
   expect(Math.abs(field.x - selection.x)).toBeLessThan(4)
   expect(Math.abs(field.y - selection.y)).toBeLessThan(4)
   await dragOnto(designer.page, designer.node('submit'), designer.node('email'), 'top')
-  const children = await designer.rootChildren()
-  expect(children.indexOf('submit')).toBe(children.indexOf('email') - 1)
+  await expect
+    .poll(async () => {
+      const children = await designer.rootChildren()
+      return children[children.indexOf('submit') + 1]
+    })
+    .toBe('email')
   await designer.page.getByLabel('Applies to').selectOption('desktop')
   await expect(designer.page.getByRole('button', { name: 'Desktop', exact: true })).toHaveAttribute(
     'aria-pressed',

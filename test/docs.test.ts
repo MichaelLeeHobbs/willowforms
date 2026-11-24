@@ -455,7 +455,7 @@ describe('the accessibility document', () => {
   it('lists exactly the axe rules the suite disables', () => {
     const suite = read('test/a11y.test.tsx')
     const declared = [
-      ...(/const NEEDS_LAYOUT = \[([^\]]*)\]/.exec(suite)?.[1] ?? '').matchAll(/'([\w-]+)'/g),
+      ...(/const NEEDS_BROWSER = \[([^\]]*)\]/.exec(suite)?.[1] ?? '').matchAll(/'([\w-]+)'/g),
     ].map((match) => match[1] ?? '')
 
     expect(declared.length, 'the disabled-rule list was not found').toBeGreaterThan(0)

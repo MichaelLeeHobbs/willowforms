@@ -24,9 +24,7 @@ test('a field dropped into a repeater lands in the authored row, once', async ({
   )
 
   // One node in the document, not one per row: rows are a projection of the authored subtree.
-  const doc = await designer.document()
-  const repeater = doc.root.children?.find((child) => child.key === 'repeater')
-  expect(repeater?.children?.map((child) => child.key)).toEqual(['textField'])
+  await expect.poll(() => designer.childrenOf('repeater')).toEqual(['textField'])
 
   // Row zero is the one edit mode draws.
   await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'repeater[0]')
@@ -77,8 +75,11 @@ test('a row is addressed by the repeater data key, not its node key', async ({ d
 
   await expect(designer.node('textField')).toHaveAttribute('data-fs-row', 'contacts[0]')
 
-  const doc = await designer.document()
-  const repeater = doc.root.children?.find((child) => child.key === 'repeater')
   // The key must stay `repeater`; a rename that also moved the key would prove nothing.
-  expect(repeater?.dataKey).toBe('contacts')
+  await expect
+    .poll(async () => {
+      const { root } = await designer.document()
+      return root.children?.find((child) => child.key === 'repeater')?.dataKey
+    })
+    .toBe('contacts')
 })

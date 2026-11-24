@@ -13,7 +13,7 @@ test('browses examples without losing the original draft or edited examples', as
   await expect(gallery.getByRole('article')).toHaveCount(10)
   await gallery.getByRole('searchbox', { name: 'Search examples' }).fill('feedback')
   await expect(gallery.getByRole('article')).toHaveCount(1)
-  await gallery.getByRole('button', { name: 'Open Customer feedback' }).click()
+  await gallery.getByRole('button', { name: 'Open example: Customer feedback' }).click()
   await expect(gallery).not.toBeVisible()
   await expect(page).toHaveURL(/example=customer-feedback/)
   await page.getByRole('tab', { name: 'Settings' }).click()
@@ -24,7 +24,7 @@ test('browses examples without losing the original draft or edited examples', as
   await page.getByRole('tab', { name: 'Settings' }).click()
   await expect(page.getByRole('textbox', { name: 'Form name' })).toHaveValue('My original draft')
   await page.getByRole('button', { name: /^Examples/ }).click()
-  await gallery.getByRole('button', { name: 'Open Customer feedback' }).click()
+  await gallery.getByRole('button', { name: 'Open example: Customer feedback' }).click()
   await page.reload()
   await page.getByRole('tab', { name: 'Settings' }).click()
   await expect(page.getByRole('textbox', { name: 'Form name' })).toHaveValue('My feedback form')
@@ -63,7 +63,7 @@ test('keeps edits in memory when storage is unavailable and examples are switche
   await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByRole('textbox', { name: 'Form name' }).fill('Keep my unsaved work')
   await page.getByRole('button', { name: /^Examples/ }).click()
-  await page.getByRole('button', { name: 'Open Customer feedback' }).click()
+  await page.getByRole('button', { name: 'Open example: Customer feedback' }).click()
   await page.getByRole('button', { name: /^Examples/ }).click()
   await page.getByRole('button', { name: 'Back to your draft' }).click()
   await page.getByRole('tab', { name: 'Settings' }).click()
@@ -81,7 +81,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addScriptTag({ content: axe.source })
     const violations = await page.evaluate(async () => {
       const result = await (window as typeof window & { axe: typeof axe }).axe.run('.pg-gallery', {
-        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
       })
       return result.violations.map(({ id, nodes }) => ({
         id,
@@ -91,7 +91,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(violations).toEqual([])
     await page
       .getByRole('dialog', { name: 'Find your starting point.' })
-      .getByRole('button', { name: 'Open Contact request' })
+      .getByRole('button', { name: 'Open example: Contact request' })
       .click()
     await page.setViewportSize({ width: 390, height: 844 })
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
@@ -106,7 +106,10 @@ for (const theme of ['light', 'dark'] as const) {
     const resetViolations = await confirmation.evaluate(async (element) =>
       (
         await (window as typeof window & { axe: typeof axe }).axe.run(element, {
-          runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+          runOnly: {
+            type: 'tag',
+            values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+          },
         })
       ).violations.map(({ id }) => id),
     )

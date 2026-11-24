@@ -33,7 +33,12 @@ for (const kit of ['html', 'mui']) {
           (
             await (window as typeof window & { axe: typeof axe }).axe.run(
               ['.fs-panel--right', '.fs-selection__toolbar'],
-              { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } },
+              {
+                runOnly: {
+                  type: 'tag',
+                  values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+                },
+              },
             )
           ).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(({ target }) => target) })),
         ),
