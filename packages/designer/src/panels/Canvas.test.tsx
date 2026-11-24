@@ -660,27 +660,16 @@ describe('typing into a kit component while arranging the form', () => {
 })
 
 describe('a press that is not the primary button', () => {
-  /*
-   * These pin the outcome, not `Canvas.tsx`'s primary-button guard: with the
-   * guard removed they still pass, because something else in jsdom stops a
-   * right-press arming a drag.
-   */
-  const order = (view: ReturnType<typeof setup>['view']): (string | null)[] =>
-    [...view.container.querySelectorAll('[data-fs-key]')].map((el) =>
-      el.getAttribute('data-fs-key'),
-    )
-
-  it('does not relocate the component on a right-press', () => {
+  it('does not arm a drag on a right-press', () => {
     const { view, node } = setup()
-    const before = order(view)
-    expect(before.length, 'nothing is on the canvas, so this proves nothing').toBeGreaterThan(1)
 
     fireEvent.pointerDown(node('first'), { button: 2, clientX: 10, clientY: 10, pointerId: 1 })
     fireEvent.pointerMove(window, { clientX: 14, clientY: 60, pointerId: 1 })
-    fireEvent.pointerUp(window, { clientX: 14, clientY: 60, pointerId: 1 })
 
+    // Before the release, which removes the label whether or not a drag armed.
     expect(view.container.querySelector('.fs-drag-label'), 'a drag was armed').toBeNull()
-    expect(order(view)).toEqual(before)
+
+    fireEvent.pointerUp(window, { clientX: 14, clientY: 60, pointerId: 1 })
   })
 
   it('still arms one on the primary button', () => {

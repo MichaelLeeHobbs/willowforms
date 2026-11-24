@@ -234,23 +234,24 @@ describe('emitting the document to the host', () => {
     const emit = vi.fn<(doc: FormDocument) => void>()
     const document = documentOf([ENGLISH])
 
-    const view = render(
-      <Designer initialDocument={document} kit={kit} rendererKit={rendererKit} onChange={emit} />,
+    // A new arrow on every call, as a host's inline `onChange` is on every render.
+    const host = (): ReactNode => (
+      <Designer
+        initialDocument={document}
+        kit={kit}
+        rendererKit={rendererKit}
+        onChange={(doc) => {
+          emit(doc)
+        }}
+      />
     )
+
+    const view = render(host())
 
     return {
       emit,
-      // A host render with nothing changed, which is what an inline arrow makes
-      // a new function on. Every prop is the same value it already had.
       rerender: () => {
-        view.rerender(
-          <Designer
-            initialDocument={document}
-            kit={kit}
-            rendererKit={rendererKit}
-            onChange={emit}
-          />,
-        )
+        view.rerender(host())
       },
     }
   }

@@ -476,12 +476,14 @@ describe('the accessibility document', () => {
      * document in the repository that exists so a reader does not have to take
      * "we care about accessibility" on trust was itself unchecked.
      *
-     * Counted inside the axe describe, so a helper or an unrelated test in the
-     * same file cannot inflate it.
+     * Counted inside the `axe audit` describes, so a helper or an unrelated test
+     * in the same file cannot inflate it.
      */
     const suite = read('test/a11y.test.tsx')
-    const audits = suite.slice(suite.indexOf("describe('axe audit of the designer'"))
-    const states = [...audits.matchAll(/^\s+it\(/gm)].length
+    const audits = suite
+      .split(/\n(?=describe\b)/)
+      .filter((block) => block.startsWith("describe('axe audit"))
+    const states = audits.flatMap((block) => [...block.matchAll(/^\s+it\(/gm)]).length
 
     // Loose about the verb, which the documents word differently, and exact
     // about "<number> states", so a sentence about something else is not swept in.
