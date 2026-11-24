@@ -135,21 +135,29 @@ export interface KeyScopes {
 }
 
 /**
- * Shared by `keyScopesFor` (the picker) and `rowScopeProblems` (validation), so
- * a key the picker offers as a row answer is one validation accepts.
+ * The one collector behind `keyScopesFor` (the picker) and `rowScopeProblems`
+ * (validation), so a key the picker offers is one validation accepts.
+ *
+ * A repeater's own data key is an answer in the scope that holds the repeater.
+ * What is inside it is an answer in *its* rows. A set, because data keys may
+ * legally repeat: two fields behind opposite guards can write one answer.
  */
+function gatherKeys(node: ComponentNode, names: Set<string>, depth: number): void {
+  if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
+  if (node.schema) names.add(dataKeyOf(node))
+  if (isRowScope(node)) return
+  for (const child of childNodesOf(node)) gatherKeys(child, names, depth + 1)
+}
+
+function formKeysOf(root: ComponentNode): Set<string> {
+  const names = new Set<string>()
+  gatherKeys(root, names, 0)
+  return names
+}
+
 function rowKeysOf(repeater: ComponentNode): Set<string> {
   const names = new Set<string>()
-  const gather = (node: ComponentNode, isRepeater: boolean, depth: number): void => {
-    if (depth > MAX_TREE_DEPTH) return
-    if (!isRepeater) {
-      if (node.schema) names.add(dataKeyOf(node))
-      // Its children are answers in *its* rows, not in this one.
-      if (isRowScope(node)) return
-    }
-    for (const child of childNodesOf(node)) gather(child, false, depth + 1)
-  }
-  gather(repeater, true, 0)
+  for (const child of childNodesOf(repeater)) gatherKeys(child, names, 1)
   return names
 }
 
@@ -167,7 +175,7 @@ function rowKeysOf(repeater: ComponentNode): Set<string> {
  * row further down and no ref from here can name it.
  */
 export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
-  const form: string[] = []
+  const form = [...formKeysOf(root)]
   let row: string[] | undefined
 
   let matched = false
@@ -177,8 +185,6 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
     depth: number,
   ): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
-    if (!enclosing && node.schema) form.push(dataKeyOf(node))
-
     if (!matched && node.key === nodeKey) {
       matched = true
       if (enclosing) row = [...rowKeysOf(enclosing)]
@@ -189,10 +195,7 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
   }
   visit(root, undefined, 0)
 
-  // Deduplicated, because data keys may legally repeat: two fields behind
-  // opposite guards can write one answer, and as names to test they are one.
-  const unique = (names: string[]): string[] => [...new Set(names)]
-  return row === undefined ? { form: unique(form) } : { form: unique(form), row: unique(row) }
+  return row === undefined ? { form } : { form, row }
 }
 
 /**
@@ -206,17 +209,7 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
 export function rowScopeProblems(root: ComponentNode): { key: string; problem: string }[] {
   const problems: { key: string; problem: string }[] = []
 
-  const formKeys = new Set<string>()
-
-  const mark = (node: ComponentNode, repeating: boolean, depth: number): void => {
-    if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
-    if (node.schema && !isRowScope(node) && !repeating) {
-      formKeys.add(dataKeyOf(node))
-    }
-    const deeper = repeating || isRowScope(node)
-    for (const child of childNodesOf(node)) mark(child, deeper, depth + 1)
-  }
-  mark(root, false, 0)
+  const formKeys = formKeysOf(root)
 
   // A truncated walk is reported, never passed as clean. Once per node, because
   // the three branches below ask the same condition.
