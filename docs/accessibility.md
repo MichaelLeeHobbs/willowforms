@@ -89,7 +89,9 @@ people already know it. Without them, every rearrangement in this builder would 
   reader reads on arrival, and a second announcement would say everything twice.
 - Identical consecutive announcements get a zero-width space appended, because an unchanged live region
   is never read out and a second identical move would otherwise be silent. The clipboard notes in the
-  JSON dialogs and Preview's action note do the same.
+  JSON dialogs, Preview's action note, and a refused language, code action name or image do the same.
+  The JSON dialog inserts its list of errors again instead. Leaving an invalid field without editing it
+  repeats nothing.
 
 ## Kits own their own accessibility
 

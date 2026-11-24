@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MAX_EMBEDDED_IMAGE_BYTES, safeImageSource } from '@willowforms/core'
 
+import { useAnnouncement } from '../announce.js'
+
 export function ImageSource({
   id,
   value,
@@ -13,7 +15,7 @@ export function ImageSource({
 }): ReactNode {
   const [draft, setDraft] = useState(value)
   const [seen, setSeen] = useState(value)
-  const [error, setError] = useState('')
+  const [error, setError] = useAnnouncement()
   const [failed, setFailed] = useState('')
   const request = useRef({ version: 0 })
   useEffect(() => {
@@ -28,22 +30,27 @@ export function ImageSource({
     setDraft(value)
     setError('')
   }
-  const embedded = /^data:/i.test(value) && draft === value
+  const edited = draft.trim() !== value.trim()
+  const embedded = /^data:/i.test(value) && !edited
   const source = safeImageSource(value)
+  // The last two are about the stored address, so they go while another is being typed.
   const problem =
     error ||
-    (value && !source
-      ? 'Use an http/https address, a relative path, or an embedded PNG, JPEG, WebP, or GIF up to 2 MiB.'
-      : failed === source && source
-        ? 'The image could not be loaded. Check its address or choose another file.'
-        : '')
+    (edited
+      ? ''
+      : value && !source
+        ? 'Use an http/https address, a relative path, or an embedded PNG, JPEG, WebP, or GIF up to 2 MiB.'
+        : failed === source && source
+          ? 'The image could not be loaded. Check its address or choose another file.'
+          : '')
   const commit = (): void => {
     if (draft.trim() && !safeImageSource(draft)) {
       setError('Use an image URL or embed a PNG, JPEG, WebP, or GIF up to 2 MiB.')
       return
     }
     setError('')
-    if (draft.trim() !== value) setFailed('')
+    if (!edited) return
+    setFailed('')
     onChange(draft.trim())
   }
   return (
@@ -59,8 +66,12 @@ export function ImageSource({
         onChange={(event) => {
           request.current.version++
           setDraft(event.target.value)
+          setError('')
         }}
-        onBlur={commit}
+        // Only an edit, and not one already refused: its error would be read out again.
+        onBlur={() => {
+          if (edited && !error) commit()
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault()
