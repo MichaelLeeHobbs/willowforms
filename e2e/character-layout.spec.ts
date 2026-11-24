@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import axe from 'axe-core'
+import { transitionsEnd } from './harness.js'
 
 for (const kit of ['mui', 'html']) {
   test(`${kit} character folio uses desktop columns and keeps every page within the desktop canvas`, async ({
@@ -64,6 +65,7 @@ for (const kit of ['mui', 'html']) {
     await form.getByRole('textbox', { name: 'Weapon / attack name', exact: true }).fill('Longsword')
     for (const theme of ['light', 'dark']) {
       await page.getByLabel('Designer theme').selectOption(theme)
+      await transitionsEnd(page)
       await page.addScriptTag({ content: axe.source })
       const violations = await form.evaluate(async (element) => {
         const result = await (window as typeof window & { axe: typeof axe }).axe.run(element, {

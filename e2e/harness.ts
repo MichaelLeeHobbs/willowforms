@@ -131,6 +131,23 @@ export async function stableBox(
 }
 
 /**
+ * Waits out CSS transitions. A kit fades colours when the theme or the focus changes, and a contrast
+ * audit reads whatever is on screen when it runs.
+ */
+export async function transitionsEnd(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const running = (): Animation[] =>
+      document
+        .getAnimations()
+        .filter((each) => each instanceof CSSTransition && each.playState === 'running')
+    // Until none is left: a child that inherits a fading colour starts a transition of its own.
+    for (let batch = running(); batch.length > 0; batch = running()) {
+      await Promise.allSettled(batch.map((each) => each.finished))
+    }
+  })
+}
+
+/**
  * Scrolls the drag source into view before measuring: `boundingBox()` gives page coordinates
  * for an element below the fold, so the press would land outside the window. Never scroll the
  * target; that moves the source out from under the press.

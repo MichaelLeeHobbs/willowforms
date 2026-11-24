@@ -2,7 +2,7 @@ import axe from 'axe-core'
 import { createDocument, instantiate, prop } from '../packages/core/src/factory.js'
 import type { FormDocument } from '../packages/core/src/types.js'
 import { htmlKit } from '../packages/kit-html/src/definitions.js'
-import { expect, test, STORAGE_KEY } from './harness.js'
+import { expect, test, STORAGE_KEY, transitionsEnd } from './harness.js'
 
 function catalogue(): FormDocument {
   const document = createDocument('Accessible form', 'accessibility')
@@ -69,6 +69,7 @@ for (const kit of ['html', 'mui']) {
       await expect(form.getByRole('radiogroup', { name: 'RadioGroup question' })).toBeVisible()
       await expect(form.getByRole('img', { name: 'Example illustration' })).toBeVisible()
       await expect(form.getByRole('navigation', { name: 'Breadcrumbs question' })).toBeVisible()
+      await transitionsEnd(page)
       await page.addScriptTag({ content: axe.source })
       const violations = await page.evaluate(async () => {
         const result = await (window as typeof window & { axe: typeof axe }).axe.run(

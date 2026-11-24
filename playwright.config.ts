@@ -8,10 +8,17 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65_535) {
 }
 const baseURL = 'http://localhost:' + String(PORT)
 
+// Vite without pnpm in front, which can take a minute to start on Windows.
+const vite = 'node node_modules/vite/bin/vite.js'
+// Per port, so two suites in one checkout keep apart, and outside `dist`, which `e2e:dist` empties.
+const outDir = 'node_modules/.e2e/' + String(PORT)
+
 export default defineConfig({
   testDir: './e2e',
   // Twice the default, for a machine that is also running something else.
   timeout: 60_000,
+  // Ends a run of hung tests before CI cancels the job, because a cancelled job uploads no traces.
+  globalTimeout: process.env['CI'] ? 600_000 : 0,
   // The server only serves files and the document lives in each test's own browser storage, so no
   // test can see another. Two workers, because a CI runner has two CPUs.
   fullyParallel: true,
@@ -39,14 +46,16 @@ export default defineConfig({
      * `--strictPort` so a busy port fails loudly instead of starting somewhere else and leaving
      * every test to time out against the wrong address.
      */
-    command: 'pnpm --filter playground run serve:e2e --port ' + String(PORT) + ' --strictPort',
+    command:
+      `${vite} build --minify false --outDir ${outDir} && ` +
+      `${vite} preview --outDir ${outDir} --port ${String(PORT)} --strictPort`,
+    cwd: 'apps/playground',
     url: baseURL,
     /*
      * Never reuse: Playwright would skip the command when something already answers on the port,
      * and test another checkout's server instead of this one.
      */
     reuseExistingServer: false,
-    // Starting anything through pnpm can take 90 seconds on a cold Windows machine.
-    timeout: 180_000,
+    timeout: 120_000,
   },
 })
