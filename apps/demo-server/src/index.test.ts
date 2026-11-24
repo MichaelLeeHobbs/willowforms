@@ -3,7 +3,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentNode, FormDocument } from '@willowforms/core'
 
 import { expectConsoleError } from '../../../test/console-errors.js'
@@ -55,9 +55,15 @@ afterAll(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 
-// The store every test starts from. A test that changes it puts it back.
+// The store this file starts with.
 const restore = async (): Promise<void> => {
   await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
+}
+
+/** For a describe whose tests change the store or read all of it: some above leave forms in it. */
+const restoreAroundEach = (): void => {
+  beforeEach(restore)
+  afterEach(restore)
 }
 
 const send = async (path: string, method: string, body: string): Promise<Response> =>
@@ -570,11 +576,24 @@ describe('the origins another page may call from', () => {
 describe('an id borrowed from Object.prototype, on the routes that read and write the store', () => {
   const BORROWED = ['__proto__', 'constructor', 'toString', 'hasOwnProperty']
 
-  afterEach(restore)
+  restoreAroundEach()
 
   it.each(BORROWED)('holds nothing under %s until something is written there', async (id) => {
     expect((await app.request('/api/forms/' + id)).status).toBe(404)
     expect((await app.request('/api/forms/' + id, { method: 'DELETE' })).status).toBe(404)
+  })
+
+  it('does not hold a whole document that the store only inherits', async () => {
+    Object.defineProperty(Object.prototype, 'inherited', {
+      configurable: true,
+      value: { ...FORM, id: 'inherited' },
+    })
+    try {
+      expect((await app.request('/api/forms/inherited')).status).toBe(404)
+      expect((await send('/api/forms/inherited/submit', 'POST', '{"name":"Ada"}')).status).toBe(404)
+    } finally {
+      Reflect.deleteProperty(Object.prototype, 'inherited')
+    }
   })
 
   it.each(BORROWED)('stores a document under %s, lists it, and deletes it', async (id) => {
@@ -645,7 +664,7 @@ describe('a form this server cannot validate in full', () => {
     return await send('/api/forms/gated/submit', 'POST', '{"name":"Ada"}')
   }
 
-  afterEach(restore)
+  restoreAroundEach()
 
   it('is refused when it needs an evaluator', async () => {
     const response = await submitTo(gated({ kind: 'computed', expression: 'name === "Ada"' }))
@@ -673,7 +692,7 @@ describe('a form this server cannot validate in full', () => {
 })
 
 describe('a PUT whose document id is not the one in the URL', () => {
-  afterEach(restore)
+  restoreAroundEach()
 
   it('is refused and stores nothing under either id', async () => {
     const response = await put('inTheUrl', { ...FORM, id: 'inTheDocument' })
@@ -688,7 +707,7 @@ describe('a PUT whose document id is not the one in the URL', () => {
 })
 
 describe('a store file that holds no store', () => {
-  afterEach(restore)
+  restoreAroundEach()
 
   it.each([
     ['truncated JSON', '{"deep":'],

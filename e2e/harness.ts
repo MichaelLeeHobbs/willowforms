@@ -67,10 +67,7 @@ export const test = base.extend<{ designer: Designer }>({
       // `.first()`: a repeater draws its subtree once per row, so a key can match many elements.
       node: (key) => page.locator(`[data-fs-key="${key}"]`).first(),
 
-      /*
-       * Throws rather than answering `[]`, so `toEqual(before)` cannot pass for a designer that
-       * saved nothing.
-       */
+      // Throws, so `toEqual(before)` cannot pass for a designer that saved nothing.
       document: async () => {
         const raw = await saved()
         if (!raw) throw new Error('The playground has not persisted a document yet.')
@@ -162,7 +159,7 @@ export async function dragFrom(
  * Moves in steps: the drag controller needs a move past its threshold, and the drop zones measure
  * on the moves after it.
  */
-export async function dragOnto(
+export async function dragOver(
   page: Page,
   from: Locator,
   to: Locator,
@@ -182,6 +179,15 @@ export async function dragOnto(
   await page.mouse.down()
   await page.mouse.move(start.x + 50, start.y + start.height / 2 + 12, { steps: 4 })
   await page.mouse.move(end.x + Math.min(40, end.width / 2), targetY, { steps: 12 })
+}
+
+export async function dragOnto(
+  page: Page,
+  from: Locator,
+  to: Locator,
+  where: 'top' | 'middle' | 'bottom' = 'middle',
+): Promise<void> {
+  await dragOver(page, from, to, where)
   await page.mouse.up()
 }
 

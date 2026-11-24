@@ -80,10 +80,7 @@ test('a move still lands where the bar showed at mobile width', async ({ designe
 })
 
 test('a move at mobile width lands at the pointer rather than at the end', async ({ designer }) => {
-  /*
-   * The test above also passes if drops ignore the pointer and append. This asserts the
-   * neighbour rather than the index, so a growing fixture does not break it.
-   */
+  // The test above also passes if drops ignore the pointer and append.
   await designer.page.getByRole('button', { name: 'Mobile' }).click()
 
   const before = await designer.rootChildren()

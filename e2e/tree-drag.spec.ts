@@ -1,8 +1,6 @@
 // Dragging a row in the structure tree. Needs real layout: the tree measures its rows.
 
-import type { Page } from '@playwright/test'
-
-import { dragFrom, dragOnto, expect, stableBox, test } from './harness.js'
+import { dragOnto, dragOver, expect, stableBox, test } from './harness.js'
 
 const TREE_ROW = '.fs-tree__row'
 
@@ -16,13 +14,26 @@ test('a row dragged onto a container row moves inside it', async ({ designer }) 
   await expect(designer.row('website')).toHaveAttribute('aria-level', '3')
 })
 
-test('a row dragged between rows lands where the line showed', async ({ designer }) => {
+test('a row dragged up lands above the row it was dropped over', async ({ designer }) => {
   const before = await designer.rootChildren()
 
   await dragOnto(designer.page, designer.row('submit'), designer.row('email'), 'top')
 
   const moved = before.filter((key) => key !== 'submit')
   moved.splice(moved.indexOf('email'), 0, 'submit')
+  await expect.poll(() => designer.rootChildren()).toEqual(moved)
+})
+
+// Taking the row out first shifts every row below it up by one.
+test('a row dragged down lands directly below the row it was dropped under', async ({
+  designer,
+}) => {
+  const before = await designer.rootChildren()
+
+  await dragOnto(designer.page, designer.row('heading'), designer.row('email'), 'bottom')
+
+  const moved = before.filter((key) => key !== 'heading')
+  moved.splice(moved.indexOf('email') + 1, 0, 'heading')
   await expect.poll(() => designer.rootChildren()).toEqual(moved)
 })
 
@@ -39,31 +50,18 @@ test('a row dragged out of its container lands beside the row it was dropped und
   expect(await designer.rootChildren()).toEqual(moved)
 })
 
-async function dragOver(
-  designer: { page: Page },
-  from: { x: number; y: number; width: number; height: number },
-  to: { x: number; y: number },
-): Promise<void> {
-  await designer.page.mouse.move(from.x + 40, from.y + from.height / 2)
-  await designer.page.mouse.down()
-  await designer.page.mouse.move(from.x + 50, from.y + from.height / 2 + 12, { steps: 4 })
-  await designer.page.mouse.move(to.x, to.y, { steps: 12 })
-}
-
 test('the row under the pointer says where a drop would go, and Escape drops nothing', async ({
   designer,
 }) => {
   const before = await designer.rootChildren()
-  const from = await dragFrom(designer.row('website'))
-  const container = await stableBox(designer.row('name'))
-  const field = await stableBox(designer.row('email'))
-
-  await dragOver(designer, from, { x: container.x + 40, y: container.y + container.height / 2 })
+  // Not the row below `email`, which a drop under `email` would leave where it is.
+  await dragOver(designer.page, designer.row('subscribe'), designer.row('name'), 'middle')
   await expect(designer.page.locator(TREE_ROW + '.is-drop-inside')).toHaveAttribute(
     'data-fs-tree-row',
     'name',
   )
 
+  const field = await stableBox(designer.row('email'))
   await designer.page.mouse.move(field.x + 40, field.y + 3, { steps: 6 })
   await expect(designer.page.locator(TREE_ROW + '.is-drop-before')).toHaveAttribute(
     'data-fs-tree-row',
@@ -80,7 +78,7 @@ test('the row under the pointer says where a drop would go, and Escape drops not
   await designer.page.mouse.up()
 
   await expect(designer.page.locator('[class*="is-drop-"]')).toHaveCount(0)
-  // A later, accepted drag, so the order above it is not read before the Escape could have dropped.
+  // A later, accepted drag, so the order is not read before a drop on release could be saved.
   await dragOnto(designer.page, designer.row('submit'), designer.row('heading'), 'top')
   await expect
     .poll(() => designer.rootChildren())
@@ -89,10 +87,8 @@ test('the row under the pointer says where a drop would go, and Escape drops not
 
 test('a container is not dropped into its own child', async ({ designer }) => {
   const before = await designer.rootChildren()
-  const from = await dragFrom(designer.row('name'))
-  const child = await stableBox(designer.row('firstName'))
 
-  await dragOver(designer, from, { x: child.x + 40, y: child.y + child.height - 3 })
+  await dragOver(designer.page, designer.row('name'), designer.row('firstName'), 'bottom')
   await expect(designer.page.locator('.fs-drag-label')).toBeVisible()
   await expect(designer.page.locator('[class*="is-drop-"]')).toHaveCount(0)
   await designer.page.mouse.up()

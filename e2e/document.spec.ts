@@ -157,7 +157,12 @@ test('the same document renders through either kit', async ({ designer }) => {
   await designer.page.locator('#pg-kit').selectOption('html')
 
   await expect(designer.node('email').locator('label').first()).toHaveText(/Work email/)
-  await expect.poll(() => designer.rootChildren()).toContain('email')
+  await expect
+    .poll(async () => {
+      const { root } = await designer.document()
+      return root.children?.find((child) => child.key === 'email')?.props['label']
+    })
+    .toEqual({ kind: 'static', value: 'Work email' })
 
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
   await expect(designer.page.locator('.fs-canvas__surface .MuiInputBase-root')).toHaveCount(0)
@@ -198,8 +203,8 @@ test('an edit survives switching the kit', async ({ designer }) => {
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Text field', exact: true }).click()
 
+  await expect.poll(() => designer.rootChildren()).toContain('textField')
   const before = await designer.rootChildren()
-  expect(before).toContain('textField')
 
   await designer.page.locator('#pg-kit').selectOption('html')
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()

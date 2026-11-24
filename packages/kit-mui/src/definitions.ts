@@ -454,7 +454,7 @@ export const muiKit: Kit = {
           label: 'Height',
           editor: 'number',
           section: 'style',
-          hint: 'Pixels. Zero keeps the image�s proportions; set a height to use Cover or Contain.',
+          hint: "Pixels. Zero keeps the image's proportions; set a height to use Cover or Contain.",
         },
       ],
       events: [],
