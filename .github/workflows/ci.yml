@@ -1,4 +1,3 @@
-# One job: the install dominates the runtime, so parallel jobs would pay for it repeatedly.
 name: CI
 
 on:
@@ -6,9 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# A newer push to a pull request replaces its run. Every `main` commit needs its own verdict, so each
+# gets its own group: a shared one queues them and cancels all but the newest one waiting.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Pull requests only: every `main` commit needs its own verdict.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -17,12 +17,11 @@ permissions:
 # Every action is pinned to a commit, because whoever owns the action can move a tag.
 # The comment after each pin names the version that commit was.
 
+# Two jobs of about the same length. Setting one up takes about 15 seconds.
 jobs:
   verify:
     runs-on: ubuntu-latest
-    # Long enough for a cold install plus the browser download, short enough
-    # that a hung step is a failed run rather than six hours of a runner.
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -48,19 +47,45 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Vitest leaves one CPU free by default, and the runner has two.
       - name: Test
-        run: pnpm test
+        run: pnpm test --maxWorkers=100%
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
 
-      # Only chromium, and only its own dependencies: the suite covers behaviour
-      # this project owns, not rendering differences between engines.
+      # A script rather than an inline block, so the check can be run locally.
+      - name: Check build output
+        run: node scripts/check-dist.mjs
+
+      # Only chromium: the suite covers behaviour this project owns, not rendering differences
+      # between engines. No `--with-deps`: the runner image has every library chromium needs, and
+      # the flag then only downloads fonts, from a mirror that has taken five minutes.
       - name: Install the browser
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --only-shell chromium
 
       - name: End-to-end
         run: pnpm e2e
+
+      # Builds the playground with `--mode dist`, which skips `aliases.ts`, so the
+      # packages and their two stylesheets resolve through the published exports.
+      - name: Production package smoke
+        run: pnpm e2e:dist
 
       - name: Keep the trace from a failed run
         if: failure()
@@ -71,12 +96,3 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
-
-      # Builds the playground with `--mode dist`, which skips `aliases.ts`, so the
-      # packages and their two stylesheets resolve through the published exports.
-      - name: Production package smoke
-        run: pnpm e2e:dist
-
-      # A script rather than an inline block, so the check can be run locally.
-      - name: Check build output
-        run: node scripts/check-dist.mjs

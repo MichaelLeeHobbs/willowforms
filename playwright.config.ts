@@ -10,35 +10,43 @@ const baseURL = 'http://localhost:' + String(PORT)
 
 export default defineConfig({
   testDir: './e2e',
-  // The first navigation includes Vite's cold compilation on a clean runner.
+  // Twice the default, for a machine that is also running something else.
   timeout: 60_000,
-  // Everything here shares one dev server, and several tests drag components
-  // around the same document, so they run in order rather than in parallel.
-  fullyParallel: false,
-  workers: 1,
+  // The server only serves files and the document lives in each test's own browser storage, so no
+  // test can see another. Two workers, because a CI runner has two CPUs.
+  fullyParallel: true,
+  workers: 2,
   forbidOnly: !!process.env['CI'],
-  // No retries: every check is deterministic for a build, so a flaky test is a bug to fix.
-  retries: 0,
+  // The second run exists to record a trace, which costs too much to record for every passing test.
+  // It never turns a failure into a pass: a flaky test is a bug to fix.
+  retries: 1,
+  failOnFlakyTests: true,
   reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
 
   use: {
     baseURL,
-    trace: 'retain-on-failure',
+    trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
   webServer: {
-    // `--strictPort` so a busy port fails loudly instead of starting somewhere
-    // else and leaving every test to time out against the wrong address.
-    command: 'pnpm --filter playground exec vite --port ' + String(PORT) + ' --strictPort',
+    /*
+     * A bundle and not the dev server, which sends every module separately to every test's empty
+     * browser cache. Unminified, so a custom property reads the way the stylesheet writes it.
+     *
+     * `--strictPort` so a busy port fails loudly instead of starting somewhere else and leaving
+     * every test to time out against the wrong address.
+     */
+    command: 'pnpm --filter playground run serve:e2e --port ' + String(PORT) + ' --strictPort',
     url: baseURL,
     /*
      * Never reuse: Playwright would skip the command when something already answers on the port,
      * and test another checkout's server instead of this one.
      */
     reuseExistingServer: false,
-    timeout: 60_000,
+    // Starting anything through pnpm can take 90 seconds on a cold Windows machine.
+    timeout: 180_000,
   },
 })
