@@ -67,7 +67,10 @@ for (const kit of ['mui', 'html']) {
       await page.addScriptTag({ content: axe.source })
       const violations = await form.evaluate(async (element) => {
         const result = await (window as typeof window & { axe: typeof axe }).axe.run(element, {
-          runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+          runOnly: {
+            type: 'tag',
+            values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+          },
         })
         return result.violations.map(({ id, nodes }) => ({
           id,

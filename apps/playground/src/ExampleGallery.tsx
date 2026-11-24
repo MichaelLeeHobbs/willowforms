@@ -105,7 +105,7 @@ export function ExampleGallery({
                 <button
                   type="button"
                   onClick={() => choose(example.id)}
-                  aria-label={'Open ' + example.title}
+                  aria-label={'Open example: ' + example.title}
                 >
                   Open example
                 </button>

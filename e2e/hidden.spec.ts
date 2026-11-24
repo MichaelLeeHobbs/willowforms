@@ -57,9 +57,7 @@ test('something can still be dropped into a hidden container', async ({ designer
   })
   await designer.page.mouse.up()
 
-  const doc = await designer.document()
-  const row = doc.root.children?.find((child) => child.key === 'name')
-  expect(row?.children?.map((child) => child.key)).toContain('textField')
+  await expect.poll(() => designer.childrenOf('name')).toContain('textField')
 })
 
 test('preview still hides it, because that is what a user sees', async ({ designer }) => {

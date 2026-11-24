@@ -133,7 +133,10 @@ test('new palettes keep header controls and the gallery accessible on a narrow s
       const headerViolations = await page.evaluate(async () =>
         (
           await axe.run('.pg-kit-switch', {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           })
         ).violations.map(({ id }) => id),
       )
@@ -142,7 +145,10 @@ test('new palettes keep header controls and the gallery accessible on a narrow s
       const galleryViolations = await page.evaluate(async () =>
         (
           await axe.run('.pg-gallery', {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           })
         ).violations.map(({ id }) => id),
       )
@@ -183,7 +189,10 @@ test('editing chrome distinguishes fields, selection, hover, and focus in both p
       const violations = await page.evaluate(async () =>
         (
           await axe.run('.fs-panel', {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           })
         ).violations.map(({ id }) => id),
       )

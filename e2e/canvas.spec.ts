@@ -90,15 +90,15 @@ test('dragging from the palette drops the component where the bar showed', async
     'top',
   )
 
-  const after = await designer.rootChildren()
-  expect(after.indexOf('checkbox')).toBe(before.indexOf('email'))
+  await expect
+    .poll(async () => (await designer.rootChildren()).indexOf('checkbox'))
+    .toBe(before.indexOf('email'))
 })
 
 test('dragging a component on the canvas moves it', async ({ designer }) => {
   await dragOnto(designer.page, designer.node('heading'), designer.node('submit'), 'bottom')
 
-  const after = await designer.rootChildren()
-  expect(after[after.length - 1]).toBe('heading')
+  await expect.poll(async () => (await designer.rootChildren()).at(-1)).toBe('heading')
 })
 
 test('dropping into a row container infers the horizontal axis', async ({ designer }) => {
@@ -116,16 +116,16 @@ test('dropping into a row container infers the horizontal axis', async ({ design
   })
   await designer.page.mouse.up()
 
-  const doc = await designer.document()
-  const stack = doc.root.children?.find((child) => child.key === 'name')
-  expect(stack?.children?.map((child) => child.key)).toEqual(['firstName', 'textField', 'lastName'])
+  await expect
+    .poll(() => designer.childrenOf('name'))
+    .toEqual(['firstName', 'textField', 'lastName'])
 })
 
 test('a plain click is still a click, not a swallowed drag', async ({ designer }) => {
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Checkbox', exact: true }).click()
 
-  expect(await designer.rootChildren()).toContain('checkbox')
+  await expect.poll(() => designer.rootChildren()).toContain('checkbox')
 })
 
 test('Escape abandons a drag without changing the document', async ({ designer }) => {
@@ -185,14 +185,17 @@ test('the toolbar is clickable, despite sitting on a frame that is not', async (
 
   await designer.page.getByRole('button', { name: 'Duplicate email' }).click()
 
-  const after = await designer.rootChildren()
-  expect(after.length).toBe(before.length + 1)
-  expect(after[after.indexOf('email') + 1]).toBe('email2')
+  const at = before.indexOf('email') + 1
+  await expect
+    .poll(() => designer.rootChildren())
+    .toEqual([...before.slice(0, at), 'email2', ...before.slice(at)])
 })
 
 test('add a sibling makes a fresh component, not a copy', async ({ designer }) => {
+  const before = await designer.rootChildren()
   await designer.node('email').click()
   await designer.page.getByRole('button', { name: 'Add a sibling after email' }).click()
+  await expect.poll(() => designer.rootChildren()).toHaveLength(before.length + 1)
 
   const doc = await designer.document()
   const children = doc.root.children ?? []
@@ -210,7 +213,7 @@ test('the toolbar removes the selected component', async ({ designer }) => {
   const toolbar = designer.page.locator('.fs-selection__toolbar')
   await toolbar.getByRole('button', { name: 'Remove website' }).click()
 
-  expect(await designer.rootChildren()).not.toContain('website')
+  await expect.poll(() => designer.rootChildren()).not.toContain('website')
 })
 
 test('a palette drag released off the canvas adds nothing', async ({ designer }) => {

@@ -74,7 +74,10 @@ for (const kit of ['html', 'mui']) {
         const result = await (window as typeof window & { axe: typeof axe }).axe.run(
           '[data-fs-key="root"]',
           {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           },
         )
         return result.violations.map(({ id, nodes }) => ({

@@ -4,8 +4,8 @@
 
 /**
  * Lives here, not in the designer package, because it pairs the designer with a
- * real kit and the designer may not import one. Rules needing layout are off
- * because jsdom has none; contrast is checked in `test/contrast.test.ts`.
+ * real kit and the designer may not import one. Contrast is checked in
+ * `test/contrast.test.ts`.
  */
 
 import { render, screen } from '@testing-library/react'
@@ -17,7 +17,13 @@ import { Designer } from '@willowforms/designer'
 import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
 import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
-const NEEDS_LAYOUT = ['color-contrast', 'target-size', 'scrollable-region-focusable']
+/** Rules that need what jsdom lacks: layout, or a canvas to measure text on. */
+const NEEDS_BROWSER = [
+  'color-contrast',
+  'target-size',
+  'scrollable-region-focusable',
+  'label-content-name-mismatch',
+]
 
 function makeDocument(): FormDocument {
   return {
@@ -81,20 +87,20 @@ function makeDocument(): FormDocument {
   }
 }
 
-interface Violation {
+interface Finding {
   id: string
   impact: string | null | undefined
   help: string
   nodes: string[]
 }
 
-async function audit(element: HTMLElement): Promise<Violation[]> {
+async function audit(element: HTMLElement): Promise<Finding[]> {
   // axe reports no violations for an empty subtree, so the checks below insist
   // something was there and some rule ran.
   const results = await axe.run(element, {
     // Best-practice rules are excluded so a failure always means a real barrier.
     runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
-    rules: Object.fromEntries(NEEDS_LAYOUT.map((id) => [id, { enabled: false }])),
+    rules: Object.fromEntries(NEEDS_BROWSER.map((id) => [id, { enabled: false }])),
   })
 
   if (element.querySelectorAll('*').length < 10) {
@@ -104,12 +110,17 @@ async function audit(element: HTMLElement): Promise<Violation[]> {
     throw new Error('axe applied no rule to this subtree')
   }
 
-  return results.violations.map((violation) => ({
-    id: violation.id,
-    impact: violation.impact,
-    help: violation.help,
-    nodes: violation.nodes.map((node) => node.html),
-  }))
+  const finding = (result: axe.Result, help: string): Finding => ({
+    id: result.id,
+    impact: result.impact,
+    help,
+    nodes: result.nodes.map((node) => node.html),
+  })
+  return [
+    ...results.violations.map((result) => finding(result, result.help)),
+    // Not a pass: axe could not tell, or its rule threw.
+    ...results.incomplete.map((result) => finding(result, 'undecided: ' + result.help)),
+  ]
 }
 
 function renderDesigner(kit = htmlKit, rendererKit = htmlRendererKit): HTMLElement {
@@ -151,6 +162,7 @@ describe('axe audit of the designer', () => {
     if (!row) throw new Error('no tree row')
     await user.click(row)
 
+    expect(screen.getByRole('textbox', { name: 'Key' })).toBeTruthy()
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -200,6 +212,7 @@ describe('axe audit of the designer', () => {
     await user.click(screen.getByRole('button', { name: 'Validate' }))
 
     // Validated, so every required field shows an error.
+    expect(container.querySelectorAll('[role="alert"]').length).toBeGreaterThan(0)
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -210,6 +223,8 @@ describe('axe audit of the designer', () => {
     await user.click(screen.getByRole('button', { name: /Hide Components and structure/ }))
     await user.click(screen.getByRole('button', { name: /Hide Component properties/ }))
 
+    expect(screen.getByRole('button', { name: /Show Components and structure/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Show Component properties/ })).toBeTruthy()
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -237,6 +252,8 @@ describe('axe audit of the designer', () => {
     await user.click(row)
     await user.selectOptions(screen.getByLabelText('Show when'), 'condition')
 
+    // The operator, which only the condition editor draws.
+    showing('-op')
     expect(await audit(container)).toEqual([])
   }, 20000)
 
@@ -261,6 +278,30 @@ describe('axe audit of the designer', () => {
     expect(dialog?.querySelector('[role="tabpanel"]')).not.toBeNull()
 
     expect(await audit(container)).toEqual([])
+  }, 20000)
+})
+
+describe('a rule axe could not decide', () => {
+  it('is reported rather than counted as clean', async () => {
+    const { container } = render(
+      <form>
+        {['One', 'Two', 'Three', 'Four', 'Five'].map((name) => (
+          <label key={name}>
+            {name}
+            <input />
+          </label>
+        ))}
+        {/* axe asks for a review when the described element is not on the page. */}
+        <button type="button" aria-describedby="nowhere">
+          Send
+        </button>
+      </form>,
+    )
+
+    const found = await audit(container)
+
+    expect(found.map((each) => each.id)).toEqual(['aria-valid-attr-value'])
+    expect(found[0]?.help).toMatch(/^undecided: /)
   }, 20000)
 })
 

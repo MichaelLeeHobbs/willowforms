@@ -157,7 +157,12 @@ test('the same document renders through either kit', async ({ designer }) => {
   await designer.page.locator('#pg-kit').selectOption('html')
 
   await expect(designer.node('email').locator('label').first()).toHaveText(/Work email/)
-  expect((await designer.document()).root.children?.some((c) => c.key === 'email')).toBe(true)
+  await expect
+    .poll(async () => {
+      const { root } = await designer.document()
+      return root.children?.find((child) => child.key === 'email')?.props['label']
+    })
+    .toEqual({ kind: 'static', value: 'Work email' })
 
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
   await expect(designer.page.locator('.fs-canvas__surface .MuiInputBase-root')).toHaveCount(0)
@@ -198,8 +203,8 @@ test('an edit survives switching the kit', async ({ designer }) => {
   await designer.openTab('Components')
   await designer.page.getByRole('button', { name: 'Text field', exact: true }).click()
 
+  await expect.poll(() => designer.rootChildren()).toContain('textField')
   const before = await designer.rootChildren()
-  expect(before).toContain('textField')
 
   await designer.page.locator('#pg-kit').selectOption('html')
   await expect(designer.page.locator('.fsh-screen')).toBeVisible()
@@ -225,20 +230,28 @@ test('focus stays inside the open dialog', async ({ designer }) => {
 
   // Cycle past the last control to check that background controls stay inert.
   const outside: string[] = []
+  const inside = new Set<string>()
   for (let i = 0; i < 15; i += 1) {
     await designer.page.keyboard.press('Tab')
 
     // Chromium reports body while focus passes through browser chrome.
-    const offender = await designer.page.evaluate(() => {
+    const landed = await designer.page.evaluate(() => {
       const active = document.activeElement
       if (!active || active === document.body) return null
-      return active.closest('dialog[aria-label="Form JSON"]') ? null : active.outerHTML.slice(0, 80)
+      return {
+        inside: active.closest('dialog[aria-label="Form JSON"]') !== null,
+        what: active.getAttribute('aria-label') ?? active.textContent ?? '',
+        html: active.outerHTML.slice(0, 80),
+      }
     })
 
-    if (offender) outside.push(offender)
+    if (landed?.inside) inside.add(landed.what.trim())
+    else if (landed) outside.push(landed.html)
   }
 
-  expect(outside).toEqual([])
+  expect(outside, 'focus reached a control behind the dialog').toEqual([])
+  // A dialog with nothing to focus also keeps focus off the page behind it.
+  expect([...inside]).toEqual(expect.arrayContaining(['Close', 'Apply', 'Copy', 'Revert']))
 })
 
 test('Escape closes the dialog and leaves the document alone', async ({ designer }) => {

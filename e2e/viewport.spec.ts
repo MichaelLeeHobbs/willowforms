@@ -12,10 +12,13 @@ test('desktop is the default and constrains nothing', async ({ designer }) => {
   expect((await box.evaluate((el) => el.style.width)) || '').toBe('')
 
   const frameBox = await box.boundingBox()
-  const surface = await designer.page.locator('.fs-canvas__surface').boundingBox()
-  if (!frameBox || !surface) throw new Error('nothing to measure')
-  // Inside the surface's padding, and not narrower than that.
-  expect(surface.width - frameBox.width).toBeLessThanOrEqual(64)
+  if (!frameBox) throw new Error('nothing to measure')
+  // `clientWidth` leaves out a scrollbar, so this is all the room the frame has.
+  const room = await designer.page.locator('.fs-canvas__surface').evaluate((element) => {
+    const style = getComputedStyle(element)
+    return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+  })
+  expect(Math.abs(frameBox.width - room)).toBeLessThanOrEqual(1)
 
   const pressed = designer.page.getByRole('button', { name: 'Desktop' })
   await expect(pressed).toHaveAttribute('aria-pressed', 'true')
@@ -71,16 +74,13 @@ test('a move still lands where the bar showed at mobile width', async ({ designe
   const before = await designer.rootChildren()
   await dragOnto(designer.page, designer.node('heading'), designer.node('submit'), 'bottom')
 
-  const after = await designer.rootChildren()
-  expect(after).toHaveLength(before.length)
-  expect(after[after.length - 1]).toBe('heading')
+  await expect
+    .poll(() => designer.rootChildren())
+    .toEqual([...before.filter((key) => key !== 'heading'), 'heading'])
 })
 
 test('a move at mobile width lands at the pointer rather than at the end', async ({ designer }) => {
-  /*
-   * The test above also passes if drops ignore the pointer and append. This asserts the
-   * neighbour rather than the index, so a growing fixture does not break it.
-   */
+  // The test above also passes if drops ignore the pointer and append.
   await designer.page.getByRole('button', { name: 'Mobile' }).click()
 
   const before = await designer.rootChildren()
@@ -88,8 +88,7 @@ test('a move at mobile width lands at the pointer rather than at the end', async
 
   await dragOnto(designer.page, designer.node('submit'), designer.node('email'), 'top')
 
-  const after = await designer.rootChildren()
-  expect(after).toHaveLength(before.length)
-  expect(after[after.indexOf('submit') + 1]).toBe('email')
-  expect(after[after.length - 1]).not.toBe('submit')
+  const moved = before.filter((key) => key !== 'submit')
+  moved.splice(moved.indexOf('email'), 0, 'submit')
+  await expect.poll(() => designer.rootChildren()).toEqual(moved)
 })
