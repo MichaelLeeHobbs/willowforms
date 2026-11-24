@@ -270,6 +270,8 @@ row and left at form scope reads nothing, hides its component, and takes it out 
 failure this project is organised against. `validateDocument` reports it, because unlike a missing
 context it is decidable from the tree alone.
 
+No scope reaches an outer row. Inside a nested repeater `row` is the innermost row and `form` is the top level, so an answer that only an outer row holds cannot be read from there. The nested repeater's own list is one of those answers. `validateDocument` reports the ref at either scope, in a condition and in a `matches` or `after` rule, and the message does not suggest the other scope because neither one reads the answer. A name the ref's scope does hold is accepted even when an outer row holds it too.
+
 ### What a host writes
 
 `onChange` reports an address. Outside a repeater it is the data key, byte for byte, so a host that never

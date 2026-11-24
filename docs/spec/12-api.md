@@ -303,10 +303,12 @@ string of JavaScript reads is the evaluator's business, and core does not parse 
 
 #### A row's own scope
 
-**Status: built.** A condition inside a repeater says which scope it means: `scope: 'row'` reads the
-enclosing row, and the absence of it reads the form, which is what every document written before rows
-existed already meant. `validateDocument` reports the three mismatches at boot, under the `row-scope`
-code, rather than letting a condition read nothing and quietly hide a component.
+**Status: built.** A condition inside a repeater says which scope it means: `scope: 'row'` reads the enclosing row, and the absence of it reads the form, which is what every document written before rows existed already meant. `validateDocument` reports the four mismatches at boot, under the `row-scope` code, rather than letting a condition read nothing and quietly hide a component:
+
+- a form-scoped ref to an answer the enclosing row holds and the form does not;
+- a row-scoped ref outside every repeater;
+- a row-scoped ref to an answer the form holds and the enclosing row does not;
+- a ref at either scope, in a nested repeater, to an answer that only an outer row holds.
 
 The check itself is `rowScopeProblems`, which is internal on purpose: a host has one boot-time gate to
 call and `validateDocument` runs this inside it. An earlier version of this page named that function as
