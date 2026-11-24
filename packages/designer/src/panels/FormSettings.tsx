@@ -29,7 +29,7 @@ function CodeActionEditor({
 }): ReactNode {
   const errorId = useId()
   const [params, setParams] = useState(() => paramsText(action.params))
-  const [paramsError, setParamsError] = useAnnouncement()
+  const [paramsError, setParamsError] = useState('')
 
   const commitParams = (): void => {
     try {
@@ -274,8 +274,8 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
             type="text"
             placeholder="fr"
             value={code}
-            // `role="alert"` announces once; the description lets a returning
-            // screen-reader user hear the refusal.
+            // `role="alert"` is read out when it appears; the description lets a
+            // returning screen-reader user hear the refusal.
             aria-invalid={error ? true : undefined}
             {...(error ? { 'aria-describedby': idBase + '-fs-language-error' } : {})}
 

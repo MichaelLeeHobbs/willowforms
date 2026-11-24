@@ -61,8 +61,12 @@ export function ImageSource({
         onChange={(event) => {
           request.current.version++
           setDraft(event.target.value)
+          setError('')
         }}
-        onBlur={commit}
+        // Not while an error shows: nothing has changed since, and it would be read out again.
+        onBlur={() => {
+          if (!error) commit()
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault()

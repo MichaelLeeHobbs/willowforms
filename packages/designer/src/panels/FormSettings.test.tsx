@@ -71,4 +71,14 @@ describe('an error in Settings', () => {
     expect(screen.getByRole('alert').textContent).not.toBe(first)
     expect(screen.getByRole('alert').textContent).toContain(first)
   })
+
+  it('stays as it is when an invalid field is left without an edit', () => {
+    open()
+    refuseParams()
+    const first = screen.getByRole('alert').textContent
+
+    fireEvent.blur(screen.getByLabelText('Default parameters'))
+
+    expect(screen.getByRole('alert').textContent).toBe(first)
+  })
 })

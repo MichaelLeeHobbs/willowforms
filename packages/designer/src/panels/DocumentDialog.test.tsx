@@ -490,10 +490,13 @@ describe('the JSON dialog', () => {
     await waitFor(() => expect(note()).toContain('refused clipboard access'))
   })
 
-  it('inserts the errors again when the same draft is refused again, so they are read out again', async () => {
+  it.each([
+    ['not JSON', 'not json'],
+    ['not a document', '{}'],
+  ])('inserts the errors again when a draft that is %s is refused again', async (_what, draft) => {
     const { user, open, editor } = setup()
     await open()
-    await replaceEditor(user, editor(), 'not json')
+    await replaceEditor(user, editor(), draft)
     const apply = screen.getByRole('button', { name: 'Apply' })
 
     await user.click(apply)
@@ -502,7 +505,23 @@ describe('the JSON dialog', () => {
     await user.click(apply)
     const second = screen.getByRole('alert')
     expect(second.textContent).toBe(first.textContent)
-    expect(second, 'the alert stayed on the page').not.toBe(first)
+    expect(second, 'the alert stayed on the page, so it is not read out again').not.toBe(first)
+  })
+
+  it('inserts the error again when a file is too large again', async () => {
+    const { user, open } = setup()
+    await open()
+    const huge = (): File => {
+      const file = asFile('huge.json', '{}')
+      Object.defineProperty(file, 'size', { value: 11 * 1024 * 1024 })
+      return file
+    }
+
+    await chooseFile(user, huge())
+    const first = screen.getByRole('alert')
+
+    await chooseFile(user, huge())
+    expect(screen.getByRole('alert')).not.toBe(first)
   })
 
   it('changes the note when the same copy is refused again, so it is read out again', async () => {
