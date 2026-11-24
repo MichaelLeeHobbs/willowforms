@@ -64,6 +64,12 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
   const [view, setView] = useState<View>('document')
   const [draft, setDraft] = useState(documentJson)
   const [errors, setErrors] = useState<string[]>([])
+  // Keys the alert, so errors that come back unchanged are inserted, and read out, again.
+  const [refusals, setRefusals] = useState(0)
+  const refuse = useCallback((messages: string[]) => {
+    setErrors(messages)
+    setRefusals((count) => count + 1)
+  }, [])
   const [note, setNote] = useAnnouncement()
   const fileRead = useRef({ version: 0 })
   useEffect(() => {
@@ -80,20 +86,20 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
     try {
       parsed = JSON.parse(draft)
     } catch (error) {
-      setErrors([error instanceof Error ? error.message : 'That is not valid JSON.'])
+      refuse([error instanceof Error ? error.message : 'That is not valid JSON.'])
       return
     }
 
     const loaded = loadDocument(parsed)
     if (!loaded.ok) {
-      setErrors(loaded.errors.map((error) => error.message))
+      refuse(loaded.errors.map((error) => error.message))
       return
     }
 
     setErrors([])
     onReplace(loaded.document)
     onClose()
-  }, [draft, onClose, onReplace, setNote])
+  }, [draft, onClose, onReplace, refuse, setNote])
 
   const copy = useCallback(
     (text: string, what: string) => {
@@ -128,7 +134,7 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
       const version = ++fileRead.current.version
       setNote('')
       if (file.size > MAX_IMPORT) {
-        setErrors([
+        refuse([
           'That file is too large. JSON files must be 10 MiB or smaller. Use linked images to reduce file size.',
         ])
         return
@@ -146,10 +152,10 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
         .catch(() => {
           if (version !== fileRead.current.version) return
           setNote('')
-          setErrors(['That file could not be read.'])
+          refuse(['That file could not be read.'])
         })
     },
-    [setNote],
+    [refuse, setNote],
   )
 
   const slug = slugify(doc.name)
@@ -185,7 +191,7 @@ function DialogBody({ document: doc, onClose, onReplace }: DialogBodyProps): Rea
             />
 
             {errors.length > 0 && (
-              <ul className="fs-dialog__errors" role="alert">
+              <ul key={refusals} className="fs-dialog__errors" role="alert">
                 {/* Position in the key: `validateDocument` can repeat a message. */}
                 {errors.map((message, index) => (
                   <li key={String(index) + ':' + message}>{message}</li>

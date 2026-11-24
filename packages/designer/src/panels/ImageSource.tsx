@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MAX_EMBEDDED_IMAGE_BYTES, safeImageSource } from '@willowforms/core'
 
+import { useAnnouncement } from '../announce.js'
+
 export function ImageSource({
   id,
   value,
@@ -13,7 +15,7 @@ export function ImageSource({
 }): ReactNode {
   const [draft, setDraft] = useState(value)
   const [seen, setSeen] = useState(value)
-  const [error, setError] = useState('')
+  const [error, setError] = useAnnouncement()
   const [failed, setFailed] = useState('')
   const request = useRef({ version: 0 })
   useEffect(() => {

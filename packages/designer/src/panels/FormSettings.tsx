@@ -9,6 +9,7 @@ import { languagesOf, nameOf } from '../language.js'
 import { indexKit, keyProblem, languageTag, prop } from '@willowforms/core'
 import type { CodeAction, JsonValue, Kit, Language } from '@willowforms/core'
 
+import { useAnnouncement } from '../announce.js'
 import type { DesignerApi } from '../store.js'
 import { paramsText } from './text.js'
 
@@ -26,8 +27,9 @@ function CodeActionEditor({
   onChange: (next: CodeAction) => void
   onRemove: () => void
 }): ReactNode {
+  const errorId = useId()
   const [params, setParams] = useState(() => paramsText(action.params))
-  const [paramsError, setParamsError] = useState('')
+  const [paramsError, setParamsError] = useAnnouncement()
 
   const commitParams = (): void => {
     try {
@@ -67,6 +69,7 @@ function CodeActionEditor({
           rows={4}
           value={params}
           aria-invalid={paramsError ? true : undefined}
+          {...(paramsError ? { 'aria-describedby': errorId } : {})}
           onChange={(event) => {
             setParams(event.target.value)
             setParamsError('')
@@ -74,7 +77,11 @@ function CodeActionEditor({
           onBlur={commitParams}
         />
       </label>
-      {paramsError && <p className="fs-languages__error">{paramsError}</p>}
+      {paramsError && (
+        <p id={errorId} className="fs-languages__error" role="alert">
+          {paramsError}
+        </p>
+      )}
     </li>
   )
 }
@@ -97,9 +104,9 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
   const languages = languagesOf(doc)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useAnnouncement()
   const [actionName, setActionName] = useState('')
-  const [actionError, setActionError] = useState('')
+  const [actionError, setActionError] = useAnnouncement()
   const actions =
     doc.actions && typeof doc.actions === 'object' && !Array.isArray(doc.actions) ? doc.actions : {}
 
@@ -340,6 +347,7 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
           placeholder="actionName"
           value={actionName}
           aria-invalid={actionError ? true : undefined}
+          {...(actionError ? { 'aria-describedby': idBase + '-fs-action-error' } : {})}
           onChange={(event) => {
             setActionName(event.target.value)
             setActionError('')
@@ -354,7 +362,11 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
           Add action
         </button>
       </div>
-      {actionError && <p className="fs-languages__error">{actionError}</p>}
+      {actionError && (
+        <p id={idBase + '-fs-action-error'} className="fs-languages__error" role="alert">
+          {actionError}
+        </p>
+      )}
     </div>
   )
 }

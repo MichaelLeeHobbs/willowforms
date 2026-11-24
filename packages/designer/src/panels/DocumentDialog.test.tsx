@@ -490,6 +490,21 @@ describe('the JSON dialog', () => {
     await waitFor(() => expect(note()).toContain('refused clipboard access'))
   })
 
+  it('inserts the errors again when the same draft is refused again, so they are read out again', async () => {
+    const { user, open, editor } = setup()
+    await open()
+    await replaceEditor(user, editor(), 'not json')
+    const apply = screen.getByRole('button', { name: 'Apply' })
+
+    await user.click(apply)
+    const first = screen.getByRole('alert')
+
+    await user.click(apply)
+    const second = screen.getByRole('alert')
+    expect(second.textContent).toBe(first.textContent)
+    expect(second, 'the alert stayed on the page').not.toBe(first)
+  })
+
   it('changes the note when the same copy is refused again, so it is read out again', async () => {
     const { user, open } = setup()
     const written = stubClipboardWrites(() => Promise.reject(new Error('denied')))
