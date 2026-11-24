@@ -121,6 +121,42 @@ test('keyboard resizing, canceled drags, and default reset keep selection and ac
   }
 })
 
+test('resizes that arrive within one frame each start from the width on screen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.goto('/')
+  const handle = page.getByRole('separator', { name: leftName })
+  const panel = page.locator('aside.fs-panel--left')
+  await expect(panel).toHaveCSS('width', '288px')
+  await expect(handle).toHaveAttribute('aria-valuenow', '288')
+
+  /*
+   * Yields only microtasks, which is where React commits. A ResizeObserver reports once per frame,
+   * so none of these events can see the width it would have measured for the one before.
+   */
+  await handle.evaluate(async (element) => {
+    for (let press = 0; press < 2; press++) {
+      element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      await Promise.resolve()
+    }
+    // A synthetic pointer is never active, and capturing one that is not active throws.
+    element.setPointerCapture = () => undefined
+    element.releasePointerCapture = () => undefined
+    for (const [type, clientX] of [
+      ['pointerdown', 100],
+      ['pointermove', 150],
+      ['pointerup', 150],
+    ] as const) {
+      element.dispatchEvent(new PointerEvent(type, { pointerId: 1, clientX, bubbles: true }))
+      await Promise.resolve()
+    }
+  })
+
+  // 288, two steps of 10, then a 50px drag.
+  await expect(panel).toHaveCSS('width', '358px')
+})
+
 for (const stored of ['not json', '{"left":-1,"right":1e999}', '{"left":"900px","right":null}']) {
   test(`invalid saved widths recover and resizing survives blocked storage: ${stored}`, async ({
     page,
