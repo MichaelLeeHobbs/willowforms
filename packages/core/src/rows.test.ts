@@ -11,6 +11,7 @@ import {
   keyScopesFor,
   pushRow,
   rowContext,
+  rowScopeProblems,
   rowsOf,
 } from './rows.js'
 import {
@@ -21,7 +22,7 @@ import {
   validateForm,
 } from './validation.js'
 import { createDocument } from './factory.js'
-import { MAX_TREE_DEPTH, findNode, validateDocument } from './tree.js'
+import { MAX_TREE_DEPTH, findNode, findParent, moveNode, validateDocument } from './tree.js'
 import type { ComponentNode, FormData, FormDocument, JsonValue } from './types.js'
 
 describe('the row coordinate', () => {
@@ -1063,6 +1064,241 @@ describe('the picker and validation agree that a top-level repeater is a form an
     expect(validateForm(document.root, { items: [{ items: '' }] })).toEqual({
       'items[0].targetField': DEFAULT_MESSAGES.required,
     })
+  })
+})
+
+describe('a ref from a nested row to an answer only an outer row holds', () => {
+  type Scope = 'form' | 'row'
+  type Target = Pick<ComponentNode, 'props' | 'renderWhen' | 'schema'>
+
+  const field = (key: string, dataKey: string, target: Partial<Target> = {}): ComponentNode => ({
+    key,
+    dataKey,
+    type: 'Field',
+    props: {},
+    schema: { type: 'string', validations: [] },
+    ...target,
+  })
+
+  const repeater = (key: string, dataKey: string, children: ComponentNode[]): ComponentNode => ({
+    key,
+    dataKey,
+    type: 'Repeater',
+    props: {},
+    schema: { type: 'array', validations: [] },
+    children,
+  })
+
+  const doc = (children: ComponentNode[]): FormDocument => ({
+    ...createDocument('Orders', 'orders-form'),
+    root: { key: 'root', type: 'Screen', props: {}, children },
+  })
+
+  /** `orders` rows hold `reference` and `lines`; `lines` rows hold `target`. */
+  const nested = (target: Partial<Target>, inLines: ComponentNode[] = []): ComponentNode =>
+    repeater('orderList', 'orders', [
+      field('referenceField', 'reference'),
+      repeater('lineList', 'lines', [...inLines, field('targetField', 'target', target)]),
+    ])
+
+  const truthy = (dataKey: string, scope: Scope) =>
+    ({
+      kind: 'condition',
+      condition: { op: 'truthy', value: { kind: 'ref', dataKey, scope } },
+    }) as const
+
+  const shown = (dataKey: string, scope: Scope): Partial<Target> => ({
+    renderWhen: truthy(dataKey, scope),
+  })
+
+  const carriers: [string, (dataKey: string, scope: Scope) => Partial<Target>][] = [
+    ['renderWhen', shown],
+    ['a property', (dataKey, scope) => ({ props: { disabled: truthy(dataKey, scope) } })],
+    [
+      'a rule guard',
+      (dataKey, scope) => ({
+        schema: {
+          type: 'string',
+          validations: [{ key: 'required', when: truthy(dataKey, scope) }],
+        },
+      }),
+    ],
+    [
+      'a matches rule',
+      (dataKey, scope) => ({
+        schema: { type: 'string', validations: [{ key: 'matches', field: dataKey, scope }] },
+      }),
+    ],
+    [
+      'an after rule',
+      (dataKey, scope) => ({
+        schema: { type: 'string', validations: [{ key: 'after', field: dataKey, scope }] },
+      }),
+    ],
+  ]
+
+  const scopes: Scope[] = ['form', 'row']
+
+  const reported = (document: FormDocument): [string, string | undefined][] =>
+    validateDocument(document).map((error) => [error.code, error.key])
+
+  describe.each(carriers)('in %s', (_what, target) => {
+    describe.each(scopes)('at %s scope', (scope) => {
+      it.each([
+        ['a field of the outer row', 'reference'],
+        ["the nested repeater's own list", 'lines'],
+      ])('is reported when it names %s', (_name, dataKey) => {
+        const document = doc([nested(target(dataKey, scope))])
+        const errors = validateDocument(document)
+
+        expect(errors.map((error) => [error.code, error.key])).toEqual([
+          ['row-scope', 'targetField'],
+        ])
+        expect(errors[0]?.message).toContain(dataKey + ', which only an outer row holds')
+        expect(errors[0]?.message).not.toMatch(/scope|read this row/)
+
+        // The picker refuses the same name, so the two still agree.
+        const offered = keyScopesFor(document.root, 'targetField')
+        expect(offered).toEqual({ form: ['orders'], row: ['target'] })
+      })
+
+      it('is accepted when the scope it names holds the key too', () => {
+        const copy = field('referenceCopy', 'reference')
+        const document =
+          scope === 'row'
+            ? doc([nested(target('reference', scope), [copy])])
+            : doc([copy, nested(target('reference', scope))])
+
+        expect(validateDocument(document)).toEqual([])
+      })
+
+      it('says nothing about a key no outer row holds', () => {
+        const cousin = repeater('noteList', 'notes', [field('bodyField', 'body')])
+        const order = nested(target('body', scope))
+
+        expect(
+          validateDocument(doc([{ ...order, children: [...(order.children ?? []), cousin] }])),
+        ).toEqual([])
+      })
+
+      it('reaches past more than one outer row', () => {
+        const three = (dataKey: string): FormDocument =>
+          doc([
+            repeater('orderList', 'orders', [
+              field('referenceField', 'reference'),
+              repeater('lineList', 'lines', [
+                field('skuField', 'sku'),
+                repeater('partList', 'parts', [
+                  field('targetField', 'target', target(dataKey, scope)),
+                ]),
+              ]),
+            ]),
+          ])
+
+        for (const dataKey of ['reference', 'lines', 'sku', 'parts']) {
+          expect(reported(three(dataKey)), dataKey).toEqual([['row-scope', 'targetField']])
+        }
+      })
+    })
+
+    it('still suggests the row when this row holds the key as well as an outer one', () => {
+      const errors = validateDocument(
+        doc([nested(target('reference', 'form'), [field('referenceCopy', 'reference')])]),
+      )
+
+      expect(errors.map((error) => [error.code, error.key])).toEqual([['row-scope', 'targetField']])
+      expect(errors[0]?.message).toMatch(/exists inside (a|this) row/)
+    })
+
+    it('still names the form when the form holds the key as well as an outer row', () => {
+      const errors = validateDocument(
+        doc([field('referenceCopy', 'reference'), nested(target('reference', 'row'))]),
+      )
+
+      expect(errors.map((error) => [error.code, error.key])).toEqual([['row-scope', 'targetField']])
+      expect(errors[0]?.message).toContain('only the form has that answer')
+    })
+  })
+
+  it('lets the nested repeater itself, and what follows it, read the outer row', () => {
+    const inLines = repeater('lineList', 'lines', [field('targetField', 'target')])
+    const document = doc([
+      repeater('orderList', 'orders', [
+        field('referenceField', 'reference'),
+        { ...inLines, ...shown('reference', 'row') },
+        field('afterField', 'after', shown('reference', 'row')),
+      ]),
+    ])
+
+    expect(validateDocument(document)).toEqual([])
+  })
+
+  it('reports a field whose working condition moved into the nested repeater', () => {
+    const before = doc([
+      repeater('orderList', 'orders', [
+        field('referenceField', 'reference'),
+        field('movedField', 'moved', {
+          ...shown('reference', 'row'),
+          schema: { type: 'string', validations: [{ key: 'required' }] },
+        }),
+        repeater('lineList', 'lines', [field('skuField', 'sku')]),
+      ]),
+    ])
+    const data: FormData = { orders: [{ reference: 'R1', lines: [{ sku: 'S1' }] }] }
+
+    expect(validateDocument(before)).toEqual([])
+    expect(validateForm(before.root, data)).toEqual({
+      'orders[0].movedField': DEFAULT_MESSAGES.required,
+    })
+
+    const after = { ...before, root: moveNode(before.root, 'movedField', 'lineList') }
+
+    expect(findParent(after.root, 'movedField')?.key).toBe('lineList')
+    // Hidden, so its required rule no longer runs.
+    expect(validateForm(after.root, data)).toEqual({})
+    expect(reported(after)).toEqual([['row-scope', 'movedField']])
+  })
+
+  // `validateDocument` catches a throw, so these two ask the check itself.
+  it('walks past a malformed component in a nested row', () => {
+    const broken = (part: Record<string, unknown>): ComponentNode => ({
+      ...field('brokenField', 'broken'),
+      ...part,
+    })
+
+    for (const part of [
+      { renderWhen: 5 },
+      { renderWhen: { kind: 'condition' } },
+      { renderWhen: { kind: 'condition', condition: { op: 'eq', left: null, right: 7 } } },
+      { props: 'disabled' },
+      { schema: { type: 'string', validations: [null, 3, { key: 'matches', field: 4 }] } },
+      { schema: { type: 'string', validations: [{ key: 'after', scope: 'row' }] } },
+      { children: [null, 'text', 4] },
+    ]) {
+      const { root } = doc([nested(shown('reference', 'row'), [broken(part)])])
+
+      const keys = rowScopeProblems(root).map((found) => found.key)
+      expect(keys, JSON.stringify(part)).toEqual(['targetField'])
+    }
+  })
+
+  it('walks repeaters nested to the depth bound, and no further', () => {
+    // The innermost field sits `levels + 1` below the root.
+    const chain = (levels: number): FormDocument => {
+      let inner = field('targetField', 'target', shown('reference', 'row'))
+      for (let i = levels; i > 0; i -= 1) {
+        const held = i === 1 ? [field('referenceField', 'reference'), inner] : [inner]
+        inner = repeater('list' + String(i), 'rows' + String(i), held)
+      }
+      return doc([inner])
+    }
+
+    const keys = (levels: number): string[] =>
+      rowScopeProblems(chain(levels).root).map((found) => found.key)
+
+    expect(keys(MAX_TREE_DEPTH - 1)).toEqual(['targetField'])
+    expect(keys(MAX_TREE_DEPTH)).toEqual([])
+    expect(keys(5000)).toEqual([])
   })
 })
 

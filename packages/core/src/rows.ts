@@ -199,8 +199,9 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
 }
 
 /**
- * Refs that read nothing because they name the wrong scope, reported at boot.
- * Evaluation cannot tell them from a ref to a key the form does not hold.
+ * Refs that read nothing because the scope they name does not hold the answer
+ * and another scope or an outer row does, reported at boot. Evaluation cannot
+ * tell them from a ref to a key the form does not hold.
  *
  * Total, like everything reachable from `validateDocument`: the document is
  * unchecked here, so anything unreadable contributes nothing and the structural
@@ -234,8 +235,29 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
     return refs
   }
 
-  const visit = (node: ComponentNode, enclosing: Set<string> | undefined, depth = 0): void => {
+  // Outermost first, like a `RowPath`.
+  const visit = (node: ComponentNode, rows: readonly Set<string>[], depth = 0): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
+    const enclosing = rows[rows.length - 1]
+
+    const onlyInOuterRow = (name: string): boolean =>
+      !formKeys.has(name) && !enclosing?.has(name) && rows.some((row) => row.has(name))
+
+    const reportOuterRow = (verb: string, name: string): void => {
+      problems.push({
+        key: node.key,
+        problem:
+          node.key +
+          ' ' +
+          verb +
+          ' ' +
+          name +
+          ', which only an outer row holds. Nothing inside a nested row can read an outer row, ' +
+          'so this reads nothing. Move the component into that row, or name an answer this row ' +
+          'or the form holds.',
+      })
+    }
+
     if (enclosing) {
       const props =
         node.props && typeof node.props === 'object' && !Array.isArray(node.props)
@@ -257,6 +279,8 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
                 ', which only exists inside a row. Set the test to read this row, ' +
                 'or it will read nothing and quietly hide the component.',
             })
+          } else if (onlyInOuterRow(ref)) {
+            reportOuterRow('tests', ref)
           }
         }
       }
@@ -275,6 +299,9 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
               rule.field +
               ', which only exists inside this row. Set the comparison scope to row.',
           })
+        } else if (onlyInOuterRow(rule.field)) {
+          // Both scopes end here, so the row-scope branch below leaves this out.
+          reportOuterRow('compares with', rule.field)
         }
       }
     }
@@ -336,6 +363,8 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
                 " as this row's answer, and only the form has that answer. " +
                 'That reads nothing, so the component is hidden and never validated.',
             })
+          } else if (onlyInOuterRow(ref)) {
+            reportOuterRow('tests', ref)
           }
         }
       }
@@ -361,10 +390,10 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
       }
     }
 
-    const scope = isRowScope(node) ? rowKeysOf(node) : enclosing
-    for (const child of childNodesOf(node)) visit(child, scope, depth + 1)
+    const inner = isRowScope(node) ? [...rows, rowKeysOf(node)] : rows
+    for (const child of childNodesOf(node)) visit(child, inner, depth + 1)
   }
-  visit(root, undefined)
+  visit(root, [])
 
   return problems
 }
