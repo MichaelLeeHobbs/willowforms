@@ -2,13 +2,22 @@
  * @vitest-environment jsdom
  */
 
-import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 import type { FormDocument, JsonSchema, Kit } from '@willowforms/core'
 import type { NodeRendererProps, RendererKit } from '@willowforms/renderer'
 
+import { stubClipboard, stubClipboardWrites } from '../../../../test/clipboard.js'
 import { Designer } from '../Designer.js'
 
 function Screen_({ nodeProps, children }: NodeRendererProps): ReactNode {
@@ -64,26 +73,6 @@ function makeDocument(): FormDocument {
     settings: {},
   }
 }
-
-beforeAll(() => {
-  /*
-   * jsdom implements neither. Typed as optional properties so assigning them is
-   * not an unbound method read. Focus trapping and the backdrop cannot be
-   * checked here.
-   */
-  const proto = HTMLDialogElement.prototype as {
-    showModal?: () => void
-    close?: () => void
-    open?: boolean
-  }
-  proto.showModal ??= function showModal(this: HTMLDialogElement): void {
-    this.open = true
-  }
-  proto.close ??= function close(this: HTMLDialogElement): void {
-    this.open = false
-    this.dispatchEvent(new Event('close'))
-  }
-})
 
 interface Harness {
   user: ReturnType<typeof userEvent.setup>
@@ -299,7 +288,7 @@ describe('the JSON dialog', () => {
         return pending.promise
       })
       expect(editor().value).toBe(operation === 'edit' ? '{"manual":true}' : original)
-      expect(within(screen.getByRole('dialog')).queryByRole('status')).toBeNull()
+      expect(within(screen.getByRole('dialog')).getByRole('status').textContent).toBe('')
     },
   )
 
@@ -487,95 +476,64 @@ describe('the JSON dialog', () => {
     )
   })
 
-  // A clipboard for one test, restored so later tests do not inherit it.
-  const clipboard = (
-    writeText: (text: string) => Promise<void>,
-  ): { calls: string[]; restore: () => void } => {
-    const calls: string[] = []
-    const before = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
-
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: {
-        writeText: (text: string) => {
-          calls.push(text)
-          return writeText(text)
-        },
-      },
-    })
-
-    return {
-      calls,
-      restore: () => {
-        if (before) Object.defineProperty(navigator, 'clipboard', before)
-        else delete (navigator as { clipboard?: unknown }).clipboard
-      },
-    }
-  }
+  // Scoped to the dialog: the designer shell has a live region of its own.
+  const note = (): string =>
+    within(screen.getByRole('dialog', { name: 'Form JSON' })).getByRole('status').textContent ?? ''
 
   it('says so when the clipboard is refused instead of appearing to work', async () => {
     const { user, open } = setup()
-    const denied = clipboard(() => Promise.reject(new Error('denied')))
+    stubClipboardWrites(() => Promise.reject(new Error('denied')))
 
-    try {
-      await open()
-      await user.click(screen.getByRole('button', { name: 'Copy' }))
+    await open()
+    await user.click(screen.getByRole('button', { name: 'Copy' }))
 
-      // Scoped to the dialog: the designer shell also has a live region with
-      // role="status", which is a different thing entirely.
-      const dialog = document.querySelector('dialog')
-      if (!dialog) throw new Error('no dialog')
-      expect(await within(dialog).findByRole('status')).toHaveProperty(
-        'textContent',
-        expect.stringContaining('refused clipboard access'),
-      )
-    } finally {
-      denied.restore()
-    }
+    await waitFor(() => expect(note()).toContain('refused clipboard access'))
+  })
+
+  it('changes the note when the same copy is refused again, so it is read out again', async () => {
+    const { user, open } = setup()
+    const written = stubClipboardWrites(() => Promise.reject(new Error('denied')))
+    await open()
+
+    await user.click(screen.getByRole('button', { name: 'Copy' }))
+    await waitFor(() => expect(note()).toContain('refused clipboard access'))
+    const first = note()
+
+    await user.click(screen.getByRole('button', { name: 'Copy' }))
+    await waitFor(() => expect(note()).not.toBe(first))
+    expect(note()).toContain('refused clipboard access')
+    expect(written).toHaveLength(2)
+  })
+
+  it('has its live region on the page before there is anything to say', async () => {
+    const { open } = setup()
+
+    await open()
+
+    expect(note()).toBe('')
   })
 
   it('copies the draft and says it did', async () => {
     const { user, open, editor } = setup()
-    const allowed = clipboard(() => Promise.resolve())
+    const written = stubClipboardWrites()
 
-    try {
-      await open()
-      const text = editor().value
-      await user.click(screen.getByRole('button', { name: 'Copy' }))
+    await open()
+    const text = editor().value
+    await user.click(screen.getByRole('button', { name: 'Copy' }))
 
-      expect(allowed.calls).toEqual([text])
-
-      const dialog = document.querySelector('dialog')
-      if (!dialog) throw new Error('no dialog')
-      expect(await within(dialog).findByRole('status')).toHaveProperty(
-        'textContent',
-        expect.stringContaining('copied to the clipboard'),
-      )
-    } finally {
-      allowed.restore()
-    }
+    expect(written).toEqual([text])
+    await waitFor(() => expect(note()).toContain('copied to the clipboard'))
   })
 
   it('says so when the browser offers no clipboard at all', async () => {
     // `navigator.clipboard` is undefined on an insecure origin, such as plain HTTP.
     const { user, open } = setup()
-    const before = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
-    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
+    stubClipboard(undefined)
 
-    try {
-      await open()
-      await user.click(screen.getByRole('button', { name: 'Copy' }))
+    await open()
+    await user.click(screen.getByRole('button', { name: 'Copy' }))
 
-      const dialog = document.querySelector('dialog')
-      if (!dialog) throw new Error('no dialog')
-      expect(await within(dialog).findByRole('status')).toHaveProperty(
-        'textContent',
-        expect.stringContaining('offers no clipboard'),
-      )
-    } finally {
-      if (before) Object.defineProperty(navigator, 'clipboard', before)
-      else delete (navigator as { clipboard?: unknown }).clipboard
-    }
+    await waitFor(() => expect(note()).toContain('offers no clipboard'))
   })
 })
 
