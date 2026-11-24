@@ -28,3 +28,8 @@ coverage/
 # leaves it behind -- so it needs ignoring too, or a crash dirties the tree.
 apps/demo-server/forms.json
 apps/demo-server/forms.json.tmp
+
+# Claude Code, per person or per machine. The rest of .claude is shared.
+.claude/worktrees/
+.claude/settings.local.json
+CLAUDE.local.md

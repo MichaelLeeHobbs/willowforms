@@ -1,0 +1,49 @@
+{"id":"D0001","name":"CSS declaration text","def":"Raw or parsed CSS style text, declaration lists, or declaration name/value pairs."}
+{"id":"D0002","name":"CSS property name","def":"A single CSS property identifier."}
+{"id":"D0003","name":"DOM element","def":"A DOM node or event target inspected for identity, containment or attributes."}
+{"id":"D0004","name":"HTTP request body","def":"The incoming request body or stream on the demo server, or the reason it was refused."}
+{"id":"D0005","name":"unknown JSON value","def":"A raw or parsed JSON value of unknown shape, to be checked or classified."}
+{"id":"D0006","name":"URL / link address","def":"A URL, link, image source or query-string parameter."}
+{"id":"D0007","name":"action reference","def":"A reference to a built-in or code action, its encoded form, or its parameters."}
+{"id":"D0008","name":"evaluation scope / context","def":"The ambient renderer or evaluation context, a dotted path into it, or a scope fragment."}
+{"id":"D0009","name":"data key / answer path","def":"A data key, storage name, row path or answer address identifying where an answer lives."}
+{"id":"D0010","name":"single answer value","def":"One answer or literal value entered into, or read from, a field."}
+{"id":"D0011","name":"form answers record","def":"The whole answers record, or answers for a repeated row, possibly with a tree to evaluate against."}
+{"id":"D0012","name":"prop value of unknown shape","def":"A component prop value to be coerced, normalised or set."}
+{"id":"D0013","name":"property / attribute name","def":"The name of a component property, attribute or parameter."}
+{"id":"D0014","name":"rectangle geometry","def":"Measured element rectangles, bands or points for hit testing and layout."}
+{"id":"D0015","name":"pointer event / position","def":"A pointer event or client coordinates, possibly with candidates to hit-test."}
+{"id":"D0016","name":"numeric value","def":"A number or numeric input to parse, bound or clamp."}
+{"id":"D0017","name":"condition operand","def":"One side of a comparison: an operand, its reference, kind or resolved readings."}
+{"id":"D0018","name":"condition tree","def":"A condition, expression or visibility rule, possibly with its operator, scope or depth."}
+{"id":"D0019","name":"component node","def":"A single component node or subtree, with optional parent, depth, scope or answers for traversal."}
+{"id":"D0020","name":"component node key","def":"A node key or set of taken keys, used for lookup, selection or unique-key generation."}
+{"id":"D0021","name":"component tree / form document","def":"A whole form document or component tree, optionally with a key or context to look up."}
+{"id":"D0022","name":"component type definition","def":"A component type, kit, palette entry, schema or default props describing what a component is."}
+{"id":"D0023","name":"free text entry","def":"Text typed, pasted or drafted by the user."}
+{"id":"D0024","name":"error / message text","def":"An error, fault, helper or validation message to show or report."}
+{"id":"D0025","name":"event handler wiring","def":"An event name, handler map or event wiring on a node."}
+{"id":"D0026","name":"validation rule","def":"A validation rule, its bounds, guard, message or the value it checks."}
+{"id":"D0027","name":"regex pattern","def":"A pattern source, optionally with the string to test against it."}
+{"id":"D0028","name":"drag and drop state","def":"Drag source, drop slot, pending drag or reorder direction in the designer."}
+{"id":"D0029","name":"document store / persistence","def":"Stored documents, store files, change callbacks and saved drafts."}
+{"id":"D0030","name":"edit history","def":"Undo history state or a document transform applied through it."}
+{"id":"D0031","name":"language / locale","def":"A language tag, language definition list or translation bundle."}
+{"id":"D0032","name":"label / help text","def":"Component label, description or help text, optionally with its key."}
+{"id":"D0033","name":"choice option","def":"An option or option list for a select, radio or similar choice field."}
+{"id":"D0034","name":"keyboard event","def":"A keyboard event to interpret as a command."}
+{"id":"D0035","name":"no input / signal","def":"No meaningful argument: a click, blur, scroll or resize signal, or no parameters."}
+{"id":"D0036","name":"designer pane size","def":"Designer panel, canvas or pixel widths and pane sides."}
+{"id":"D0037","name":"tree edit operation","def":"A tree plus key, target, parent, index or updater describing an immutable edit."}
+{"id":"D0038","name":"heading","def":"A heading tag name or heading props."}
+{"id":"D0039","name":"image settings","def":"Settings for a decorative image component."}
+{"id":"D0040","name":"grid layout","def":"A grid component, column count or grid track template."}
+{"id":"D0041","name":"unhandled union tag","def":"A discriminant value that should be unreachable, for exhaustiveness checks."}
+{"id":"D0042","name":"identifier / name","def":"An identifier or saved name for a form, tab, kit, palette, preset or example."}
+{"id":"D0043","name":"untrusted document input","def":"An imported, not-yet-validated document, condition or binding."}
+{"id":"D0044","name":"field data type","def":"A field's data type, optionally with an answer to check against it."}
+{"id":"D0045","name":"designer shell ref","def":"A designer API handle or shell element ref."}
+{"id":"D0046","name":"designer theme mode","def":"The designer chrome theme mode."}
+{"id":"D0047","name":"server lifecycle","def":"A server handle and its exit callback."}
+{"id":"D0048","name":"property binding","def":"A binding of a component property to data or a condition."}
+{"id":"D0049","name":"render surface / zone","def":"A rendering surface or zone, possibly with an element, key or resolver."}

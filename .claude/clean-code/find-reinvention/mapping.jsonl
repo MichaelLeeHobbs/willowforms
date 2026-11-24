@@ -1,0 +1,283 @@
+{"value":"CSS declaration values","domain":"D0001"}
+{"value":"CSS property name","domain":"D0002"}
+{"value":"CSS text","domain":"D0001"}
+{"value":"DOM node under pointer","domain":"D0003"}
+{"value":"HTTP request body","domain":"D0004"}
+{"value":"JSON value","domain":"D0005"}
+{"value":"JSON values","domain":"D0005"}
+{"value":"URL query parameter","domain":"D0006"}
+{"value":"action parameters","domain":"D0007"}
+{"value":"action reference list","domain":"D0007"}
+{"value":"ambient renderer state","domain":"D0008"}
+{"value":"answer address","domain":"D0009"}
+{"value":"answer storage name","domain":"D0009"}
+{"value":"answer type constraints","domain":"D0026"}
+{"value":"answer value","domain":"D0010"}
+{"value":"answers and scope","domain":"D0011"}
+{"value":"attribute key","domain":"D0013"}
+{"value":"bands and vertical position","domain":"D0014"}
+{"value":"body refusal reason","domain":"D0004"}
+{"value":"built-in action reference","domain":"D0007"}
+{"value":"candidate scope or reason","domain":"D0008"}
+{"value":"candidate value","domain":"D0010"}
+{"value":"candidates and pointer position","domain":"D0015"}
+{"value":"canvas size setting","domain":"D0036"}
+{"value":"child components and column count","domain":"D0040"}
+{"value":"child rectangles","domain":"D0014"}
+{"value":"children and pointer position","domain":"D0015"}
+{"value":"click or press signal","domain":"D0035"}
+{"value":"client coordinates","domain":"D0015"}
+{"value":"clipboard text","domain":"D0023"}
+{"value":"code action map","domain":"D0007"}
+{"value":"comparable values","domain":"D0017"}
+{"value":"comparison side","domain":"D0017"}
+{"value":"component and css","domain":"D0001"}
+{"value":"component and data key","domain":"D0009"}
+{"value":"component default props","domain":"D0022"}
+{"value":"component key","domain":"D0020"}
+{"value":"component key and property name","domain":"D0013"}
+{"value":"component kit","domain":"D0022"}
+{"value":"component node","domain":"D0019"}
+{"value":"component node and answers","domain":"D0019"}
+{"value":"component node and depth","domain":"D0019"}
+{"value":"component node and scope","domain":"D0019"}
+{"value":"component node definition","domain":"D0019"}
+{"value":"component node list","domain":"D0019"}
+{"value":"component node record","domain":"D0019"}
+{"value":"component node tree","domain":"D0021"}
+{"value":"component node value, path and depth","domain":"D0019"}
+{"value":"component property setting","domain":"D0012"}
+{"value":"component props label","domain":"D0032"}
+{"value":"component schema","domain":"D0022"}
+{"value":"component subtree","domain":"D0019"}
+{"value":"component tree","domain":"D0021"}
+{"value":"component tree and answers","domain":"D0011"}
+{"value":"component tree and child key","domain":"D0037"}
+{"value":"component tree and context","domain":"D0021"}
+{"value":"component tree and context path","domain":"D0021"}
+{"value":"component tree and data key","domain":"D0021"}
+{"value":"component tree and key","domain":"D0021"}
+{"value":"component tree root","domain":"D0021"}
+{"value":"component tree, answers and scopes","domain":"D0011"}
+{"value":"component tree, key and updater","domain":"D0037"}
+{"value":"component type and values","domain":"D0022"}
+{"value":"component type name","domain":"D0022"}
+{"value":"condition and operator","domain":"D0018"}
+{"value":"condition and scope","domain":"D0018"}
+{"value":"condition binding","domain":"D0018"}
+{"value":"condition operand","domain":"D0017"}
+{"value":"condition operand array","domain":"D0017"}
+{"value":"condition record","domain":"D0018"}
+{"value":"condition tree","domain":"D0018"}
+{"value":"condition tree and depth","domain":"D0018"}
+{"value":"context and dotted path","domain":"D0008"}
+{"value":"context path and value","domain":"D0008"}
+{"value":"coordinate text","domain":"D0015"}
+{"value":"css text","domain":"D0001"}
+{"value":"data key","domain":"D0009"}
+{"value":"data key and scope","domain":"D0009"}
+{"value":"data key list","domain":"D0009"}
+{"value":"data key lists","domain":"D0009"}
+{"value":"declaration pairs","domain":"D0001"}
+{"value":"declaration text","domain":"D0001"}
+{"value":"decorative image settings","domain":"D0039"}
+{"value":"designer api and shell ref","domain":"D0045"}
+{"value":"designer theme mode","domain":"D0046"}
+{"value":"document and node key","domain":"D0021"}
+{"value":"document and root","domain":"D0021"}
+{"value":"document name and id","domain":"D0029"}
+{"value":"document pair","domain":"D0029"}
+{"value":"document transform","domain":"D0030"}
+{"value":"draft text","domain":"D0023"}
+{"value":"drag identifier","domain":"D0028"}
+{"value":"drag source","domain":"D0028"}
+{"value":"drag source and press","domain":"D0028"}
+{"value":"dragged node key","domain":"D0028"}
+{"value":"dragged row key","domain":"D0028"}
+{"value":"drop commit callback","domain":"D0028"}
+{"value":"drop slot position","domain":"D0028"}
+{"value":"drop source and landing","domain":"D0028"}
+{"value":"edited choice list","domain":"D0033"}
+{"value":"element box","domain":"D0014"}
+{"value":"encoded reference","domain":"D0007"}
+{"value":"enumerated prop value","domain":"D0012"}
+{"value":"error message","domain":"D0024"}
+{"value":"error or helper text","domain":"D0024"}
+{"value":"event handler map","domain":"D0025"}
+{"value":"event name","domain":"D0025"}
+{"value":"event target","domain":"D0003"}
+{"value":"event wiring","domain":"D0025"}
+{"value":"example identifier","domain":"D0042"}
+{"value":"existing component key","domain":"D0020"}
+{"value":"expression and data","domain":"D0018"}
+{"value":"fault message","domain":"D0024"}
+{"value":"field component","domain":"D0019"}
+{"value":"field data type","domain":"D0044"}
+{"value":"field description","domain":"D0032"}
+{"value":"field key and scope","domain":"D0009"}
+{"value":"field layout props","domain":"D0019"}
+{"value":"field type and answer","domain":"D0044"}
+{"value":"field value","domain":"D0010"}
+{"value":"file content","domain":"D0029"}
+{"value":"flat rows and direction","domain":"D0028"}
+{"value":"flat rows and key","domain":"D0028"}
+{"value":"form answer","domain":"D0010"}
+{"value":"form answer data","domain":"D0010"}
+{"value":"form data and depth","domain":"D0011"}
+{"value":"form data and key","domain":"D0011"}
+{"value":"form data record","domain":"D0011"}
+{"value":"form data, address and value","domain":"D0011"}
+{"value":"form document","domain":"D0021"}
+{"value":"form document of unknown version","domain":"D0043"}
+{"value":"form document store","domain":"D0029"}
+{"value":"form entry","domain":"D0010"}
+{"value":"form metadata and children","domain":"D0021"}
+{"value":"form name","domain":"D0042"}
+{"value":"form tree and answers","domain":"D0011"}
+{"value":"grid component","domain":"D0040"}
+{"value":"grid track template","domain":"D0040"}
+{"value":"heading props","domain":"D0038"}
+{"value":"heading tag name","domain":"D0038"}
+{"value":"history state","domain":"D0030"}
+{"value":"image address","domain":"D0006"}
+{"value":"initial form document","domain":"D0021"}
+{"value":"key and label","domain":"D0032"}
+{"value":"keyboard event","domain":"D0034"}
+{"value":"kit identifier","domain":"D0042"}
+{"value":"label and bounds","domain":"D0026"}
+{"value":"label and help text","domain":"D0032"}
+{"value":"label and rules","domain":"D0026"}
+{"value":"label and validation rules","domain":"D0026"}
+{"value":"language bundles","domain":"D0031"}
+{"value":"language definition","domain":"D0031"}
+{"value":"language entry","domain":"D0031"}
+{"value":"language list","domain":"D0031"}
+{"value":"language list and tag","domain":"D0031"}
+{"value":"language name","domain":"D0031"}
+{"value":"link address","domain":"D0006"}
+{"value":"link string","domain":"D0006"}
+{"value":"list bound rules","domain":"D0026"}
+{"value":"list position","domain":"D0028"}
+{"value":"literal value","domain":"D0010"}
+{"value":"measured rectangle","domain":"D0014"}
+{"value":"measurement function","domain":"D0014"}
+{"value":"message text","domain":"D0024"}
+{"value":"move direction","domain":"D0028"}
+{"value":"name list","domain":"D0009"}
+{"value":"nested context fragment","domain":"D0008"}
+{"value":"new form value","domain":"D0010"}
+{"value":"no input","domain":"D0035"}
+{"value":"no parameters","domain":"D0035"}
+{"value":"node children","domain":"D0019"}
+{"value":"node event and action refs","domain":"D0007"}
+{"value":"node event handlers","domain":"D0025"}
+{"value":"node key","domain":"D0020"}
+{"value":"node key and scope","domain":"D0009"}
+{"value":"node list and key","domain":"D0037"}
+{"value":"node with parent and depth","domain":"D0019"}
+{"value":"node, scope and depth","domain":"D0019"}
+{"value":"node, trail and depth","domain":"D0019"}
+{"value":"numeric bound","domain":"D0016"}
+{"value":"numeric input field","domain":"D0016"}
+{"value":"operand","domain":"D0017"}
+{"value":"operand and kind","domain":"D0017"}
+{"value":"operand readings","domain":"D0017"}
+{"value":"operand record","domain":"D0017"}
+{"value":"operand reference","domain":"D0017"}
+{"value":"option entry","domain":"D0033"}
+{"value":"option list","domain":"D0033"}
+{"value":"palette component definition","domain":"D0022"}
+{"value":"pane side","domain":"D0036"}
+{"value":"panel and canvas widths","domain":"D0036"}
+{"value":"panel width","domain":"D0036"}
+{"value":"parameter name","domain":"D0013"}
+{"value":"parameter values","domain":"D0007"}
+{"value":"parent and child rectangles","domain":"D0014"}
+{"value":"parsed JSON value","domain":"D0005"}
+{"value":"partial field schema","domain":"D0022"}
+{"value":"pattern and input string","domain":"D0027"}
+{"value":"pattern source","domain":"D0027"}
+{"value":"pending drag","domain":"D0028"}
+{"value":"pixel length","domain":"D0036"}
+{"value":"pixel width","domain":"D0036"}
+{"value":"pointer cancel event","domain":"D0015"}
+{"value":"pointer coordinates and dragged key","domain":"D0015"}
+{"value":"pointer event","domain":"D0015"}
+{"value":"pointer height and tree rows","domain":"D0028"}
+{"value":"pointer move event","domain":"D0015"}
+{"value":"pointer position and candidates","domain":"D0015"}
+{"value":"pointer release position","domain":"D0015"}
+{"value":"pointer up event","domain":"D0015"}
+{"value":"preset identifier","domain":"D0042"}
+{"value":"preset recipe","domain":"D0022"}
+{"value":"prop value","domain":"D0012"}
+{"value":"property binding","domain":"D0048"}
+{"value":"property name","domain":"D0013"}
+{"value":"property schema","domain":"D0022"}
+{"value":"raw JSON value","domain":"D0005"}
+{"value":"rectangle and point","domain":"D0014"}
+{"value":"rectangle pair","domain":"D0014"}
+{"value":"repeated row answers","domain":"D0011"}
+{"value":"repeater component node","domain":"D0019"}
+{"value":"repeater value","domain":"D0011"}
+{"value":"request body stream","domain":"D0004"}
+{"value":"required flag","domain":"D0026"}
+{"value":"row path","domain":"D0009"}
+{"value":"row path and frame","domain":"D0028"}
+{"value":"row path and name","domain":"D0009"}
+{"value":"row template and help text","domain":"D0032"}
+{"value":"rule guard","domain":"D0026"}
+{"value":"rule guard binding","domain":"D0026"}
+{"value":"rule message setting","domain":"D0024"}
+{"value":"saved draft","domain":"D0029"}
+{"value":"saved selector key","domain":"D0042"}
+{"value":"schema property and validation rule","domain":"D0026"}
+{"value":"scope and data key","domain":"D0009"}
+{"value":"scroll or resize event","domain":"D0035"}
+{"value":"select option","domain":"D0033"}
+{"value":"selected and hovered keys","domain":"D0020"}
+{"value":"server and exit callback","domain":"D0047"}
+{"value":"shell element ref","domain":"D0045"}
+{"value":"slot among neighbours","domain":"D0028"}
+{"value":"store and form id","domain":"D0029"}
+{"value":"store change callback","domain":"D0029"}
+{"value":"store file","domain":"D0029"}
+{"value":"stored entry","domain":"D0029"}
+{"value":"stored form document","domain":"D0029"}
+{"value":"stored measurement","domain":"D0014"}
+{"value":"stored panel widths","domain":"D0036"}
+{"value":"style value string","domain":"D0001"}
+{"value":"submitted option text","domain":"D0023"}
+{"value":"surface and component tree","domain":"D0049"}
+{"value":"surface and element","domain":"D0049"}
+{"value":"surface and key","domain":"D0049"}
+{"value":"swallow-click flag","domain":"D0015"}
+{"value":"tab identifier","domain":"D0042"}
+{"value":"taken keys and base name","domain":"D0020"}
+{"value":"taken keys, base, start number","domain":"D0020"}
+{"value":"text and subject label","domain":"D0023"}
+{"value":"title and child components","domain":"D0019"}
+{"value":"translation bundle","domain":"D0031"}
+{"value":"translation text","domain":"D0031"}
+{"value":"tree and target key","domain":"D0037"}
+{"value":"tree node with position","domain":"D0019"}
+{"value":"tree, key, new parent and index","domain":"D0037"}
+{"value":"tree, parent key, new node and index","domain":"D0037"}
+{"value":"typed text","domain":"D0023"}
+{"value":"unhandled union tag","domain":"D0041"}
+{"value":"unknown rule value","domain":"D0026"}
+{"value":"untrusted condition object","domain":"D0043"}
+{"value":"untrusted document value","domain":"D0043"}
+{"value":"untrusted effect object","domain":"D0007"}
+{"value":"untrusted form document","domain":"D0043"}
+{"value":"untrusted property binding","domain":"D0043"}
+{"value":"validation key","domain":"D0026"}
+{"value":"validation messages by address","domain":"D0024"}
+{"value":"validation rule","domain":"D0026"}
+{"value":"value and allowed set","domain":"D0026"}
+{"value":"value of unknown shape","domain":"D0005"}
+{"value":"visibility binding","domain":"D0018"}
+{"value":"visibility condition","domain":"D0018"}
+{"value":"window blur signal","domain":"D0035"}
+{"value":"workshop form tree","domain":"D0021"}
+{"value":"zone name and resolver","domain":"D0049"}

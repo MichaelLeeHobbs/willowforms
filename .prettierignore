@@ -18,3 +18,6 @@ pnpm-lock.yaml
 # `docs/reports` -- which is exactly the drift the tests here exist to catch.
 docs/reviews
 docs/reports
+
+# Written by the clean-code skills; their re-runs replace these files.
+.claude/clean-code
