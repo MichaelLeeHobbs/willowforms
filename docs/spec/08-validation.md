@@ -159,6 +159,8 @@ everywhere -- on a server that injects nothing, in the designer, in a worker. A 
 boolean. A guard of a kind this code cannot read is treated as "has not said no", so the rule still
 applies: the other direction turns a required answer optional over a mistyped tag.
 
+Inside a repeater row, a `computed` guard reads the row's answers as well as the form's, like every other expression. See [07-bindings.md](07-bindings.md#computed).
+
 Guarded rules are the reason `toJsonSchema` reports lossiness — see
 [10-interchange.md](10-interchange.md).
 

@@ -15,7 +15,7 @@ import { RE2JS } from 're2js'
 
 import { evaluateCondition, same } from './condition.js'
 import { isEmpty, jsonToString, safeHref, valueOf } from './json.js'
-import { NO_ROWS, addressOf, pushRow, rowContext, rowsOf } from './rows.js'
+import { NO_ROWS, addressOf, expressionData, pushRow, rowContext, rowsOf } from './rows.js'
 import type { RowContext } from './rows.js'
 import {
   MAX_TREE_DEPTH,
@@ -235,7 +235,8 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
       if (!options.evaluate) return false
 
       try {
-        return Boolean(options.evaluate(when.expression, data, options.context))
+        const scoped = expressionData(data, options.row)
+        return Boolean(options.evaluate(when.expression, scoped, options.context))
       } catch {
         return true
       }
@@ -292,7 +293,7 @@ export function applyRule(
     }
     if (message.kind === 'computed' && options.evaluate) {
       try {
-        const scoped = options.row ? { ...data, ...options.row.values } : data
+        const scoped = expressionData(data, options.row)
         const resolved = options.evaluate(message.expression, scoped, options.context)
         return typeof resolved === 'string' && resolved ? resolved : fallback
       } catch {
@@ -372,7 +373,7 @@ export function applyRule(
        * rule would make core unusable without a sandbox.
        */
       try {
-        const scoped = options.row ? { ...data, ...options.row.values } : data
+        const scoped = expressionData(data, options.row)
         return options.evaluate(rule.expression, scoped, options.context) ? undefined : fail()
       } catch {
         return fail()

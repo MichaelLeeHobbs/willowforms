@@ -61,6 +61,8 @@ The expression is a string. WillowForms does not evaluate it: the host injects a
 sandbox. With none injected the property resolves to `null` and the component still renders. See
 [09-actions.md](09-actions.md) for why that boundary exists and what a host must supply.
 
+Inside a repeater row, every expression receives the form's answers with the enclosing row's answers over them, so a row answer hides a form answer of the same name. This holds for a property, `renderWhen`, a rule's `when` guard, a `custom` rule and a computed message. In a nested repeater, only the innermost row is added.
+
 The panel says so next to the editor, because a binding that silently produces nothing is otherwise
 indistinguishable from one that is wrong.
 
