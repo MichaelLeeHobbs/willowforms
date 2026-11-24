@@ -1,16 +1,9 @@
 /**
- * Editors for the two non-static property bindings.
+ * The binding mode picker, and the expression and translation editors.
  *
- * `PropValue` is a tagged union, so a property is static text, a computed
- * expression, or a translation key, and never some blend of the three. The
- * panel mirrors that: one control picks the mode, and the editor below it
- * belongs to whichever mode is chosen. Before this existed, computed and i18n
- * bindings rendered correctly but could only be authored by editing the
- * document JSON by hand.
- *
- * Which modes a property offers comes from its `PropSchema`. `computable: false`
- * means an expression makes no sense there, and `localizable` is set on
- * user-facing copy, so a colour or a gap never offers a translation key.
+ * Which modes a property offers comes from its `PropSchema`: `computable: false` rules
+ * out an expression, `localizable` allows a translation key, and `conditional` allows a
+ * condition.
  */
 
 import { useState } from 'react'

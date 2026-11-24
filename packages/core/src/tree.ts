@@ -1022,11 +1022,8 @@ function inspectDocument(doc: unknown): StructuralError[] {
           )
           continue
         }
-        /*
-         * Only a `code` reference names something on the document. A `builtin`
-         * names something the host supplies, which core deliberately knows
-         * nothing about.
-         */
+        // Only a `code` reference names something on the document. A `builtin` is one
+        // of core's own names.
         if (ref['type'] === 'builtin') {
           if (!BUILTIN_ACTIONS.has(name)) {
             malformed('Component ' + key + ' references unknown built-in action ' + name + '.')

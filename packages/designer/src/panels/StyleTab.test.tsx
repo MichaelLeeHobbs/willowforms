@@ -442,19 +442,9 @@ describe('a style property bound to a condition inside a row', () => {
 
 describe('a brace typed into a structured control', () => {
   /*
-   * Every refusal test in this file types into the RAW CSS box, and nothing
-   * ever typed a brace into a structured control -- so `StyleTab.tsx:143-145`
-   * was untested here and in `e2e/style.spec.ts`, which also only fills the raw
-   * box.
-   *
-   * Delete the `safeDeclarations` check and both suites stayed green while the
-   * defect its own comment records returns: "a brace typed into the Radius
-   * field was stored, the renderer then dropped the whole block, and the
-   * component lost every other declaration on that layer with nothing on screen
-   * explaining why".
-   *
-   * The file has a Radius test and three brace tests. The one combination that
-   * matters is the one that was missing.
+   * The other brace tests type into the raw CSS box. Without the structured control's
+   * own `safeDeclarations` check, a brace would be stored and the renderer would drop
+   * the component's whole block.
    */
   it('is refused rather than written', async () => {
     const harness = setup(field())

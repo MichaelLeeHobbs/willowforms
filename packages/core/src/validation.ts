@@ -1,14 +1,14 @@
 /**
  * Rule evaluation.
  *
- * Pure and dependency-free, so the same rules run in the browser during preview
- * and in Node on the server. That symmetry is the point: a form's validation
- * should not be reimplemented on the backend and drift.
+ * Pure, so the same rules run in the browser during preview and in Node on the server.
+ * That symmetry is the point: a form's validation should not be reimplemented on the
+ * backend and drift.
  *
- * Expression-backed rules ('custom', and any rule with a `when` guard) need a JS
- * evaluator, which core deliberately does not provide. The host injects one. With
- * no evaluator, guarded rules are skipped and 'custom' rules pass, so a missing
- * sandbox degrades to permissive rather than throwing.
+ * `custom` rules and `computed` guards need a JS evaluator, which core deliberately
+ * does not provide. The host injects one. With no evaluator, a rule with a computed
+ * guard is skipped and `custom` rules pass, so a missing sandbox degrades to permissive
+ * rather than throwing.
  */
 
 import { RE2JS } from 're2js'
@@ -350,11 +350,8 @@ export function applyRule(
     }
     case 'pattern':
       /*
-       * A pattern with no pattern fails rather than throwing. A document is
-       * data, so `{ key: 'pattern' }` with no `value` reaches here from a paste,
-       * and `nestedUnbounded(undefined)` reads `.length` off it -- out of
-       * `validateForm`, which is a 500 on submit. The same answer a pattern this
-       * refuses to run already gets: what cannot be checked has not been
+       * A document is data, so a pattern rule with no `value` can reach here. It fails,
+       * as a pattern this refuses to run does: what cannot be checked has not been
        * satisfied.
        */
       if (typeof rule.value !== 'string') return fail()

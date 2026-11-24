@@ -1,6 +1,5 @@
 /**
- * - `unavailable`: no clipboard API, as outside a secure context or in some
- *   embedded webviews.
+ * - `unavailable`: no clipboard API, as outside a secure context.
  * - `refused`: the API exists but the write failed, usually a denied permission.
  */
 export type CopyOutcome = 'copied' | 'unavailable' | 'refused'

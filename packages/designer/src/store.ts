@@ -131,9 +131,9 @@ export interface DesignerApi {
   /**
    * Rename the value this component submits, without touching its identity.
    *
-   * An empty string, or one matching the component's own key, removes the
-   * override rather than storing a redundant copy of the key. Data keys are
-   * allowed to collide, so nothing is refused here.
+   * An empty string, or one matching the component's own key, removes the override
+   * rather than storing a redundant copy of the key. Data keys are allowed to collide;
+   * one that breaks the key grammar is refused.
    */
   setDataKey: (key: string, dataKey: string) => RenameResult
   /**
@@ -144,7 +144,7 @@ export interface DesignerApi {
    * same as setting it to false: absent means always shown.
    */
   setRenderWhen: (key: string, value: PropValue | undefined) => void
-  /** Replace the selected component's event wiring. */
+  /** Replace a component's event wiring. */
   setNodeEvents: (key: string, events: ComponentNode['events']) => void
   /** Replace the document's reusable code actions. */
   setCodeActions: (actions: Record<string, CodeAction>) => void
@@ -171,10 +171,9 @@ export interface DesignerApi {
 }
 
 /**
- * The nearest node at or above `key` that can hold children. `insertNode` would
- * give a leaf children no renderer draws, and refusing would make the palette
- * click a dead control. A container is the node with a `children` array, so no
- * kit is needed.
+ * The nearest node at or above `key` that can hold children. `insertNode` refuses a
+ * leaf, which would make the palette click a dead control. A container is the node with
+ * a `children` array, so no kit is needed.
  */
 function containerFor(root: ComponentNode, key: string | undefined): string {
   if (key === undefined) return root.key
@@ -303,19 +302,6 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     chosenKey !== undefined && findNode(document.root, chosenKey) ? chosenKey : undefined
 
   /*
-   * The current document, readable from a handler without putting it in a
-   * dependency array.
-   *
-   * A state updater has to be pure — React is free to call it twice — so a
-   * handler that must *decide* something before it writes cannot decide it in
-   * there. `addComponent` is the case: where a component lands depends on the
-   * tree, and so does whether anything landed at all.
-   *
-   * A ref rather than the render closure, which is what `duplicateComponent`
-   * reads and is a render behind whenever two edits land in one tick. Written in
-   * an effect rather than during render, for the reason `drag.ts` gives.
-   */
-  /*
    * A host's document skips the `validateDocument` gate pasted JSON passes, so
    * it is checked once per mount. A warning, not a refusal: the designer is
    * where somebody repairs a broken document.
@@ -331,6 +317,8 @@ export function useDesigner(initial: FormDocument): DesignerApi {
     )
   }, [])
 
+  // A ref, so a writer can decide against the current document before it commits: the
+  // render closure is a render behind when two edits land in one tick.
   const latest = useRef(history.present)
   useEffect(() => {
     latest.current = history.present

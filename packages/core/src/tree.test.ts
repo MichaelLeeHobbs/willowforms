@@ -500,13 +500,8 @@ describe('structural sharing', () => {
   })
 
   it('refuses to move a node into a leaf', () => {
-    /*
-     * `insertNode` will give a leaf a `children` array, which produces a subtree
-     * no renderer draws while `validateForm` and `toJsonSchema` keep walking it
-     * -- a required field nobody can fill in. The designer's drop paths refused
-     * this and the API did not, which is the worse of the two places to leave a
-     * hole.
-     */
+    // No renderer draws a subtree under a leaf, but `validateForm` and `toJsonSchema`
+    // walk it: a required field nobody can fill in.
     const before = tree()
     expect(moveNode(before, 'b', 'a'), 'a leaf is not a parent').toBe(before)
   })

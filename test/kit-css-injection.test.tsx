@@ -23,7 +23,7 @@ import { muiKit, muiRendererKit } from '@willowforms/kit-mui'
 
 const INJECTION = 'red}html{display:none}.x{'
 
-/** Fetches from an inline style and from an emotion class alike. */
+/** A value that makes the browser fetch. */
 const EXFILTRATION = 'url(https://evil.example/p.png)'
 
 function documentOf(root: ComponentNode): FormDocument {

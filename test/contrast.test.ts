@@ -34,8 +34,8 @@ function palettes(css: string, base: string, chosenDark: string, systemDark: str
   const chosen = tokensFrom(css, chosenDark)
   const system = tokensFrom(css, systemDark)
 
-  // Selectors are matched exactly, so a typo in one would silently produce an
-  // empty override set and check the light palette again under another name.
+  // A block that declares no tokens would check the light palette again under another
+  // name.
   for (const [selector, tokens] of [
     [base, light],
     [chosenDark, chosen],

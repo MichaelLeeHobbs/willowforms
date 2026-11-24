@@ -12,9 +12,8 @@ import { measureIn, nodeElement } from '../geometry.js'
 import type { Rect } from '../geometry.js'
 
 /**
- * A node hidden by `renderWhen` is absent from the DOM, which is the only way a
- * selectable node currently goes invisible. If per-node CSS ever lands, a
- * `display: none` node would measure zero here and want a visibility check.
+ * Undefined when the node has no element, as when its kit drops `nodeProps`. A node
+ * styled `display: none` measures zero.
  */
 function measure(surface: HTMLElement, key: string | undefined, row?: string): Rect | undefined {
   if (!key) return undefined

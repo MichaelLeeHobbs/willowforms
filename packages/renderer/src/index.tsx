@@ -656,10 +656,10 @@ export interface FormRendererProps {
   /**
    * The CSP nonce for the stylesheet this renders.
    *
-   * Per-component styling is one `<style>` element, and a host serving
-   * `style-src 'self'` drops it -- with no error, because a blocked style is not
-   * one. The form then renders with every authored style missing and nothing
-   * says why. Pass the same nonce the response header carries.
+   * Per-component styling is one `<style>` element, which a `style-src` of `'self'`
+   * blocks. The form then renders with every authored style missing, and the only
+   * report is a CSP violation in the browser console: `onError` does not see it. Pass
+   * the same nonce the response header carries.
    */
   nonce?: string
   /**

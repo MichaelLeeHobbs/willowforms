@@ -111,7 +111,7 @@ test('the inspector tabs are reachable and navigable by keyboard', async ({ desi
     'true',
   )
 
-  // Three tabs: Properties, Style, Rules. End lands on the last.
+  // End lands on the last tab.
   await designer.page.keyboard.press('End')
   await expect(designer.page.getByRole('tab', { name: 'Rules' })).toBeFocused()
 })

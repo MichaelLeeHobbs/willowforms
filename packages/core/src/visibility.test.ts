@@ -271,13 +271,8 @@ describe('a renderWhen this code cannot read', () => {
 })
 
 /**
- * A host's evaluator is arbitrary JavaScript, and it can throw.
- *
- * `matchesPattern` two files over catches for exactly this, and its comment
- * records the incident: an uncaught throw "took Preview down in the browser and
- * surfaced as an unhandled 500 on the server". This called `options.evaluate`
- * with nothing around it, so an author's half-written expression did the same
- * thing from a different place.
+ * A host's evaluator is arbitrary JavaScript, and an author's half-written expression
+ * throws.
  */
 describe('an evaluator that throws', () => {
   const boom: Evaluator = () => {

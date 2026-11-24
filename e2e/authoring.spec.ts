@@ -74,7 +74,7 @@ test('a rule authored in the panel fails a real submit with its own message', as
 })
 
 test('a field hidden by a condition does not fail the submit', async ({ designer }) => {
-  // Authored through the JSON editor, since there is no visibility UI yet.
+  // Through the JSON dialog, which can set the visibility and the rule in one step.
   await designer.page.getByRole('button', { name: 'JSON' }).click()
   const editor = designer.page.getByLabel('Form document JSON')
   const doc = JSON.parse(await editor.inputValue()) as {
@@ -113,7 +113,6 @@ test('a translated label reaches the canvas', async ({ designer }) => {
 
 test('adding a language leaves the document valid', async ({ designer }) => {
   await designer.openTab('Settings')
-  // Scoped by id: "Name" and "Code" both appear in more than one panel.
   await designer.page.getByLabel('Code', { exact: true }).fill('fr')
   await designer.page.getByRole('textbox', { name: 'Name', exact: true }).fill('French')
   await designer.page.getByRole('button', { name: 'Add language' }).click()

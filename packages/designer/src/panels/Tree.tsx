@@ -212,8 +212,8 @@ export function Tree({
 
       if ((event.key === 'Delete' || event.key === 'Backspace') && node.key !== root.key) {
         event.preventDefault()
-        // The shell also handles Delete on the window; without this one keypress
-        // removes the component twice.
+        // The shell also handles Delete; without this one keypress removes the
+        // component twice.
         event.stopPropagation()
         /*
          * Focus moves to the next row outside the removed subtree, or the
@@ -230,11 +230,6 @@ export function Tree({
         if (after) focusRowSoon(after.node.key)
       }
     },
-    /*
-     * `rows` and `defs` rather than `root` and `kit`: the memos above are
-     * derived from exactly those, so listing the derived values keeps this
-     * callback stable for the same inputs and lets the rule check it honestly.
-     */
     [announce, defs, focusRow, focusRowSoon, onDuplicate, onMove, onRemove, onSelect, root, rows],
   )
 

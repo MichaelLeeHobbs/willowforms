@@ -527,7 +527,7 @@ function Toolbar({
 }
 
 /**
- * Global shortcuts. Ignored while focus is in a text field, so typing "z" in a
+ * The shell's shortcuts. Ignored while focus is in a text field, so typing "z" in a
  * label does not undo the document.
  */
 function useKeyboardShortcuts(

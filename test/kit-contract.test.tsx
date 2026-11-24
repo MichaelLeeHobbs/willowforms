@@ -449,8 +449,8 @@ describe('what a data-bound control has to say about itself', () => {
   }
 
   /**
-   * ARIA widget roles too, because a kit need not use a native element. Every
-   * role listed supports `aria-invalid` and `aria-required`.
+   * ARIA widget roles too, because a kit need not use a native element. Every role
+   * listed supports `aria-invalid`, and all but `slider` support `aria-required`.
    */
   const WIDGET =
     'input, select, textarea, [role="combobox"], [role="textbox"], [role="listbox"],' +
@@ -672,12 +672,9 @@ describe('a data-bound control hands back what the person entered', () => {
 })
 
 /**
- * A value a host seeded, shown in the control that holds it.
- *
- * `str(value)` answers `''` for anything that is not a string, so a host
- * restoring `{age: 30}` saw an empty field whose data was not empty: `required`
- * passed, the field looked unanswered, and the first keystroke overwrote an
- * answer nobody had seen. `jsonToString` is what the rest of each kit uses.
+ * A value a host seeded, shown in the control that holds it. Drawn as empty, a number
+ * would pass `required` while looking unanswered, and the first keystroke would
+ * overwrite it.
  */
 describe('a control holding a value that is not a string', () => {
   const holding = (type: string, dataType: string): ComponentNode => ({
@@ -833,12 +830,8 @@ describe('a document value a kit puts somewhere structural', () => {
   })
 
   it.each(KITS)('$name falls back when a text prop is cleared to empty', ({ renderers }) => {
-    /*
-     * `str(v, fallback)` returns `''` when the value *is* `''`, so every "safe
-     * default" was bypassed by an emptied field — a button with no text, a link
-     * with no text, a label with nothing in it. Clearing a label in the panel is
-     * the most natural way to try to remove it.
-     */
+    // Clearing a label in the panel is the most natural way to try to remove it, and a
+    // control with no text has no name.
     const element = draw(renderers, nodeWith('Button', { text: '' }))
 
     expect(element.textContent?.trim()).not.toBe('')
@@ -925,14 +918,8 @@ function chosenText(container: HTMLElement): string {
 }
 
 /**
- * A numeric option value survives being chosen.
- *
- * `str()` answers `''` for a number, so a select whose stored answer was `2`
- * rendered as nothing selected: the user picks an option, the data holds it,
- * the control shows blank, and the choice can never be made to stick.
- * `optionValue` in core exists so a numeric value survives the round trip, and
- * this was the one end that dropped it — the radio group in the same kit
- * already had it right, which is how one control drifts from its neighbour.
+ * A numeric option value survives being chosen. Drawn as nothing selected, the data
+ * would hold the choice while the control showed blank.
  */
 describe('a select holding a number', () => {
   function numeric(): ComponentNode {
@@ -1000,8 +987,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
   }
 
   it('puts a radio group role on the element carrying its group state', () => {
-    // A `<fieldset>` maps to `group`, which supports neither `aria-invalid` nor
-    // `aria-required`.
+    // A `<fieldset>` maps to `group`, which does not support `aria-required`.
     const element = drawn({
       key: 'target',
       type: 'RadioGroup',
@@ -1388,8 +1374,7 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
         const node = made(def, { key: 'r', type: 'r', props: {} })
         node.key = 'field'
 
-        // No error yet: a description attached only when it changes is announced
-        // twice or not at all, depending on the screen reader.
+        // No error yet: the description has to be attached before its text changes.
         const { container: dom } = render(
           <FormUnderTest
             document={documentOf(node)}
@@ -1495,17 +1480,8 @@ describe.each(KITS)('$name', ({ kit, renderers }) => {
 })
 
 describe('a default copied between kits', () => {
-  /*
-   * There is no general rule here to check: MUI's `gap` is a spacing-scale
-   * multiplier and the HTML kit's is pixels, so 16 is right in one and 128
-   * pixels in the other, and MUI's `Grid` legitimately uses pixels because its
-   * renderer converts them.
-   *
-   * What is checkable is narrower and is the mistake that actually happened.
-   * `Step` renders as a `Stack` in both kits — same element, same pass-through
-   * of `gap` — so the two must agree within a kit. `Step` arrived carrying the
-   * HTML kit's 16 into MUI, where it is 128 pixels.
-   */
+  // `Step` renders as a `Stack` in both kits, with the same pass-through of `gap`, so
+  // the two defaults must agree within a kit.
   it.each(KITS)('$name gives Step the same gap as the Stack it renders as', ({ kit }) => {
     const gapOf = (type: string): unknown =>
       kit.components.find((def) => def.type === type)?.defaultProps['gap']

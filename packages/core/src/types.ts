@@ -15,9 +15,9 @@ export type Device = 'any' | 'desktop' | 'tablet' | 'mobile'
 export type EventName = 'onChange' | 'onClick' | 'onBlur' | 'onFocus' | 'onMount' | 'onUnmount'
 
 /**
- * A property value is a tagged union rather than a bag discriminated by the
- * presence of an optional field. Every consumer switches on `kind` exhaustively,
- * so adding a fourth binding mode is a compile error at every call site.
+ * A property value is a tagged union rather than a bag discriminated by the presence of
+ * an optional field. Consumers check every `kind`, so adding a binding mode fails the
+ * build.
  */
 export type PropValue =
   | { kind: 'static'; value: JsonValue }

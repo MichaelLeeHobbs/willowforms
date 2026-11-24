@@ -79,14 +79,9 @@ describe('the drop zone handshake', () => {
 
   it('asks the zones in registration order, and stops at the first answer', async () => {
     /*
-     * The test above has one zone answering and one declining, so it holds
-     * whichever order the zones are asked in -- and order is the whole point.
-     * `drag.ts` says registration order "is a decision rather than a detail":
-     * in the product the canvas and the tree can both answer for a point, and
-     * the tree is reachable only because it registers first.
-     *
-     * Two zones that both answer, so the commit names which one was asked
-     * first, plus the call counts to show the other was not asked at all.
+     * Two zones that both answer, so the commit names which was asked first, and the
+     * call counts show the other was not asked. In the product the canvas and the tree
+     * cannot both be under the pointer (docs/spec/05-canvas.md).
      */
     const commitWith = async (zones: [string, DropResolver][]): Promise<DropCommit | undefined> => {
       const onCommit = vi.fn()

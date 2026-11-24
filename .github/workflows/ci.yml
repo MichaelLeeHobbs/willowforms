@@ -6,7 +6,6 @@ on:
     branches: [main]
   pull_request:
 
-# A newer push to the same branch makes the in-flight run irrelevant.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # Pull requests only: every `main` commit needs its own verdict.
@@ -15,15 +14,8 @@ concurrency:
 permissions:
   contents: read
 
-# Every action is pinned to a commit, with the version it was in the comment.
-#
-# A tag is a mutable pointer: whoever owns the action can move `v4` onto any
-# commit at any time, and every workflow in the world picks it up on the next
-# run without a diff anywhere. A commit hash cannot be moved. The cost is that
-# bumps are manual, so the comment names the version each hash was, and the
-# hashes here are the tip of v4 as of 2026-08-31. Majors have moved on since
-# (checkout and setup-node are at v7, upload-artifact at v7, action-setup at
-# v6); those bumps need a CI run to verify and are not something to make blind.
+# Every action is pinned to a commit, because whoever owns the action can move a tag.
+# The comment after each pin names the version that commit was.
 
 jobs:
   verify:

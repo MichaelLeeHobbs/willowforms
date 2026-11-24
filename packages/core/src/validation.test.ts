@@ -1247,18 +1247,8 @@ describe('bounds and schemes', () => {
 })
 
 /**
- * A bounded quantifier wrapping an unbounded one.
- *
- * The ReDoS guard asks whether an *unbounded* quantifier is applied to a group
- * holding another one, so `(a+)+` is refused and `(a+){10}` is not. The bound on
- * the outside is not what makes it safe: splitting thirty characters into ten
- * non-empty groups is ten million ways, and the exponent is the repeat count,
- * which the author chooses.
- *
- * The guard's own comment says a bounded quantifier "is not the shape that goes
- * exponential, because there is a fixed amount for the engine to try". That is
- * true of `a{10}` and false of `(a+){10}`, and the code was written to the
- * sentence rather than to the distinction inside it.
+ * Nested quantifiers, which a backtracking engine can take exponential time to match.
+ * RE2 matches in linear time, so these run instead of being refused.
  */
 describe('bounded matching of nested quantifiers', () => {
   // Each value matches its pattern, so a refusal cannot pass for a mismatch.
@@ -1285,17 +1275,9 @@ describe('bounded matching of nested quantifiers', () => {
 })
 
 /**
- * The host evaluator throwing, on the two call sites that did not catch it.
- *
- * `visibility.ts` wraps the same call in `try`/`catch` and explains why: a throw
- * out of `isVisible` is an unhandled 500 on submit and a blank form in the
- * browser. `guardPasses` and the `custom` rule call it bare, so an expression
- * that throws escapes `validateForm` entirely -- and the expression is authored
- * in a document while the evaluator belongs to the host, so neither side owns
- * the failure.
- *
- * The two answers differ on purpose, and each matches a decision already written
- * down one case away.
+ * The host owns the evaluator and the document holds the expression, so a throw must
+ * not escape `validateForm`. The two answers differ on purpose: a guard that throws
+ * leaves its rule applying, and a `custom` rule that throws fails.
  */
 describe('an evaluator that throws', () => {
   const boom: Evaluator = () => {

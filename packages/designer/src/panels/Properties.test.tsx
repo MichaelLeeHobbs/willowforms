@@ -519,7 +519,7 @@ describe('the multiline editor', () => {
 })
 
 describe('the visibility row', () => {
-  /** A document with two data-bound fields, so one can test the other. */
+  /** The component under test. `withSibling` adds a second field for it to test. */
   const pair = (): ComponentNode => ({
     key: 'website',
     type: 'Field',
@@ -956,12 +956,11 @@ describe('the condition editor survives a hand-edited document', () => {
   ]
 
   it('draws an operator it does not know as one it does', async () => {
-    // A controlled select whose value matches no option renders blank.
     const harness = setup(withRenderWhen({ op: 'sorcery' }))
     await harness.select()
 
-    // Not the select's value alone: jsdom falls back to the first option when
-    // none matches. A real operator draws operands; `sorcery` draws none.
+    // Not the select's value alone: React selects the first enabled option when none
+    // matches. A real operator draws operands; `sorcery` draws none.
     expect(screen.getByLabelText('Subject')).toBeTruthy()
     expect(screen.getByLabelText('Comparison')).toHaveProperty('value', 'truthy')
   })
@@ -1504,10 +1503,6 @@ describe('the select editor and a value that is not a string', () => {
     await select()
 
     await user.selectOptions(weightSelect(), '2')
-    /*
-     * `/^Weight/`, because a property with a value set announces itself as
-     * "Weight (modified)". That is Trap 4 and it cost this control a run.
-     */
     await user.selectOptions(weightSelect(), '')
 
     expect(latest()?.props?.['weight']).toBeUndefined()
@@ -1690,9 +1685,6 @@ describe('a data key that breaks the key grammar', () => {
   })
 })
 
-/**
- * Editing on the canvas, and what the panel does around it.
- */
 describe('the Rules tab and a pattern nobody can run', () => {
   const withPattern = (): ComponentNode => ({
     key: 'field',

@@ -59,11 +59,8 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   )
 }
 
-/*
- * A repeater draws the rows it was handed and nothing else. The renderer has
- * already expanded them, so a kit never counts rows, never sees an index, and
- * never learns what an address is.
- */
+// The renderer has already expanded the rows, so a kit never learns what an address is.
+// It draws them, and adds or removes a row by writing the whole list.
 function Repeater({
   node,
   itemLimits: limits = itemLimits(node),

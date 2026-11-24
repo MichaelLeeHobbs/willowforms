@@ -66,7 +66,10 @@ function commaSeparated(prelude: string): string[] {
   return parts
 }
 
-/** Selector text of every rule in the file, comments and at-rule preludes removed. */
+/**
+ * Selector text of every rule, at-rule preludes removed. `source` must hold no
+ * comments.
+ */
 function selectors(source: string): string[] {
   return blocks(source)
     .filter((block) => !block.prelude.startsWith('@'))

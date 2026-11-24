@@ -24,8 +24,9 @@ rather than the selection. See [04-shell.md](04-shell.md#tabbed-left-pane).
 every tab rather than only the selected one.
 
 Only the selected panel is rendered, so only the selected tab carries `aria-controls`. Every tab used to
-carry it, which left two of the three naming an id that was not in the document. An unresolved IDREF is
-not an axe violation, so the accessibility suite passed over it for as long as it existed.
+carry it, which left two of the three naming an id that was not in the document. axe does not flag an
+unresolved `aria-controls` on an unselected tab, so the accessibility suite passed over it for as long as
+it existed.
 
 The whole pattern costs about fifteen lines, and tests hold it. It lives in `panels/Tabs.tsx` and both
 panes use it: the left pane needed the same thing, and two copies would have been two places to get the
