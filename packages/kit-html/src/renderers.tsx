@@ -464,13 +464,16 @@ function Grid({ props, nodeProps, children }: NodeRendererProps): ReactNode {
 /**
  * Never the `background` shorthand beside the image's longhands, nor its key with
  * no value: React cannot update a style that mixes them. The shorthand alone, so
- * a gradient still paints; under an image only the colour shows.
+ * a gradient still paints.
  */
 function boxBackground(props: NodeRendererProps['props']): CSSProperties {
   const background = safeStyleValue(str(props['background']))
   const image = backgroundImageStyle(props)
   if (!background) return image
-  return 'backgroundImage' in image ? { backgroundColor: background, ...image } : { background }
+  if (!('backgroundImage' in image)) return { background }
+  // Only a colour: the browser ignores anything else, which would leave the last colour behind.
+  if (/gradient\(|^none$/i.test(background)) return image
+  return { backgroundColor: background, ...image }
 }
 
 function Box({ props, nodeProps, children }: NodeRendererProps): ReactNode {

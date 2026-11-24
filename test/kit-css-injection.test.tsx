@@ -40,17 +40,22 @@ function documentOf(root: ComponentNode): FormDocument {
   }
 }
 
-const boxWith = (background: string, padding = 2): ComponentNode => ({
+const boxWith = (background: string, padding = 2, image = ''): ComponentNode => ({
   key: 'target',
   type: 'Box',
-  props: { padding: prop(padding), background: prop(background), radius: prop(0) },
+  props: {
+    padding: prop(padding),
+    background: prop(background),
+    backgroundImage: prop(image),
+    radius: prop(0),
+  },
   children: [],
 })
 
-function formOf(kit: RendererKit, background: string, padding = 2): ReactElement {
+function formOf(kit: RendererKit, background: string, padding = 2, image = ''): ReactElement {
   return (
     <FormRenderer
-      document={documentOf(boxWith(background, padding))}
+      document={documentOf(boxWith(background, padding, image))}
       kit={kit}
       data={{}}
       revealHidden
@@ -103,8 +108,8 @@ function emittedRules(background: string, padding = 2): { selector: string; body
  * Requires a `padding` declaration first: callers assert with `not`, which an
  * empty string passes.
  */
-function serverStyleAttribute(kit: RendererKit, background: string): string {
-  const markup = renderToStaticMarkup(formOf(kit, background))
+function serverStyleAttribute(kit: RendererKit, background: string, image = ''): string {
+  const markup = renderToStaticMarkup(formOf(kit, background, 2, image))
   const at = markup.indexOf('data-fs-key="target"')
   expect(at, 'the Box did not render').toBeGreaterThanOrEqual(0)
   const style = /style="([^"]*)"/.exec(markup.slice(at))?.[1] ?? ''
@@ -183,19 +188,21 @@ describe('a document CSS value cannot author a rule', () => {
     })
   })
 
-  describe('@willowforms/kit-html', () => {
+  // A Box writes its background to a different property when it has an image.
+  describe.each(['', '/picture.png'])('@willowforms/kit-html, image "%s"', (image) => {
     it('server-renders one declaration list, not a rule of its own', () => {
-      const style = serverStyleAttribute(htmlRendererKit, INJECTION)
+      const style = serverStyleAttribute(htmlRendererKit, INJECTION, image)
       expect(style).not.toMatch(/[{}<@]/)
       expect(style).not.toContain('display:none')
     })
 
     it('keeps a legitimate colour', () => {
-      expect(serverStyleAttribute(htmlRendererKit, '#ff0000')).toContain('#ff0000')
+      expect(serverStyleAttribute(htmlRendererKit, '#ff0000', image)).toContain('#ff0000')
     })
 
     it('refuses a value that fetches', () => {
-      expect(serverStyleAttribute(htmlRendererKit, EXFILTRATION)).not.toContain('evil.example')
+      const style = serverStyleAttribute(htmlRendererKit, EXFILTRATION, image)
+      expect(style).not.toContain('evil.example')
     })
   })
 })

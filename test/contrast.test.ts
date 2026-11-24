@@ -411,11 +411,12 @@ describe('the contrast figures the documents quote', () => {
 /**
  * `tokensFrom` reads custom properties, so a colour literal in a rule is invisible
  * to every assertion above, and neither the dark palette nor a host can change it.
- * `color-mix` and `rgb(from ...)` build on tokens, so they are allowed.
+ * `rgb(from ...)` builds on a token, and a `var()` fallback is only a default.
  */
 describe('no colour is written outside the token blocks', () => {
   const LITERAL =
     /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\((?!\s*from\b)[^)]*\)/gi
+  const WITH_FALLBACK = /var\(\s*--[a-z0-9-]+\s*,[^()]*(?:\([^()]*\))?[^()]*\)/gi
 
   const literals = (css: string): string[] => {
     const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -429,7 +430,10 @@ describe('no colour is written outside the token blocks', () => {
         const name = declaration.slice(0, at).trim()
         if (name.startsWith('--')) continue
 
-        const written = declaration.slice(at + 1).match(LITERAL)
+        const written = declaration
+          .slice(at + 1)
+          .replace(WITH_FALLBACK, '')
+          .match(LITERAL)
         if (written) {
           found.push((block[1] ?? '').trim() + ' { ' + name + ': ' + written.join(' ') + ' }')
         }
@@ -456,5 +460,32 @@ describe('no colour is written outside the token blocks', () => {
     ])
     expect(literals(':root { --fs-accent: #1a73e8 }')).toEqual([])
     expect(literals('.fs-a { color: rgb(from var(--fs-text) r g b / 50%) }')).toEqual([])
+    expect(literals('.fs-a { color: var(--fs-text, rgb(0 0 0 / 50%)) }')).toEqual([])
+    expect(literals('.fs-a { color: var(--fs-text) rgb(0 0 0 / 50%) }')).toEqual([
+      '.fs-a { color: rgb(0 0 0 / 50%) }',
+    ])
+  })
+})
+
+/** A `var()` naming a token nobody declares silently paints nothing. */
+describe('every token a stylesheet reads is declared in it', () => {
+  const undeclared = (css: string): string[] => {
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    const declared = new Set(
+      [...withoutComments.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((match) => match[1]),
+    )
+    const read = [...withoutComments.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map(
+      (match) => match[1] ?? '',
+    )
+    if (read.length === 0) throw new Error('no var() found, so this checked nothing')
+    return [...new Set(read)].filter((token) => !declared.has(token)).sort()
+  }
+
+  it('the designer stylesheet', () => {
+    expect(undeclared(designerCss)).toEqual([])
+  })
+
+  it('the HTML kit stylesheet', () => {
+    expect(undeclared(kitCss)).toEqual([])
   })
 })

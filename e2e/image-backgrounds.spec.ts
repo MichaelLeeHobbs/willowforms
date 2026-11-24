@@ -1,12 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { createDocument, prop } from '../packages/core/src/index.js'
 import type { ComponentNode } from '../packages/core/src/index.js'
-
-// One transparent pixel, so the request answers rather than logging a failed load.
-const PIXEL = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-  'base64',
-)
+import { PIXEL_PNG } from './harness.js'
 
 for (const kit of ['html', 'mui']) {
   test(`${kit}: backgrounds stay on each container and refuse unsafe sources`, async ({ page }) => {
@@ -73,11 +68,16 @@ for (const kit of ['html', 'mui']) {
       JSON.stringify(doc),
     )
     await page.route('**/background-test.png', (route) =>
-      route.fulfill({ contentType: 'image/png', body: PIXEL }),
+      route.fulfill({ contentType: 'image/png', body: PIXEL_PNG }),
     )
     await page.goto('/')
     await page.getByLabel('Kit', { exact: true }).selectOption(kit)
     await page.getByRole('tab', { name: 'Tree', exact: true }).click()
+
+    await expect(page.locator('[data-fs-key="coloured"]')).toHaveCSS(
+      'background-color',
+      'rgb(255, 0, 0)',
+    )
 
     const panel = page.locator('.fs-panel--right')
     for (const key of ['coloured', 'graded', 'bare']) {

@@ -572,7 +572,8 @@
 
 .fs-dialog::backdrop,
 .fs-drawer::backdrop {
-  background: var(--fs-backdrop);
+  /* The fallback is for Chrome before 122 and Safari before 17.4, where this inherits no token. */
+  background: var(--fs-backdrop, rgb(0 0 0 / 50%));
 }
 
 .fs-dialog__close {
@@ -1577,7 +1578,7 @@
   min-height: 80px;
   border: 1px solid var(--fs-border);
   border-radius: 4px;
-  background: var(--fs-surface);
+  background: var(--fs-bg-well);
 }
 .fs-image-source__preview img {
   display: block;

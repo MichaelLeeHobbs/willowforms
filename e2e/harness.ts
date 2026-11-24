@@ -3,6 +3,12 @@ import type { Locator, Page } from '@playwright/test'
 
 export const STORAGE_KEY = 'willowforms.playground.document'
 
+/** A 1x1 PNG. */
+export const PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+  'base64',
+)
+
 export interface Designer {
   page: Page
   /** A row in the structure tree. */

@@ -471,6 +471,20 @@ describe('a Box that gains and loses a background image', () => {
       expect(inlineStyle(container)).toBe(plain)
     },
   )
+
+  const CHANGES = KITS.flatMap(({ name, renderers }) =>
+    ['', '#0000ff', 'linear-gradient(red, blue)', 'none'].map((to) => ({ name, renderers, to })),
+  )
+
+  it.each(CHANGES)('$name replaces the colour under an image with "$to"', ({ renderers, to }) => {
+    const { container: fresh } = render(formOf(renderers, to, IMAGE))
+    const expected = inlineStyle(fresh)
+
+    const { container, rerender } = render(formOf(renderers, '#ff0000', IMAGE))
+    rerender(formOf(renderers, to, IMAGE))
+
+    expect(inlineStyle(container)).toBe(expected)
+  })
 })
 
 describe('what a data-bound control has to say about itself', () => {

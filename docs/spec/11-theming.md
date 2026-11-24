@@ -85,7 +85,7 @@ fighting specificity.
 squares off the selection frame, the selection toolbar's buttons and the rule count badge along with
 everything else. Six radii used to be written as literals and ignored the override entirely.
 
-The dark palette deepens the three shadows and the backdrop, because a shadow dark enough to see on a light panel disappears on a dark one. `--fs-drop-ring` is the same in both: it is drawn over the form, whose colours belong to the host.
+The dark palette deepens the three shadows and the backdrop, because a shadow dark enough to see on a light panel disappears on a dark one. `--fs-drop-ring` is the same in both: it is drawn over the form, whose colours belong to the host. Before Chrome 122 and Safari 17.4, `::backdrop` inherits no custom property, so those browsers draw the light backdrop in both palettes.
 
 ## HTML kit tokens
 
