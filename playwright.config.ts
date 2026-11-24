@@ -50,6 +50,8 @@ export default defineConfig({
       `${vite} build --minify false --outDir ${outDir} && ` +
       `${vite} preview --outDir ${outDir} --port ${String(PORT)} --strictPort`,
     cwd: 'apps/playground',
+    // Bundles development React, for StrictMode and for the warnings a production build leaves out.
+    env: { NODE_ENV: 'development' },
     url: baseURL,
     /*
      * Never reuse: Playwright would skip the command when something already answers on the port,
