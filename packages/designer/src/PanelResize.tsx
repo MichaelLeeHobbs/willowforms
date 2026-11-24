@@ -53,6 +53,32 @@ export function usePanelWidths(): {
   return { widths, resize }
 }
 
+interface Size {
+  width: number
+  max: number
+}
+
+interface ResizeParts {
+  panel: Element
+  canvas: Element
+}
+
+function resizeParts(handle: HTMLElement | null, controls: string): ResizeParts | undefined {
+  const panel = handle?.ownerDocument.getElementById(controls)
+  const canvas = handle?.parentElement?.querySelector('.fs-canvas')
+  return panel && canvas ? { panel, canvas } : undefined
+}
+
+/** Undefined while the panel has no layout. */
+function measure({ panel, canvas }: ResizeParts): Size | undefined {
+  const width = panel.getBoundingClientRect().width
+  if (width <= 0) return undefined
+  return {
+    width: Math.round(width),
+    max: clamp(width + canvas.getBoundingClientRect().width - CANVAS_MIN),
+  }
+}
+
 export function PanelResize({
   side,
   controls,
@@ -65,7 +91,7 @@ export function PanelResize({
   onResize: (width: number | undefined, save: boolean) => void
 }): ReactNode {
   const ref = useRef<HTMLDivElement>(null)
-  const [size, setSize] = useState({ width: 288, max: MAX_WIDTH })
+  const [size, setSize] = useState<Size>({ width: 288, max: MAX_WIDTH })
   const drag = useRef<
     | { id: number; x: number; width: number; original: number | undefined; latest: number }
     | undefined
@@ -75,23 +101,24 @@ export function PanelResize({
     resize.current = onResize
   }, [onResize])
   useEffect(() => {
-    const handle = ref.current
-    const panel = handle?.ownerDocument.getElementById(controls)
-    const canvas = handle?.parentElement?.querySelector('.fs-canvas')
-    if (!panel || !canvas) return
-    const measure = (): void => {
-      const width = panel.getBoundingClientRect().width
-      if (width <= 0) return
-      const max = clamp(width + canvas.getBoundingClientRect().width - CANVAS_MIN)
-      setSize({ width: Math.round(width), max })
+    const parts = resizeParts(ref.current, controls)
+    if (!parts) return
+    const update = (): void => {
+      const next = measure(parts)
+      if (next) setSize(next)
     }
-    measure()
+    update()
     if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(measure)
-    observer.observe(panel)
-    observer.observe(canvas)
+    const observer = new ResizeObserver(update)
+    observer.observe(parts.panel)
+    observer.observe(parts.canvas)
     return () => observer.disconnect()
   }, [controls])
+  // `size` trails the screen by a frame, so a resize that starts from it can repeat a step.
+  const currentSize = (): Size => {
+    const parts = resizeParts(ref.current, controls)
+    return (parts && measure(parts)) ?? size
+  }
   useEffect(
     () => () => {
       if (drag.current) resize.current(drag.current.original, false)
@@ -127,12 +154,13 @@ export function PanelResize({
         event.preventDefault()
         event.currentTarget.focus()
         event.currentTarget.setPointerCapture(event.pointerId)
+        const { width } = currentSize()
         drag.current = {
           id: event.pointerId,
           x: event.clientX,
-          width: size.width,
+          width,
           original: preferred,
-          latest: size.width,
+          latest: width,
         }
       }}
       onPointerMove={(event) => {
@@ -168,19 +196,20 @@ export function PanelResize({
         if (drag.current) return
         const direction = side === 'left' ? 1 : -1
         const delta = (event.shiftKey ? 40 : 10) * direction
+        const { width, max } = currentSize()
         const next =
           event.key === 'ArrowLeft'
-            ? size.width - delta
+            ? width - delta
             : event.key === 'ArrowRight'
-              ? size.width + delta
+              ? width + delta
               : event.key === 'Home'
                 ? MIN_WIDTH
                 : event.key === 'End'
-                  ? size.max
+                  ? max
                   : undefined
         if (next !== undefined) {
           event.preventDefault()
-          onResize(clamp(next, size.max), true)
+          onResize(clamp(next, max), true)
         }
         if (event.key === 'Enter') {
           event.preventDefault()

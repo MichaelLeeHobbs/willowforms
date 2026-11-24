@@ -3,14 +3,26 @@ import type { Locator, Page } from '@playwright/test'
 
 export const STORAGE_KEY = 'willowforms.playground.document'
 
+/** A 1x1 PNG. */
+export const PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+  'base64',
+)
+
 export interface Designer {
   page: Page
   /** A row in the structure tree. */
   row: (key: string) => Locator
   /** A component as the kit actually rendered it on the canvas. */
   node: (key: string) => Locator
+  /*
+   * The next three read what the playground has saved, which it does from an effect after the
+   * gesture. Poll them: one read straight after a gesture can see the document from before it.
+   */
   rootChildren: () => Promise<string[]>
-  /** The whole document as the playground has persisted it. */
+  /** The keys inside one of the root's children, or none when the root has no such child. */
+  childrenOf: (key: string) => Promise<string[]>
+  /** The whole document. */
   document: () => Promise<FormDocumentShape>
   select: (key: string) => Promise<void>
   openTab: (
@@ -52,30 +64,32 @@ export const test = base.extend<{ designer: Designer }>({
     await page.getByRole('tab', { name: 'Tree' }).click()
     await expect(page.locator('[data-fs-tree-row="root"]')).toBeVisible()
 
+    const saved = (): Promise<string | null> =>
+      page.evaluate((key: string) => window.localStorage.getItem(key), STORAGE_KEY)
+
     const designer: Designer = {
       page,
       row: (key) => page.locator(`[data-fs-tree-row="${key}"]`),
       // `.first()`: a repeater draws its subtree once per row, so a key can match many elements.
       node: (key) => page.locator(`[data-fs-key="${key}"]`).first(),
 
-      /*
-       * Throws rather than answering `[]`, so `toEqual(before)` cannot pass for a designer that
-       * saved nothing.
-       */
-      rootChildren: async () =>
-        page.evaluate((storageKey: string) => {
-          const raw = window.localStorage.getItem(storageKey)
-          if (!raw) throw new Error('The playground has not persisted a document yet.')
-          const doc = JSON.parse(raw) as FormDocumentShape
-          return (doc.root.children ?? []).map((child) => child.key)
-        }, STORAGE_KEY),
+      // Throws, so `toEqual(before)` cannot pass for a designer that saved nothing.
+      document: async () => {
+        const raw = await saved()
+        if (!raw) throw new Error('The playground has not persisted a document yet.')
+        return JSON.parse(raw) as FormDocumentShape
+      },
 
-      document: async () =>
-        page.evaluate((storageKey: string) => {
-          const raw = window.localStorage.getItem(storageKey)
-          if (!raw) throw new Error('The playground has not persisted a document yet.')
-          return JSON.parse(raw) as FormDocumentShape
-        }, STORAGE_KEY),
+      rootChildren: async () => {
+        const { root } = await designer.document()
+        return (root.children ?? []).map((child) => child.key)
+      },
+
+      childrenOf: async (key) => {
+        const { root } = await designer.document()
+        const parent = root.children?.find((child) => child.key === key)
+        return (parent?.children ?? []).map((child) => child.key)
+      },
 
       select: async (key) => {
         await designer.row(key).click()
@@ -83,12 +97,17 @@ export const test = base.extend<{ designer: Designer }>({
       },
 
       openTab: async (name) => {
-        await page.getByRole('tab', { name }).click()
-        await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true')
+        const tab = page.getByRole('tab', { name })
+        await tab.click()
+        await expect(tab).toHaveAttribute('aria-selected', 'true')
+        const panel = await tab.getAttribute('aria-controls')
+        await expect(page.locator(`[role="tabpanel"][id="${panel ?? ''}"]`)).toBeVisible()
       },
 
       undo: async () => {
+        const before = await saved()
         await page.getByRole('button', { name: 'Undo' }).click()
+        await expect.poll(saved).not.toBe(before)
       },
     }
 
@@ -163,7 +182,7 @@ export async function dragFrom(
  * Moves in steps: the drag controller needs a move past its threshold, and the drop zones measure
  * on the moves after it.
  */
-export async function dragOnto(
+export async function dragOver(
   page: Page,
   from: Locator,
   to: Locator,
@@ -183,6 +202,15 @@ export async function dragOnto(
   await page.mouse.down()
   await page.mouse.move(start.x + 50, start.y + start.height / 2 + 12, { steps: 4 })
   await page.mouse.move(end.x + Math.min(40, end.width / 2), targetY, { steps: 12 })
+}
+
+export async function dragOnto(
+  page: Page,
+  from: Locator,
+  to: Locator,
+  where: 'top' | 'middle' | 'bottom' = 'middle',
+): Promise<void> {
+  await dragOver(page, from, to, where)
   await page.mouse.up()
 }
 

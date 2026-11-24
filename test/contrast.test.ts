@@ -381,10 +381,13 @@ describe('the contrast figures the documents quote', () => {
     expect(wrong).toEqual([])
   })
 
-  it('measures every border token in designer.css, or says why not', () => {
+  it.each([
+    ['designer.css', designerCss],
+    ['kit-html.css', kitCss],
+  ])('measures every border token in %s, or says why not', (_name, css) => {
     const declared = [
       ...new Set(
-        [...designerCss.matchAll(/(--fs-[a-z0-9-]*border[a-z0-9-]*)\s*:/g)].map(
+        [...css.matchAll(/(--fsh?-[a-z0-9-]*border[a-z0-9-]*)\s*:/g)].map(
           (match) => match[1] ?? '',
         ),
       ),
@@ -406,11 +409,15 @@ describe('the contrast figures the documents quote', () => {
 })
 
 /**
- * `tokensFrom` reads custom properties, so a hex literal in a rule is invisible
- * to every assertion above. Only hex is checked: `color-mix` and `rgb(from ...)`
- * build on tokens, so they stay measurable.
+ * `tokensFrom` reads custom properties, so a colour literal in a rule is invisible
+ * to every assertion above, and neither the dark palette nor a host can change it.
+ * `rgb(from ...)` builds on a token, and a `var()` fallback is only a default.
  */
 describe('no colour is written outside the token blocks', () => {
+  const LITERAL =
+    /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\((?!\s*from\b)[^)]*\)/gi
+  const WITH_FALLBACK = /var\(\s*--[a-z0-9-]+\s*,[^()]*(?:\([^()]*\))?[^()]*\)/gi
+
   const literals = (css: string): string[] => {
     const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
     const found: string[] = []
@@ -423,8 +430,13 @@ describe('no colour is written outside the token blocks', () => {
         const name = declaration.slice(0, at).trim()
         if (name.startsWith('--')) continue
 
-        const hex = declaration.slice(at + 1).match(/#[0-9a-fA-F]{3,8}\b/g)
-        if (hex) found.push((block[1] ?? '').trim() + ' { ' + name + ': ' + hex.join(' ') + ' }')
+        const written = declaration
+          .slice(at + 1)
+          .replace(WITH_FALLBACK, '')
+          .match(LITERAL)
+        if (written) {
+          found.push((block[1] ?? '').trim() + ' { ' + name + ': ' + written.join(' ') + ' }')
+        }
       }
     }
 
@@ -443,6 +455,35 @@ describe('no colour is written outside the token blocks', () => {
     expect(literals('.fs-dialog__actions button { border-color: #e8eaed }')).toEqual([
       '.fs-dialog__actions button { border-color: #e8eaed }',
     ])
+    expect(literals('.fs-drop--bar { box-shadow: 0 0 0 1px rgb(255 255 255 / 65%) }')).toEqual([
+      '.fs-drop--bar { box-shadow: rgb(255 255 255 / 65%) }',
+    ])
     expect(literals(':root { --fs-accent: #1a73e8 }')).toEqual([])
+    expect(literals('.fs-a { color: rgb(from var(--fs-text) r g b / 50%) }')).toEqual([])
+    expect(literals('.fs-a { color: var(--fs-text, rgb(0 0 0 / 50%)) }')).toEqual([])
+    expect(literals('.fs-a { color: var(--fs-text) rgb(0 0 0 / 50%) }')).toEqual([
+      '.fs-a { color: rgb(0 0 0 / 50%) }',
+    ])
+  })
+})
+
+/** A `var()` naming a token nobody declares silently paints nothing. */
+describe('every token a stylesheet reads is declared in its light palette', () => {
+  const undeclared = (css: string, base: string): string[] => {
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    const declared = tokensFrom(css, base)
+    const read = [...withoutComments.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map(
+      (match) => match[1] ?? '',
+    )
+    if (read.length === 0) throw new Error('no var() found, so this checked nothing')
+    return [...new Set(read)].filter((token) => !(token in declared)).sort()
+  }
+
+  it('the designer stylesheet', () => {
+    expect(undeclared(designerCss, '.fs-shell')).toEqual([])
+  })
+
+  it('the HTML kit stylesheet', () => {
+    expect(undeclared(kitCss, '.fsh-screen')).toEqual([])
   })
 })

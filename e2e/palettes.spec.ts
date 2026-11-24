@@ -133,7 +133,10 @@ test('new palettes keep header controls and the gallery accessible on a narrow s
       const headerViolations = await page.evaluate(async () =>
         (
           await axe.run('.pg-kit-switch', {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           })
         ).violations.map(({ id }) => id),
       )
@@ -142,7 +145,10 @@ test('new palettes keep header controls and the gallery accessible on a narrow s
       const galleryViolations = await page.evaluate(async () =>
         (
           await axe.run('.pg-gallery', {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           })
         ).violations.map(({ id }) => id),
       )
@@ -183,11 +189,43 @@ test('editing chrome distinguishes fields, selection, hover, and focus in both p
       const violations = await page.evaluate(async () =>
         (
           await axe.run('.fs-panel', {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           })
         ).violations.map(({ id }) => id),
       )
       expect(violations).toEqual([])
     }
+  }
+})
+
+test('the dark palette deepens the chrome shadows and the dialog backdrop', async ({ page }) => {
+  await page.goto('/?example=contact-request')
+  await page.getByRole('button', { name: 'Tablet', exact: true }).click()
+  await page.locator('[data-fs-key="firstName"]').click()
+  const frame = page.locator('.fs-canvas__frame')
+  const toolbar = page.locator('.fs-selection__toolbar')
+  const dialog = page.locator('dialog.fs-dialog[aria-label="Form JSON"]')
+
+  for (const [mode, frameAlpha, toolbarAlpha, backdrop] of [
+    ['light', '0.12', '0.22', 'rgba(0, 0, 0, 0.5)'],
+    ['dark', '0.45', '0.55', 'rgba(0, 0, 0, 0.65)'],
+  ] as const) {
+    await page.getByLabel('Designer theme').selectOption(mode)
+    await expect(frame).toHaveCSS('box-shadow', new RegExp(`^rgba\\(0, 0, 0, ${frameAlpha}\\)`))
+    await expect(toolbar).toHaveCSS('box-shadow', new RegExp(`^rgba\\(0, 0, 0, ${toolbarAlpha}\\)`))
+
+    // A browser check: `::backdrop` gets the token by inheriting it from the dialog.
+    await page.getByRole('button', { name: 'JSON', exact: true }).click()
+    await expect(dialog).toBeVisible()
+    await expect
+      .poll(() =>
+        dialog.evaluate((element) => getComputedStyle(element, '::backdrop').backgroundColor),
+      )
+      .toBe(backdrop)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
   }
 })

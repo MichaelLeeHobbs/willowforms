@@ -413,6 +413,80 @@ describe('a length means the same thing in both kits', () => {
   })
 })
 
+/**
+ * React clears a removed longhand without setting a shorthand beside it again, so
+ * a style that mixes the two can differ from a fresh render. React warns when it
+ * does, and `console-errors.ts` fails the test.
+ */
+describe('a Box that gains and loses a background image', () => {
+  const IMAGE = '/picture.png'
+  const BACKGROUNDS = ['', '#ff0000', 'linear-gradient(red, blue)']
+
+  function formOf(renderers: RendererKit, background: string, image: string): ReactElement {
+    const node: ComponentNode = {
+      key: 'target',
+      type: 'Box',
+      props: { background: prop(background), backgroundImage: prop(image) },
+      children: [],
+    }
+    return (
+      <FormUnderTest
+        document={documentOf(node)}
+        kit={renderers}
+        data={{}}
+        revealHidden
+        onChange={() => undefined}
+      />
+    )
+  }
+
+  function inlineStyle(container: HTMLElement): string {
+    const element = container.querySelector<HTMLElement>('[data-fs-key="target"]')
+    if (!element) throw new Error('the Box did not render')
+    return element.style.cssText
+  }
+
+  const CASES = KITS.flatMap(({ name, renderers }) =>
+    BACKGROUNDS.map((background) => ({ name, renderers, background })),
+  )
+
+  it.each(CASES)(
+    '$name ends up as a fresh render does, with background "$background"',
+    ({ renderers, background }) => {
+      const fresh = (image: string): string => {
+        const { container, unmount } = render(formOf(renderers, background, image))
+        const style = inlineStyle(container)
+        unmount()
+        return style
+      }
+      const plain = fresh('')
+      const pictured = fresh(IMAGE)
+      expect(pictured, 'the image reached no style, so nothing changes below').toContain(IMAGE)
+
+      const { container, rerender } = render(formOf(renderers, background, ''))
+      rerender(formOf(renderers, background, IMAGE))
+      expect(inlineStyle(container)).toBe(pictured)
+
+      rerender(formOf(renderers, background, ''))
+      expect(inlineStyle(container)).toBe(plain)
+    },
+  )
+
+  const CHANGES = KITS.flatMap(({ name, renderers }) =>
+    ['', '#0000ff', 'linear-gradient(red, blue)', 'none'].map((to) => ({ name, renderers, to })),
+  )
+
+  it.each(CHANGES)('$name replaces the colour under an image with "$to"', ({ renderers, to }) => {
+    const { container: fresh } = render(formOf(renderers, to, IMAGE))
+    const expected = inlineStyle(fresh)
+
+    const { container, rerender } = render(formOf(renderers, '#ff0000', IMAGE))
+    rerender(formOf(renderers, to, IMAGE))
+
+    expect(inlineStyle(container)).toBe(expected)
+  })
+})
+
 describe('what a data-bound control has to say about itself', () => {
   // Not containers: a repeater is data-bound, but marking a container invalid
   // or required says nothing a screen reader can use.

@@ -3,8 +3,10 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentNode, FormDocument } from '@willowforms/core'
+
+import { expectConsoleError } from '../../../test/console-errors.js'
 
 /*
  * Set before a dynamic import: `index.ts` reads it at module scope, and a static import would be
@@ -53,13 +55,29 @@ afterAll(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 
-// `app.request` is typed as possibly synchronous, so this awaits it.
-const submit = async (body: string): Promise<Response> =>
-  await app.request('/api/forms/deep/submit', {
-    method: 'POST',
+// The store this file starts with.
+const restore = async (): Promise<void> => {
+  await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
+}
+
+/** For a describe whose tests change the store or read all of it: some above leave forms in it. */
+const restoreAroundEach = (): void => {
+  beforeEach(restore)
+  afterEach(restore)
+}
+
+const send = async (path: string, method: string, body: string): Promise<Response> =>
+  await app.request(path, {
+    method,
     headers: { 'content-type': 'application/json' },
     body,
   })
+
+const put = async (id: string, document: unknown): Promise<Response> =>
+  await send('/api/forms/' + id, 'PUT', JSON.stringify(document))
+
+const submit = async (body: string): Promise<Response> =>
+  await send('/api/forms/deep/submit', 'POST', body)
 
 const deepBody = (n: number): string =>
   '{"answers":' + '['.repeat(n) + '1' + ']'.repeat(n) + ',"name":"Ada"}'
@@ -142,15 +160,10 @@ describe('localized validation messages', () => {
 describe('two documents stored at once', () => {
   const formNamed = (id: string): FormDocument => ({ ...FORM, id, name: id })
 
-  const put = async (id: string): Promise<Response> =>
-    await app.request('/api/forms/' + id, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(formNamed(id)),
-    })
+  const save = (id: string): Promise<Response> => put(id, formNamed(id))
 
   it('keeps both', async () => {
-    const [first, second] = await Promise.all([put('one'), put('two')])
+    const [first, second] = await Promise.all([save('one'), save('two')])
 
     expect(first.status).toBe(200)
     expect(second.status).toBe(200)
@@ -166,7 +179,7 @@ describe('two documents stored at once', () => {
   it('keeps all of a larger burst', async () => {
     // Ten, because two requests can pass by luck when their reads happen to be ordered.
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-    await Promise.all(ids.map(put))
+    await Promise.all(ids.map(save))
 
     // Containment, not equality: the store is shared by every test in this describe.
     const listed = (await (await app.request('/api/forms')).json()) as { id: string }[]
@@ -419,11 +432,6 @@ describe('a store holding something that is not a document', () => {
     await writeFile(store, JSON.stringify({ ...JUNK, ...extra }), 'utf8')
   }
 
-  // Every case restores the store, because the rest of this file reads `deep`.
-  const restore = async (): Promise<void> => {
-    await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
-  }
-
   it.each(Object.keys(JUNK))('refuses a submit against %s', async (id) => {
     await withJunk()
     try {
@@ -484,17 +492,6 @@ describe('a document PUT that the read guard would refuse', () => {
     defaultLanguage: 'en-US',
   }
 
-  const put = async (id: string, body: unknown): Promise<Response> =>
-    app.request('/api/forms/' + id, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-
-  const restore = async (): Promise<void> => {
-    await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
-  }
-
   it('is refused rather than stored', async () => {
     try {
       expect((await put('thin', thin)).status, 'the thin document was accepted').toBe(422)
@@ -540,5 +537,214 @@ describe('a document PUT that the read guard would refuse', () => {
     } finally {
       await restore()
     }
+  })
+})
+
+describe('the origins another page may call from', () => {
+  // A browser enforces this, so these read the header a browser acts on.
+  const allowed = async (origin: string): Promise<string | null> =>
+    (await app.request('/api/forms', { headers: { origin } })).headers.get(
+      'access-control-allow-origin',
+    )
+
+  it.each(['http://localhost:5180', 'http://127.0.0.1:5180'])('include %s', async (origin) => {
+    expect(await allowed(origin)).toBe(origin)
+  })
+
+  // `51800` would pass a prefix match.
+  it.each(['http://evil.example', 'http://localhost:5181', 'http://localhost:51800', 'null'])(
+    'do not include %s',
+    async (origin) => {
+      expect(await allowed(origin)).toBeNull()
+    },
+  )
+
+  it.each([
+    ['http://localhost:5180', 'http://localhost:5180'],
+    ['http://evil.example', null],
+  ])('answer a preflight for DELETE from %s with %s', async (origin, expected) => {
+    const response = await app.request('/api/forms/deep', {
+      method: 'OPTIONS',
+      headers: { origin, 'access-control-request-method': 'DELETE' },
+    })
+
+    expect(response.headers.get('access-control-allow-origin')).toBe(expected)
+    expect(response.headers.get('access-control-allow-methods')).toContain('DELETE')
+  })
+})
+
+describe('an id borrowed from Object.prototype, on the routes that read and write the store', () => {
+  const BORROWED = ['__proto__', 'constructor', 'toString', 'hasOwnProperty']
+
+  restoreAroundEach()
+
+  it.each(BORROWED)('holds nothing under %s until something is written there', async (id) => {
+    expect((await app.request('/api/forms/' + id)).status).toBe(404)
+    expect((await app.request('/api/forms/' + id, { method: 'DELETE' })).status).toBe(404)
+  })
+
+  it('does not hold a whole document that the store only inherits', async () => {
+    Object.defineProperty(Object.prototype, 'inherited', {
+      configurable: true,
+      value: { ...FORM, id: 'inherited' },
+    })
+    try {
+      expect((await app.request('/api/forms/inherited')).status).toBe(404)
+      expect((await send('/api/forms/inherited/submit', 'POST', '{"name":"Ada"}')).status).toBe(404)
+    } finally {
+      Reflect.deleteProperty(Object.prototype, 'inherited')
+    }
+  })
+
+  it.each(BORROWED)('stores a document under %s, lists it, and deletes it', async (id) => {
+    expect((await put(id, { ...FORM, id })).status).toBe(200)
+
+    // Through the routes: a write that only set a prototype answers 200 and stores nothing.
+    const read = await app.request('/api/forms/' + id)
+    expect(read.status, id + ' was written and cannot be read back').toBe(200)
+    expect(((await read.json()) as FormDocument).id).toBe(id)
+    const rows = (await (await app.request('/api/forms')).json()) as { id: string }[]
+    expect(rows.map((row) => row.id).sort()).toEqual(['deep', id].sort())
+
+    expect((await app.request('/api/forms/' + id, { method: 'DELETE' })).status).toBe(200)
+    expect((await app.request('/api/forms/' + id)).status).toBe(404)
+    expect((await app.request('/api/forms/deep')).status).toBe(200)
+  })
+})
+
+describe('a body that is not JSON', () => {
+  const BAD = ['not json at all', '{"unclosed":', '', '{"trailing":1,}', 'undefined']
+
+  it.each(BAD)('is a 400 on submit: %j', async (body) => {
+    const response = await submit(body)
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Body is not valid JSON' })
+  })
+
+  it.each(BAD)('is a 400 on PUT: %j', async (body) => {
+    const response = await send('/api/forms/deep', 'PUT', body)
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Body is not valid JSON' })
+  })
+})
+
+describe('a form this server cannot validate in full', () => {
+  const gated = (renderWhen: NonNullable<ComponentNode['renderWhen']>): FormDocument => ({
+    ...FORM,
+    id: 'gated',
+    root: {
+      ...FORM.root,
+      children: [
+        ...(FORM.root.children ?? []),
+        {
+          key: 'extra',
+          type: 'TextField',
+          props: {},
+          schema: { type: 'string', validations: [] },
+          renderWhen,
+        },
+      ],
+    },
+  })
+
+  const readsContext = (path: string): FormDocument =>
+    gated({
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path },
+        right: { kind: 'literal', value: 'guest' },
+      },
+    })
+
+  const submitTo = async (document: FormDocument): Promise<Response> => {
+    expect((await put('gated', document)).status, 'the form was not stored').toBe(200)
+    return await send('/api/forms/gated/submit', 'POST', '{"name":"Ada"}')
+  }
+
+  restoreAroundEach()
+
+  it('is refused when it needs an evaluator', async () => {
+    const response = await submitTo(gated({ kind: 'computed', expression: 'name === "Ada"' }))
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({
+      error: 'This form needs an expression evaluator and this server has none',
+      components: ['extra'],
+    })
+  })
+
+  it('is refused when it reads context the server does not supply', async () => {
+    const response = await submitTo(readsContext('tenant.plan'))
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({
+      error: 'This form reads context this server does not supply',
+      missing: ['tenant.plan'],
+    })
+  })
+
+  it('is accepted when it reads only context the server supplies', async () => {
+    expect((await submitTo(readsContext('user.role'))).status).toBe(200)
+  })
+})
+
+describe('a PUT whose document id is not the one in the URL', () => {
+  restoreAroundEach()
+
+  it('is refused and stores nothing under either id', async () => {
+    const response = await put('inTheUrl', { ...FORM, id: 'inTheDocument' })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({
+      error: 'The document id must match the one in the URL',
+    })
+    const held = JSON.parse(await readFile(store, 'utf8')) as Record<string, unknown>
+    expect(Object.keys(held)).toEqual(['deep'])
+  })
+})
+
+describe('a store file that holds no store', () => {
+  restoreAroundEach()
+
+  it.each([
+    ['truncated JSON', '{"deep":'],
+    ['not JSON', 'this is not json'],
+    ['a list', '[1,2,3]'],
+    ['a string', '"a string"'],
+    ['empty', ''],
+  ])(
+    'is refused rather than served as empty, or written over, when it is %s',
+    async (_what, text) => {
+      // Hono logs the error it answers 500 for.
+      expectConsoleError(/Refusing to read/)
+      await writeFile(store, text, 'utf8')
+
+      expect((await app.request('/api/forms')).status).toBe(500)
+      expect((await put('deep', FORM)).status).toBe(500)
+      expect(await readFile(store, 'utf8'), 'the write replaced the corrupt store').toBe(text)
+    },
+  )
+
+  it('does not stop the next write once it is repaired', async () => {
+    expectConsoleError(/Refusing to read/)
+    await writeFile(store, 'this is not json', 'utf8')
+    expect((await put('deep', FORM)).status).toBe(500)
+
+    await restore()
+    expect((await put('deep', { ...FORM, name: 'Renamed' })).status).toBe(200)
+  })
+
+  it('starts empty, and takes a write, when there is no file', async () => {
+    await rm(store)
+
+    const listed = await app.request('/api/forms')
+    expect(listed.status).toBe(200)
+    expect(await listed.json()).toEqual([])
+
+    expect((await put('deep', FORM)).status).toBe(200)
+    expect((await app.request('/api/forms/deep')).status).toBe(200)
   })
 })

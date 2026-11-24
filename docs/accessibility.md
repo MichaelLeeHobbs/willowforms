@@ -34,7 +34,7 @@ These fail the build, not a review.
 Two designer axe states use the MUI kit. A separate Chromium audit renders both complete runtime catalogues in light and dark mode, with labelled inputs, informative images, navigation, and populated repeated rows. That browser audit enables all axe rules tagged for WCAG 2.0–2.2 A/AA; it also checks repeated-field descriptions and keyboard focus order.
 
 The dialog row is in a browser and not in the axe pass on purpose. jsdom has no `<dialog>`, so
-`test/a11y.test.tsx` polyfills `showModal()` as `this.open = true`: there is no top layer, no inert
+`test/setup.ts` polyfills `showModal()` as `this.open = true`: there is no top layer, no inert
 background and no `::backdrop` there, and the properties this document credits to the browser are
 exactly the ones that environment cannot provide.
 
@@ -88,7 +88,10 @@ people already know it. Without them, every rearrangement in this builder would 
   removals. Tree navigation is deliberately not announced there: focus lands on the row, which a screen
   reader reads on arrival, and a second announcement would say everything twice.
 - Identical consecutive announcements get a zero-width space appended, because an unchanged live region
-  is never read out and a second identical move would otherwise be silent.
+  is never read out and a second identical move would otherwise be silent. The clipboard notes in the
+  JSON dialogs, Preview's action note, and a refused language, code action name or image do the same.
+  The JSON dialog inserts its list of errors again instead. Leaving an invalid field without editing it
+  repeats nothing.
 
 ## Kits own their own accessibility
 
@@ -115,8 +118,9 @@ Verification gaps remain even with a defined keyboard authoring path.
 - **The automated audit cannot see layout.** axe-core runs over the designer in twelve states: at rest,
   with a component selected, on the Rules, Settings and Style tabs, with a condition being edited, in
   validated preview, with both panes collapsed, and with the JSON dialog open. jsdom has no
-  rendering engine, so `color-contrast`, `target-size`, and `scrollable-region-focusable` are disabled by
-  name rather than reporting nothing useful. Contrast is covered separately by computing the ratios from
+  rendering engine and no canvas, so `color-contrast`, `target-size`, `scrollable-region-focusable` and
+  `label-content-name-mismatch` are disabled by name rather than reporting nothing useful. Any other rule
+  axe cannot decide fails the audit. Contrast is covered separately by computing the ratios from
   the stylesheets. The runtime catalogue now has a separate browser audit; the designer states still need equivalent browser coverage.
 - **No screen reader has actually been used.** Everything above is verified from the DOM and from the
   spec, which catches wiring mistakes but not awkward phrasing or a confusing reading order.

@@ -5,6 +5,7 @@ import { languagesOf } from './language.js'
 import type { Device, FormDocument, IconName, Kit } from '@willowforms/core'
 import type { RendererKit } from '@willowforms/renderer'
 
+import { useAnnouncement } from './announce.js'
 import { dragLabel, useDrag } from './drag.js'
 import type { DragSource, DropCommit } from './drag.js'
 import { Icon } from './Icon.js'
@@ -96,12 +97,7 @@ export function Designer({
    * Selecting, moving, adding and removing do not move focus, so a screen reader
    * hears them only if they are announced. Polite: none of it is urgent.
    */
-  const [announcement, setAnnouncement] = useState('')
-  const announce = useCallback((message: string) => {
-    // The zero-width space forces a change even when the same message repeats,
-    // so moving a component twice is announced twice.
-    setAnnouncement((previous) => (previous === message ? message + '​' : message))
-  }, [])
+  const [announcement, announce] = useAnnouncement()
 
   const commitDrop = useCallback(
     (source: DragSource, target: DropCommit) => {

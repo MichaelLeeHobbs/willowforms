@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormData } from '@willowforms/core'
 
+import { useAnnouncement } from '../announce.js'
 import { copyText } from '../clipboard.js'
 
 export function PreviewData({ data }: { data: FormData }): ReactNode {
@@ -9,7 +10,7 @@ export function PreviewData({ data }: { data: FormData }): ReactNode {
   const dialog = useRef<HTMLDialogElement>(null)
   const editor = useRef<HTMLTextAreaElement>(null)
   const [open, setOpen] = useState(false)
-  const [note, setNote] = useState('')
+  const [note, setNote] = useAnnouncement()
 
   useEffect(() => {
     if (open && !dialog.current?.open) {

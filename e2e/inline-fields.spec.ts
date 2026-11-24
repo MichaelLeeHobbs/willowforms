@@ -76,7 +76,10 @@ for (const kit of ['html', 'mui']) {
       const violations = await form.evaluate(async (element) =>
         (
           await (window as typeof window & { axe: typeof axe }).axe.run(element, {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+            },
           })
         ).violations.map(({ id }) => id),
       )
