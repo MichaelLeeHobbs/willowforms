@@ -60,6 +60,7 @@ export interface NodeRendererProps {
   /** `undefined` preserves the kit's host defaults. */
   density?: FormDensity | undefined
   node: ComponentNode
+  /** Bindings already resolved. */
   props: Record<string, JsonValue>
   /**
    * Spread onto the outermost DOM element: the designer hit-tests the canvas with
@@ -69,7 +70,9 @@ export interface NodeRendererProps {
   nodeProps: NodeAttributes
   value: JsonValue | undefined
   error: string | undefined
+  /** Evaluated against the current form, context, and row. */
   required?: boolean | undefined
+  /** Resolved in the repeater's enclosing scope. */
   itemLimits?: { min: number; max: number } | undefined
   onChange: (value: JsonValue) => void
   events?: NodeEventHandlers | undefined
@@ -114,6 +117,7 @@ export type NodeRenderer = ComponentType<NodeRendererProps>
 export interface RendererKit {
   id: string
   renderers: Record<string, NodeRenderer>
+  /** Drawn when a document references a type this kit does not implement. */
   fallback?: NodeRenderer
 }
 
