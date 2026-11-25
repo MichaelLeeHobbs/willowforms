@@ -70,7 +70,7 @@ describe("the designer's two dark blocks", () => {
   it('match declaration for declaration, not only token for token', () => {
     const { chosen, system } = darkBlocks(
       designerCss,
-      ".fs-shell[data-fs-theme='dark']",
+      ".fs-shell:where([data-fs-theme='dark'])",
       ".fs-shell:where(:not([data-fs-theme='light']))",
     )
     expect(system, 'the two dark blocks have drifted apart').toEqual(chosen)
@@ -105,7 +105,7 @@ describe.each(
   palettes(
     designerCss,
     '.fs-shell',
-    ".fs-shell[data-fs-theme='dark']",
+    ".fs-shell:where([data-fs-theme='dark'])",
     ".fs-shell:where(:not([data-fs-theme='light']))",
   ),
 )('designer chrome, $name theme', ({ name, tokens }) => {
@@ -187,7 +187,7 @@ describe("the HTML kit's two dark blocks", () => {
   it('declare the same tokens', () => {
     const { chosen, system } = darkBlocks(
       kitCss,
-      ".fsh-screen[data-fsh-theme='dark']",
+      ".fsh-screen:where([data-fsh-theme='dark'])",
       ".fsh-screen:where(:not([data-fsh-theme='light']))",
     )
     expect(system, 'the two dark blocks have drifted apart').toEqual(chosen)
@@ -198,7 +198,7 @@ describe.each(
   palettes(
     kitCss,
     '.fsh-screen',
-    ".fsh-screen[data-fsh-theme='dark']",
+    ".fsh-screen:where([data-fsh-theme='dark'])",
     ".fsh-screen:where(:not([data-fsh-theme='light']))",
   ),
 )('html kit, $name theme', ({ name, tokens }) => {
