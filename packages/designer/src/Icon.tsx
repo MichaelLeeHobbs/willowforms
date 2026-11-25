@@ -200,10 +200,7 @@ export interface IconProps {
   size?: number
 }
 
-/**
- * Decorative: the word it stands for is beside it or in its button's `aria-label`, so naming it
- * would make a screen reader read the label twice.
- */
+/** Decorative: its name is the word beside it, or its button's `aria-label`. */
 export function Icon({ name, size = 16 }: IconProps): ReactNode {
   const glyph = GLYPHS[name]
   if (!glyph) return null

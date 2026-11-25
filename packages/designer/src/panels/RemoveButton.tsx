@@ -1,10 +1,10 @@
-import type { ComponentProps, ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 import { Icon } from '../Icon.js'
 
 export interface RemoveButtonProps extends Omit<
-  ComponentProps<'button'>,
-  'aria-label' | 'children' | 'title' | 'type'
+  ComponentPropsWithoutRef<'button'>,
+  'aria-label' | 'children' | 'type'
 > {
   /** What it removes, for its accessible name. */
   name: string
@@ -18,7 +18,6 @@ export function RemoveButton({ name, className, ...rest }: RemoveButtonProps): R
       type="button"
       className={'fs-remove' + (className ? ' ' + className : '')}
       aria-label={'Remove ' + name}
-      title="Remove"
     >
       <Icon name="trash" size={13} />
     </button>

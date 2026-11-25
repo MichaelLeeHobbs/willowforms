@@ -450,9 +450,9 @@
   opacity: 1;
 }
 
-/* The negative margin keeps every row as tall as its text. */
+/* The margin leaves it no height of its own, so a row is as tall as its text in any host's font. */
 .fs-tree__remove {
-  margin-block: -2px;
+  margin-block: -12px;
   margin-inline-start: auto;
   padding: 0 6px;
   border: 0;

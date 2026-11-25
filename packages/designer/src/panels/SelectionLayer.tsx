@@ -175,6 +175,7 @@ export function SelectionLayer({
               <RemoveButton
                 className="is-danger"
                 name={selectedKey ?? 'component'}
+                title="Remove"
                 onClick={actions.onRemove}
               />
             </div>

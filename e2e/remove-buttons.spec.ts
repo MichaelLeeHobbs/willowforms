@@ -82,7 +82,7 @@ test('every button that removes something draws the trash icon, and × only clos
 
   const expectTrash = async (button: Locator, text = ''): Promise<void> => {
     const icon = button.locator('svg')
-    expect(await icon.innerHTML()).toBe(trash)
+    await expect(icon).toHaveJSProperty('innerHTML', trash)
     await expect(button).toHaveText(text)
     await expect(icon).toHaveCSS(
       'color',
@@ -93,9 +93,10 @@ test('every button that removes something draws the trash icon, and × only clos
     expect(box?.width).toBeGreaterThanOrEqual(24)
     expect(box?.height).toBeGreaterThanOrEqual(24)
   }
-  const expectAll = async (within: Locator, names: string[], text = ''): Promise<void> => {
+  const expectAll = async (region: Locator, names: string[], text = ''): Promise<void> => {
+    await expect(region.getByRole('button', { name: /^Remove/ })).toHaveCount(names.length)
     for (const name of names) {
-      await expectTrash(within.getByRole('button', { name, exact: true }), text)
+      await expectTrash(region.getByRole('button', { name, exact: true }), text)
     }
     await expect(page.getByRole('button').filter({ hasText: /^[×−]/ })).toHaveCount(0)
   }
@@ -108,9 +109,6 @@ test('every button that removes something draws the trash icon, and × only clos
     'Remove trigger',
     'Remove art',
   ])
-  expect((await row('choice').boundingBox())?.height).toBe(
-    (await row('root').boundingBox())?.height,
-  )
 
   await tab('Properties')
   await expectAll(panel, ['Remove option 1'])
@@ -138,4 +136,21 @@ test('every button that removes something draws the trash icon, and × only clos
   await expect(
     page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }),
   ).toHaveText('×')
+})
+
+test('a tree row is as tall as its text, with a Remove button or without', async ({ designer }) => {
+  // Text shorter than the button, which a host's own font and line height can make it.
+  await designer.page.addStyleTag({
+    content: '.fs-shell { --fs-font-size: 10px; line-height: normal }',
+  })
+  const rows = designer.page.locator('[data-fs-tree-row]')
+  expect(await rows.count()).toBeGreaterThan(1)
+  await expect(designer.row('root').getByRole('button')).toHaveCount(0)
+
+  const heights = await rows.evaluateAll((all) =>
+    all.map((each) => each.getBoundingClientRect().height),
+  )
+  // Less than the button and the row's padding, or equal heights would prove nothing.
+  expect(heights[0]).toBeLessThan(24 + 8)
+  expect(new Set(heights).size, heights.join(', ')).toBe(1)
 })
