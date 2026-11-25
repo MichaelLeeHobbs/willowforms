@@ -49,12 +49,6 @@ function normalize(value: unknown): unknown {
   }
 }
 
-/**
- * Load arbitrary JSON into the current canonical document shape.
- *
- * Loading migrates first, fills compatibility defaults, and then performs the
- * complete structural validation gate. The input is never mutated.
- */
 export function loadDocument(value: unknown): DocumentLoadResult {
   try {
     const candidate = normalize(migrate(value))

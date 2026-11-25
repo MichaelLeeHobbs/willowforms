@@ -21,7 +21,6 @@ import type {
   ValidationRule,
 } from './types.js'
 
-/** Depth-first walk, parents before children. */
 export function walk(
   node: ComponentNode,
   fn: (node: ComponentNode, parent?: ComponentNode) => void,
@@ -66,7 +65,6 @@ export function findParent(root: ComponentNode, key: string, depth = 0): Compone
   return undefined
 }
 
-/** Keys from the root down to the target, inclusive. Empty if not found. */
 export function pathTo(root: ComponentNode, key: string): string[] {
   const search = (n: ComponentNode, trail: string[], depth: number): string[] | undefined => {
     if (!n || typeof n !== 'object' || depth > MAX_TREE_DEPTH) return undefined
@@ -81,28 +79,13 @@ export function pathTo(root: ComponentNode, key: string): string[] {
   return search(root, [], 0) ?? []
 }
 
-/** One node's place in the tree, as a flat list in document order. */
 export interface FlatNode {
   node: ComponentNode
-  /** Undefined for the root. */
   parentKey: string | undefined
-  /** Position among its parent's children. */
   index: number
-  /** Root is 0; deeper nodes count up. */
   depth: number
 }
 
-/**
- * The tree as a flat list, parents before children.
- *
- * This is the order the structure panel draws and the order keyboard navigation
- * moves through, so both read it from here rather than each walking the tree and
- * disagreeing about what "the next row" means.
- *
- * It walks the tree itself rather than through `walk`, because each entry needs
- * its index among its parent's children and its depth, and `walk` passes
- * neither to its callback.
- */
 export function flatten(root: ComponentNode): FlatNode[] {
   const out: FlatNode[] = []
   const visit = (
@@ -126,10 +109,6 @@ export function collectKeys(root: ComponentNode): string[] {
   return keys
 }
 
-/**
- * Generate the next free key for a component type: textField, textField2,
- * textField3. Matches the convention users already expect from other builders.
- */
 export function generateKey(root: ComponentNode, type: string): string {
   const camel = type.charAt(0).toLowerCase() + type.slice(1)
 
@@ -284,13 +263,8 @@ export function repointDataKey(
 }
 
 /**
- * How many nodes answer under one data key.
- *
- * Two fields behind opposite `renderWhen` guards writing one answer is a
- * supported shape -- `07-bindings.md` says so -- and it is the case that decides
- * whether a rename should re-point anything. If another node still writes the
- * name, every ref to it still resolves and rewriting them would break the
- * document rather than repair it.
+ * Two fields behind opposite `renderWhen` guards may write one answer. While another node
+ * still writes the name, a rename must not re-point the refs to it.
  */
 export function writersOf(root: ComponentNode, dataKey: string): string[] {
   const keys: string[] = []
@@ -300,7 +274,6 @@ export function writersOf(root: ComponentNode, dataKey: string): string[] {
   return keys
 }
 
-/** A copy of the subtree at `key`, re-keyed. See the block above `repointBinding`. */
 export function duplicateNode(root: ComponentNode, key: string): ComponentNode | undefined {
   const source = findNode(root, key)
   if (!source) return undefined
@@ -338,10 +311,6 @@ export function duplicateNode(root: ComponentNode, key: string): ComponentNode |
   return copy(source)
 }
 
-/**
- * Replace the node matching key, returning a new tree, sharing structure with
- * everything that did not change.
- */
 export function updateNode(
   root: ComponentNode,
   key: string,
@@ -366,7 +335,6 @@ export function updateNode(
   return changed ? { ...root, children } : root
 }
 
-/** Insert a node into the given parent's children at index, appended if omitted. */
 export function insertNode(
   root: ComponentNode,
   parentKey: string,
@@ -389,7 +357,6 @@ export function insertNode(
   })
 }
 
-/** Remove the node matching key. Removing the root is a no-op. */
 export function removeNode(root: ComponentNode, key: string, depth = 0): ComponentNode {
   // Total and bounded, for the reason `updateNode` gives.
   if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return root
@@ -418,10 +385,6 @@ export function removeNode(root: ComponentNode, key: string, depth = 0): Compone
   return changed ? { ...root, children } : root
 }
 
-/**
- * Move a node to a new parent and index. Returns the tree unchanged if the move
- * is illegal: unknown keys, moving the root, or dropping a node inside itself.
- */
 export function moveNode(
   root: ComponentNode,
   key: string,
@@ -442,10 +405,8 @@ export function moveNode(
 }
 
 /**
- * The name a node's value is stored under.
- *
- * One helper, used everywhere data is read or written, so `key` and `dataKey`
- * cannot be used interchangeably by accident.
+ * Every read or write of form data goes through this, so `key` and `dataKey` cannot be used
+ * interchangeably by accident.
  */
 export function dataKeyOf(node: ComponentNode): string {
   return node.dataKey ?? node.key
@@ -599,12 +560,7 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(BUILTIN_ACTION_NAMES)
 const BIDI: ReadonlySet<string> = new Set(BIDI_LIST)
 const ROW_SCOPES: ReadonlySet<string> = new Set(ROW_SCOPE_LIST)
 
-/**
- * How deep a document this gate will walk before refusing it.
- *
- * Far past anything a form has: a hundred levels of nesting is a layout nobody
- * can use, and the panel draws depth by indentation in a 288px pane.
- */
+/** How deep a document this gate will walk before refusing it. */
 export const MAX_TREE_DEPTH = 500
 
 function inspectDocument(doc: unknown): StructuralError[] {
@@ -1083,7 +1039,7 @@ function inspectDocument(doc: unknown): StructuralError[] {
   return errors
 }
 
-/** Validate external document data without throwing on unreadable objects. */
+/** Must not throw on unreadable objects. */
 export function validateDocument(doc: unknown): StructuralError[] {
   try {
     return inspectDocument(doc)
