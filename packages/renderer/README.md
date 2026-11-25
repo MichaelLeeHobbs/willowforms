@@ -7,7 +7,7 @@ It walks a document and resolves property bindings; it knows nothing about which
 the result.
 
 ```bash
-npm install @willowforms/renderer @willowforms/core @willowforms/kit-mui @mui/material@7 @emotion/react @emotion/styled
+npm install @willowforms/renderer @willowforms/core @willowforms/kit-mui @mui/material@9 @emotion/react @emotion/styled
 ```
 
 ```tsx
