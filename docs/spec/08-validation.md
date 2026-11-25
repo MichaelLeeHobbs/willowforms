@@ -195,6 +195,7 @@ submittedAcross(root, data, scopes): FormData
 interface EvalOptions {
   evaluate?: Evaluator      // absent means every `custom` rule and `computed` guard is skipped
   context?: FormContext     // what the host knows: the user, the step, the tenant
+  messages?: Record<string, string> // the active language's bundle, for localized messages
   row?: RowContext          // set by the walk that enters a repeater row, never by a caller
 }
 ```
