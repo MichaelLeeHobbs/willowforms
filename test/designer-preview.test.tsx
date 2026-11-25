@@ -194,6 +194,25 @@ describe('beta authoring regressions', () => {
     expect(canvas.getByRole('status').textContent).toBe('')
   })
 
+  it('keeps a note that the edit itself raised', () => {
+    const view = open([
+      {
+        ...required('Name'),
+        events: {
+          onMount: [{ type: 'builtin', name: 'announce', params: { message: 'Name is here.' } }],
+        },
+      },
+    ])
+    fireEvent.click(view.container.querySelector('[data-fs-key="nameField"]')!)
+    fireEvent.keyDown(view.container.querySelector('.fs-shell')!, { key: 'Delete' })
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const note = within(screen.getByRole('main')).getByRole('status')
+    expect(note.textContent).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(note.textContent).toBe('Name is here.')
+  })
+
   it("checks a field's new value when the field's own action validates", () => {
     open([
       {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent,
@@ -227,8 +227,9 @@ export function Canvas({
     [setActionNote],
   )
 
-  // An edit made in Preview, such as Undo, can make the note untrue.
-  useEffect(() => {
+  // An edit made in Preview, such as Undo, can make the note untrue. A layout effect, so it runs
+  // before the effects that raise `onMount` and `onUnmount`, whose notes are about the edit.
+  useLayoutEffect(() => {
     setActionNote('')
   }, [api.document.root, setActionNote])
 
