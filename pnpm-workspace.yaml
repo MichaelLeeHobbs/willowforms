@@ -1,3 +1,9 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+
+# Strict peers refuse every install that resolves again, because this plugin declares TypeScript 6.
+# Remove it with the TypeScript 6 upgrade.
+peerDependencyRules:
+  allowedVersions:
+    '@vitest/eslint-plugin>typescript': '5'

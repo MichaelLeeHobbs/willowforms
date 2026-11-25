@@ -5,7 +5,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { expectConsoleError } from '../../../test/console-errors.js'
+import { expectCaughtError } from '../../../test/caught-error.js'
 import type { ReactNode } from 'react'
 import type {
   ComponentNode,
@@ -917,10 +917,10 @@ describe('a component that throws while rendering', () => {
     ])
 
   /** React logs a caught error itself, and the gate in test/setup.ts makes each test say so. */
-  const boomLogged = /The above error occurred in the <Boom> component\./
+  const expectBoom = (): void => expectCaughtError('Boom', /kit exploded/)
 
   it('keeps the rest of the form on the page', () => {
-    expectConsoleError(boomLogged)
+    expectBoom()
     render(
       <FormRenderer
         document={documentWithBoom()}
@@ -935,7 +935,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('keeps the row coordinate on the fallback, so the right row stays selectable', () => {
-    expectConsoleError(boomLogged)
+    expectBoom()
     const doc = documentOf([
       {
         key: 'addressList',
@@ -965,7 +965,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('marks a revealed component that failed as revealed', () => {
-    expectConsoleError(boomLogged)
+    expectBoom()
     const doc = documentOf([
       {
         key: 'boom',
@@ -990,7 +990,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('leaves the mark off a failed component the form really asks for', () => {
-    expectConsoleError(boomLogged)
+    expectBoom()
     const { container } = render(
       <FormRenderer
         document={documentWithBoom()}
@@ -1006,7 +1006,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('says so where the component would have been', () => {
-    expectConsoleError(boomLogged)
+    expectBoom()
     const { container } = render(
       <FormRenderer
         document={documentWithBoom()}
@@ -1022,7 +1022,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('keeps the node selectable, which is how an author removes it', () => {
-    expectConsoleError(boomLogged)
+    expectBoom()
     const { container } = render(
       <FormRenderer
         document={documentWithBoom()}
@@ -1038,7 +1038,7 @@ describe('a component that throws while rendering', () => {
   })
 
   it('hands the error to the host rather than swallowing it', () => {
-    expectConsoleError(boomLogged)
+    expectBoom()
     const onError = vi.fn()
     render(
       <FormRenderer
@@ -1247,7 +1247,7 @@ describe('a throw from RenderNode before it reaches the kit component', () => {
   })
 
   it('draws the fallback for the node that threw', () => {
-    expectConsoleError(/the kit blew up looking up Field/)
+    expectCaughtError('RenderNodeBody', /the kit blew up looking up Field/)
     const onError = vi.fn()
     const { container } = render(
       <FormRenderer
@@ -1266,7 +1266,7 @@ describe('a throw from RenderNode before it reaches the kit component', () => {
   })
 
   it('keeps the rest of the form, which is what per-node means', () => {
-    expectConsoleError(/the kit blew up looking up Field/)
+    expectCaughtError('RenderNodeBody', /the kit blew up looking up Field/)
     const { container } = render(
       <FormRenderer
         document={documentOf([field('broken'), { key: 'ok', type: 'Screen', props: {} }])}
@@ -1282,7 +1282,7 @@ describe('a throw from RenderNode before it reaches the kit component', () => {
   })
 
   it('draws a fallback when the document root itself throws, rather than a blank tree', () => {
-    expectConsoleError(/the kit blew up looking up Screen/)
+    expectCaughtError('RenderNodeBody', /the kit blew up looking up Screen/)
     const onError = vi.fn()
     const { container } = render(
       <FormRenderer
@@ -1464,7 +1464,7 @@ describe('a document shaped in ways the type forbids', () => {
 
 describe('a boundary after the cause has gone', () => {
   it('draws the component again when the node it wraps changes', () => {
-    expectConsoleError(/this type never renders/)
+    expectCaughtError('Broken', /this type never renders/)
     const throwing: RendererKit = {
       id: 'sometimes',
       renderers: {
@@ -1500,7 +1500,7 @@ describe('a boundary after the cause has gone', () => {
   })
 
   it('keeps the fallback while the cause is still there', () => {
-    expectConsoleError(/this type never renders/)
+    expectCaughtError('Broken', /this type never renders/)
     const throwing: RendererKit = {
       id: 'always',
       renderers: {
@@ -1678,7 +1678,7 @@ describe('the node boundary letting go', () => {
     ])
 
   it('comes back when the prop that broke it is repaired', () => {
-    expectConsoleError(/the kit refused this label/)
+    expectCaughtError('Fussy', /the kit refused this label/)
     const { container, rerender } = render(
       <FormRenderer
         document={withLabel('boom')}
@@ -1707,7 +1707,7 @@ describe('the node boundary letting go', () => {
   })
 
   it('stays down while the prop is still broken', () => {
-    expectConsoleError(/the kit refused this label/)
+    expectCaughtError('Fussy', /the kit refused this label/)
     // A fresh but equal document, as from a host that rebuilds it each render:
     // a retry keyed on identity rather than content would loop forever.
     const { container, rerender } = render(
@@ -1732,7 +1732,7 @@ describe('the node boundary letting go', () => {
   })
 
   it('recovers when the renderer kit changes', () => {
-    expectConsoleError(/the first kit failed/)
+    expectCaughtError('Field', /the first kit failed/)
     const document = withLabel('fine')
     const data = {}
     const onChange = (): void => undefined
@@ -1761,7 +1761,7 @@ describe('the node boundary letting go', () => {
   })
 
   it('recovers when the field data changes', () => {
-    expectConsoleError(/the value failed/)
+    expectCaughtError('ValueFussy', /the value failed/)
     const ValueFussy = ({ nodeProps, value }: NodeRendererProps): ReactNode => {
       if (value === 'boom') throw new Error('the value failed')
       return <div {...nodeProps}>{typeof value === 'string' ? value : ''}</div>
