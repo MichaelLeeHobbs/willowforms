@@ -1,14 +1,8 @@
 /**
- * Rule evaluation.
+ * Pure, so the browser and the server run the same rules.
  *
- * Pure, so the same rules run in the browser during preview and in Node on the server.
- * That symmetry is the point: a form's validation should not be reimplemented on the
- * backend and drift.
- *
- * `custom` rules and `computed` guards need a JS evaluator, which core deliberately
- * does not provide. The host injects one. With no evaluator, a rule with a computed
- * guard is skipped and `custom` rules pass, so a missing sandbox degrades to permissive
- * rather than throwing.
+ * Core deliberately provides no JS evaluator. Without a host's, a rule with a `computed`
+ * guard is skipped and a `custom` rule passes.
  */
 
 import { RE2JS } from 're2js'
@@ -119,7 +113,6 @@ const PATTERN_INPUT_LIMIT = 4096
  * character can cause.
  */
 const PATTERN_PROGRAM_LIMIT = 512
-/* Compilation is far costlier than a short match, and a repeater applies one rule to every row. */
 const PATTERN_CACHE_LIMIT = 256
 
 type CompiledPattern = { regex: RE2JS } | { problem: string }

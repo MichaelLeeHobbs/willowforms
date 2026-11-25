@@ -168,7 +168,6 @@ describe('mutations: what they return, and what they leave alone', () => {
     const before = fixture()
     const after = updateNode(before, 'a', (n) => ({ ...n, props: { label: prop('Hi') } }))
     expect(findNode(after, 'a')?.props['label']).toEqual({ kind: 'static', value: 'Hi' })
-    // Untouched subtrees keep referential identity, which is what memoisation needs.
     expect(findNode(after, 'c')).toBe(findNode(before, 'c'))
     expect(findNode(after, 'b')).toBe(findNode(before, 'b'))
     expect(findNode(after, 'stack')).not.toBe(findNode(before, 'stack'))

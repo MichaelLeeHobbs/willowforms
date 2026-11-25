@@ -236,10 +236,7 @@ export function toJsonSchema(document: FormDocument): JsonSchema {
   return schema
 }
 
-/**
- * One object of the projection: a form, or one row of a repeater. A row's
- * `required` belongs inside its `items`, never on the document.
- */
+/** A row's `required` belongs inside its `items`, never on the document. */
 function objectFor(
   root: ComponentNode,
 

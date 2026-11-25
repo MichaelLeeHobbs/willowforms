@@ -83,11 +83,6 @@ export function optionValue(options: readonly unknown[], submitted: string): Jso
   return submitted
 }
 
-/**
- * Kits call `optionEntry` once per option inside `options.map`, so the table is
- * cached per list or rendering a select is quadratic. Keyed by identity: hashing
- * the contents would repeat the walk.
- */
 const tables = new WeakMap<readonly unknown[], string[]>()
 
 function valuesFor(all: readonly unknown[]): string[] {

@@ -93,7 +93,6 @@ const WALKERS: Walker[] = [
   {
     name: 'evaluate, through and',
     drive: () => evaluateCondition(deepAnd(DEPTH), {}),
-    // An unreadable rule evaluates to false, which hides the component.
     read: (result) => result,
     answer: false,
   },
@@ -209,8 +208,6 @@ const WALKERS: Walker[] = [
 describe('a recursive walker driven past its bound', () => {
   it.each(WALKERS)('$name answers instead of throwing', ({ drive, read, answer }) => {
     expect(drive).not.toThrow()
-    // Driven again rather than captured inside the matcher, so a row that throws
-    // fails on the throw above rather than on a confusing undefined below.
     expect(read(drive())).toEqual(answer)
   })
 

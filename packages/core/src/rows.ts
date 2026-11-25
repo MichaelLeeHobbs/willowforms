@@ -143,14 +143,7 @@ export interface KeyScopes {
   row?: string[]
 }
 
-/**
- * The one collector behind `keyScopesFor` (the picker) and `rowScopeProblems`
- * (validation), so a key the picker offers is one validation accepts.
- *
- * A repeater's own data key is an answer in the scope that holds the repeater.
- * What is inside it is an answer in *its* rows. A set, because data keys may
- * legally repeat: two fields behind opposite guards can write one answer.
- */
+/** Shared by the picker and validation, so a key the picker offers is one validation accepts. */
 function gatherKeys(node: ComponentNode, names: Set<string>, depth: number): void {
   if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
   if (node.schema) names.add(dataKeyOf(node))

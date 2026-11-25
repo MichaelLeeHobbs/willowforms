@@ -4,13 +4,7 @@ import { expressionData } from './rows.js'
 import type { ComponentNode, FormData } from './types.js'
 import type { EvalOptions } from './validation.js'
 
-/**
- * A host's evaluator, run without letting it take the caller down. The expression is
- * authored a character at a time, so it throws for most of the time it is being typed.
- *
- * A throw reads as hidden, which is the answer a missing evaluator gets and what the
- * renderer draws: `resolveProp` gives null for both.
- */
+/** A throw reads as hidden, like a missing evaluator: `resolveProp` gives null for both. */
 function runs(
   evaluate: NonNullable<EvalOptions['evaluate']>,
   expression: string,

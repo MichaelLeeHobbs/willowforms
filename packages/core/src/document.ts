@@ -6,10 +6,7 @@ import type { StructuralError } from './tree.js'
 
 export const CURRENT_DOCUMENT_VERSION: FormDocument['version'] = '1'
 
-/*
- * Bounds the work loading an in-memory value can cause. A default text field is
- * about 19 values, so this admits tens of thousands of components.
- */
+/* Bounds the work loading an in-memory value can cause. */
 const DOCUMENT_VALUE_LIMIT = 1_000_000
 
 export type DocumentLoadResult =
@@ -18,11 +15,7 @@ export type DocumentLoadResult =
 type DocumentRecord = Record<string, unknown>
 type Migration = (document: DocumentRecord) => DocumentRecord
 
-/*
- * Add version N -> N+1 migrations here when a second document version is
- * introduced. Migrations are pure and total; structural validation runs after
- * the chain reaches the current version.
- */
+/* A migration must be pure and total: it runs before structural validation. */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {}
 
 function migrate(value: unknown): unknown {

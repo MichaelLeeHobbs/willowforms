@@ -915,7 +915,6 @@ describe('validateForm and a body with too many rows', () => {
     const errors = validateForm(root, data)
 
     expect(Object.keys(errors).length).toBeLessThan(100_000)
-    // Says so, rather than quietly validating a prefix.
     expect(Object.values(errors).join(' ')).toContain('rows')
   })
 })
@@ -1157,7 +1156,6 @@ describe('a ref from a nested row to an answer only an outer row holds', () => {
     root: { key: 'root', type: 'Screen', props: {}, children },
   })
 
-  /** `orders` rows hold `reference` and `lines`; `lines` rows hold `target`. */
   const nested = (target: Partial<Target>, inLines: ComponentNode[] = []): ComponentNode =>
     repeater('orderList', 'orders', [
       field('referenceField', 'reference'),
@@ -1220,7 +1218,6 @@ describe('a ref from a nested row to an answer only an outer row holds', () => {
         expect(errors[0]?.message).toContain(dataKey + ', which only an outer row holds')
         expect(errors[0]?.message).not.toMatch(/scope|read this row/)
 
-        // The picker refuses the same name, so the two still agree.
         const offered = keyScopesFor(document.root, 'targetField')
         expect(offered).toEqual({ form: ['orders'], row: ['target'] })
       })
@@ -1317,7 +1314,6 @@ describe('a ref from a nested row to an answer only an outer row holds', () => {
     const after = { ...before, root: moveNode(before.root, 'movedField', 'lineList') }
 
     expect(findParent(after.root, 'movedField')?.key).toBe('lineList')
-    // Hidden, so its required rule no longer runs.
     expect(validateForm(after.root, data)).toEqual({})
     expect(reported(after)).toEqual([['row-scope', 'movedField']])
   })

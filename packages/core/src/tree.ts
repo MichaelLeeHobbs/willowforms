@@ -111,7 +111,7 @@ export function flatten(root: ComponentNode): FlatNode[] {
     index: number,
     depth: number,
   ): void => {
-    // Total and bounded, like `walk`: `autoValidateKeys` runs it on host trees.
+    // Total and bounded, like `walk`: a host's tree may be unvalidated.
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     out.push({ node, parentKey, index, depth })
     childNodesOf(node).forEach((child, i) => visit(child, node.key, i, depth + 1))
@@ -348,10 +348,7 @@ export function updateNode(
   update: (node: ComponentNode) => ComponentNode,
   depth = 0,
 ): ComponentNode {
-  /*
-   * Total and bounded, like `walk`: `store.ts` warns about an invalid host
-   * document rather than refusing it, so this runs on unvalidated trees.
-   */
+  // Total and bounded, like `walk`: a host's tree may be unvalidated.
   if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return root
   if (root.key === key) return update(root)
   if (!Array.isArray(root.children)) return root
@@ -823,7 +820,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
 
       if (value['kind'] === 'ref') {
         text(value['dataKey'], what + "'s data key")
-        // Absent means the form.
         if (value['scope'] !== undefined) oneOf(value['scope'], ROW_SCOPES, what + "'s scope")
         return
       }
