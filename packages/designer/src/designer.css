@@ -389,6 +389,21 @@
   color: var(--fs-text-muted);
 }
 
+/* At least the target size WCAG 2.5.8 asks for, which the glyph alone does not reach. */
+.fs-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+/* Overrides the muted `.fs-icon` colour, so the glyph follows its button's hover and selection. */
+.fs-remove .fs-icon {
+  color: inherit;
+}
+
 .fs-tree__list {
   margin: 0;
   padding: 0;
@@ -399,6 +414,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
+  /* Holds the Remove button, which would cover the next row's in a shorter one. */
+  min-height: 24px;
   padding: 4px 8px;
   border-radius: var(--fs-radius);
   cursor: pointer;
@@ -435,7 +453,9 @@
   opacity: 1;
 }
 
+/* The margin leaves it no height of its own, so it makes no row taller, whatever the host's font. */
 .fs-tree__remove {
+  margin-block: -12px;
   margin-inline-start: auto;
   padding: 0 6px;
   border: 0;
@@ -1426,7 +1446,7 @@
 
 .fs-condition__remove {
   flex: 0 0 auto;
-  padding: 2px 6px;
+  padding: 0;
 }
 
 .fs-style__heading {
