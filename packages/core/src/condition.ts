@@ -21,12 +21,12 @@ export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth =
 }
 
 /**
- * `evaluate` and `same` must never throw, and a stored document nests as deep as whoever
- * wrote it chose: an overflow is an unhandled 500 on submit and a blank form in the
- * browser.
+ * `evaluate` and `same` are total, and a stored document nests as deep as whoever wrote it
+ * chose: a `RangeError` out of `isVisible` is an unhandled 500 on submit and a blank form
+ * in the browser.
  *
- * Every walker that crosses a condition stops here. A higher bound would accept documents
- * the renderer cannot answer.
+ * Every walker that crosses a condition has to stop where the evaluator stops: a gate with
+ * a higher bound would accept documents the renderer cannot answer.
  */
 export const MAX_CONDITION_DEPTH = 200
 

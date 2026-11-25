@@ -9,7 +9,10 @@ import type { ComponentNode, Device } from './types.js'
 import { walk } from './tree.js'
 
 export interface StyleSheetOptions {
-  /** For a canvas that simulates a width: emits only this device's rules, with no media query. */
+  /**
+   * For a canvas that simulates a width: emits `any` and this device's rules, with no media
+   * query.
+   */
   device?: Device | undefined
   /**
    * Keys are unique within a document, not a page: without this, one form's rules style

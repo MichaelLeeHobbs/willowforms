@@ -8,15 +8,10 @@ export type PropValue =
   | { kind: 'static'; value: JsonValue }
   /** A JS expression evaluated against the live form at render time. */
   | { kind: 'computed'; expression: string }
-  /** A lookup into the active language's translation bundle. */
   | { kind: 'i18n'; key: string }
   /**
-   * A structured condition, evaluated by core with no sandbox.
-   *
-   * Resolves to a boolean, so it is meant for `renderWhen`, a rule's `when`
-   * guard, and properties that take one. Nothing stops it being set on a label,
-   * where it renders as `true` or `false`; the panel only offers it where it
-   * makes sense, which is the same way `i18n` is offered only on copy.
+   * Evaluated by core with no sandbox. Resolves to a boolean, so on a label it renders as
+   * `true` or `false`.
    */
   | { kind: 'condition'; condition: Condition }
 

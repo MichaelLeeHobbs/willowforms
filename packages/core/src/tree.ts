@@ -86,6 +86,7 @@ export interface FlatNode {
   depth: number
 }
 
+/** Not through `walk`, which passes neither index nor depth. */
 export function flatten(root: ComponentNode): FlatNode[] {
   const out: FlatNode[] = []
   const visit = (
@@ -404,10 +405,7 @@ export function moveNode(
   return insertNode(removeNode(root, key), newParentKey, node, index)
 }
 
-/**
- * Every read or write of form data goes through this, so `key` and `dataKey` cannot be used
- * interchangeably by accident.
- */
+/** Form data is keyed by this, never by `node.key`. */
 export function dataKeyOf(node: ComponentNode): string {
   return node.dataKey ?? node.key
 }

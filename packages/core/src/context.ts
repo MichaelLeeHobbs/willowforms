@@ -70,9 +70,9 @@ export function contextKeys(root: ComponentNode): Set<string> {
 }
 
 /**
- * Ask once at startup. Without an evaluator `isVisible` answers false, so the node and its
- * whole subtree leave `validateForm`: a host that injects one only in the browser has a
- * server that calls an unchecked form fine.
+ * Ask once at startup. Without an evaluator a `computed` `renderWhen` takes its node and
+ * its whole subtree out of `validateForm`: a host that injects one only in the browser has
+ * a server that calls an unchecked form fine.
  *
  * Total, because that is before anything has refused the document.
  */

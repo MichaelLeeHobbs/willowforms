@@ -39,7 +39,7 @@ export interface EvalOptions {
   context?: FormContext | undefined
   /** Active-language strings used by localized validation messages. */
   messages?: Record<string, string> | undefined
-  /** Set by the walk that enters a row, never by a caller. */
+  /** Set by the walk that enters a row, never by a host. */
   row?: RowContext | undefined
 }
 

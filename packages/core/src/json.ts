@@ -60,8 +60,8 @@ export function optionValues(options: readonly unknown[]): string[] {
 }
 
 /**
- * `submitted` is `event.target.value`, always a string. One that matches nothing is the
- * empty placeholder, returned as it is.
+ * `submitted` is a value `optionEntry` rendered from the same list. One that matches
+ * nothing, such as the empty placeholder, is returned as it is.
  */
 export function optionValue(options: readonly unknown[], submitted: string): JsonValue {
   const values = optionValues(options)
@@ -89,7 +89,7 @@ function valuesFor(all: readonly unknown[]): string[] {
 export function optionEntry(
   option: JsonValue | undefined,
   index: number,
-  /** Without it, two options can render the same value. See `optionValues`. */
+  /** Without it, two options can render the same value. */
   all?: readonly unknown[],
 ): { value: string; label: string } {
   const record =
@@ -163,8 +163,8 @@ export function valueOf(data: FormData, dataKey: string): JsonValue | undefined 
 }
 
 /**
- * Own properties of plain objects only, at every step: `constructor.prototype` is a path
- * somebody can type.
+ * Own properties only, at every step, and never a string's or an array's:
+ * `constructor.prototype` is a path somebody can type.
  *
  * A key containing a dot, and a step through an array, are unreachable on purpose: an
  * escape syntax is a parser in the middle of a security boundary, and rows have their own

@@ -88,7 +88,7 @@ export function expressionData(data: FormData, row: RowContext | undefined): For
 
 export interface KeyScopes {
   form: string[]
-  /** Absent: not inside a row. Empty: inside a row that holds nothing else yet. */
+  /** Absent: not inside a row. Empty: inside a row that holds no answers. */
   row?: string[]
 }
 

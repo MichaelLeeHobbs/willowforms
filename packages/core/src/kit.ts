@@ -69,7 +69,6 @@ export interface PropSchema {
 }
 
 export interface ComponentDef {
-  /** Matches `ComponentNode.type`. */
   type: string
   label: string
   group: PaletteGroup
