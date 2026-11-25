@@ -24,7 +24,10 @@
   --fs-panel-width: 288px;
   --fs-scrollbar-thumb: #737e77;
   --fs-font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --fs-font-size-xs: 11px;
+  --fs-font-size-sm: 12px;
   --fs-font-size: 14px;
+  --fs-font-size-lg: 16px;
 
   --fs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -251,7 +254,7 @@
 
 .fs-panel__heading {
   margin: 0 0 14px;
-  font-size: 16px;
+  font-size: var(--fs-font-size-lg);
   font-weight: 600;
   color: var(--fs-text);
 }
@@ -312,7 +315,7 @@
 
 .fs-palette__group-title {
   margin: 20px 0 8px;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   font-weight: 600;
   color: var(--fs-text-muted);
 }
@@ -366,7 +369,7 @@
   display: block;
   margin-block-start: 3px;
   color: var(--fs-text-muted);
-  font-size: 11px;
+  font-size: var(--fs-font-size-xs);
   line-height: 1.4;
 }
 
@@ -450,7 +453,7 @@
 }
 
 .fs-tree__type {
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   opacity: 0.75;
 }
 
@@ -517,7 +520,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   color: var(--fs-text-muted);
 }
 
@@ -626,7 +629,7 @@
   width: 100%;
   min-height: 46vh;
   font-family: var(--fs-font-mono);
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   line-height: 1.5;
   color: var(--fs-text);
   padding: 8px;
@@ -645,7 +648,7 @@
   background: var(--fs-bg-well);
   border: 1px solid var(--fs-danger);
   border-radius: var(--fs-radius);
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   line-height: 1.6;
 }
 
@@ -685,7 +688,7 @@
 
 .fs-dialog__note {
   margin: 12px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   line-height: 1.6;
   color: var(--fs-text-muted);
 }
@@ -712,7 +715,7 @@
 
 .fs-binding__mode {
   align-self: start;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
 }
 
 .fs-binding__expression,
@@ -720,7 +723,7 @@
   display: block;
   width: 100%;
   font-family: var(--fs-font-mono);
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
 }
 
 .fs-binding__languages {
@@ -734,7 +737,7 @@
 
 .fs-binding__languages label {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-font-size-xs);
   color: var(--fs-text-muted);
 }
 
@@ -772,7 +775,7 @@
 }
 
 .fs-languages__name code {
-  font-size: 11px;
+  font-size: var(--fs-font-size-xs);
   color: var(--fs-text-muted);
 }
 
@@ -781,7 +784,7 @@
   align-items: center;
   gap: 12px;
   margin-block-start: 6px;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
 }
 
 .fs-languages__controls label {
@@ -797,7 +800,7 @@
 
 .fs-languages__error {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   color: var(--fs-danger);
 }
 
@@ -806,7 +809,7 @@
   align-items: center;
   gap: 6px;
   margin: 16px 0 8px;
-  font-size: 11px;
+  font-size: var(--fs-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -868,7 +871,7 @@
 .fs-rule__note,
 .fs-rules__note {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   line-height: 1.5;
   color: var(--fs-text-muted);
 }
@@ -903,7 +906,7 @@
   display: grid;
   gap: 4px;
   color: var(--fs-text-muted);
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
 }
 
 .fs-action__head {
@@ -951,7 +954,7 @@
   transform: translate(12px, 12px);
   padding: 3px 8px;
   border-radius: var(--fs-radius);
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   line-height: 1.5;
   white-space: nowrap;
   color: var(--fs-primary-text);
@@ -1088,7 +1091,7 @@
 
 .fs-empty__title {
   color: var(--fs-text);
-  font-size: 16px;
+  font-size: var(--fs-font-size-lg);
 }
 
 .fs-toolbar__group {
@@ -1250,7 +1253,7 @@
   margin-block-end: 4px;
   padding: 1px 6px;
   border-radius: var(--fs-radius-sm);
-  font-size: 11px;
+  font-size: var(--fs-font-size-xs);
   line-height: 1.5;
   white-space: nowrap;
   color: var(--fs-primary-text);
@@ -1271,7 +1274,7 @@
   padding: 8px;
   max-height: 180px;
   overflow: auto;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   background: var(--fs-bg-well);
   border-radius: var(--fs-radius);
 }
@@ -1322,20 +1325,20 @@
 }
 
 .fs-prop-row__caption {
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   color: var(--fs-text-muted);
 }
 
 .fs-prop-row__hint {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   color: var(--fs-text-muted);
 }
 
 .fs-prop-row__clear {
   padding: 2px 6px;
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
 }
 
 .fs-color {
@@ -1387,7 +1390,7 @@
   display: block;
   inline-size: 100%;
   font-family: var(--fs-font-mono);
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   line-height: 1.5;
   white-space: pre;
   overflow-wrap: normal;
@@ -1397,7 +1400,7 @@
 .fs-code__count {
   margin: 2px 0 0;
   color: var(--fs-text-muted);
-  font-size: 11px;
+  font-size: var(--fs-font-size-xs);
   text-align: end;
 }
 
@@ -1458,7 +1461,7 @@
 .fs-style__heading {
   margin: 12px 0 8px;
   color: var(--fs-text);
-  font-size: 16px;
+  font-size: var(--fs-font-size-lg);
   font-weight: 600;
 }
 
@@ -1531,7 +1534,7 @@
 .fs-style-tools__hint {
   margin: 0;
   color: var(--fs-text-muted);
-  font-size: 11px;
+  font-size: var(--fs-font-size-xs);
 }
 
 .fs-style-tools__section {
@@ -1557,7 +1560,7 @@
 .fs-advanced > summary {
   margin-block-end: 10px;
   color: var(--fs-text-muted);
-  font-size: 12px;
+  font-size: var(--fs-font-size-sm);
   cursor: pointer;
 }
 
