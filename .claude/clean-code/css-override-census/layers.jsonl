@@ -1,0 +1,6 @@
+{"t":"layer","name":"guide","order":0}
+{"t":"layer","name":"selection","order":1}
+{"t":"layer","name":"drag","order":2}
+{"t":"assign","value":1,"layer":"guide"}
+{"t":"assign","value":4000,"layer":"selection"}
+{"t":"assign","value":5000,"layer":"drag"}
