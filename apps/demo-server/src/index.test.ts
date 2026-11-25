@@ -16,7 +16,6 @@ const directory = await mkdtemp(join(tmpdir(), 'willowforms-demo-'))
 const store = join(directory, 'forms.json')
 process.env['WILLOWFORMS_DEMO_STORE'] = store
 
-// No `computed` binding: this server has no evaluator and would refuse the document.
 const FORM: FormDocument = {
   version: '1',
   id: 'deep',
@@ -59,7 +58,7 @@ const restore = async (): Promise<void> => {
   await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
 }
 
-/** For a describe whose tests change the store or read all of it: some above leave forms in it. */
+/** For a describe whose tests change the store or read all of it. */
 const restoreAroundEach = (): void => {
   beforeEach(restore)
   afterEach(restore)
@@ -343,7 +342,6 @@ describe('a signal arriving mid-write', () => {
 
     stopper({ close: (done) => (closed = done) }, exit)('SIGTERM')
 
-    // Not yet: an in-flight PUT may be between `writeFile` and `rename`.
     expect(exit).not.toHaveBeenCalled()
 
     closed?.()
@@ -390,7 +388,6 @@ describe('a store holding something that is not a document', () => {
       defaultLanguage: 'en',
       translations: {},
     },
-    // Only a hand-edited file can produce this: `validateDocument` rejects it on write.
     scalarLanguage: {
       version: '1',
       id: 'scalarLanguage',
@@ -505,7 +502,6 @@ describe('a document PUT that the read guard would refuse', () => {
       }
       const said = (body.errors ?? []).map((e) => e.message).join(' ')
 
-      // `validateDocument` accepts both absences, so naming them proves the storage guard answered.
       for (const field of ['actions', 'settings']) {
         expect(said, field + ' was not named').toContain(field)
       }
@@ -539,7 +535,6 @@ describe('a document PUT that the read guard would refuse', () => {
 })
 
 describe('the origins another page may call from', () => {
-  // A browser enforces this, so these read the header a browser acts on.
   const allowed = async (origin: string): Promise<string | null> =>
     (await app.request('/api/forms', { headers: { origin } })).headers.get(
       'access-control-allow-origin',

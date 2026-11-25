@@ -471,12 +471,8 @@ export interface StructuralError {
   key?: string
 }
 
-/*
- * Written out because an untrusted string is checked against them at runtime.
- * `satisfies` refuses a string outside the union and `Covers` refuses a missing
- * member, so a new kind or rule stops the build. Not read from
- * `DEFAULT_MESSAGES`: `validation.ts` imports this file, so that is a cycle.
- */
+// `RULE_KEY_LIST` is not read from `DEFAULT_MESSAGES`: `validation.ts` imports this file, so
+// that is a cycle.
 const BINDING_KIND_LIST = [
   'static',
   'computed',
@@ -711,7 +707,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
       }
       seen.add(key)
 
-      // The rule a rename is judged by. The emptiness check above is more specific.
       const problem = keyProblem(key)
       if (problem) {
         errors.push({ code: 'invalid-key', message: 'Component ' + key + ': ' + problem, key })
@@ -1018,8 +1013,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
           )
           continue
         }
-        // Only a `code` reference names something on the document. A `builtin` is one
-        // of core's own names.
         if (ref['type'] === 'builtin') {
           if (!BUILTIN_ACTIONS.has(name)) {
             malformed('Component ' + key + ' references unknown built-in action ' + name + '.')
@@ -1040,11 +1033,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
 
   visit(candidate['root'], 'root')
 
-  /*
-   * A condition inside a repeater that reads a row's field at form scope reads
-   * nothing, hides its component, and takes it out of validation. Decidable
-   * from the tree, so it is reported here rather than discovered per submit.
-   */
   const rootNode = candidate['root']
   if (isRecord(rootNode)) {
     for (const found of rowScopeProblems(rootNode as unknown as ComponentNode)) {
@@ -1061,7 +1049,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
   const tags = languages.map((language) => {
     if (!isRecord(language) || typeof language['code'] !== 'string') return undefined
 
-    // `name` is the language selector's label and `bidi` becomes `dir`.
     if (typeof language['name'] !== 'string') malformed('every language needs a name.')
     if (!BIDI.has(language['bidi'] as string)) {
       malformed(

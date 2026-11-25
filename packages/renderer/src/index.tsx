@@ -152,15 +152,16 @@ interface RenderContext {
 const Ctx = createContext<RenderContext | null>(null)
 const DensityCtx = createContext<FormDensity | undefined>(undefined)
 
+// Identity must hold across renders: `NodeBoundary` retries a failed node when the context
+// changes, so a fresh literal loops if the host sets state in `onError`.
 const NO_ERRORS: FormErrors = Object.freeze({})
 const NO_TRANSLATIONS: Record<string, string> = Object.freeze({})
 const NO_NAVIGATION: ReadonlyMap<string, NodeNavigation> = new Map()
 const NO_DATA: FormData = Object.freeze({})
 
 /**
- * Anything other than `static` and `i18n` counts as reading `data`, unknown
- * kinds included: a wrong guess that way costs a memo, the other way a prop
- * resolved against an empty form.
+ * Unknown kinds count as reading `data`: the other guess resolves a prop against an empty
+ * form.
  */
 function readsData(node: ComponentNode): boolean {
   const props: unknown = node.props
@@ -398,8 +399,7 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
   const { scope, revealHidden, kit, data, errors, translations, options, onChange, dispatch } = ctx
   const row = useContext(RowCtx)
 
-  // Everything a rule reads has to know which row it is in, or the renderer and
-  // validateForm disagree about what is on screen.
+  // Row included, or the renderer and validateForm disagree about what is on screen.
   const scoped = useMemo<EvalOptions>(
     () => ({ ...options, ...(row ? { row } : {}) }),
     [options, row],
@@ -417,8 +417,6 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
       ? props['density']
       : inheritedDensity
 
-  // `address` memoises on this string, not on `node`: depending on the node
-  // gives `handleChange` a new identity on any edit to it.
   const dataKey = dataKeyOf(node)
   const address = useMemo(() => addressOf(row?.path ?? NO_ROWS, dataKey), [row, dataKey])
   const handleChange = useCallback(
@@ -518,7 +516,6 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
 
 const EMPTY_ROWS: FormData[] = []
 
-/** The row an empty repeater draws while authored. Shared: `Row` memoises on it by identity. */
 const AUTHORED_ROW: FormData[] = [{}]
 
 export interface FormNavigation {

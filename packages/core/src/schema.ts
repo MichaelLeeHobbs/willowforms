@@ -85,8 +85,6 @@ export function unexportableRules(document: FormDocument): { key: string; rule: 
         continue
       }
 
-      // A measuring rule on a type `withRule` exports no keyword for. The form still
-      // enforces it, so the loss has to be reported.
       // Asked on the exported type, as `withRule` asks it: `date` and `file` export as
       // `string`.
       const exported = node.schema ? baseType(node.schema.type).type : undefined
@@ -294,9 +292,8 @@ function objectFor(
     for (const child of childNodesOf(node)) visit(child, depth + 1)
   }
 
-  // The document's root can itself be a field. Visiting it and then its children too
-  // would walk every child twice.
-  // Seeded from the caller's depth so nested repeaters share one bound.
+  // The document's root can itself be a field. Seeded from the caller's depth so nested
+  // repeaters share one bound.
   if (root.schema && !isRowScope(root)) visit(root, from)
   else for (const child of childNodesOf(root)) visit(child, from)
 

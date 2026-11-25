@@ -56,11 +56,8 @@ function operand(
   if (value.kind === 'ref') {
     if (typeof value.dataKey !== 'string') return UNREADABLE
 
-    /*
-     * `row` reads the enclosing row and never falls back to the form: once a name can
-     * mean either, no caller can tell which one it got. With no enclosing row it reads
-     * as unanswered.
-     */
+    // `row` never falls back to the form: once a name can mean either, no caller can tell
+    // which one it got.
     if (value.scope === 'row') return row ? valueOf(row.values, value.dataKey) : undefined
 
     return valueOf(data, value.dataKey)

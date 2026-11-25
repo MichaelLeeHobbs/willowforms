@@ -2,12 +2,9 @@
  * @vitest-environment jsdom
  */
 
-/*
- * MUI's `sx` multiplies a bare number by a theme value (`padding` by
- * `theme.spacing`, `borderRadius` by `theme.shape.borderRadius`), so an
- * authored length must reach it as pixels. The cross-kit half is in
- * `test/kit-contract.test.tsx`.
- */
+// MUI's `sx` multiplies a bare number by a theme value (`padding` by `theme.spacing`,
+// `borderRadius` by `theme.shape.borderRadius`), so an authored length must reach it as
+// pixels.
 
 import { fireEvent, render } from '@testing-library/react'
 import { ThemeProvider, createTheme } from '@mui/material/styles'

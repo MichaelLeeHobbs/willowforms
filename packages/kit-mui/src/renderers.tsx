@@ -48,9 +48,8 @@ const px = (value: number): string => String(value) + 'px'
 
 const GAP = 16
 
-// MUI wires `aria-describedby` only when the field has an `id` and helper text,
-// so an empty helper becomes a non-breaking space. It also reserves the line
-// for an error.
+// MUI wires `aria-describedby` only when the field has an `id` and helper text, so an empty
+// helper becomes a non-breaking space.
 const message = (error: string | undefined, helper: string): string => error ?? (helper || ' ')
 
 const alertWhenError = (error: string | undefined): { role?: 'alert' } =>
@@ -136,7 +135,8 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
   )
 }
 
-// A kit never learns a row's address: it adds or removes a row by writing the whole list.
+// `children` is already expanded, one entry per row. Add or remove a row by writing the whole
+// list.
 function RepeaterNode({
   node,
   itemLimits: limits = itemLimits(node),
@@ -773,8 +773,7 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 function LinkNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const href = safeHref(props['href'])
   const blank = props['target'] === 'blank'
-  // A refused address renders as text: a link that does nothing is worse than
-  // none.
+  // A refused address renders as text, not as a link that does nothing.
   if (!href) {
     return (
       <Typography {...nodeProps} component="span">

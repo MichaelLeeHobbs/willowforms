@@ -108,17 +108,13 @@ describe('validating a repeater', () => {
     schema: { type: 'string', validations: [{ key: 'required' }] },
   })
 
-  /** A field whose two names differ, so which one is used is visible. */
   const named = (key: string, dataKey: string): ComponentNode => ({
     ...field(key),
     dataKey,
   })
 
-  /*
-   * The row is addressed by the repeater's data key and the field by its node
-   * key, which is only observable when they differ. `postcode` keeps one name
-   * deliberately: a real document mixes the two.
-   */
+  // Names differ so a node key used where a data key belongs shows; postcode keeps one name on
+  // purpose.
   const form: ComponentNode = {
     key: 'root',
     type: 'Screen',
@@ -334,7 +330,6 @@ describe('the quiet failure, caught before anyone submits', () => {
 
   it('says nothing when the form really does hold that key too', () => {
     const withRoot = doc(undefined)
-    // Node keys are unique; data keys may repeat.
     withRoot.root.children?.unshift({
       key: 'accountType',
       dataKey: 'business',
@@ -400,11 +395,8 @@ describe('writing an answer at an address', () => {
 })
 
 describe('keyScopesFor', () => {
-  /*
-   * Every name differs from every other name on purpose. The repeater's node
-   * key is not its data key, and no field's key is its data key, so a lookup
-   * that confuses the two cannot pass by coincidence.
-   */
+  // Every name differs on purpose, so a lookup that confuses node and data keys cannot pass by
+  // coincidence.
   const tree = (): ComponentNode => ({
     key: 'root',
     type: 'Screen',
@@ -558,8 +550,7 @@ describe('a repeater whose two names differ', () => {
 })
 
 describe('a repeater inside a repeater', () => {
-  // Every name differs from every other, so which of the two names each
-  // position uses is visible in every assertion.
+  // Every name differs, so which of the two names each position uses is visible.
   const root: ComponentNode = {
     key: 'root',
     type: 'Screen',
@@ -633,7 +624,6 @@ describe('a repeater inside a repeater', () => {
 
   it('keeps a row coordinate readable in both directions', () => {
     const address = 'orders[1].lines[0].sku'
-    // Data keys in the prefixes, a node key at the leaf.
     const decoded = decodeAddress(address)
     expect(decoded?.name).toBe('sku')
     expect(encodeRow(decoded?.path ?? NO_ROWS)).toBe('orders[1].lines[0]')
@@ -987,8 +977,6 @@ describe('the picker and validation agree on what a row holds at the depth bound
         },
       ],
     }
-    // `levels` containers between the outer repeater and the nested one, so the
-    // nested repeater sits `levels + 1` below the outer repeater.
     for (let i = 0; i < levels; i += 1) {
       below = { key: 'stack' + String(i), type: 'Stack', props: {}, children: [below] }
     }
@@ -1342,7 +1330,6 @@ describe('a ref from a nested row to an answer only an outer row holds', () => {
   })
 
   it('walks repeaters nested to the depth bound, and no further', () => {
-    // The innermost field sits `levels + 1` below the root.
     const chain = (levels: number): FormDocument => {
       let inner = field('targetField', 'target', shown('reference', 'row'))
       for (let i = levels; i > 0; i -= 1) {

@@ -100,8 +100,6 @@ export const TOO_DEEP = 'This form is nested too deeply to check.'
 export const UNREADABLE_RULE = 'This field could not be checked. The form has an unreadable rule.'
 export const INVALID_TYPE = 'This value does not match the field type.'
 
-// `DEFAULT_MESSAGES` is a total record over the rule union, so this set cannot
-// fall behind it.
 const KNOWN_RULES: ReadonlySet<string> = new Set(Object.keys(DEFAULT_MESSAGES))
 
 const PATTERN_SOURCE_LIMIT = 1024
@@ -224,7 +222,6 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
     case 'static':
       return Boolean(when.value)
     case 'computed':
-      // Without a sandbox we cannot know, so skip the rule rather than guess.
       if (!options.evaluate) return false
 
       try {
@@ -343,11 +340,8 @@ export function applyRule(
       return fail()
     }
     case 'pattern':
-      /*
-       * A document is data, so a pattern rule with no `value` can reach here. It fails,
-       * as a pattern this refuses to run does: what cannot be checked has not been
-       * satisfied.
-       */
+      // An unvalidated document can hold a pattern rule with no `value`; what cannot be
+      // checked has not been satisfied.
       if (typeof rule.value !== 'string') return fail()
       return matchesPattern(rule.value, jsonToString(value)) ? undefined : fail()
     case 'email':
@@ -472,11 +466,9 @@ export function validateForm(
 
       const all = rowsOf(stored)
 
-      /*
-       * Rows come from the data, never from a count the client sends, so the
-       * request body decides the work and rows nest multiplicatively. Over the
-       * cap the form fails rather than validating a prefix.
-       */
+      // Rows come from the data, never from a count the client sends, so the request body
+      // decides the work and rows nest multiplicatively. Over the cap the form fails rather
+      // than validating a prefix.
       if (all.length > MAX_ROWS) {
         // Keep the repeater's own rule failure, the message a person can act on.
         const at = addressOf(path, node.key)
@@ -553,8 +545,8 @@ export function submittedData(
 
       if (!Array.isArray(stored)) return
 
-      // Over the cap, the list is not projected at all -- the same answer
-      // `validateForm` gives, and for the same reason.
+      // Over the cap `validateForm` fails the form; a projected prefix would pass for the
+      // whole list.
       if (rows.length > MAX_ROWS) return
 
       into[key] = rows.map((row, index) => {
@@ -587,8 +579,7 @@ export function submittedAcross(
   data: FormData,
   scopes: EvalOptions[],
 ): FormData {
-  // No prototype, for the reason `submittedData` has none and `validateAcross`
-  // has none: document keys are external input.
+  // No prototype, for the reason `validateAcross` has none.
   const merged: FormData = Object.create(null) as FormData
 
   for (const scope of scopes) {

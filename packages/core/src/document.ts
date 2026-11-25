@@ -15,7 +15,10 @@ export type DocumentLoadResult =
 type DocumentRecord = Record<string, unknown>
 type Migration = (document: DocumentRecord) => DocumentRecord
 
-/* A migration must be pure and total: it runs before structural validation. */
+/*
+ * Each takes version N to N+1. Total, because it runs before structural validation;
+ * pure, because `loadDocument` never mutates its input.
+ */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {}
 
 function migrate(value: unknown): unknown {

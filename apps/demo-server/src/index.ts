@@ -18,7 +18,7 @@ import {
   validateDocument,
 } from '@willowforms/core'
 
-// A filesystem path, set by tests so they do not write into the checkout.
+// A filesystem path, not a URL.
 const storePath = process.env['WILLOWFORMS_DEMO_STORE']
 const STORE = storePath ? pathToFileURL(storePath) : new URL('../forms.json', import.meta.url)
 // Refuses a malformed PORT: `listen(NaN)` would bind an ephemeral port instead.
@@ -203,10 +203,8 @@ async function bodyOf(c: {
   } catch {
     return { refused: 'not-json' }
   }
-  /*
-   * Refused past `MAX_CONDITION_DEPTH`, where core stops reading. V8's `JSON.parse` accepts far
-   * deeper input, but `JSON.stringify` in the response echo throws past roughly 5000 levels.
-   */
+  // Refused past `MAX_CONDITION_DEPTH`, where core stops reading; `JSON.parse` accepts far
+  // deeper input than `JSON.stringify` can always write.
   if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return { refused: 'too-deep' }
   return { value: parsed }
 }
@@ -336,7 +334,6 @@ app.delete('/api/forms/:id', async (c) => {
   const id = c.req.param('id')
 
   const found = await withStore((store) => {
-    // Decided inside the chain, against the version about to be written.
     if (!held(store, id)) return { result: false }
 
     const next: Store = Object.assign(Object.create(null) as Store, store)

@@ -21,7 +21,6 @@ import { TOO_DEEP, submittedData, validateForm } from './validation.js'
  */
 const DEPTH = 50_000
 
-// Built with a loop, or building it would overflow too.
 const deepList = (n: number): JsonValue => {
   let value: JsonValue = 1
   for (let i = 0; i < n; i += 1) value = [value]

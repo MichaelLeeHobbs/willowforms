@@ -34,11 +34,8 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
     case 'computed':
       return options.evaluate ? runs(options.evaluate, when.expression, data, options) : false
 
-    /*
-     * A translation key is not a condition. Treating it as one would hide a
-     * component whenever its bundle happened to be missing, so this reads as
-     * "no condition expressed" instead.
-     */
+    // A translation key is not a condition: treating it as one would hide a component whenever
+    // its bundle is missing.
     case 'i18n':
       return true
 

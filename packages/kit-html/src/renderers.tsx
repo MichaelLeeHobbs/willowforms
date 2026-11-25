@@ -59,7 +59,8 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   )
 }
 
-// A kit never learns a row's address: it adds or removes a row by writing the whole list.
+// `children` is already expanded, one entry per row. Add or remove a row by writing the whole
+// list.
 function Repeater({
   node,
   itemLimits: limits = itemLimits(node),
@@ -174,8 +175,7 @@ function Heading({ props, nodeProps }: NodeRendererProps): ReactNode {
   const raw = str(props['level'], 'h2')
   const tag: Level = isLevel(raw) ? raw : 'h2'
 
-  // createElement, not a dynamic JSX tag, which React and the linter read as a
-  // component defined during render.
+  // createElement, not a dynamic JSX tag: `react-hooks/static-components` reports one.
   return createElement(tag, { ...nodeProps, className: 'fsh-heading' }, str(props['text']))
 }
 
@@ -737,8 +737,7 @@ function RadioItemNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const group = useContext(RadioGroupContext)
   const value = str(props['value'])
 
-  // Disabled outside a group: the palette lets a RadioItem be dropped anywhere,
-  // and alone it has no question to answer.
+  // Disabled outside a group: alone it has no question to answer.
   return (
     <label {...nodeProps} className="fsh-radio">
       <input
@@ -808,7 +807,6 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
     <div
       {...nodeProps}
       className={'fsh-alert fsh-alert--' + severity}
-      // `role="note"` for the rest, as in kit-mui, so both kits give one tree.
       {...(severity === 'error' ? { role: 'alert' as const } : { role: 'note' as const })}
     >
       {title && <strong className="fsh-alert__title">{title}</strong>}
@@ -820,7 +818,6 @@ function AlertNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
   const circular = props['variant'] === 'circular'
   const raw = props['value']
-  // `Number.isFinite`: a document can hold `NaN`.
   const determinate = typeof raw === 'number' && Number.isFinite(raw)
   const value = determinate ? Math.min(100, Math.max(0, raw)) : 0
 
@@ -845,8 +842,7 @@ function ProgressNode({ props, nodeProps }: NodeRendererProps): ReactNode {
 function LinkNode({ props, nodeProps, events }: NodeRendererProps): ReactNode {
   const href = safeHref(props['href'])
   const blank = props['target'] === 'blank'
-  // A refused address renders as text: a link that does nothing is worse than
-  // none.
+  // A refused address renders as text, not as a link that does nothing.
   if (!href) {
     return (
       <span {...nodeProps} className="fsh-link is-inert">
