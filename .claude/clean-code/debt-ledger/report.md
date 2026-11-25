@@ -5,7 +5,7 @@ Debt ledger: willowforms  commit 5d2d6dd3f9c6212cf8bb85280d41d0ba5ef988ed  2026-
 Ledger: .claude/clean-code/debt-ledger/ (committed: yes)   Work folder: outside the repo (session scratchpad)
 Since last run: first run (9 added)
 Trend: not comparable (first_run)
-Coverage: items 1.0000 over 293 files; baselines none found (0 files)   PASS
+Coverage: items 1.0000 over 286 files; baselines none found (0 files)   PASS
 Canaries: patterns 10 of 10 languages, baseline 8 of 8 planted changes   PASS
 Ages: from blame committer date, lower bounds
 ```
@@ -45,6 +45,6 @@ Identical items in one file share their dates as a group: which of two identical
 ## Footer
 
 - Patterns: languages css, hash, html, js, jsonc, markdown, ts, tsx, xml, yaml; pattern-set hash a6db23bdb0ace83e7c6897de9c8b4b41ef4f9e10d5c97343c152bf34564dd127. Rows added this run, because PATTERNS.md lists no such language: `jsonc` (JSON files with C-family comments, as in tsconfig files) and `hash` (.npmrc, .gitignore, .gitattributes, .editorconfig and .prettierignore with `#` comments).
-- Out of scope: clean-code folder 8. Tracked files at the commit: 301; searched: 293, of which 6 (the LICENSE files) have no comment syntax and got only the loose search. No file is marked vendored or generated.
+- Out of scope: clean-code folder 8, vendored 7. Tracked files at the commit: 301; searched: 286, of which 6 (the LICENSE files) have no comment syntax and got only the loose search. Vendored means the folders `.prettierignore` marks as vendored: `.claude/skills/codebase-design` and `.claude/skills/steelman`. No file is marked generated.
 - Loose hits: 10. Excluded, by reason: directive named in prose (code span) 1. Unexplained: 0.
 - Before sharing this report outside the team, check that no path names a customer or a confidential project.
