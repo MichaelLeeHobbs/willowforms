@@ -14,7 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
-    "clean": "rimraf \"packages/*/dist\" \"apps/*/dist\" \"packages/*/*.tsbuildinfo\" \"apps/*/*.tsbuildinfo\" \"*.tsbuildinfo\"",
+    "clean": "rimraf \"packages/*/dist\" \"apps/*/dist\" \"apps/playground/node_modules/.e2e\" \"packages/*/*.tsbuildinfo\" \"apps/*/*.tsbuildinfo\" \"*.tsbuildinfo\"",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "format:check": "prettier --check .",
     "e2e": "playwright test",
