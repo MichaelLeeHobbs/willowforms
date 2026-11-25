@@ -30,7 +30,7 @@ execSync('pnpm install --no-frozen-lockfile', { cwd: fileURLToPath(root), stdio:
 // An override pnpm ignored would leave React 19 in place, and the job would pass on it.
 const projects = ['./', ...workspaceDirs('packages'), ...workspaceDirs('apps')]
 const wrong = []
-let checked = 0
+const checked = new Map(Object.keys(overrides).map((name) => [name, 0]))
 for (const project of projects) {
   const manifest = JSON.parse(readFileSync(new URL(`${project}package.json`, root), 'utf8'))
   const named = {
@@ -38,21 +38,30 @@ for (const project of projects) {
     ...manifest.dependencies,
     ...manifest.peerDependencies,
   }
+  // The overrides rewrite peer ranges during resolution, so strict peers cannot see a narrowed one.
+  for (const [name, range] of Object.entries(manifest.peerDependencies ?? {})) {
+    if (name in overrides && !/(^|\|\| *)\^18\./.test(range)) {
+      wrong.push(`${project} declares ${name} ${range}, which leaves out React 18`)
+    }
+  }
   const require = createRequire(new URL(`${project}package.json`, root))
   for (const [name, version] of Object.entries(overrides)) {
     if (!(name in named)) continue
-    checked += 1
+    checked.set(name, checked.get(name) + 1)
     const installed = require(`${name}/package.json`).version
     if (installed !== version) wrong.push(`${project} resolves ${name} ${installed}`)
   }
 }
-if (checked === 0) wrong.push('no project names React, so nothing was checked')
+for (const [name, count] of checked) {
+  if (count === 0) wrong.push(`no project names ${name}, so its override was not checked`)
+}
 if (wrong.length > 0) {
-  console.error('React 18 was not installed everywhere:')
+  console.error('React 18 is not in place everywhere:')
   for (const line of wrong) console.error('  ' + line)
   process.exit(1)
 }
-console.log(`React 18 resolves in all ${checked} places that name it`)
+const places = [...checked.values()].reduce((sum, count) => sum + count, 0)
+console.log(`React 18 resolves in all ${places} places that name it`)
 
 function workspaceDirs(parent) {
   return readdirSync(new URL(`${parent}/`, root), { withFileTypes: true })

@@ -11,6 +11,6 @@ export function expectCaughtError(component: string, message: RegExp): void {
   expectConsoleError(
     version.startsWith('18.')
       ? new RegExp(`^${where}:`)
-      : new RegExp(`${message.source}[\\s\\S]*${where}\\.`),
+      : new RegExp(`(?:${message.source})[\\s\\S]*${where}\\.`, message.flags),
   )
 }
