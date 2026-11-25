@@ -1,9 +1,9 @@
-The flaky lane did not run. CI keeps no per-test reports, so there is no evidence for it and the slow lane used local timings (rung b).
+The flaky lane did not run. CI kept no per-test reports at this commit, so there is no evidence for it and the slow lane used local timings (rung b).
 
 ```
 Test garden: MichaelLeeHobbs/willowforms  commit 5d2d6dd3f9c6212cf8bb85280d41d0ba5ef988ed  2026-11-25
 Catalog: .claude/clean-code/test-garden   Work folder: session scratchpad, folder tg (outside the repo, not kept)
-Lanes: slow run  flaky not run (no CI test reports)  weak run  dupes run
+Lanes: slow run  flaky not run (no CI test reports at this commit)  weak run  dupes run
 Inventory: 3139 tests in 107 files; never ran 0, shortfall 0, broken 0, excepted 1   PASS
 Evidence: rung b, window 14 days, 12 local runs from 3 job ids, partial: no, retry results visible: no
 Slow: 3139 tests and 71 file rows ranked, 0 unseen, 0 orphans (ids unstable: no)
@@ -17,8 +17,8 @@ Since last run: first run
 ## How to read it
 
 - Costs are machine time, not CI wall time. The whole suite costs 1734 test-seconds a day (about 29 machine-minutes), so no single row is a large win.
-- Timing noise: the machine was shared with other sessions' test runs during 27 of 35 checks (20 s apart) during the runs used. Run 1 was the cold run and was dropped.
-- `local-unit` counts the CI runs of the unit step (verify + react-18), `local-e2e` and `local-dist` count theirs. The skill assumes one CI job runs the whole suite and none does, so each suite is its own job.
+- Timing noise: the machine was shared with other sessions' test, lint, typecheck or Vite processes during 27 of 35 checks (20 s apart) during the runs used. Run 1 was the cold run and was dropped.
+- `local-unit` counts the CI runs of the unit step (verify + react-18), `local-e2e` and `local-dist` count theirs. The skill assumes one CI job runs the whole suite; at this commit none does, so each suite is its own job. CI job names are as of this commit.
 - Weak verdicts are per test. A negative test that survives an inverted guard can still be covered by its neighbours.
 - Every row has 4 measurements, so all are flagged `low_n`.
 
@@ -30,7 +30,7 @@ Since last run: first run
 4. 34.9 test-seconds a day: test `test/readme.test.ts > the examples in every published README > compile against the packages they import` (mean 6266 ms, 5.57 runs a day).
 5. 31.3 test-seconds a day: test `e2e/character-layout.spec.ts > mui character folio uses desktop columns and keeps every page within the desktop canvas` (mean 6010 ms, 5.21 runs a day).
 
-None of the judged tests is `cannot_fail` or `unreached`, so no test costs time while protecting nothing (within the 86 judged).
+None of the judged tests is `cannot_fail` or `unreached`, so none of those 86 costs time while protecting nothing. That says nothing about the slow tests: none of the 30 slowest was judged, and the costliest judged test ranks 835th.
 
 ## Slow table (top 30)
 
@@ -69,7 +69,7 @@ None of the judged tests is `cannot_fail` or `unreached`, so no test costs time 
 
 ## Weak
 
-Targets: 25 functions; 41 test declarations (86 ids) were judged, 18 of them weak. Candidates: 87 declarations with a tell plus the 10 slowest tests (one tell I added to the skill list: an assertion only on `toBeDefined`, `toBeTruthy` or `toHaveBeenCalled`); everything not mapped to one directly called function (UI tests through `render`, e2e, config and README tests) is unmapped, so it was not judged.
+Targets: 25 functions; 41 test declarations (86 ids) were judged, 18 of them weak. Candidates: 87 declarations with a tell plus the 10 slowest tests (one tell I added to the skill list: an assertion only on `toBeDefined`, `toBeTruthy`, `toBeFalsy` or `toHaveBeenCalled`); everything not mapped to one directly called function (UI tests through `render`, e2e, config and README tests) is unmapped, so it was not judged.
 
 | Class | ids |
 | - | - |
@@ -94,13 +94,13 @@ The 10 weak tests with the highest slow cost:
 | 5 | packages/designer/src/store.regressions.test.ts > the document a host hands in, checked once > says nothing about a document that validates | 2 |
 | 1 | packages/core/src/keys.test.ts > the key grammar > refuses what would break the things a key is used for | 1 |
 
-Most weak ids are parametrised rows of `keyProblem refuses X`, `applyRule ... does not pass` and the empty-value rules. They use a loose `toBeDefined` or `toBeTruthy`, so inverting the first guard still passes (value mutants that change the answer were killed). Fix: assert the message or the exact value (write-tests trap 1.1, "The assertion that cannot fail", in the weaker form "proves the crash, not the answer").
+Most weak ids (37 of 53) are rows of two parametrised tests, `keyProblem refuses X` (13) and `applyRule ... does not pass` (24). They assert only `toBeTruthy` or `toBeDefined`, so inverting the first guard still passes (value mutants that change the answer were killed). Fix: assert the message or the exact value (Trap 1 in `.claude/skills/write-tests/SKILL.md`). The character-sheet row is about core `flatten`, which that test uses to read the keys, not about the sheet.
 
 ## Dupes
 
-Groups judged: the 30 largest of 93 (1 stop stem, `field`, 28 helpers, not grouped). Every member has 0 importers (nothing here is exported and imported), so "keep" is the one the judge named.
-Groups overlap (G0083's SAME cluster is inside G0008; G0001 shares four of its five members with G0080), so a member can be counted twice; distinct members: 34 SAME, 52 VARIANT.
-SAME: the harness ran both copies and they agreed (41 confirmed, 5 blocked). VARIANT: 27 confirmed by differing output, 27 blocked (need the repo, a page or a render). Diffs marked predicted are the judge's reading, not run. "!" = an assertion in that test file reads the differing field, so merging changes a result.
+Groups judged: the 30 largest of 93 (1 stop stem, `field`, 28 helpers, not grouped). No judged helper is exported, so every member has 0 importers and "keep" is the one the judge named. Four judged groups have no row because every member is DIFFERENT: G0035 (5), G0081 (4), G0049 (3), G0090 (7). "-" in the DIFFERENT column hides 23 more: G0080 9, G0039 8, G0040 4, G0069 1, G0077 1.
+Groups overlap (G0083's SAME cluster is inside G0008; G0001 shares four of its five members with G0080, whose row names a different keep; use `core/src/css.test.ts:21` for both), so a member can be counted twice; distinct members: 34 SAME, 52 VARIANT.
+SAME: the harness ran both copies and they agreed (41 confirmed, 5 blocked). VARIANT: 27 confirmed by differing output, 27 not confirmed (most need the repo, a page or a render). Where fewer were run than counted, the rest are the judge's reading. A row shows at most two diffs unless a later one has a "!", and Job and diff text is cut short. "!" = an assertion in that test file reads the differing field, so merging changes a result.
 
 | Group | Job | Keep | SAME | VARIANT | DIFFERENT | What varies |
 | - | - | - | - | - | - | - |
@@ -110,7 +110,7 @@ SAME: the harness ran both copies and they agreed (41 confirmed, 5 blocked). VAR
 | G0084 stem: | Render Designer over a fixture document with the fake kits,  | designer/src/Designer.test.tsx:89 | 0 | 7 (0 run) | 4 | ! document fixture (makeDocument(languages)); ! document fixture (makeDocument()) |
 | G0083 stem: | Fake renderer component: a div with nodeProps and its childr | designer/src/Designer.test.tsx:20 | 8 (8 run) | 0 | 1 |  |
 | G0041 stem: | Wrap a tree in an otherwise empty FormDocument. | core/src/depth.test.ts:64 | 0 | 5 (0 run) | 1 | id; id |
-| G0010 same: | Fake RendererKit 'fake' with Screen and Field renderers. | designer/src/Designer.test.tsx:27 | 1 (1 run) | 3 (3 run) | 0 | renderers.Field (renders an empty div, not the lab; renderers.Field (renders an empty div, not the lab |
+| G0010 same: | Fake RendererKit 'fake' with Screen and Field renderers. | designer/src/Designer.test.tsx:27 | 1 (1 run) | 3 (3 run) | 0 | renderers.Field (renders an empty div, not the label), twice; ! renderers.Field (renders an input with an error span) |
 | G0066 stem: | A document with a lines repeater nested in an orders repeate | core/src/schema.test.ts:303 | 0 | 1 (0 run) | 3 | ! document id and name |
 | G0092 stem: | Form answers with an email and two one-field address rows. | renderer/src/renderer.test.tsx:435 | 1 (1 run) | 0 | 2 |  |
 | G0039 stem: | Wrap nodes in an otherwise empty FormDocument. | core/src/rows.test.ts:1155 | 0 | 3 (0 run) | - | ! id; parameter: the root instead of its children |
@@ -146,4 +146,4 @@ Largest cluster: a pass-through `Screen_`/`Node`/`List`/`Box` renderer, 12 ident
 - The inventory was re-run with real collection: `vitest list` in 5.x parses statically and does not expand parametrised titles.
 - Weak: 25 targets mutated over 143 vitest runs in 160 s, selected by whole file because `file:line` misses `it.each`. Canary ids kept off every list. Canaries: slow 2.0 s sleep (1), weak W1 cannot_fail, W2 weak, W3 ok, W4 unreached (4), dupes D1 VARIANT with its changed field in the diff, D2 DIFFERENT (2). The skill plants no flaky canary when the lane is not run.
 - Copied setup inside test bodies is not covered. `ignore.jsonl`: no entries proposed.
-- To run the flaky lane, CI has to upload per-test results (a JUnit or JSON reporter in vitest and Playwright, uploaded by each job). Neither does today.
+- To run the flaky lane, CI has to upload per-test results (a JUnit or JSON reporter in vitest and Playwright, uploaded by each job). Neither did at this commit; pull request 209 has since added it.
