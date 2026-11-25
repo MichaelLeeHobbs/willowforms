@@ -11,6 +11,8 @@ every form it produces.
 
 ## The two systems
 
+**Status: built.**
+
 |                 | Prefix   | Scope         | Owned by                          |
 | --------------- | -------- | ------------- | --------------------------------- |
 | Designer chrome | `--fs-`  | `.fs-shell`   | The host embedding the builder    |
@@ -32,11 +34,15 @@ designer chrome. The HTML Screen uses its surface token; the MUI Screen uses `ba
 
 ## Form density
 
+**Status: built.**
+
 `density` is a form-author choice independent of color. The renderer exports `FormDensity` (`comfortable | compact`), passes the inherited value through optional `NodeRendererProps.density`, and includes `data-fs-density` in node attributes when a choice is active. Older documents omit it and keep their host styling. Custom kits may use this value without depending on either reference kit.
 
 The HTML kit styles its own controls using that attribute. The MUI kit applies a nested theme at explicit density boundaries, preserving the host palette, variants, and unrelated component defaults. Compact MUI labels remain above their controls even when empty. Comfortable restores normal sizing within a compact form. Authored gaps override density's fallback spacing. The D&D example uses a document-level compact choice; its host theme now supplies colors and button typography rather than required sizing overrides.
 
 ## Designer tokens
+
+**Status: built.**
 
 The playground's Palette selector offers Willow and Desert Willow — AZT Bi-Color independently of Light/Dark/System mode. Both palettes share neutral light surfaces and the original Willow forest surfaces in dark mode. Desert Willow changes the action and selection accents to burgundy and pink. Palette choices are saved locally; retired or invalid choices fall back to Willow. These host-owned accents leave example documents and kit styling independent.
 
@@ -81,7 +87,7 @@ fighting specificity.
 | `--fs-font`                              | Typeface                                            |
 | `--fs-font-size`                         | Base text size, for text without a size of its own  |
 | `--fs-font-size-xs`, `--fs-font-size-sm` | Small labels and tags; captions, notes, code        |
-| `--fs-font-size-lg`                      | Panel headings                                      |
+| `--fs-font-size-lg`                      | Panel headings and the empty-canvas title           |
 | `--fs-font-mono`                         | The JSON editor, the raw CSS box, the code editor   |
 
 `--fs-radius-sm` derives from `--fs-radius` rather than standing on its own, so overriding the one
@@ -91,6 +97,8 @@ everything else. Six radii used to be written as literals and ignored the overri
 The dark palette deepens the three shadows and the backdrop, because a shadow dark enough to see on a light panel disappears on a dark one. `--fs-drop-ring` is the same in both: it is drawn over the form, whose colours belong to the host. Before Chrome 122 and Safari 17.4, `::backdrop` inherits no custom property, so those browsers draw the light backdrop in both palettes.
 
 ## HTML kit tokens
+
+**Status: built.**
 
 On `.fsh-screen`:
 
@@ -110,17 +118,17 @@ however thoroughly a host restyled the rest.
 
 The designer and the HTML kit each have their own type scale, because a host that restyles its builder has not restyled its forms. Both use one set of spacing steps. The scales cover the two published stylesheets only: a kit built on a component library keeps that library's sizes, and an example document's authored styles are its author's.
 
-| Text                               | Designer                   | HTML kit                     |
-| ---------------------------------- | -------------------------- | ---------------------------- |
-| Small label, tag, shortest hint    | `--fs-font-size-xs` (11px) |                              |
-| Caption, note, code, dense control | `--fs-font-size-sm` (12px) |                              |
-| Compact help text                  |                            | `--fsh-font-size-2xs` (12px) |
-| Help text, compact or inline label |                            | `--fsh-font-size-xs` (13px)  |
-| Label, compact control             |                            | `--fsh-font-size-sm` (14px)  |
-| Base: everything without its own   | `--fs-font-size` (14px)    | `--fsh-font-size` (16px)     |
-| Panel heading                      | `--fs-font-size-lg` (16px) |                              |
+| Text                                     | Designer                   | HTML kit                     |
+| ---------------------------------------- | -------------------------- | ---------------------------- |
+| Small label, tag, palette and style hint | `--fs-font-size-xs` (11px) |                              |
+| Caption, note, code, dense control       | `--fs-font-size-sm` (12px) |                              |
+| Compact help text                        |                            | `--fsh-font-size-2xs` (12px) |
+| Help text, compact or inline label       |                            | `--fsh-font-size-xs` (13px)  |
+| Label, compact control                   |                            | `--fsh-font-size-sm` (14px)  |
+| Base: text with no size of its own       | `--fs-font-size` (14px)    | `--fsh-font-size` (16px)     |
+| Panel heading, empty-canvas title        | `--fs-font-size-lg` (16px) |                              |
 
-The steps are independent lengths. Overriding `--fs-font-size` moves the base and leaves the others where they are, dense controls included.
+The steps are independent lengths. Overriding `--fs-font-size` moves the base and leaves the others where they are, dense controls included. An element the browser sizes itself, such as `<small>`, stays off the scale unless a rule gives it a step.
 
 Font weights: `400`, `600`. Text that declares no weight keeps the browser's own, so the HTML kit's headings and card titles, and `<strong>` in the designer, are bold (700).
 
@@ -235,6 +243,8 @@ is authored rather than typed.
 vocabulary outside the built-in palette.
 
 ## What is not themeable
+
+**Status: built.**
 
 The designer's **layout** is not a token. Pane widths are, but the three-pane arrangement is not
 configurable and should not be: a builder whose layout varies per host is a builder nobody can write
