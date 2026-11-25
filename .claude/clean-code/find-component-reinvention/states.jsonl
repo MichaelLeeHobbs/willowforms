@@ -1,0 +1,55 @@
+{"class":"alert","state":"default","payload":"message \"Something went wrong\""}
+{"class":"alert","state":"with-action","payload":"message plus one action \"Retry\""}
+{"class":"alert","state":"with-detail","payload":"message plus the 120-character detail \"The report could not be saved because the connection to the reports service closed before the last section was sent.\""}
+{"class":"breadcrumb","state":"default","payload":"items Home (href \"/home\"), Reports (href \"/reports\"), Summary (the current page, no href)"}
+{"class":"breadcrumb","state":"long","payload":"items Home (href \"/home\") and the current page labelled \"Quarterly summary of every open order across all regions\""}
+{"class":"breadcrumb","state":"single","payload":"one item Home (current page)"}
+{"class":"button","state":"default","payload":"label \"Save\""}
+{"class":"button","state":"disabled","payload":"label \"Save\", disabled"}
+{"class":"button","state":"long","payload":"label \"Save and continue to the next step\""}
+{"class":"card","state":"default","payload":"title \"Open orders\", value 1234 (as a text child \"1234\")"}
+{"class":"card","state":"empty","payload":"title \"Open orders\", no value"}
+{"class":"card","state":"long","payload":"the 90-character title \"Open orders waiting for an external review before they can be released to the warehouse team\", value 1234"}
+{"class":"choice","state":"checked","payload":"label \"Receive updates\", selected (a group: \"Email\" selected)"}
+{"class":"choice","state":"disabled","payload":"selected and disabled"}
+{"class":"choice","state":"invalid","payload":"not selected, with the message \"Required\""}
+{"class":"choice","state":"long","payload":"the 90-character label \"Receive updates about every open order, including the ones that are waiting for a review\", not selected"}
+{"class":"choice","state":"unchecked","payload":"label \"Receive updates\", not selected (a group shows options \"Email\" and \"Phone\", none selected)"}
+{"class":"date-picker","state":"disabled","payload":"label \"Due\", value 2026-03-10, disabled"}
+{"class":"date-picker","state":"empty","payload":"label \"Due\", no value"}
+{"class":"date-picker","state":"invalid","payload":"label \"Due\", value 2026-03-10 with the message \"Required\" (a native date input cannot hold the text \"31/02/2026\")"}
+{"class":"date-picker","state":"value","payload":"label \"Due\", value 2026-03-10"}
+{"class":"error-state","state":"default","payload":"message \"Something went wrong\""}
+{"class":"error-state","state":"with-action","payload":"message plus one action \"Retry\""}
+{"class":"error-state","state":"with-detail","payload":"message plus a 120-character detail"}
+{"class":"form-field","state":"disabled","payload":"the value state, disabled"}
+{"class":"form-field","state":"empty","payload":"label \"Title\" where the member takes a label, no value"}
+{"class":"form-field","state":"invalid","payload":"a value the member refuses, with its error message showing (or the message \"Required\" where the message is a prop)"}
+{"class":"form-field","state":"long","payload":"the 90-character label \"Title shown on the cover page of the quarterly report that goes to every regional manager\", no value"}
+{"class":"form-field","state":"value","payload":"label \"Title\" and a short valid value of the member's own value type: text \"Quarterly report\", colour #336699, length 12px, CSS \"padding: 8px;\", JSON {\"a\":1}"}
+{"class":"link","state":"default","payload":"label \"Save\", address \"/reports\""}
+{"class":"link","state":"disabled","payload":"label \"Save\", with no usable address"}
+{"class":"link","state":"long","payload":"label \"Save and continue to the next step\", address \"/reports\""}
+{"class":"list","state":"empty","payload":"zero rows"}
+{"class":"list","state":"error","payload":"request failed"}
+{"class":"list","state":"loading","payload":"request pending, no data"}
+{"class":"list","state":"long-cell","payload":"three rows, one name of 120 characters"}
+{"class":"list","state":"rows","payload":"three rows, columns name, status, date: Ada Example / Active / 2026-03-10; Sam Sample / Pending / 2026-03-12; Ada Sample / Draft / 2026-03-12"}
+{"class":"loading","state":"default","payload":"in progress, amount unknown, label \"Loading\""}
+{"class":"modal","state":"default","payload":"open, title \"Delete report?\", body one sentence, confirm and cancel"}
+{"class":"modal","state":"destructive","payload":"as default, confirm marked destructive"}
+{"class":"modal","state":"long","payload":"open, body of three paragraphs"}
+{"class":"select","state":"disabled","payload":"label \"Status\", \"Active\" chosen, disabled"}
+{"class":"select","state":"empty","payload":"label \"Status\", options \"Active\", \"Pending\", \"Draft\", nothing chosen"}
+{"class":"select","state":"invalid","payload":"label \"Status\", \"Active\" chosen, with the message \"Required\""}
+{"class":"select","state":"value","payload":"label \"Status\", \"Active\" chosen"}
+{"class":"stepper","state":"first","payload":"step 1: back unavailable, next available"}
+{"class":"stepper","state":"last","payload":"step 3: back available, next unavailable"}
+{"class":"stepper","state":"middle","payload":"step 2: back and next available"}
+{"class":"tabs","state":"first","payload":"tabs \"Details\" and \"Rules\", the first active, panel text \"Panel\""}
+{"class":"tabs","state":"long","payload":"tabs \"Details of the selected component\" and \"Rules that apply to the selected component\", the first active, panel text \"Panel\""}
+{"class":"tabs","state":"second","payload":"the same tabs, the second active, panel text \"Panel\""}
+{"class":"text-field","state":"disabled","payload":"the value state, disabled"}
+{"class":"text-field","state":"empty","payload":"label \"Title\" where the member takes a label, no value"}
+{"class":"text-field","state":"invalid","payload":"the value state plus the message \"Required\" (or the member's own error message for a value it refuses)"}
+{"class":"text-field","state":"value","payload":"label \"Title\" where the member takes a label, text value \"Quarterly report\" (a number input: 1234; JSON: {\"a\":1})"}

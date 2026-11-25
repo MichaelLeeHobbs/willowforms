@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { contrast, luminance, parseHex, ratio, rgbToHex, tokensFrom } from './contrast.js'
+import { styleRules } from './css.js'
 
 const read = (path: string): string =>
   readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
@@ -424,24 +425,14 @@ describe('no colour is written outside the token blocks', () => {
   const WITH_FALLBACK = /var\(\s*--[a-z0-9-]+\s*,[^()]*(?:\([^()]*\))?[^()]*\)/gi
 
   const literals = (css: string): string[] => {
-    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
     const found: string[] = []
 
-    for (const block of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      for (const declaration of (block[2] ?? '').split(';')) {
-        const at = declaration.indexOf(':')
-        if (at < 0) continue
-
-        const name = declaration.slice(0, at).trim()
+    for (const { selector, declarations } of styleRules(css)) {
+      for (const [name, value] of declarations) {
         if (name.startsWith('--')) continue
 
-        const written = declaration
-          .slice(at + 1)
-          .replace(WITH_FALLBACK, '')
-          .match(LITERAL)
-        if (written) {
-          found.push((block[1] ?? '').trim() + ' { ' + name + ': ' + written.join(' ') + ' }')
-        }
+        const written = value.replace(WITH_FALLBACK, '').match(LITERAL)
+        if (written) found.push(selector + ' { ' + name + ': ' + written.join(' ') + ' }')
       }
     }
 

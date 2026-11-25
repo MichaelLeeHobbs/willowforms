@@ -47,7 +47,7 @@ second kit is a new package, not a rewrite of the builder.
 
 ## Theming
 
-Every value is a custom property on `.fs-shell`, so a host restyles the builder by overriding tokens
+Every token is a custom property on `.fs-shell`, so a host restyles the builder by overriding tokens
 rather than fighting specificity:
 
 ```css

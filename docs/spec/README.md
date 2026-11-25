@@ -49,7 +49,7 @@ by anything.
 | [08-validation.md](08-validation.md)         | The rule catalogue and its semantics                       | Built   |
 | [09-actions.md](09-actions.md)               | Events, code actions, and the sandbox boundary             | Built   |
 | [10-interchange.md](10-interchange.md)       | Import, export, and JSON Schema                            | Built   |
-| [11-theming.md](11-theming.md)               | Token vocabulary for the designer and for kits             | Built   |
+| [11-theming.md](11-theming.md)               | Token vocabulary for the designer and for kits             | Partial |
 | [12-api.md](12-api.md)                       | What a consumer imports, and the platform baseline         | Built   |
 
 Adjacent documents that are not contracts:
@@ -116,7 +116,8 @@ suite has rules -- the per-kit block and the rules driven per kit from outside i
 
 It checks more than that now, and the list is worth having in one place: the events table in
 `03-components.md` against what the two kits declare, both token tables in `11-theming.md` against the
-two stylesheets in both directions, the axe rules `a11y.test.tsx` disables against the ones
+two stylesheets in both directions, its type and spacing scales against the same two
+(`test/style-scale.test.ts`), the axe rules `a11y.test.tsx` disables against the ones
 `accessibility.md` names, each file's opening status against the state this index gives it, every
 interface a file declares against its source, the decision log's shape, and
 the component catalogue against the kits.
