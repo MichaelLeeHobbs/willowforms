@@ -334,6 +334,17 @@ describe('a base rule does not out-specify the rules it is a base for', () => {
   })
 })
 
+describe('panel placeholders', () => {
+  it('are not faded in older Firefox, which no browser test here runs', () => {
+    const rules = blocks(withoutComments).filter((block) =>
+      commaSeparated(block.prelude).includes(':where(.fs-panel) ::placeholder'),
+    )
+
+    expect(rules).toHaveLength(1)
+    expect(rules[0]?.body).toMatch(/(^|[\s;])opacity:\s*1\s*(;|$)/)
+  })
+})
+
 describe('designer.css isolation', () => {
   const all = selectors(withoutComments)
 
