@@ -7,6 +7,8 @@ export const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 export const MAX_KEY_LENGTH = 128
 
 /**
+ * Names `KEY_PATTERN` allows that must still not be used.
+ *
  * The second lock, never the first: nothing on the render or validate path calls
  * `validateDocument`, so an accumulator keyed by a document's names also needs a null
  * prototype. Assigning `__proto__` sets the prototype, and on a plain object `merged[key]

@@ -10,6 +10,7 @@ export function emptyRoot(): ComponentNode {
   return { key: 'root', type: 'Screen', props: {}, children: [] }
 }
 
+/** Its one language is `en-US`. */
 export function createDocument(name: string, id: string): FormDocument {
   return {
     version: '1',

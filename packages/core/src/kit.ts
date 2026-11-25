@@ -63,8 +63,13 @@ export interface PropSchema {
   /** Defaults to true. */
   computable?: boolean
   localizable?: boolean
-  /** Only for a property that takes a boolean, since a condition resolves to one. */
+  /**
+   * Only for a property that takes a boolean, since a condition resolves to one. Opt-in,
+   * because the `boolean` editor covers both "is this disabled" and "did the user tick it",
+   * and only the first is worth making conditional.
+   */
   conditional?: boolean
+  /** Defaults to 'main'. */
   section?: 'main' | 'style' | 'advanced'
 }
 
@@ -117,6 +122,7 @@ export function indexKit(kit: Kit): ReadonlyMap<string, ComponentDef> {
   return byType
 }
 
+/** Leaves out the root component. */
 export function groupKit(kit: Kit): Array<{ group: PaletteGroup; components: ComponentDef[] }> {
   const out: Array<{ group: PaletteGroup; components: ComponentDef[] }> = []
 

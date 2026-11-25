@@ -16,7 +16,7 @@ export interface StyleSheetOptions {
   device?: Device | undefined
   /**
    * Keys are unique within a document, not a page: without this, one form's rules style
-   * another's nodes.
+   * another's nodes. The caller puts it on every node as `data-fs-scope`.
    */
   scope?: string | undefined
 }
@@ -101,6 +101,7 @@ function selectorFor(key: string, scope: string | undefined): string {
   return within + '[data-fs-key="' + escapeKey(key) + '"]'
 }
 
+/** `any` applies at every width, and a device's own rules override it at that device's widths. */
 export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = {}): string {
   const { device, scope } = options
   const base: string[] = []

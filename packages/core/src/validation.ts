@@ -383,8 +383,8 @@ export function validateField(
 }
 
 /**
- * Skips hidden components and everything beneath them: a required field the user cannot see
- * must never block a submit.
+ * An empty object means the form is valid. Skips hidden components and everything beneath
+ * them: a required field the user cannot see must never block a submit.
  */
 export function validateForm(
   root: ComponentNode,
@@ -466,8 +466,8 @@ export function autoValidateKeys(root: ComponentNode): Set<string> {
 }
 
 /**
- * Apply when submitting, not to the data as it is held: hiding is often temporary, and must
- * not destroy what someone typed.
+ * The data with the answers to hidden questions left out. Apply when submitting, not to the
+ * data as it is held: hiding is often temporary, and must not destroy what someone typed.
  */
 export function submittedData(
   root: ComponentNode,
@@ -537,11 +537,12 @@ export function submittedAcross(
 }
 
 /**
- * For submitting a multi-step form, where `validateForm` would skip the steps not on screen
- * and accept the form with their required answers missing.
+ * Runs `validateForm` under each of `scopes` and merges the errors; where two report one
+ * key, the first wins. For submitting a multi-step form, where `validateForm` would skip
+ * the steps not on screen and accept the form with their required answers missing.
  *
- * The server takes the environments from the document, `contextValues(root, 'step')`, never
- * from the request: a client that names one step would leave the rest unchecked.
+ * The server takes the scopes from the document, `contextValues(root, 'step')`, never from
+ * the request: a client that names one step would leave the rest unchecked.
  */
 export function validateAcross(
   root: ComponentNode,

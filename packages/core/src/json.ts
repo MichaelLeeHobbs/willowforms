@@ -89,7 +89,10 @@ function valuesFor(all: readonly unknown[]): string[] {
 export function optionEntry(
   option: JsonValue | undefined,
   index: number,
-  /** Without it, two options can render the same value. */
+  /**
+   * Without it, an option with no declared value renders its position, which another option
+   * may also render.
+   */
   all?: readonly unknown[],
 ): { value: string; label: string } {
   const record =

@@ -70,11 +70,12 @@ export function contextKeys(root: ComponentNode): Set<string> {
 }
 
 /**
- * Ask once at startup. Without an evaluator a `computed` `renderWhen` takes its node and
- * its whole subtree out of `validateForm`: a host that injects one only in the browser has
- * a server that calls an unchecked form fine.
+ * Keys of the nodes that cannot be evaluated without a sandbox. Ask once at startup; total,
+ * because nothing has refused the document by then.
  *
- * Total, because that is before anything has refused the document.
+ * Without an evaluator a `computed` `renderWhen`, for one, takes its node and its whole
+ * subtree out of `validateForm`: a host that injects one only in the browser has a server
+ * that calls an unchecked form fine.
  */
 export function evaluatorKeys(root: ComponentNode): string[] {
   const keys = new Set<string>()
@@ -109,7 +110,8 @@ export function evaluatorKeys(root: ComponentNode): string[] {
 
 /**
  * Call once at startup and accept only an empty result: every path in it is a rule that
- * will quietly not apply. `false` and `0` are not missing.
+ * will quietly not apply. A path is missing when it cannot be read at all, not when it
+ * holds a falsy value.
  */
 export function missingContext(root: ComponentNode, context: FormContext): string[] {
   const missing: string[] = []
@@ -122,11 +124,13 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
 export const MAX_CONTEXT_VALUES = 1000
 
 /**
- * A server takes the steps of a form from this, `contextValues(root, 'step')`, never from
- * the request: a client that names one step would leave the others unchecked.
+ * The literals this document compares a context path with, and the options of its `in` and
+ * `notIn`. A comparison with a field contributes nothing.
  *
- * Collects too much on purpose. A name this missed is a step whose required fields never
- * get checked.
+ * A server takes the steps of a form from this, `contextValues(root, 'step')`, never from
+ * the request: a client that names one step would leave the others unchecked. Any
+ * comparison with a literal counts, even `gt`: a name this missed is a step whose required
+ * fields never get checked.
  */
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
   if (path === '') return []

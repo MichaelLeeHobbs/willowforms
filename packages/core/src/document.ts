@@ -49,6 +49,7 @@ function normalize(value: unknown): unknown {
   }
 }
 
+/** Never mutates its input. */
 export function loadDocument(value: unknown): DocumentLoadResult {
   try {
     const candidate = normalize(migrate(value))

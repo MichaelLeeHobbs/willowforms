@@ -21,6 +21,7 @@ import type {
   ValidationRule,
 } from './types.js'
 
+/** Depth-first, parents before children. */
 export function walk(
   node: ComponentNode,
   fn: (node: ComponentNode, parent?: ComponentNode) => void,
@@ -65,6 +66,7 @@ export function findParent(root: ComponentNode, key: string, depth = 0): Compone
   return undefined
 }
 
+/** Root to target, inclusive. Empty if not found. */
 export function pathTo(root: ComponentNode, key: string): string[] {
   const search = (n: ComponentNode, trail: string[], depth: number): string[] | undefined => {
     if (!n || typeof n !== 'object' || depth > MAX_TREE_DEPTH) return undefined
@@ -86,7 +88,7 @@ export interface FlatNode {
   depth: number
 }
 
-/** Not through `walk`, which passes neither index nor depth. */
+/** Parents before children. Not through `walk`, which passes neither index nor depth. */
 export function flatten(root: ComponentNode): FlatNode[] {
   const out: FlatNode[] = []
   const visit = (
@@ -264,8 +266,9 @@ export function repointDataKey(
 }
 
 /**
- * Two fields behind opposite `renderWhen` guards may write one answer. While another node
- * still writes the name, a rename must not re-point the refs to it.
+ * Keys of the nodes that answer under one data key. Two fields behind opposite `renderWhen`
+ * guards may write one answer: while another in the same row scope still writes the name,
+ * every ref to it still resolves, and a rename must leave them.
  */
 export function writersOf(root: ComponentNode, dataKey: string): string[] {
   const keys: string[] = []
@@ -275,6 +278,7 @@ export function writersOf(root: ComponentNode, dataKey: string): string[] {
   return keys
 }
 
+/** Returns the re-keyed copy of the subtree at `key`, inserted nowhere. */
 export function duplicateNode(root: ComponentNode, key: string): ComponentNode | undefined {
   const source = findNode(root, key)
   if (!source) return undefined
@@ -336,6 +340,7 @@ export function updateNode(
   return changed ? { ...root, children } : root
 }
 
+/** Appends when `index` is omitted. */
 export function insertNode(
   root: ComponentNode,
   parentKey: string,
@@ -358,6 +363,7 @@ export function insertNode(
   })
 }
 
+/** Removing the root is a no-op. */
 export function removeNode(root: ComponentNode, key: string, depth = 0): ComponentNode {
   // Total and bounded, for the reason `updateNode` gives.
   if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return root
@@ -386,6 +392,10 @@ export function removeNode(root: ComponentNode, key: string, depth = 0): Compone
   return changed ? { ...root, children } : root
 }
 
+/**
+ * Returns the tree unchanged if the move is illegal, such as an unknown key, the root, or a
+ * node into itself.
+ */
 export function moveNode(
   root: ComponentNode,
   key: string,
@@ -1037,7 +1047,7 @@ function inspectDocument(doc: unknown): StructuralError[] {
   return errors
 }
 
-/** Must not throw on unreadable objects. */
+/** Never throws, even on unreadable objects. */
 export function validateDocument(doc: unknown): StructuralError[] {
   try {
     return inspectDocument(doc)

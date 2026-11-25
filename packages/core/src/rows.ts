@@ -17,7 +17,7 @@ export interface RowFrame {
   index: number
 }
 
-/** Outermost first. */
+/** Outermost first. Empty means not in a row. */
 export type RowPath = readonly RowFrame[]
 
 export const NO_ROWS: RowPath = Object.freeze([])
@@ -30,6 +30,7 @@ export function innermost(path: RowPath): RowFrame | undefined {
   return path[path.length - 1]
 }
 
+/** `addresses[1].contacts[0]`, and empty outside a repeater. */
 export function encodeRow(path: RowPath): string {
   return path.map((frame) => frame.key + '[' + String(frame.index) + ']').join('.')
 }
@@ -388,8 +389,9 @@ export function decodeAddress(address: string): ParsedAddress | undefined {
 }
 
 /**
- * The writer a host uses in `onChange`. A write that cannot be placed returns the input
- * unchanged, which keeps a hostile index from minting a sparse array.
+ * The writer a host uses in `onChange`. Immutable: rows the write did not touch keep their
+ * identity. A write that cannot be placed returns the input unchanged, which keeps a
+ * hostile index from minting a sparse array.
  */
 export function applyChange(data: FormData, address: string, value: JsonValue): FormData {
   // Refuses reserved and malformed names, which `place` writes unchecked.
