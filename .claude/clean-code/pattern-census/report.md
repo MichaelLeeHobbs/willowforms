@@ -1,11 +1,11 @@
 # Pattern census
 
-**UNCONFIRMED: nobody confirmed the pattern list at the gate** (`Patterns` line); the spending cap was approved through the session that launched this one. No check failed.
+No check failed. The user confirmed the pattern list after the run, not at the gate, and changed nothing in it, so the numbers are unchanged. The spending cap was approved through the session that launched this one.
 
 ```
 Pattern census: willowforms (whole repo, scope .)  commit 8e92d4cdbf476b77b614611d869ec24e35919337  2026-11-25  definitions e66b4a14fa6c519206fc1ed52441c45ce9b4c47d61ca60c746fde7b4a573e0f2
 Catalog: .claude/clean-code/pattern-census/   Work folder: session scratch folder, outside the repo
-Jobs: 5 (docload, evalcode, kitprops, log, safeurl; 1 closed, 4 partial)   Patterns: UNCONFIRMED
+Jobs: 5 (docload, evalcode, kitprops, log, safeurl; 1 closed, 4 partial)   Patterns: confirmed
 Scanner cases: 11 of 11 (all 12 expected sites)   PASS
 Sites: 257 (17 same_as, 9 inside conduits)   Blocked: 0   Opaque: 132
 Off-pattern families: 2
