@@ -57,31 +57,22 @@ export { bool, changed, num, requiredProps, str } from './kit-props.js'
 export type FormDensity = 'comfortable' | 'compact'
 
 export interface NodeRendererProps {
-  /** Resolved from the nearest density setting; undefined preserves the kit's host defaults. */
+  /** `undefined` preserves the kit's host defaults. */
   density?: FormDensity | undefined
   node: ComponentNode
-  /** Property values with bindings already resolved to plain JSON. */
   props: Record<string, JsonValue>
   /**
-   * Attributes the kit must spread onto its outermost DOM element. This is how
-   * a rendered element maps back to a document node: the designer hit-tests the
-   * canvas with `closest('[data-fs-key]')`, and there is nothing else in the DOM
-   * that identifies a node. A kit that drops these still renders, but its
-   * components cannot be selected on the canvas.
+   * Spread onto the outermost DOM element. The designer finds a node only by
+   * `closest('[data-fs-key]')`, so a kit that drops these renders components that cannot be
+   * selected on the canvas.
    */
   nodeProps: NodeAttributes
-  /** Current value for data-bound components. */
   value: JsonValue | undefined
-  /** Validation message for this node, if any. */
   error: string | undefined
-  /** Required state evaluated against the current form, context, and row. */
   required?: boolean | undefined
-  /** Applicable row-count bounds, resolved in the repeater's enclosing scope. */
   itemLimits?: { min: number; max: number } | undefined
   onChange: (value: JsonValue) => void
-  /** Event callbacks connected to this node's configured actions. */
   events?: NodeEventHandlers | undefined
-  /** Controlled step navigation for a node identified as a step by its condition. */
   navigation?: NodeNavigation | undefined
   children?: ReactNode
 }
@@ -89,7 +80,7 @@ export interface NodeRendererProps {
 export type NodeEventHandlers = Partial<Record<EventName, (value?: JsonValue) => void>>
 
 export interface NodeNavigation {
-  /** One-based position among the steps reachable with the current answers. */
+  /** One-based, among the steps reachable with the current answers. */
   position: number
   back?: (() => void) | undefined
   next?: (() => void) | undefined
@@ -106,32 +97,22 @@ export interface NodeAttributes {
    */
   'data-fs-hidden'?: 'true'
   /**
-   * Which rendered form this element belongs to.
-   *
-   * A key identifies a node inside its document and nowhere else, so two forms
-   * on one page both have a `root` and usually an `email`. Per-component CSS is
-   * selected by key, so without this the first form's stylesheet styles the
-   * second. Per render rather than per document, because the same document
-   * rendered twice has the same problem.
+   * A key is unique only within its document: without this, one form's stylesheet styles
+   * another's nodes. Per render, because one document can be rendered twice.
    */
   'data-fs-scope': string
   /**
-   * Which row of which repeater this element is in: `addresses[1]`.
-   *
-   * Absent outside a repeater. Separate from `data-fs-key` on purpose, because
-   * the two are wanted in opposite directions: per-component CSS is authored
-   * once and has to reach every row, while a click has to land on one.
+   * Separate from `data-fs-key`: per-component CSS has to reach every row, while a click
+   * has to land on one.
    */
   'data-fs-row'?: string
 }
 
 export type NodeRenderer = ComponentType<NodeRendererProps>
 
-/** The rendering half of a kit. Its metadata half is a `Kit` from @willowforms/core. */
 export interface RendererKit {
   id: string
   renderers: Record<string, NodeRenderer>
-  /** Drawn when a document references a type this kit does not implement. */
   fallback?: NodeRenderer
 }
 
@@ -188,7 +169,6 @@ function useRenderContext(): RenderContext {
   return ctx
 }
 
-/** Resolve one binding to a plain value. */
 export function resolveProp(
   value: PropValue,
   translations: Record<string, string>,
@@ -489,11 +469,8 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 }
 
 /**
- * One node inside its own error boundary, so a throw while rendering it,
- * the document root included, replaces only that node with a notice.
- *
- * Code outside the boundary (`encodeRow`, `isVisible`, the boundary's own
- * props) must not throw for any document.
+ * Code outside the boundary (`encodeRow`, `isVisible`, the boundary's own props) must not
+ * throw for any document.
  */
 export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
   const runtime = useRenderContext()
@@ -521,7 +498,7 @@ const AUTHORED_ROW: FormData[] = [{}]
 export interface FormNavigation {
   /** Context path whose literal comparisons define the flow. Defaults to `step`. */
   path?: string
-  /** Called with the destination value; the host remains the owner of navigation state. */
+  /** The host owns the navigation state; this only reports the destination. */
   onNavigate: (value: JsonValue) => void
 }
 
@@ -604,63 +581,43 @@ export interface FormRendererProps {
   kit: RendererKit
   data: FormData
   errors?: FormErrors
-  /** Language tag to draw translations from. Defaults to the document default. */
+  /** A language tag. Defaults to the document default. */
   language?: string
 
   revealHidden?: boolean
   /** Sandbox for computed bindings. Omit to render computed props as null. */
   evaluate?: Evaluator
   /**
-   * Render per-component styling for one device instead of by media query.
-   *
-   * The designer's canvas simulates a device by sizing a frame, so a media
-   * query there would answer about the browser window and ignore the frame.
-   * A real page has no frame, so omitting this is what a host wants: every
-   * device becomes its own query and the viewport decides.
+   * For a canvas that simulates a device by sizing a frame. Omit on a real page, or the
+   * viewport no longer decides.
    */
   device?: Device
   /**
-   * What the host knows that the form did not ask: a role, a flag, a lookup's
-   * result. Conditions can read it and it is never submitted.
-   *
-   * A document that reads a path this does not hold hides the component that
-   * reads it, quietly, and on a server that also skips validating it. Call
-   * `missingContext(document.root, context)` once at startup rather than
-   * discovering that per submit.
+   * Never submitted. A path this does not hold quietly hides the component that reads it,
+   * and on a server also skips validating it: call `missingContext(document.root, context)`
+   * at startup.
    */
   context?: FormContext
-  /** Optional controlled navigation for condition-defined steps. */
   navigation?: FormNavigation
   /** Sandbox boundary for code actions. Built-in actions do not require it. */
   evaluateAction?: ActionEvaluator
   /** Receives one fully validated effect batch. The host decides how to apply it. */
   onEffects?: (effects: Effect[], dispatch: ActionDispatch) => void
-  /** Reports an action reference, evaluator, or effect failure. */
   onActionError?: (message: string, dispatch: ActionDispatch) => void
   /**
-   * A node's render threw, and its component was replaced with a notice.
-   *
-   * The form keeps rendering and the answers already typed are kept. Passing
-   * this is how a host learns it happened at all: React writes its own copy to
-   * the console and nothing else here does.
+   * A node's render threw, and its component was replaced with a notice. Nothing else here
+   * reports it.
    */
   onError?: (error: Error, key: string) => void
   /**
-   * The CSP nonce for the stylesheet this renders.
-   *
-   * Per-component styling is one `<style>` element, which a `style-src` of `'self'`
-   * blocks. The form then renders with every authored style missing, and the only
-   * report is a CSP violation in the browser console: `onError` does not see it. Pass
-   * the same nonce the response header carries.
+   * The CSP nonce the response header carries. Without it a `style-src` of `'self'` blocks
+   * the form's stylesheet: every authored style is missing, and `onError` does not see it.
    */
   nonce?: string
   /**
-   * One field changed, reported at an address.
-   *
-   * Outside a repeater the address is the bare key. Inside one it carries the
-   * row: `addresses[1].line1`. Writing `{ ...data, [address]: value }` creates a
-   * property called `addresses[1].line1` and silently drops every answer in the
-   * repeater. Write it with `applyChange` from `@willowforms/core`.
+   * Inside a repeater the address carries the row, `addresses[1].line1`. Write it with
+   * `applyChange` from `@willowforms/core`: `{ ...data, [address]: value }` silently loses
+   * the answers in the repeater.
    */
   onChange: (address: string, value: JsonValue) => void
 }
