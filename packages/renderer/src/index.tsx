@@ -152,9 +152,11 @@ interface RenderContext {
 const Ctx = createContext<RenderContext | null>(null)
 const DensityCtx = createContext<FormDensity | undefined>(undefined)
 
-// Identity must hold across renders: `NodeBoundary` retries a failed node when the context
-// changes, so a fresh literal loops if the host sets state in `onError`.
+// Goes into the context as is, so its identity must hold across renders: `NodeBoundary`
+// retries a failed node when the context changes, and a fresh literal loops if the host
+// sets state in `onError`.
 const NO_ERRORS: FormErrors = Object.freeze({})
+
 const NO_TRANSLATIONS: Record<string, string> = Object.freeze({})
 const NO_NAVIGATION: ReadonlyMap<string, NodeNavigation> = new Map()
 const NO_DATA: FormData = Object.freeze({})
@@ -407,6 +409,8 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 
   const visible = isVisible(node, data, scoped)
 
+  // `data` is a new object on every change. Passing it only to props that read it keeps the
+  // props memo, and a memoising kit component, from rerunning.
   const forProps = readsData(node) ? data : NO_DATA
   const props = useMemo(
     () => resolveProps(node, translations, forProps, scoped),

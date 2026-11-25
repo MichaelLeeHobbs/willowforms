@@ -164,8 +164,8 @@ function rowKeysOf(repeater: ComponentNode): Set<string> {
 /**
  * What a condition authored on this node is allowed to name, by scope.
  *
- * The picker's half of the answer to the quiet failure below. That one reports
- * the mistake at boot; this one stops it being authorable, by telling the panel
+ * `validateDocument` reports a ref to an answer its scope cannot reach, under
+ * the `row-scope` code; this stops it being authorable, by telling the panel
  * which names belong to the row and which to the form so that choosing a field
  * is also choosing a scope. An author never types a scope and never leaves one
  * at a default that reads the wrong place.
