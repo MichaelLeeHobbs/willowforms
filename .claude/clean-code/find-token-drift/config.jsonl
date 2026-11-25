@@ -1,0 +1,38 @@
+{"kind":"exclusion","value":"*.test.ts, *.test.tsx","reason":"test"}
+{"kind":"exclusion","value":"apps/*/vite.config.ts","reason":"build config"}
+{"kind":"exclusion","value":"docs, *.md","reason":"prose"}
+{"kind":"exclusion","value":"e2e, e2e-dist, test","reason":"test"}
+{"kind":"exclusion","value":"scripts, .claude, root configs","reason":"tooling"}
+{"kind":"extractor","value":"cssCalls: styled(_, css), columns(_, grid tracks); css: { any|mobile|tablet|desktop }"}
+{"kind":"extractor","value":"pxHelpers: px"}
+{"kind":"extractor","value":"styleFunctions: backgroundImageStyle"}
+{"kind":"mode","value":"default, dark, dark-system, desert, desert-dark, desert-dark-system","note":"attribute and system dark blocks are separate modes: the tool rejects two records with one name and mode"}
+{"kind":"root-px","value":"16","note":"assumed: no rule sets a root font size"}
+{"kind":"scope","value":"apps/demo-server","prefix":"apps/demo-server/"}
+{"kind":"scope","value":"apps/playground","prefix":"apps/playground/"}
+{"kind":"scope","value":"examples","prefix":"examples/"}
+{"kind":"scope","value":"packages/core","prefix":"packages/core/"}
+{"kind":"scope","value":"packages/designer","prefix":"packages/designer/"}
+{"kind":"scope","value":"packages/kit-html","prefix":"packages/kit-html/"}
+{"kind":"scope","value":"packages/kit-mui","prefix":"packages/kit-mui/"}
+{"kind":"scope","value":"packages/renderer","prefix":"packages/renderer/"}
+{"kind":"surface","value":"--fs-bg-app"}
+{"kind":"surface","value":"--fs-bg-panel"}
+{"kind":"surface","value":"--fs-bg-well"}
+{"kind":"surface","value":"--fsh-surface"}
+{"kind":"surface","value":"--pg-surface"}
+{"kind":"surface","value":"background.default"}
+{"kind":"surface","value":"background.paper"}
+{"kind":"syntax","value":"css"}
+{"kind":"syntax","value":"embedded-css"}
+{"kind":"syntax","value":"inline-style"}
+{"kind":"syntax","value":"media-string"}
+{"kind":"syntax","value":"mui-sx"}
+{"kind":"syntax","value":"mui-theme"}
+{"kind":"syntax","value":"svg"}
+{"kind":"token-source","value":"apps/playground/src/character-theme.ts"}
+{"kind":"token-source","value":"apps/playground/src/examples/character-sheet.ts"}
+{"kind":"token-source","value":"apps/playground/src/palettes.css"}
+{"kind":"token-source","value":"apps/playground/src/playground.css"}
+{"kind":"token-source","value":"packages/designer/src/designer.css"}
+{"kind":"token-source","value":"packages/kit-html/src/kit-html.css"}
