@@ -5,6 +5,7 @@
  * folder another suite is serving, and nothing else can take the port while the build runs.
  */
 
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 
@@ -23,18 +24,24 @@ const { values } = parseArgs({
 const port = Number(values.port)
 const outDir = values['out-dir']
 if (!Number.isInteger(port) || port < 1 || outDir === undefined) {
-  throw new Error('Usage: serve-playground.mjs --port <n> --out-dir <path> [--mode] [--no-minify]')
+  throw new Error(
+    'Usage: serve-playground.mjs --port <n> --out-dir <path> [--mode <name>] [--no-minify]',
+  )
 }
 
-const root = fileURLToPath(new URL('../apps/playground', import.meta.url))
+const at = (path) => fileURLToPath(new URL('../' + path, import.meta.url))
 const config = {
-  root,
+  root: at('apps/playground'),
   mode: values.mode,
   build: { outDir, ...(values.minify ? {} : { minify: false }) },
 }
 
 // An address rather than `localhost`, which Node and the browser can resolve differently.
 await preview({ ...config, preview: { host: '127.0.0.1', port, strictPort: true } })
+// This mode resolves the packages through their exports, so they have to be built.
+if (values.mode === 'dist') {
+  execFileSync(process.execPath, ['--run', 'build'], { cwd: at(''), stdio: 'inherit' })
+}
 await build(config)
 
 // Both Playwright configs wait for this line.

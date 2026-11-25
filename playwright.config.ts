@@ -6,6 +6,7 @@ const PORT = Number(process.env['WILLOWFORMS_E2E_PORT'] ?? 5180)
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65_535) {
   throw new Error('WILLOWFORMS_E2E_PORT must be an integer from 1 to 65535.')
 }
+// The address `serve-playground.mjs` binds. `localhost` can open another process's server.
 const baseURL = 'http://127.0.0.1:' + String(PORT)
 
 export default defineConfig({
