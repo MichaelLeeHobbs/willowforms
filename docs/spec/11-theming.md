@@ -1,6 +1,6 @@
 # Theming
 
-**Status: built.** Both stylesheets are token-driven, both themes clear WCAG AA in CI, the toolbar can
+**Status: partial.** Built, except the open questions under [Type and spacing scales](#type-and-spacing-scales). Both stylesheets are token-driven, both themes clear WCAG AA in CI, the toolbar can
 force either, and the public token vocabulary is documented here and linked from the project README.
 The playground keeps its host-owned MUI palette aligned with the toolbar choice in both editing and
 preview modes.
@@ -42,7 +42,7 @@ The playground's Palette selector offers Willow and Desert Willow — AZT Bi-Col
 
 The default WillowForms chrome uses soft neutral-gray workspace and panel surfaces, lighter editable fields, and restrained green accents in light mode. Dark mode retains forest surfaces and sage actions. Hover, selection, editable fields, and primary-button hover have separate tokens. Selected controls use a tinted fill and a contrasting indicator; secondary buttons use quiet borders. Chrome typography uses a 14px local Segoe UI/system sans-serif base, with monospace reserved for code. Example documents, rendered form typography, and kit palettes remain independent.
 
-Every value is a custom property on `.fs-shell`, so a host restyles by overriding tokens rather than
+Every token is a custom property on `.fs-shell`, so a host restyles by overriding tokens rather than
 fighting specificity.
 
 ```css
@@ -78,7 +78,10 @@ fighting specificity.
 | `--fs-shadow-toolbar`                    | The shadow under the selection toolbar              |
 | `--fs-drop-ring`                         | The halo around the drop bar                        |
 | `--fs-backdrop`                          | The page behind an open dialog or drawer            |
-| `--fs-font`, `--fs-font-size`            | Type                                                |
+| `--fs-font`                              | Typeface                                            |
+| `--fs-font-size`                         | Base text size, for text without a size of its own  |
+| `--fs-font-size-xs`, `--fs-font-size-sm` | Small labels and tags; captions, notes, code        |
+| `--fs-font-size-lg`                      | Panel headings                                      |
 | `--fs-font-mono`                         | The JSON editor, the raw CSS box, the code editor   |
 
 `--fs-radius-sm` derives from `--fs-radius` rather than standing on its own, so overriding the one
@@ -93,12 +96,42 @@ On `.fsh-screen`:
 
 `--fsh-text`, `--fsh-muted`, `--fsh-surface`, `--fsh-field`, `--fsh-border`, `--fsh-accent`,
 `--fsh-accent-text`, `--fsh-danger`, `--fsh-success`, `--fsh-warning`, `--fsh-shadow`, `--fsh-radius`,
-`--fsh-font`, `--fsh-scrollbar-thumb`.
+`--fsh-font`, `--fsh-font-size`, `--fsh-font-size-sm`, `--fsh-font-size-xs`, `--fsh-font-size-2xs`,
+`--fsh-scrollbar-thumb`.
 
 Both lists are checked against the stylesheets by `test/docs.test.ts`. A token a host cannot find here is
 a token they cannot override, which is the whole mechanism this section describes -- and three of the kit's
 were missing, so an alert's success and warning accents and every shadow stayed on the default palette
 however thoroughly a host restyled the rest.
+
+## Type and spacing scales
+
+**Status: partial.** The steps are declared and `test/style-scale.test.ts` refuses a new value off them. The values that are still off a step are listed there, and the questions under Undecided below are open.
+
+The designer and the HTML kit each have their own type scale, because a host that restyles its builder has not restyled its forms. Both use one set of spacing steps. The scales cover the two published stylesheets only: a kit built on a component library keeps that library's sizes, and an example document's authored styles are its author's.
+
+| Text                               | Designer                   | HTML kit                     |
+| ---------------------------------- | -------------------------- | ---------------------------- |
+| Small label, tag, shortest hint    | `--fs-font-size-xs` (11px) |                              |
+| Caption, note, code, dense control | `--fs-font-size-sm` (12px) |                              |
+| Compact help text                  |                            | `--fsh-font-size-2xs` (12px) |
+| Help text, compact or inline label |                            | `--fsh-font-size-xs` (13px)  |
+| Label, compact control             |                            | `--fsh-font-size-sm` (14px)  |
+| Base: everything without its own   | `--fs-font-size` (14px)    | `--fsh-font-size` (16px)     |
+| Panel heading                      | `--fs-font-size-lg` (16px) |                              |
+
+The steps are independent lengths. Overriding `--fs-font-size` moves the base and leaves the others where they are, dense controls included.
+
+Font weights: `400`, `600`. Text that declares no weight keeps the browser's own, so the HTML kit's headings and card titles, and `<strong>` in the designer, are bold (700).
+
+Spacing steps: `2px`, `4px`, `6px`, `8px`, `10px`, `12px`, `16px`, `20px`, `24px`. They apply to margin, padding and gap, where a margin may also be the negative of a step. They are not tokens: a host that could move one step could not see what else it moved. A listed exception may sit one border short of a step, so that its padding and its 1px border add up to it: a designer button is 7px of padding plus 1px of border.
+
+**Undecided:**
+
+- Which listed exceptions fold onto a step.
+- What size and weight each heading level takes in the HTML kit, which today leaves both to the browser ([issue 224](https://github.com/MichaelLeeHobbs/willowforms/issues/224)).
+- Whether the kit's four `rem` sizes become steps ([issue 229](https://github.com/MichaelLeeHobbs/willowforms/issues/229)).
+- Whether the designer's small section headings, at 11px and 12px, and its dense controls, at 12px, are meant to differ from the panel heading and the base.
 
 ## Light and dark
 

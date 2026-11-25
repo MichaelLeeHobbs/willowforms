@@ -23,13 +23,17 @@
   --fsh-scrollbar-thumb: #6b7280;
   --fsh-radius: 6px;
   --fsh-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --fsh-font-size-2xs: 12px;
+  --fsh-font-size-xs: 13px;
+  --fsh-font-size-sm: 14px;
+  --fsh-font-size: 16px;
 
   display: flex;
   flex-direction: column;
   margin-inline: auto;
   padding: 16px;
   font-family: var(--fsh-font);
-  font-size: 16px;
+  font-size: var(--fsh-font-size);
   color: var(--fsh-text);
   background: var(--fsh-surface);
   scrollbar-width: thin;
@@ -148,7 +152,7 @@
 }
 
 .fsh-field__label {
-  font-size: 14px;
+  font-size: var(--fsh-font-size-sm);
   font-weight: 600;
 }
 
@@ -177,7 +181,7 @@
  */
 .fsh-field__message {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fsh-font-size-xs);
   line-height: 1.4;
   color: var(--fsh-muted);
 }
@@ -193,7 +197,7 @@
 }
 
 .fsh-field--label-inline > .fsh-field__label {
-  font-size: 13px;
+  font-size: var(--fsh-font-size-xs);
   line-height: 1.25;
 }
 
@@ -211,16 +215,16 @@
 
 .fsh-field[data-fs-density='compact'] > .fsh-input {
   padding: 6px 10px;
-  font-size: 14px;
+  font-size: var(--fsh-font-size-sm);
   min-height: 36px;
 }
 
 .fsh-field[data-fs-density='compact'] > .fsh-field__label {
-  font-size: 13px;
+  font-size: var(--fsh-font-size-xs);
 }
 
 .fsh-field[data-fs-density='compact'] > .fsh-field__message {
-  font-size: 12px;
+  font-size: var(--fsh-font-size-2xs);
 }
 
 .fsh-field--inline[data-fs-density='compact'] {
@@ -235,7 +239,7 @@
 .fsh-button[data-fs-density='compact'],
 [data-fs-density='compact'] > .fsh-button {
   padding: 6px 12px;
-  font-size: 14px;
+  font-size: var(--fsh-font-size-sm);
   min-height: 32px;
 }
 

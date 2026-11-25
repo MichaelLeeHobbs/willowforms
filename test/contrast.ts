@@ -3,6 +3,8 @@
  * ratio". sRGB only, no alpha: every colour in these stylesheets is opaque.
  */
 
+import { styleRules } from './css.js'
+
 export interface Rgb {
   r: number
   g: number
@@ -62,19 +64,15 @@ export function tokensFrom(
   // to compare every declaration, such as `color-scheme`.
   customOnly = true,
 ): Record<string, string> {
-  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
   const tokens: Record<string, string> = {}
   let found = false
 
-  for (const match of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if ((match[1]?.trim() ?? '') !== selector) continue
+  for (const rule of styleRules(css)) {
+    if (rule.selector !== selector) continue
     found = true
 
-    for (const declaration of (match[2] ?? '').split(';')) {
-      const [name, value] = declaration.split(':')
-      if (!name || !value) continue
-      const trimmed = name.trim()
-      if (trimmed.startsWith('--') || !customOnly) tokens[trimmed] = value.trim()
+    for (const [name, value] of rule.declarations) {
+      if (name.startsWith('--') || !customOnly) tokens[name] = value
     }
   }
 
