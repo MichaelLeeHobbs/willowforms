@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { createDocument, prop } from '@willowforms/core'
-import type { ComponentNode } from '@willowforms/core'
+import type { ActionRef, ComponentNode } from '@willowforms/core'
 import { htmlKit, htmlRendererKit } from '@willowforms/kit-html'
 import { Designer } from '../packages/designer/src/Designer.js'
 
@@ -26,6 +26,21 @@ const required = (label: string): ComponentNode => ({
   type: 'TextField',
   props: { label: prop(label) },
   schema: { type: 'string', validations: [{ key: 'required' }] },
+})
+
+const page = (value: number, children: ComponentNode[]): ComponentNode => ({
+  key: `step${value}`,
+  type: 'Step',
+  props: { title: prop(`Page ${value}`) },
+  children,
+  renderWhen: {
+    kind: 'condition',
+    condition: {
+      op: 'eq',
+      left: { kind: 'context', path: 'step' },
+      right: { kind: 'literal', value },
+    },
+  },
 })
 
 describe('beta authoring regressions', () => {
@@ -72,22 +87,7 @@ describe('beta authoring regressions', () => {
   })
 
   it('supports numeric step identities without turning them into strings', () => {
-    open(
-      [1, 2].map((value) => ({
-        key: `step${value}`,
-        type: 'Step',
-        props: { title: prop(`Page ${value}`) },
-        children: [],
-        renderWhen: {
-          kind: 'condition',
-          condition: {
-            op: 'eq',
-            left: { kind: 'context', path: 'step' },
-            right: { kind: 'literal', value },
-          },
-        },
-      })),
-    )
+    open([page(1, []), page(2, [])])
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
     const canvas = screen.getByRole('main')
     expect(canvas.querySelector('[data-fs-key="step1"]')).not.toBeNull()
@@ -234,6 +234,29 @@ describe('beta authoring regressions', () => {
     fireEvent.click(canvas.getByRole('button', { name: 'Clear data' }))
     fireEvent.click(canvas.getByRole('button', { name: 'Validate' }))
     expect(canvas.getByRole('status').textContent).toBe('Check 1 field before submitting.')
+  })
+
+  // Unlike the Validate button, which stays on a page that has an error.
+  it.each<[string, ActionRef]>([
+    ['validate', { type: 'builtin', name: 'validate', params: {} }],
+    ['submit', { type: 'builtin', name: 'emit', params: { event: 'submit' } }],
+  ])('goes to the first page with an error on a %s action, even from one of them', (_, action) => {
+    open([
+      page(1, [required('Name')]),
+      page(2, [
+        required('City'),
+        { key: 'act', type: 'Button', props: { text: prop('Act') }, events: { onClick: [action] } },
+      ]),
+      page(3, [required('Country')]),
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const canvas = within(screen.getByRole('main'))
+    const step = canvas.getByLabelText<HTMLSelectElement>('Step')
+    fireEvent.change(step, { target: { value: '2' } })
+
+    fireEvent.click(canvas.getByRole('button', { name: 'Act' }))
+    expect(step.value).toBe('1')
+    expect(canvas.getByRole('status').textContent).toBe('Check 3 fields before submitting.')
   })
 
   it('shows guidance for an empty document only while editing', () => {

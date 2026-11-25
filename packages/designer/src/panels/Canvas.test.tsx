@@ -561,7 +561,7 @@ describe('a document with steps', () => {
   })
 
   it.each([
-    { required: ['first', 'second'], from: 'three', to: 'one', note: 'Check 2 fields' },
+    { required: ['first', 'third'], from: 'two', to: 'one', note: 'Check 2 fields' },
     { required: ['second', 'third'], from: 'one', to: 'two', note: 'Check 2 fields' },
     { required: ['first', 'second'], from: 'two', to: 'two', note: 'Check 2 fields' },
     { required: [], from: 'two', to: 'two', note: 'All answers are valid.' },
