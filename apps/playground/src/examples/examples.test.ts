@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   applyChange,
   contextValues,
+  DEFAULT_MESSAGES,
   evaluatorKeys,
   flatten,
+  languageTag,
   loadDocument,
   validateForm,
 } from '@willowforms/core'
@@ -21,6 +23,32 @@ describe('playground example documents', () => {
       expect(muiKit.components.some((def) => def.type === node.type)).toBe(true)
     }
     expect(evaluatorKeys(document.root)).toEqual([])
+  })
+
+  it.each(EXAMPLES)('$title has text in every language for what it translates', ({ document }) => {
+    const keys = flatten(document.root)
+      .flatMap(({ node }) => [
+        ...Object.values(node.props),
+        ...(node.schema?.validations ?? []).map((rule) => rule.message),
+      ])
+      .flatMap((value) => (typeof value === 'object' && value.kind === 'i18n' ? [value.key] : []))
+
+    for (const language of document.languages) {
+      const bundle = document.translations[languageTag(language)] ?? {}
+      expect(keys.filter((key) => !(key in bundle))).toEqual([])
+    }
+  })
+
+  it('words a missing answer itself only in the example that translates it', () => {
+    const errors = (id: string, key: string): string | undefined => {
+      const { root, translations, defaultLanguage } = EXAMPLES.find(
+        (example) => example.id === id,
+      )!.document
+      const messages = translations[defaultLanguage] ?? {}
+      return validateForm(root, {}, { context: { step: 'About you' }, messages })[key]
+    }
+    expect(errors('job-application', 'fullName')).toBe(DEFAULT_MESSAGES.required)
+    expect(errors('workshop-enrollment', 'participant')).toBe('Please complete this field.')
   })
 
   it('keeps example identifiers distinct for independent saved designs', () => {
