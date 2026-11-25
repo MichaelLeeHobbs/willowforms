@@ -33,7 +33,6 @@ const ACTION_VALUE_LIMIT = 10_000
 
 export type JsonShape = 'json' | 'not-json' | 'too-large'
 
-/** Classify a value as plain JSON within `limit` values, without recursion. */
 export function jsonShape(value: unknown, limit: number): JsonShape {
   try {
     return walkJson(value, limit)

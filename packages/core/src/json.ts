@@ -83,11 +83,6 @@ export function optionValue(options: readonly unknown[], submitted: string): Jso
   return submitted
 }
 
-/**
- * Kits call `optionEntry` once per option inside `options.map`, so the table is
- * cached per list or rendering a select is quadratic. Keyed by identity: hashing
- * the contents would repeat the walk.
- */
 const tables = new WeakMap<readonly unknown[], string[]>()
 
 function valuesFor(all: readonly unknown[]): string[] {
@@ -135,9 +130,8 @@ export function optionEntry(
 }
 
 /**
- * A form author is not always the person deploying the form, and `javascript:`
- * in an `href` runs on click with the page's privileges. Core ships no
- * evaluator, so it must not ship one in a URL. See docs/THREAT_MODEL.md.
+ * A form author is not always the person deploying the form, and `javascript:` in an `href`
+ * runs on click with the page's privileges. See docs/THREAT_MODEL.md.
  */
 const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 

@@ -556,7 +556,6 @@ describe('evaluatorKeys on a node with no usable key', () => {
 })
 
 describe('the boot-time walkers, driven deep through the branch a panel produces', () => {
-  // Built with loops: a recursive builder would overflow first.
   const DEEP = 50_000
 
   const nest = (op: 'and' | 'or', n: number): Condition => {

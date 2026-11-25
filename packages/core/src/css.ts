@@ -42,7 +42,7 @@ function quotesBalanced(text: string): boolean {
   let single = 0
   let double = 0
   for (let i = 0; i < text.length; i += 1) {
-    // Keep this helper correct when called independently of the token check.
+    // `FORBIDDEN` already refuses a backslash; this keeps the count right without it.
     if (text[i] === '\\') {
       i += 1
       continue
@@ -144,7 +144,7 @@ export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = 
     const css = node.css
     if (!css) return
 
-    // Invalid nodes are omitted without suppressing usable rules from siblings.
+    // An unvalidated document can hold any key, and `escapeKey` throws on a non-string.
     if (typeof node.key !== 'string') return
 
     const selector = selectorFor(node.key, scope)

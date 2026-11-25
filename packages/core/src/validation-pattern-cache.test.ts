@@ -17,8 +17,8 @@ vi.mock('re2js', async (importOriginal) => {
 })
 
 /**
- * A repeater applies one pattern to every row, and the request body chooses the
- * row count. Compiling per value would multiply compile cost by that count.
+ * The request body chooses the row count, so compiling per value would let it multiply compile
+ * cost.
  */
 describe('a pattern rule across repeater rows', () => {
   const pattern = '^[A-Z]{2}\\d{4}$'

@@ -97,8 +97,8 @@
 }
 
 /*
- * `min-width: 0` on every component that can be a flex child: otherwise a flex
- * item will not shrink below its content and a row overflows the form.
+ * `min-width: 0`: otherwise a flex item will not shrink below its content and a row overflows
+ * the form.
  */
 .fsh-stack {
   display: flex;
@@ -132,7 +132,6 @@
   line-height: 1.25;
 }
 
-/* `min-width: 0` is inert in a column and stops a field overflowing a row. */
 .fsh-field {
   display: flex;
   flex-direction: column;
@@ -175,10 +174,7 @@
   border-color: var(--fsh-danger);
 }
 
-/*
- * Always present so `aria-describedby` never points at a missing element, but it
- * takes no space until it has something to say.
- */
+/* Hidden when empty, never unmounted: `aria-describedby` points at it. */
 .fsh-field__message {
   margin: 0;
   font-size: var(--fsh-font-size-xs);
@@ -361,10 +357,7 @@
   border-block-start: 1px solid var(--fsh-border);
 }
 
-/*
- * `stretch` gives the rule its height only inside a flex row. Elsewhere it
- * falls back to a visible line an author can correct.
- */
+/* `stretch` gives the rule its height only inside a flex row. */
 .fsh-divider--vertical {
   align-self: stretch;
   border-block-start: 0;
@@ -484,7 +477,6 @@ fieldset.fsh-field {
   gap: 2px;
   padding: 12px 14px;
   border: 1px solid var(--fsh-border);
-  /* Fallback stripe for a severity with no modifier class. */
   border-inline-start: 4px solid var(--fsh-muted);
   border-radius: var(--fsh-radius);
   color: var(--fsh-text);
