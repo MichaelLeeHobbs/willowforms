@@ -117,8 +117,8 @@ suite has rules -- the per-kit block and the rules driven per kit from outside i
 It checks more than that now, and the list is worth having in one place: the events table in
 `03-components.md` against what the two kits declare, both token tables in `11-theming.md` against the
 two stylesheets in both directions, the axe rules `a11y.test.tsx` disables against the ones
-`accessibility.md` names, each file's opening status against the state this index gives it, the
-`ComponentDef` block in `03-components.md` against the interface in core, the decision log's shape, and
+`accessibility.md` names, each file's opening status against the state this index gives it, every
+interface a file declares against its source, the decision log's shape, and
 the component catalogue against the kits.
 
 The two suite totals are checked as well, and not here: `README.md`, `CLAUDE.md`, `ROADMAP.md` and the
