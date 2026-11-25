@@ -52,7 +52,7 @@ export function ratio(a: string, b: string): number {
 
 /**
  * The selector is matched exactly, not by "contains": `.fs-shell` must not match
- * `.fs-shell[data-fs-theme='dark']`. Deliberately crude otherwise: these are
+ * `.fs-shell:where([data-fs-theme='dark'])`. Deliberately crude otherwise: these are
  * stylesheets this repo owns.
  */
 export function tokensFrom(
