@@ -71,6 +71,8 @@ interface NodeRendererProps {
   required?: boolean // evaluated against the current answers, host context, and row
   itemLimits?: { min: number; max: number } // applicable repeater bounds; Infinity means no maximum
   onChange: (value: JsonValue) => void
+  events?: NodeEventHandlers // by event; call one when it happens, but not onMount or onUnmount, which the renderer calls
+  navigation?: NodeNavigation // on the current step, when the host supplies navigation
   children?: ReactNode
 }
 ```

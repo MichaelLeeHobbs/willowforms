@@ -314,9 +314,9 @@ app.put('/api/forms/:id', async (c) => {
   if (errors.length > 0) return c.json({ error: 'Invalid document', errors }, 422)
 
   /*
-   * The read guard too: `validateDocument` treats `settings`, `actions` and `translations` as
-   * optional, and a write the reads then refuse would answer 200 and then 404. Do not relax the
-   * read guard instead; it keeps hand-edited files from the walkers.
+   * The read guard too: `validateDocument` accepts what it refuses, such as a document without
+   * `settings` or `actions`, and a write the reads then refuse would answer 200 and then 404. Do
+   * not relax the read guard instead; it keeps hand-edited files from the walkers.
    */
   const faults = storageFaults(doc)
   if (faults.length > 0) return c.json({ error: 'Invalid document', errors: faults }, 422)

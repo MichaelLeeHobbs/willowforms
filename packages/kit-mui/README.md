@@ -4,7 +4,7 @@ The Material UI kit for [WillowForms](https://github.com/MichaelLeeHobbs/willowf
 implementation of the kit contract.
 
 ```bash
-npm install @willowforms/kit-mui @mui/material@7 @emotion/react @emotion/styled
+npm install @willowforms/kit-mui @mui/material@9 @emotion/react @emotion/styled
 ```
 
 ```tsx

@@ -207,6 +207,10 @@ it on arrival; announcing as well says everything twice.
 An identical consecutive message gets a zero-width space appended, because an unchanged live region is
 never read out and a second identical move would otherwise be silent.
 
+## Stacking
+
+**Status: built.** The shell is a stacking context. Its overlays, the selection frame and toolbar, the drop indicator and the drag label, are above the form and stay below anything the host stacks above the shell, such as a modal. A host element that comes before the shell and has to cover it, such as a sticky header, needs a positive `z-index`. The shell's own dialogs and drawers open in the browser's top layer.
+
 ## What the shell does not own
 
 - **The document.** It holds one and emits every version through `onChange`.

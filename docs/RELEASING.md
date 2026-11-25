@@ -20,7 +20,7 @@ clean commit whose specification status matches the implementation.
 
 ## Local browser ports
 
-For concurrent local development, set `WILLOWFORMS_E2E_PORT` or `WILLOWFORMS_E2E_DIST_PORT` to an unused port before running the respective browser suite. Both suites still start their own server with `--strictPort` and refuse to reuse another checkout's server.
+For concurrent local development, set `WILLOWFORMS_E2E_PORT` or `WILLOWFORMS_E2E_DIST_PORT` to an unused port before running the respective browser suite. Both suites start their own server on `127.0.0.1`, and fail when another process holds that address and port. Each keeps its bundle, and its results under `test-results/`, in a folder named for its port.
 
 ## Stop conditions
 

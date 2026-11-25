@@ -118,7 +118,7 @@ describe('the specification index', () => {
    * function type or an object literal and take a brace with it.
    */
   const fieldsOf = (text: string, name: string): string[] => {
-    const open = text.indexOf('interface ' + name)
+    const open = text.search(new RegExp('interface ' + name + '\\b'))
     expect(open, 'no interface ' + name + ' to read').toBeGreaterThan(-1)
 
     let depth = 0
@@ -137,7 +137,9 @@ describe('the specification index', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '')
 
-    return [...body.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1] ?? '').sort()
+    return [...body.matchAll(/^\s{2}(?:readonly )?'?([\w-]+)'?\??\s*[:(]/gm)]
+      .map((match) => match[1] ?? '')
+      .sort()
   }
 
   it('publishes the key grammar core actually enforces', () => {
@@ -199,13 +201,30 @@ describe('the specification index', () => {
     ).toBe(figure(bound, keys, 'exported MAX_KEY_LENGTH'))
   })
 
-  it.each([
-    ['03-components.md', 'ComponentDef', 'packages/core/src/kit.ts'],
+  const INTERFACES: [file: string, name: string, source: string][] = [
+    ['01-document-model.md', 'FormDocument', 'packages/core/src/types.ts'],
     ['01-document-model.md', 'ComponentNode', 'packages/core/src/types.ts'],
-  ])('%s declares the same fields as %s in core', (file, name, source) => {
+    ['02-kit-contract.md', 'NodeRendererProps', 'packages/renderer/src/index.tsx'],
+    ['03-components.md', 'ComponentDef', 'packages/core/src/kit.ts'],
+    ['08-validation.md', 'EvalOptions', 'packages/core/src/validation.ts'],
+    ['09-actions.md', 'ActionRef', 'packages/core/src/types.ts'],
+    ['09-actions.md', 'CodeAction', 'packages/core/src/types.ts'],
+  ]
+  it.each(INTERFACES)('%s declares the fields %s has in %s', (file, name, source) => {
     // Names only, not types: a spec block may shorten a type for a reader, but
     // it may not miss a field.
-    expect(fieldsOf(read('docs/spec/' + file), name)).toEqual(fieldsOf(read(source), name))
+    const declared = fieldsOf(read(source), name)
+    expect(declared, 'no fields to read, so this compared nothing').not.toEqual([])
+    expect(fieldsOf(read('docs/spec/' + file), name)).toEqual(declared)
+  })
+
+  it('pins every interface a spec page declares', () => {
+    const declared = files.flatMap((file) =>
+      [...read('docs/spec/' + file).matchAll(/^\s*(?:export )?(?:declare )?interface (\w+)/gm)].map(
+        (match) => file + ' ' + (match[1] ?? ''),
+      ),
+    )
+    expect(declared.sort()).toEqual(INTERFACES.map(([file, name]) => file + ' ' + name).sort())
   })
 
   it.each(files)('%s opens with the status the index gives it', (name) => {

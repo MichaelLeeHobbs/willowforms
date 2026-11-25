@@ -33,8 +33,6 @@ export const errors = validateForm(form.root, answers)
 **Only `required` fails on an empty value.** Every other rule passes when the value is empty, so a field
 declaring only `url` stays valid while blank.
 
-**A missing evaluator degrades permissively.** Expression-backed rules need a JS sandbox, which core does
-not provide. With none injected, guarded rules are skipped and `custom` rules pass. Code execution is the
-host's privilege boundary to own, not a convenience for this package to hand out.
+**A missing evaluator degrades permissively.** `custom` rules and `computed` guards need a JS sandbox, which core does not provide. With none injected, a rule with a `computed` guard is skipped and `custom` rules pass. Code execution is the host's privilege boundary to own, not a convenience for this package to hand out.
 
 MIT.

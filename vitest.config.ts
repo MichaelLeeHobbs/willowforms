@@ -26,7 +26,9 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 10_000,
     setupFiles: ['./test/setup.ts'],
-    reporters: ['default'],
+    reporters: process.env['CI']
+      ? ['default', ['json', { outputFile: 'test-reports/vitest.json' }]]
+      : ['default'],
     coverage: {
       reporter: ['text', 'html'],
       include: ['packages/*/src/**'],
