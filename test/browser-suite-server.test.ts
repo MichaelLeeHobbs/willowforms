@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { createServer } from 'node:net'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -57,7 +58,7 @@ describe('scripts/serve-playground.mjs', { timeout: 2 * LIMIT }, () => {
   const PACKAGES_BUILT = 'the packages are built'
 
   /** The script in a project of its own, small enough to build at once. */
-  function project(main = ''): string {
+  function project(main = "console.log('main')"): string {
     // Under `node_modules`, where the script finds Vite and no other tool looks.
     const folder = mkdtempSync(join(root, 'node_modules/.suite-server-'))
     onTestFinished(() => rmSync(folder, { recursive: true, force: true }))
@@ -76,7 +77,7 @@ describe('scripts/serve-playground.mjs', { timeout: 2 * LIMIT }, () => {
     )
     write(
       'apps/playground/index.html',
-      '<title>The bundle</title><script type="module" src="/main.js"></script>',
+      '<title>The bundle, %MODE%</title><script type="module" src="/main.js"></script>',
     )
     write('apps/playground/main.js', main)
     return folder
@@ -94,6 +95,8 @@ describe('scripts/serve-playground.mjs', { timeout: 2 * LIMIT }, () => {
 
   function run(folder: string, ...args: string[]): Promise<Run> {
     const child = spawn(process.execPath, [join(folder, SCRIPT), '--out-dir', 'out', ...args], {
+      // Outside every project, so nothing it runs can find one by accident.
+      cwd: tmpdir(),
       timeout: LIMIT,
     })
     const closed = once(child, 'close')
@@ -121,6 +124,13 @@ describe('scripts/serve-playground.mjs', { timeout: 2 * LIMIT }, () => {
     })
   }
 
+  /** The page at `url`, which has to be the bundle's and not the source's. */
+  async function page(url = ''): Promise<string> {
+    const text = await (await fetch(url)).text()
+    expect(text).toContain('/assets/')
+    return text
+  }
+
   it('refuses a taken port before it builds anything', async () => {
     const holder = createServer().listen(0, '127.0.0.1')
     onTestFinished(() => void holder.close())
@@ -138,11 +148,14 @@ describe('scripts/serve-playground.mjs', { timeout: 2 * LIMIT }, () => {
   })
 
   it('is ready once it serves the bundle at the address the tests open', async () => {
-    const { url = '', bundle, stderr } = await run(project(), '--port', '0')
+    const address = (url = ''): string => url.slice(0, url.lastIndexOf(':'))
 
-    expect(new URL(url).hostname, stderr()).toBe(new URL(suite.use?.baseURL ?? '').hostname)
+    const { url, ended, bundle, stderr } = await run(project(), '--port', '0', '--no-minify')
+
+    expect(ended, stderr()).toBeUndefined()
+    expect(address(url)).toBe(address(suite.use?.baseURL))
     expect(bundle).toContain('index.html')
-    expect(await (await fetch(url)).text()).toContain('The bundle')
+    expect(await page(url)).toContain('The bundle, production')
     // Only the dist mode needs them.
     expect(stderr()).not.toContain(PACKAGES_BUILT)
   })
@@ -150,10 +163,11 @@ describe('scripts/serve-playground.mjs', { timeout: 2 * LIMIT }, () => {
   it('builds the packages before the bundle in the dist mode, and shows what that prints', async () => {
     const importsThem = project("import './packages.js'")
 
-    const { ended, bundle, stderr } = await run(importsThem, '--port', '0', '--mode', 'dist')
+    const { url, ended, bundle, stderr } = await run(importsThem, '--port', '0', '--mode', 'dist')
 
     expect(ended, stderr()).toBeUndefined()
     expect(bundle).toContain('index.html')
+    expect(await page(url)).toContain('The bundle, dist')
     // Polled, because stderr and stdout are separate pipes.
     await expect.poll(stderr).toContain(PACKAGES_BUILT)
   })
