@@ -33,7 +33,8 @@ export function field(
 ): ComponentNode {
   const result = node(type, key, { label, ...values })
   if (!result.schema) throw new Error('Not a field: ' + type)
-  result.schema.validations = rules
+  // Copied, because examples share `required` and one of them writes its own message into it.
+  result.schema.validations = rules.map((rule) => ({ ...rule }))
   return result
 }
 
