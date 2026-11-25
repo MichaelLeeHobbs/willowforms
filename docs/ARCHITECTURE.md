@@ -11,9 +11,7 @@ metadata half  ->  Kit          from @willowforms/core      pure data, no React
 rendering half ->  RendererKit  from @willowforms/renderer   React components
 ```
 
-`@willowforms/kit-mui` exports both (`muiKit`, `muiRendererKit`), but the designer only ever imports the
-metadata half. It builds the palette from `ComponentDef[]` and the properties panel from `PropSchema[]`.
-It never imports a component library.
+`@willowforms/kit-mui` exports both (`muiKit`, `muiRendererKit`). The designer imports neither: the host passes both as props. It builds the palette from `ComponentDef[]` and the properties panel from `PropSchema[]`, and hands the rendering half to the renderer for the canvas. It never imports a component library.
 
 The rendering half carries one obligation. Every renderer spreads `nodeProps` onto its outermost DOM
 element, which puts `data-fs-key`, `data-fs-type` and `data-fs-scope` in the output -- plus
@@ -32,8 +30,7 @@ selector for free.
 
 Three things fall out of that:
 
-- **Adding a kit is a new package.** `@willowforms/kit-shadcn` implements the same two exports. No change
-  to core, renderer, or designer.
+- **Adding a kit is a new package.** A `@willowforms/kit-shadcn` would implement the same two exports, with no change to core, renderer, or designer.
 - **Core runs in Node.** No React import anywhere in `@willowforms/core`, so the same validation runs on a
   server. `apps/demo-server` exists to prove that, not because WillowForms needs a backend.
 - **Runtime ships without the designer.** Most consumers embed a form and never embed a builder. They
@@ -126,11 +123,7 @@ which reached straight into the MUI components on the canvas, overrode their pad
 notched outline so every field label sat on top of its own border. The canvas hosts the kit's components
 and must inherit nothing from the builder.
 
-Three scopes under `.fs-canvas` are the designer's own chrome rather than the form -- `.fs-canvas__bar`,
-`.fs-canvas__data` and what is inside them -- and `designer.css.test.ts` holds them as an allowlist. A
-fourth cannot arrive without somebody adding it there, which is the direction that matters: a guard that
-lists the scopes containing the form stops noticing when the form moves into a new wrapper, and that is
-exactly how `.fs-canvas__frame input` once passed every assertion in the file.
+Two scopes under `.fs-canvas` are the designer's own chrome rather than the form -- `.fs-canvas__bar` and `.fs-canvas__data`, with what is inside them -- and `designer.css.test.ts` holds them as an allowlist. A third cannot arrive without somebody adding it there, which is the direction that matters: a guard that lists the scopes containing the form stops noticing when the form moves into a new wrapper, and that is exactly how `.fs-canvas__frame input` once passed every assertion in the file.
 
 There are two deliberate exceptions, and neither sets a visual property. Both are allowlisted in
 `designer.css.test.ts`, pinned to the exact declarations they may carry, so a third one cannot arrive

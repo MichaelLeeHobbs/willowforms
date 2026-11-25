@@ -34,8 +34,7 @@ This example used to be written as a controlled component -- `initialDocument={f
 `onChange={setForm}`, where `form` is the state `onChange` sets. That reads as a two-way binding and is
 not one: the document a host holds and the document the designer holds diverge on the first edit that
 does not come from the host, and a reader concludes the designer can be driven from outside when it
-cannot. `apps/playground/src/App.tsx` documents having been bitten by exactly that and keeps its live
-document in a ref.
+cannot. `apps/playground/src/App.tsx` keeps its live document in a ref.
 
 To replace the document a designer is editing, change its React `key` so a new one mounts.
 

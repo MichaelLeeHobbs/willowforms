@@ -70,12 +70,13 @@ Undo and redo cover all of it.
 | `@willowforms/kit-mui`  | Material UI kit. The reference implementation of the kit contract.                                  |
 | `@willowforms/kit-html` | Dependency-free HTML kit. Copy it to build your own.                                                |
 
-Two apps, neither published: `apps/playground` (Vite demo) and `apps/demo-server` (a deliberately tiny
-Hono server so the demo can persist a document and prove server-side validation shares one rule set).
+Two apps, neither published: `apps/playground` (Vite demo) and `apps/demo-server` (a deliberately tiny Hono server that stores documents and proves server-side validation shares one rule set; the playground does not call it).
 
 Custom and community components use the [kit interface](docs/spec/02-kit-contract.md#community-component-packages): a package supplies authoring metadata and a React renderer, and the host adds them to its kit. Service-dependent features such as attachments belong to these host-configured extensions. WillowForms does not install plugins from form documents or provide file storage. The standard kits contain no file input; [compatibility notes](docs/COMPATIBILITY.md#pre-beta-corrections) explain how hosts can replace legacy file fields.
 
 ## Quick start
+
+The Node and pnpm versions are in the `engines` of [package.json](package.json). The browser tests also need `pnpm exec playwright install chromium` once.
 
 ```bash
 pnpm install
@@ -178,10 +179,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before making a change. Security reports
 boundaries are documented in [SECURITY.md](SECURITY.md) and
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
-`pnpm lint` enforces more than style. The architectural invariants in [CLAUDE.md](CLAUDE.md) are
-`no-restricted-imports` rules, so importing React into core or a component library into the designer
-fails with a message explaining why the rule exists. The CSS isolation rule and the colour-contrast
-thresholds are enforced by tests that parse the stylesheets.
+`pnpm lint` enforces more than style. The first two invariants in [CLAUDE.md](CLAUDE.md) are import rules in [eslint.config.js](eslint.config.js), so importing React into core or a component library into the designer fails with a message explaining why the rule exists. The CSS isolation rule and the colour-contrast thresholds are enforced by tests that parse the stylesheets.
 
 If one of those fires, read the message before silencing it. Each is there because the failure it
 prevents is invisible to the type checker.
