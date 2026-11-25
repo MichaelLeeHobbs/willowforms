@@ -500,52 +500,56 @@ function RuleMessage({
         : ''
 
   return (
-    <div className="fs-prop-row">
+    <div
+      className={'fs-prop-row' + (mode === 'custom' || mode === 'i18n' ? ' fs-prop-row--wide' : '')}
+    >
       <label htmlFor={id + '-mode'}>Message</label>
-      <select
-        id={id + '-mode'}
-        value={mode}
-        onChange={(event) => {
-          if (event.target.value === 'default') setMessage(undefined)
-          if (event.target.value === 'custom') {
-            setMessage({ kind: 'static', value: DEFAULT_MESSAGES[rule.key] })
-          }
-          if (event.target.value === 'i18n') {
-            setMessage({ kind: 'i18n', key: translationKey(nodeKey, rule.key + '_message') })
-          }
-        }}
-      >
-        <option value="default">Default</option>
-        <option value="custom">Custom text</option>
-        <option value="i18n">Translation</option>
-        {mode === 'other' && <option value="other">Unrecognised message</option>}
-      </select>
-
-      {mode === 'custom' && (
-        <input
-          id={id}
-          aria-label="Custom message"
-          type="text"
-          placeholder={DEFAULT_MESSAGES[rule.key]}
-          value={custom}
+      <div className="fs-prop-row__control">
+        <select
+          id={id + '-mode'}
+          value={mode}
           onChange={(event) => {
-            if (event.target.value) setMessage({ kind: 'static', value: event.target.value })
-            else setMessage(undefined)
+            if (event.target.value === 'default') setMessage(undefined)
+            if (event.target.value === 'custom') {
+              setMessage({ kind: 'static', value: DEFAULT_MESSAGES[rule.key] })
+            }
+            if (event.target.value === 'i18n') {
+              setMessage({ kind: 'i18n', key: translationKey(nodeKey, rule.key + '_message') })
+            }
           }}
-        />
-      )}
+        >
+          <option value="default">Default</option>
+          <option value="custom">Custom text</option>
+          <option value="i18n">Translation</option>
+          {mode === 'other' && <option value="other">Unrecognised message</option>}
+        </select>
 
-      {message && typeof message !== 'string' && message.kind === 'i18n' && (
-        <TranslationEditor
-          id={id}
-          value={message}
-          languages={languages}
-          defaultLanguage={defaultLanguage}
-          translations={translations}
-          onChange={setMessage}
-          onTranslate={onTranslate}
-        />
-      )}
+        {mode === 'custom' && (
+          <input
+            id={id}
+            aria-label="Custom message"
+            type="text"
+            placeholder={DEFAULT_MESSAGES[rule.key]}
+            value={custom}
+            onChange={(event) => {
+              if (event.target.value) setMessage({ kind: 'static', value: event.target.value })
+              else setMessage(undefined)
+            }}
+          />
+        )}
+
+        {message && typeof message !== 'string' && message.kind === 'i18n' && (
+          <TranslationEditor
+            id={id}
+            value={message}
+            languages={languages}
+            defaultLanguage={defaultLanguage}
+            translations={translations}
+            onChange={setMessage}
+            onTranslate={onTranslate}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -583,51 +587,57 @@ function RuleGuard({
   }
 
   return (
-    <div className="fs-prop-row">
+    <div
+      className={
+        'fs-prop-row' + (mode === 'condition' || mode === 'computed' ? ' fs-prop-row--wide' : '')
+      }
+    >
       <label htmlFor={id}>Apply when</label>
-      <select
-        id={id}
-        value={mode}
-        onChange={(event) => {
-          const next = event.target.value
-          if (next === 'always') return setWhen(undefined)
-          if (next === 'never') return setWhen({ kind: 'static', value: false })
-          if (next === 'computed') return setWhen({ kind: 'computed', expression: '' })
-          if (next !== 'condition') return
+      <div className="fs-prop-row__control">
+        <select
+          id={id}
+          value={mode}
+          onChange={(event) => {
+            const next = event.target.value
+            if (next === 'always') return setWhen(undefined)
+            if (next === 'never') return setWhen({ kind: 'static', value: false })
+            if (next === 'computed') return setWhen({ kind: 'computed', expression: '' })
+            if (next !== 'condition') return
 
-          const rowKey = rowDataKeys?.[0]
-          const formKey = dataKeys[0]
-          if (rowKey) setWhen({ kind: 'condition', condition: emptyCondition(rowKey, 'row') })
-          else if (formKey) setWhen({ kind: 'condition', condition: emptyCondition(formKey) })
-        }}
-      >
-        <option value="always">Always</option>
-        <option value="never">Never</option>
-        <option value="condition" disabled={(rowDataKeys?.length ?? 0) + dataKeys.length === 0}>
-          A condition
-        </option>
-        <option value="computed">An expression</option>
-        {mode === 'other' && <option value="other">Unrecognised guard</option>}
-      </select>
+            const rowKey = rowDataKeys?.[0]
+            const formKey = dataKeys[0]
+            if (rowKey) setWhen({ kind: 'condition', condition: emptyCondition(rowKey, 'row') })
+            else if (formKey) setWhen({ kind: 'condition', condition: emptyCondition(formKey) })
+          }}
+        >
+          <option value="always">Always</option>
+          <option value="never">Never</option>
+          <option value="condition" disabled={(rowDataKeys?.length ?? 0) + dataKeys.length === 0}>
+            A condition
+          </option>
+          <option value="computed">An expression</option>
+          {mode === 'other' && <option value="other">Unrecognised guard</option>}
+        </select>
 
-      {when?.kind === 'condition' && (
-        <ConditionEditor
-          id={id + '-condition'}
-          value={when.condition}
-          dataKeys={dataKeys}
-          rowDataKeys={rowDataKeys}
-          onChange={(condition) => setWhen({ kind: 'condition', condition })}
-        />
-      )}
+        {when?.kind === 'condition' && (
+          <ConditionEditor
+            id={id + '-condition'}
+            value={when.condition}
+            dataKeys={dataKeys}
+            rowDataKeys={rowDataKeys}
+            onChange={(condition) => setWhen({ kind: 'condition', condition })}
+          />
+        )}
 
-      {when?.kind === 'computed' && (
-        <textarea
-          aria-label="Guard expression"
-          rows={2}
-          value={when.expression}
-          onChange={(event) => setWhen({ kind: 'computed', expression: event.target.value })}
-        />
-      )}
+        {when?.kind === 'computed' && (
+          <textarea
+            aria-label="Guard expression"
+            rows={2}
+            value={when.expression}
+            onChange={(event) => setWhen({ kind: 'computed', expression: event.target.value })}
+          />
+        )}
+      </div>
     </div>
   )
 }

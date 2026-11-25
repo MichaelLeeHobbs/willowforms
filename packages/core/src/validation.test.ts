@@ -316,8 +316,6 @@ describe('isRequired', () => {
   })
 
   it('is false when the rule is guarded, however the guard would answer', () => {
-    // Even a statically true guard: without data, only unconditional rules
-    // count.
     expect(isRequired(node([{ key: 'required', when: { kind: 'static', value: true } }]))).toBe(
       false,
     )
@@ -739,7 +737,6 @@ describe('validateAcross, and the submit it exists to stop', () => {
   })
 
   const step = (name: string, children: ComponentNode[]): ComponentNode => ({
-    // `stepWho`, not `step-who`: a hyphen is not in the key grammar.
     key: 'step' + name.charAt(0).toUpperCase() + name.slice(1),
     type: 'Box',
     props: {},
@@ -767,7 +764,6 @@ describe('validateAcross, and the submit it exists to stop', () => {
 
   const onStep = (name: string): EvalOptions => ({ context: { step: name } })
 
-  // A context value that is not a string is not a step name; do not stringify it.
   const stepScopes = (root: ComponentNode): EvalOptions[] =>
     contextValues(root, 'step')
       .filter((name): name is string => typeof name === 'string')
@@ -903,7 +899,6 @@ describe('validateAcross and a key that lives on Object.prototype', () => {
     children: [step('who', [required(key)]), step('where', [required('city')])],
   })
 
-  // Every other field answered, so only the inherited key can fail.
   const answered: FormData = { city: 'Ely' }
 
   const inherited = ['toString', 'valueOf', 'hasOwnProperty', 'constructor', 'isPrototypeOf']
@@ -1274,11 +1269,6 @@ describe('bounded matching of nested quantifiers', () => {
   })
 })
 
-/**
- * The host owns the evaluator and the document holds the expression, so a throw must
- * not escape `validateForm`. The two answers differ on purpose: a guard that throws
- * leaves its rule applying, and a `custom` rule that throws fails.
- */
 describe('an evaluator that throws', () => {
   const boom: Evaluator = () => {
     throw new Error('the host evaluator blew up')

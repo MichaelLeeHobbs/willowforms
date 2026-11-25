@@ -670,7 +670,6 @@ describe('the exported schema and a document that is data', () => {
   })
 
   it('does not overflow on a document nested deeper than the gate walks', () => {
-    // Built with a loop, because building it recursively would overflow first.
     let node: ComponentNode = { key: 'leaf', type: 'Box', props: {} }
     for (let i = 0; i < 50_000; i += 1) {
       node = { key: 'box' + String(i), type: 'Box', props: {}, children: [node] }
@@ -721,7 +720,6 @@ describe('a repeater at the root', () => {
 const documentOf = (root: ComponentNode): FormDocument => ({ ...doc([]), root })
 
 describe('the two branches the deep test never took', () => {
-  // Built with loops: building either recursively would overflow first.
   const DEEP = 50_000
 
   const schemaChain = (n: number): ComponentNode => {

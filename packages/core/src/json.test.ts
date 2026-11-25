@@ -305,8 +305,7 @@ describe('valueOf', () => {
   })
 
   it('does not walk into a polluted prototype from a request body', () => {
-    // JSON.parse makes `__proto__` an own key rather than assigning through it,
-    // so this is data, not an attack.
+    // JSON.parse makes `__proto__` an own key rather than assigning through it.
     const body = JSON.parse('{"__proto__":{"role":"admin"}}') as Record<string, never>
     expect(valueOf(body, 'role')).toBeUndefined()
   })
@@ -457,13 +456,10 @@ describe('an option list that is not quite an option list', () => {
   it('still reads an own value of null as declared', () => {
     const options = [{ label: 'None', value: null }]
 
-    // `jsonToString(null)` is the empty string: declared, not the position.
     expect(optionEntry(options[0] as JsonValue, 0, options).value).toBe('')
   })
 
   it('does not read a value off the prototype', () => {
-    // An explicit prototype rather than a write to `Object.prototype`, so this
-    // test cannot leak into any other.
     const inherited = Object.create({ value: 'from the prototype' }) as Record<string, JsonValue>
     inherited['label'] = 'Mine'
 
@@ -485,8 +481,7 @@ describe('an option list that is not quite an option list', () => {
 
     options.forEach((option, i) => optionEntry(option, i, watched))
 
-    // Linear is about 2N reads and quadratic over N squared. The bound is loose
-    // on purpose: it pins the shape, not a count.
+    // Loose on purpose: it tells linear from quadratic, not a count.
     expect(reads).toBeLessThan(options.length * 4)
   })
 
@@ -500,7 +495,6 @@ describe('an option list that is not quite an option list', () => {
 
   it('keeps index alignment through a hole in the list', () => {
     // No document produces a hole, but both functions are public exports.
-    // Assigned, because `no-sparse-arrays` refuses a literal with a hole.
     const sparse: unknown[] = new Array<unknown>(3)
     sparse[0] = 'first'
     sparse[2] = 'third'

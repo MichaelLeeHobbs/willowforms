@@ -111,7 +111,7 @@ export function flatten(root: ComponentNode): FlatNode[] {
     index: number,
     depth: number,
   ): void => {
-    // Total and bounded, like `walk`: `autoValidateKeys` runs it on host trees.
+    // Total and bounded, like `walk`: a host's tree may be unvalidated.
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     out.push({ node, parentKey, index, depth })
     childNodesOf(node).forEach((child, i) => visit(child, node.key, i, depth + 1))
@@ -348,10 +348,7 @@ export function updateNode(
   update: (node: ComponentNode) => ComponentNode,
   depth = 0,
 ): ComponentNode {
-  /*
-   * Total and bounded, like `walk`: `store.ts` warns about an invalid host
-   * document rather than refusing it, so this runs on unvalidated trees.
-   */
+  // Total and bounded, like `walk`: a host's tree may be unvalidated.
   if (!root || typeof root !== 'object' || depth > MAX_TREE_DEPTH) return root
   if (root.key === key) return update(root)
   if (!Array.isArray(root.children)) return root
@@ -474,12 +471,8 @@ export interface StructuralError {
   key?: string
 }
 
-/*
- * Written out because an untrusted string is checked against them at runtime.
- * `satisfies` refuses a string outside the union and `Covers` refuses a missing
- * member, so a new kind or rule stops the build. Not read from
- * `DEFAULT_MESSAGES`: `validation.ts` imports this file, so that is a cycle.
- */
+// `RULE_KEY_LIST` is not read from `DEFAULT_MESSAGES`: `validation.ts` imports this file, so
+// that is a cycle.
 const BINDING_KIND_LIST = [
   'static',
   'computed',
@@ -714,7 +707,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
       }
       seen.add(key)
 
-      // The rule a rename is judged by. The emptiness check above is more specific.
       const problem = keyProblem(key)
       if (problem) {
         errors.push({ code: 'invalid-key', message: 'Component ' + key + ': ' + problem, key })
@@ -823,7 +815,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
 
       if (value['kind'] === 'ref') {
         text(value['dataKey'], what + "'s data key")
-        // Absent means the form.
         if (value['scope'] !== undefined) oneOf(value['scope'], ROW_SCOPES, what + "'s scope")
         return
       }
@@ -1022,8 +1013,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
           )
           continue
         }
-        // Only a `code` reference names something on the document. A `builtin` is one
-        // of core's own names.
         if (ref['type'] === 'builtin') {
           if (!BUILTIN_ACTIONS.has(name)) {
             malformed('Component ' + key + ' references unknown built-in action ' + name + '.')
@@ -1044,11 +1033,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
 
   visit(candidate['root'], 'root')
 
-  /*
-   * A condition inside a repeater that reads a row's field at form scope reads
-   * nothing, hides its component, and takes it out of validation. Decidable
-   * from the tree, so it is reported here rather than discovered per submit.
-   */
   const rootNode = candidate['root']
   if (isRecord(rootNode)) {
     for (const found of rowScopeProblems(rootNode as unknown as ComponentNode)) {
@@ -1065,7 +1049,6 @@ function inspectDocument(doc: unknown): StructuralError[] {
   const tags = languages.map((language) => {
     if (!isRecord(language) || typeof language['code'] !== 'string') return undefined
 
-    // `name` is the language selector's label and `bidi` becomes `dir`.
     if (typeof language['name'] !== 'string') malformed('every language needs a name.')
     if (!BIDI.has(language['bidi'] as string)) {
       malformed(

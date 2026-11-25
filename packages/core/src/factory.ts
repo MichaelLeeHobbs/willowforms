@@ -62,11 +62,8 @@ export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNo
   if (def.container) node.children = []
   if (def.dataBound) node.schema = { type: def.dataType ?? 'string', validations: [] }
 
-  /*
-   * After the key, because the rule may name the node. In a `try` because a kit
-   * supplies this function: one that throws yields a component with no
-   * condition rather than taking the designer down on drop.
-   */
+  // A kit supplies this function: one that throws yields a component with no condition rather
+  // than taking the designer down on drop.
   if (def.defaultRenderWhen) {
     try {
       node.renderWhen = def.defaultRenderWhen(node.key)

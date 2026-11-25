@@ -168,7 +168,6 @@ describe('mutations: what they return, and what they leave alone', () => {
     const before = fixture()
     const after = updateNode(before, 'a', (n) => ({ ...n, props: { label: prop('Hi') } }))
     expect(findNode(after, 'a')?.props['label']).toEqual({ kind: 'static', value: 'Hi' })
-    // Untouched subtrees keep referential identity, which is what memoisation needs.
     expect(findNode(after, 'c')).toBe(findNode(before, 'c'))
     expect(findNode(after, 'b')).toBe(findNode(before, 'b'))
     expect(findNode(after, 'stack')).not.toBe(findNode(before, 'stack'))
@@ -202,11 +201,7 @@ describe('moveNode', () => {
     expect(collectKeys(moveNode(fixture(), 'a', 'ghost'))).toEqual(collectKeys(fixture()))
   })
 
-  /*
-   * The index counts from the list without the node, because `moveNode` composes
-   * `insertNode(removeNode(...))`. The designer's `dnd.ts` adjusts its indexes
-   * for this, so it is a contract, not an accident.
-   */
+  // The index counts from the list without the node; callers must adjust for it.
   const order = (root: ComponentNode, parent: string): string[] | undefined =>
     findNode(root, parent)?.children?.map((child) => child.key)
 
@@ -308,10 +303,7 @@ describe('validateDocument', () => {
   })
 })
 
-/*
- * The gate for untrusted documents (pasted JSON, demo-server request bodies): it
- * must judge anything without throwing.
- */
+// The gate for untrusted documents: it must judge anything without throwing.
 describe('validateDocument against malformed input', () => {
   const wellFormed = (): FormDocument => ({
     version: '1',
@@ -972,11 +964,7 @@ describe('a component that arrives with a visibility rule', () => {
 })
 
 describe('two lookups for one key', () => {
-  /*
-   * A host can render a document it never validated, so duplicate keys reach
-   * these. Every lookup takes the first match, so they agree on which node a
-   * key means.
-   */
+  // A host can render a document it never validated, so duplicate keys reach these.
   const twins: ComponentNode = {
     key: 'root',
     type: 'Screen',
@@ -1035,7 +1023,6 @@ describe('validateDocument and translations', () => {
   it('accepts the shape the factory produces', () => {
     expect(validateDocument(createDocument('Contact', 'doc'))).toEqual([])
     expect(codes({ 'en-US': { greeting: 'Hello' } })).toEqual([])
-    // An empty bundle for a language is a language nobody has translated yet.
     expect(codes({ 'en-US': {} })).toEqual([])
   })
 
@@ -1135,11 +1122,8 @@ describe('validateDocument and unrecognised tags', () => {
   })
 })
 
-/*
- * The gate refuses what is malformed (a shape no version of this library wrote),
- * not what is merely unusual: refusing a document somebody holds is worse than
- * the render it protects.
- */
+// The gate refuses what is malformed (a shape no version of this library wrote), not what is
+// merely unusual.
 describe('validateDocument over the whole document', () => {
   const docWith = (patch: Record<string, unknown>): FormDocument => ({
     ...createDocument('Contact', 'doc'),
@@ -1230,7 +1214,6 @@ describe('validateDocument over the whole document', () => {
     })
 
     it('rejects a static binding with no value field at all', () => {
-      // Distinct from `value: undefined`, which JSON cannot express anyway.
       expect(codes(nodeWith({ props: { label: { kind: 'static' } } }))).toContain('malformed')
     })
   })
@@ -1412,11 +1395,8 @@ describe('the tree and keys that repeat or are quoted', () => {
   })
 
   it('stops at the first match even when that update changes nothing', () => {
-    /*
-     * What `updateNode`'s `found` flag is for: a no-op update (a controlled
-     * editor rewriting the same value) must still stop at the first match.
-     * Observed through identity, since a no-op leaves no value to compare.
-     */
+    // A no-op update must still stop at the first match; observed through identity, since a
+    // no-op leaves no value to compare.
     const before = twice()
     const seen: ComponentNode[] = []
     const next = updateNode(before, 'same', (n) => {
@@ -1668,7 +1648,6 @@ describe('toJsonSchema and a shared data key', () => {
  * ordinary), so every reader must guard the array.
  */
 describe('a field whose schema has no validations', () => {
-  // Built as JSON and cast: that is how a document arrives.
   const document_ = (): FormDocument =>
     JSON.parse(
       JSON.stringify({
@@ -1683,9 +1662,8 @@ describe('a field whose schema has no validations', () => {
     ) as FormDocument
 
   it('is a document the gate accepts', () => {
-    // The premise. If this ever starts reporting, the three tests below are
-    // about a document nothing can produce and should be re-read rather than
-    // deleted.
+    // The premise: if this starts reporting, re-read the tests below rather than deleting
+    // them.
     expect(validateDocument(document_())).toEqual([])
   })
 
@@ -1756,7 +1734,6 @@ describe('naming a copy of a copy', () => {
   })
 })
 
-// A node with an unusable key still has its shape checked, so one pass reports everything.
 describe('validateDocument and a node with no usable key', () => {
   const broken = (key: unknown): FormDocument => ({
     ...createDocument('Broken', 'broken'),
@@ -1863,7 +1840,6 @@ describe('the lookup and mutation family on a document nothing gated', () => {
   })
 
   it('and none of them is bounded only by the stack', () => {
-    // Built with a loop: building it recursively would overflow first.
     let deep: ComponentNode = { key: 'leaf', type: 'Field', props: {} }
     for (let i = 0; i < 50_000; i += 1) {
       deep = { key: 'box' + String(i), type: 'Screen', props: {}, children: [deep] }
@@ -1875,10 +1851,6 @@ describe('the lookup and mutation family on a document nothing gated', () => {
   })
 
   it('duplicates a malformed children value without changing its shape', () => {
-    /*
-     * A copy differs from its source only in its keys, so a malformed `children`
-     * is carried over as is, the way `updateNode` and `removeNode` leave it.
-     */
     for (const children of [{}, 'ab', 5]) {
       const source = { key: 'odd', type: 'Field', props: {}, children } as unknown as ComponentNode
       const root: ComponentNode = {
@@ -1971,10 +1943,7 @@ describe('the lookup and mutation family on a document nothing gated', () => {
 })
 
 describe('the gate branches nothing ever drove', () => {
-  /*
-   * Asserted on the message: all four share the code `malformed`, which any
-   * other problem in the fixture would also satisfy.
-   */
+  // Asserted on the message: any other problem in the fixture would also satisfy `malformed`.
   const doc = (root: unknown): FormDocument =>
     ({ ...createDocument('Gate', 'gate'), root }) as unknown as FormDocument
 
@@ -2071,7 +2040,7 @@ describe('invariant 4 on the operations that had no assertion for it', () => {
     expect(validations).toEqual([{ key: 'required' }])
     expect(css?.['any']).toBe('color:red')
 
-    // Now mutate them, with no optional chaining to swallow a missing record.
+    // No optional chaining: it would swallow a missing record.
     ;(events as { name: string; type: string }[]).push({ name: 'other', type: 'code' })
     ;(validations as { key: string }[]).push({ key: 'email' })
     ;(css as Record<string, string>)['any'] = 'color:blue'

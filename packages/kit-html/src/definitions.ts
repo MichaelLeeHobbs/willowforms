@@ -276,8 +276,6 @@ export const htmlKit: Kit = {
       icon: 'repeat',
       group: 'layout',
       container: true,
-      // Core's `isRowScope` makes any container whose answer is an array a
-      // repeater, whatever its type is called.
       dataBound: true,
       dataType: 'array',
       defaultProps: {

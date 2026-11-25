@@ -22,9 +22,10 @@ const { values } = parseArgs({
   },
   allowNegative: true,
 })
-const port = Number(values.port)
+// Not `Number` alone, which reads an empty string as 0.
+const port = /^\d+$/.test(values.port ?? '') ? Number(values.port) : undefined
 const outDir = values['out-dir']
-if (!Number.isInteger(port) || port < 0 || outDir === undefined) {
+if (port === undefined || outDir === undefined) {
   throw new Error(
     'Usage: serve-playground.mjs --port <n> --out-dir <path> [--mode <name>] [--no-minify]',
   )
@@ -48,4 +49,5 @@ if (values.mode === 'dist') {
 await build(config)
 
 // Both Playwright configs wait for this line.
-console.log('Bundle ready on port ' + String(server.httpServer.address().port))
+const bound = server.httpServer.address()
+console.log(`Bundle ready on http://${bound.address}:${bound.port}`)

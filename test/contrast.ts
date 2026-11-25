@@ -3,6 +3,8 @@
  * ratio". sRGB only, no alpha: every colour in these stylesheets is opaque.
  */
 
+import { styleRules } from './css.js'
+
 export interface Rgb {
   r: number
   g: number
@@ -26,6 +28,19 @@ export function parseHex(hex: string): Rgb {
     g: parseInt(full.slice(2, 4), 16),
     b: parseInt(full.slice(4, 6), 16),
   }
+}
+
+/** A browser reports a computed colour as `rgb()`. One with an alpha is refused. */
+export function rgbToHex(rgb: string): string {
+  const channels = /^rgb\((\d+), (\d+), (\d+)\)$/.exec(rgb)
+  if (!channels) throw new Error('Not an opaque rgb colour: ' + rgb)
+  return (
+    '#' +
+    channels
+      .slice(1)
+      .map((value) => Number(value).toString(16).padStart(2, '0'))
+      .join('')
+  )
 }
 
 function channel(value: number): number {
@@ -62,19 +77,15 @@ export function tokensFrom(
   // to compare every declaration, such as `color-scheme`.
   customOnly = true,
 ): Record<string, string> {
-  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
   const tokens: Record<string, string> = {}
   let found = false
 
-  for (const match of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if ((match[1]?.trim() ?? '') !== selector) continue
+  for (const rule of styleRules(css)) {
+    if (rule.selector !== selector) continue
     found = true
 
-    for (const declaration of (match[2] ?? '').split(';')) {
-      const [name, value] = declaration.split(':')
-      if (!name || !value) continue
-      const trimmed = name.trim()
-      if (trimmed.startsWith('--') || !customOnly) tokens[trimmed] = value.trim()
+    for (const [name, value] of rule.declarations) {
+      if (name.startsWith('--') || !customOnly) tokens[name] = value
     }
   }
 

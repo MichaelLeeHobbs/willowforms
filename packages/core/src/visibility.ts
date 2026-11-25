@@ -4,13 +4,7 @@ import { expressionData } from './rows.js'
 import type { ComponentNode, FormData } from './types.js'
 import type { EvalOptions } from './validation.js'
 
-/**
- * A host's evaluator, run without letting it take the caller down. The expression is
- * authored a character at a time, so it throws for most of the time it is being typed.
- *
- * A throw reads as hidden, which is the answer a missing evaluator gets and what the
- * renderer draws: `resolveProp` gives null for both.
- */
+/** A throw reads as hidden, like a missing evaluator: `resolveProp` gives null for both. */
 function runs(
   evaluate: NonNullable<EvalOptions['evaluate']>,
   expression: string,
@@ -40,11 +34,8 @@ export function isVisible(node: ComponentNode, data: FormData, options: EvalOpti
     case 'computed':
       return options.evaluate ? runs(options.evaluate, when.expression, data, options) : false
 
-    /*
-     * A translation key is not a condition. Treating it as one would hide a
-     * component whenever its bundle happened to be missing, so this reads as
-     * "no condition expressed" instead.
-     */
+    // A translation key is not a condition: treating it as one would hide a component whenever
+    // its bundle is missing.
     case 'i18n':
       return true
 

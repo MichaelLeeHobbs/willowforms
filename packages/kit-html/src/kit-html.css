@@ -23,13 +23,17 @@
   --fsh-scrollbar-thumb: #6b7280;
   --fsh-radius: 6px;
   --fsh-font: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --fsh-font-size-2xs: 12px;
+  --fsh-font-size-xs: 13px;
+  --fsh-font-size-sm: 14px;
+  --fsh-font-size: 16px;
 
   display: flex;
   flex-direction: column;
   margin-inline: auto;
   padding: 16px;
   font-family: var(--fsh-font);
-  font-size: 16px;
+  font-size: var(--fsh-font-size);
   color: var(--fsh-text);
   background: var(--fsh-surface);
   scrollbar-width: thin;
@@ -93,8 +97,8 @@
 }
 
 /*
- * `min-width: 0` on every component that can be a flex child: otherwise a flex
- * item will not shrink below its content and a row overflows the form.
+ * `min-width: 0`: otherwise a flex item will not shrink below its content and a row overflows
+ * the form.
  */
 .fsh-stack {
   display: flex;
@@ -128,7 +132,6 @@
   line-height: 1.25;
 }
 
-/* `min-width: 0` is inert in a column and stops a field overflowing a row. */
 .fsh-field {
   display: flex;
   flex-direction: column;
@@ -148,7 +151,7 @@
 }
 
 .fsh-field__label {
-  font-size: 14px;
+  font-size: var(--fsh-font-size-sm);
   font-weight: 600;
 }
 
@@ -171,13 +174,10 @@
   border-color: var(--fsh-danger);
 }
 
-/*
- * Always present so `aria-describedby` never points at a missing element, but it
- * takes no space until it has something to say.
- */
+/* Hidden when empty, never unmounted: `aria-describedby` points at it. */
 .fsh-field__message {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fsh-font-size-xs);
   line-height: 1.4;
   color: var(--fsh-muted);
 }
@@ -193,7 +193,7 @@
 }
 
 .fsh-field--label-inline > .fsh-field__label {
-  font-size: 13px;
+  font-size: var(--fsh-font-size-xs);
   line-height: 1.25;
 }
 
@@ -211,16 +211,16 @@
 
 .fsh-field[data-fs-density='compact'] > .fsh-input {
   padding: 6px 10px;
-  font-size: 14px;
+  font-size: var(--fsh-font-size-sm);
   min-height: 36px;
 }
 
 .fsh-field[data-fs-density='compact'] > .fsh-field__label {
-  font-size: 13px;
+  font-size: var(--fsh-font-size-xs);
 }
 
 .fsh-field[data-fs-density='compact'] > .fsh-field__message {
-  font-size: 12px;
+  font-size: var(--fsh-font-size-2xs);
 }
 
 .fsh-field--inline[data-fs-density='compact'] {
@@ -235,7 +235,7 @@
 .fsh-button[data-fs-density='compact'],
 [data-fs-density='compact'] > .fsh-button {
   padding: 6px 12px;
-  font-size: 14px;
+  font-size: var(--fsh-font-size-sm);
   min-height: 32px;
 }
 
@@ -357,10 +357,7 @@
   border-block-start: 1px solid var(--fsh-border);
 }
 
-/*
- * `stretch` gives the rule its height only inside a flex row. Elsewhere it
- * falls back to a visible line an author can correct.
- */
+/* `stretch` gives the rule its height only inside a flex row. */
 .fsh-divider--vertical {
   align-self: stretch;
   border-block-start: 0;
@@ -480,7 +477,6 @@ fieldset.fsh-field {
   gap: 2px;
   padding: 12px 14px;
   border: 1px solid var(--fsh-border);
-  /* Fallback stripe for a severity with no modifier class. */
   border-inline-start: 4px solid var(--fsh-muted);
   border-radius: var(--fsh-radius);
   color: var(--fsh-text);

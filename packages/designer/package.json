@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsc --build",
-    "clean": "rimraf dist *.tsbuildinfo"
+    "clean": "rimraf --glob dist *.tsbuildinfo"
   },
   "dependencies": {
     "@willowforms/core": "workspace:*",
