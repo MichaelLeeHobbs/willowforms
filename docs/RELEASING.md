@@ -6,7 +6,7 @@ clean commit whose specification status matches the implementation.
 ## Checklist
 
 1. Confirm the branch contains only intended changes and update user-facing release notes.
-2. Run `pnpm install --frozen-lockfile` on the supported Node version.
+2. Run `pnpm install --frozen-lockfile` on Node 24, the version CI runs.
 3. Run `pnpm audit --audit-level high`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and
    `pnpm test`.
 4. Run `pnpm build` and `node scripts/check-dist.mjs`.
