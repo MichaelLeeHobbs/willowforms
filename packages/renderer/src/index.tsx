@@ -152,8 +152,6 @@ interface RenderContext {
 const Ctx = createContext<RenderContext | null>(null)
 const DensityCtx = createContext<FormDensity | undefined>(undefined)
 
-// Shared so their identity holds across renders; a fresh literal would defeat
-// the context and props memos and re-render every node.
 const NO_ERRORS: FormErrors = Object.freeze({})
 const NO_TRANSLATIONS: Record<string, string> = Object.freeze({})
 const NO_NAVIGATION: ReadonlyMap<string, NodeNavigation> = new Map()
@@ -409,8 +407,6 @@ function RenderNodeBody({ node }: { node: ComponentNode }): ReactNode {
 
   const visible = isVisible(node, data, scoped)
 
-  // `data` is a new object on every keystroke; passing it only to props that
-  // read it keeps the props memo, and a memoising kit component, from rerunning.
   const forProps = readsData(node) ? data : NO_DATA
   const props = useMemo(
     () => resolveProps(node, translations, forProps, scoped),
@@ -512,8 +508,6 @@ export function RenderNode({ node }: { node: ComponentNode }): ReactNode {
       runtime={runtime}
       scope={scope}
       row={row ? encodeRow(row.path) : undefined}
-      // Evaluated again in `RenderNodeBody`; `revealHidden` short-circuits, so
-      // only the canvas pays twice.
       hidden={revealHidden && !isVisible(node, data, { ...options, ...(row ? { row } : {}) })}
       onError={onError}
     >

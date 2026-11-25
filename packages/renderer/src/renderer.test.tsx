@@ -1563,7 +1563,6 @@ describe('a translation that is not text', () => {
     ['a number', 42],
     ['null', null],
   ])('falls back to the key when the translation is %s', (_what, value) => {
-    // The key, which a translator can search for, not an empty label.
     expect(labelOf(translated(value))).toBe('email_label')
   })
 
