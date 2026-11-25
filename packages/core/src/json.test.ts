@@ -166,7 +166,7 @@ describe('safeHref', () => {
   })
 
   it('decides by scheme on a runtime with no URL.parse', () => {
-    // `URL.parse` is missing before Node 22.1 and Safari 18.
+    // `URL.parse` is missing before Safari 18.
     // Put back exactly what was there; it is never called detached.
     // eslint-disable-next-line @typescript-eslint/unbound-method
     const parse = URL.parse

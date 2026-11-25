@@ -5,7 +5,7 @@ changes must be deliberate and documented rather than arriving as incidental ref
 
 ## Supported platforms
 
-- Node.js 20 and 22 for `@willowforms/core` and server-side validation.
+- Node.js 24 and later for `@willowforms/core` and server-side validation. CI runs 24.
 - React 18 and 19 for the renderer, designer, and kits.
 - The current and previous major Material UI releases supported by `@willowforms/kit-mui` peer metadata.
 - Current evergreen Chromium, Firefox, and Safari for runtime use. Automated browser coverage currently

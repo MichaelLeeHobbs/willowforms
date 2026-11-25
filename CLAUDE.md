@@ -58,7 +58,7 @@ through package exports and are verified independently.
 
 ## Conventions
 
-- Develop on Node 22 and pnpm 10. Published package engine requirements live in each package manifest.
+- Develop on Node 24 and pnpm 10. Published package engine requirements live in each package manifest.
 - TypeScript uses `strict`, `exactOptionalPropertyTypes`, and `noUncheckedIndexedAccess`.
 - Unit tests live beside source. Cross-package contract tests live in `test/`; browser tests live in
   `e2e/`.

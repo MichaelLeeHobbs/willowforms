@@ -6,9 +6,9 @@
   "description": "Minimal persistence for the demo. Deliberately tiny: WillowForms is a frontend library.",
   "scripts": {
     "predev": "pnpm --filter @willowforms/core build",
-    "dev": "node --experimental-strip-types --watch src/index.ts",
+    "dev": "node --watch src/index.ts",
     "prestart": "pnpm --filter @willowforms/core build",
-    "start": "node --experimental-strip-types src/index.ts"
+    "start": "node src/index.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",
@@ -16,6 +16,6 @@
     "hono": "^4.13.18"
   },
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=24"
   }
 }

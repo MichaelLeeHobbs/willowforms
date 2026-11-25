@@ -429,16 +429,13 @@ down.
 | Requirement            | Because                                                    |
 | ---------------------- | ---------------------------------------------------------- |
 | React 18 or 19         | The peer range on every package                            |
-| Node 20+               | `engines` on every package. The repo itself develops on 22 |
+| Node 24+               | `engines` on every package. The repo itself develops on 24 |
 | `URL.canParse`         | The `url` validation rule, in core                         |
 | `<dialog>.showModal()` | The JSON dialog                                            |
 | `CSS.escape`           | Selecting a node by key                                    |
 | `ResizeObserver`       | Keeping the selection frame on its target                  |
 
-`URL.canParse` sets the floor, and it lives in core, so it constrains a server as much as a browser:
-Node 18.17, Chrome 120, Safari 17. Everything else here is older. In practice the baseline is the
-browsers shipping at the end of 2023, and a consumer who needs to go further back needs a polyfill for
-one function.
+`URL.canParse` sets the browser floor: Chrome 120, Safari 17. Everything else here is older, and every supported Node has it. In practice the baseline is the browsers shipping at the end of 2023, and a consumer who needs to go further back needs a polyfill for one function.
 
 ## Stability
 
