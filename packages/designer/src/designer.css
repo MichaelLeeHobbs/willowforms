@@ -1577,6 +1577,12 @@
 .fs-prop-row__error,
 .fs-prop-row__hint.is-error {
   color: var(--fs-danger);
+  overflow-wrap: anywhere;
+}
+
+/* A property's control has no gap of its own. */
+.fs-prop-row__control > .fs-prop-row__error {
+  margin-block-start: 6px;
 }
 
 .fs-prop-row--wide > .fs-prop-row__control {

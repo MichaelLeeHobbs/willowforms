@@ -6,6 +6,8 @@ import { STORAGE_KEY, expect, test } from './harness.js'
 const panelOf = (page: Page): Locator =>
   page.getByRole('complementary', { name: 'Component properties' })
 
+const LONG_KEY = 'an_answer_whose_key_is_longer_than_one_line_of_the_panel_is_wide'
+
 async function open(page: Page): Promise<void> {
   const doc = createDocument('Rows', 'rows')
   doc.languages.push({ code: 'fr', name: 'French', bidi: 'ltr' })
@@ -21,11 +23,12 @@ async function open(page: Page): Promise<void> {
       },
     },
     {
-      key: 'other',
+      key: LONG_KEY,
       type: 'TextField',
       props: { label: prop('Other') },
       schema: { type: 'string' },
     },
+    { key: 'trail', type: 'Breadcrumbs', props: { items: prop([]) } },
   ]
   await page.addInitScript(
     ({ key, text }) => {
@@ -36,11 +39,20 @@ async function open(page: Page): Promise<void> {
   )
   await page.goto('/')
   await page.getByRole('tab', { name: 'Tree', exact: true }).click()
-  await page.locator('[data-fs-tree-row="age"]').click()
+  await select(page, 'age')
 }
+
+const select = (page: Page, key: string): Promise<void> =>
+  page.locator(`[data-fs-tree-row="${key}"]`).click()
 
 const widthOf = async (locator: Locator): Promise<number> =>
   (await locator.boundingBox())?.width ?? 0
+
+/** The space between the bottom of one and the top of the other. */
+const gap = async (above: Locator, below: Locator): Promise<number> => {
+  const [first, second] = [await above.boundingBox(), await below.boundingBox()]
+  return first && second ? second.y - first.y - first.height : NaN
+}
 
 /** Controls that cover each other, or reach outside the box that holds them. */
 const collisions = (box: Locator): Promise<string[]> =>
@@ -82,10 +94,10 @@ test('a picker in a rule and the editor it opens each take the whole row', async
     const resting = await widthOf(picker)
     await picker.selectOption(choice)
 
+    const opened = rule.getByLabel(editor, { exact: true })
     expect(await widthOf(picker), choice).toBeGreaterThan(resting)
-    expect(await widthOf(rule.getByLabel(editor, { exact: true })), editor).toBe(
-      await widthOf(picker),
-    )
+    expect(await widthOf(opened), editor).toBe(await widthOf(picker))
+    expect(await gap(picker, opened), editor).toBeGreaterThan(4)
     expect(await collisions(rule), choice).toEqual([])
   }
 
@@ -113,21 +125,35 @@ test('a refused value leaves its field as wide as it was, with the reason under 
   const refuses = async (field: Locator, value: string): Promise<void> => {
     const before = await widthOf(field)
     await field.fill(value)
-    await field.press('Enter')
+    await field.press('Tab')
 
     const reason = panel.getByRole('alert')
     await expect(reason).toHaveCSS('color', danger)
     expect(await widthOf(field)).toBe(before)
-    const box = await field.boundingBox()
-    expect((await reason.boundingBox())?.y).toBeGreaterThanOrEqual(
-      (box?.y ?? Infinity) + (box?.height ?? 0),
-    )
+    // Clear of the field's focus ring.
+    expect(await gap(field, reason)).toBeGreaterThan(4)
+    const end = await reason.evaluate((each) => {
+      const text = document.createRange()
+      text.selectNodeContents(each)
+      return text.getBoundingClientRect().right
+    })
+    const edge = await panel.evaluate((each) => each.getBoundingClientRect().right)
+    expect(end, 'the reason reaches out of the panel').toBeLessThan(edge)
     await field.press('Escape')
   }
 
-  await refuses(panel.getByLabel('Key', { exact: true }), 'not a key')
+  // Already another component's, and long enough to need breaking.
+  await refuses(panel.getByLabel('Key', { exact: true }), LONG_KEY)
   await refuses(panel.getByLabel('Data key', { exact: true }), 'not a key')
+
+  await page.getByRole('tab', { name: 'Style', exact: true }).click()
+  await panel.getByText('Advanced CSS', { exact: true }).click()
+  await refuses(panel.getByLabel('Padding', { exact: true }), '}')
 
   await page.getByRole('tab', { name: 'Rules', exact: true }).click()
   await refuses(panel.getByLabel('Regular expression', { exact: true }), '(')
+
+  await select(page, 'trail')
+  await page.getByRole('tab', { name: 'Properties', exact: true }).click()
+  await refuses(panel.getByRole('textbox', { name: /^Items/ }), '[')
 })

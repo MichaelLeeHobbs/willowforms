@@ -108,7 +108,7 @@ the picker fails as soon as a modified value adds Reset in the row's third colum
 readable width and the checkbox is clipped. Keeping the checkbox below the picker leaves both controls
 visible before and after the property is modified.
 
-A rule's Message and Apply when rows stack the same way, and take the whole width while their editor is open, because a group of conditions indents. The reason a value was refused takes a line of its own under the row, so it cannot narrow the field it is about.
+A rule's Message and Apply when rows stack the same way, and take the whole width while their editor is open, because a group of conditions indents. The reason a Key, Data key, Pattern or Advanced CSS value was refused takes a line of its own under the row, so it cannot narrow the field it is about.
 
 ### Choice options
 
