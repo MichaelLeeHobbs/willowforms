@@ -108,7 +108,7 @@ the picker fails as soon as a modified value adds Reset in the row's third colum
 readable width and the checkbox is clipped. Keeping the checkbox below the picker leaves both controls
 visible before and after the property is modified.
 
-A rule's Message and Apply when rows stack the same way, and take the whole width while their editor is open, because a group of conditions indents. The reason a Key, Data key, Pattern or Advanced CSS value was refused takes a line of its own under the row, so it cannot narrow the field it is about.
+A property bound to an expression, a translation or a condition takes the whole width, with its label and Reset on the line above, because a group of conditions indents and Reset takes a column. Show when, and a rule's Message and Apply when, do the same while their editor is open. The reason a Key, Data key, Pattern or Advanced CSS value was refused takes a line of its own under the row, so it cannot narrow the field it is about.
 
 ### Choice options
 
