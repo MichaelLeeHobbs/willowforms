@@ -7,7 +7,7 @@ changes must be deliberate and documented rather than arriving as incidental ref
 
 - Node.js 24 and later for `@willowforms/core` and server-side validation. CI runs 24.
 - React 18 and 19 for the renderer, designer, and kits.
-- The current and previous major Material UI releases supported by `@willowforms/kit-mui` peer metadata.
+- Material UI 7 for `@willowforms/kit-mui`.
 - Current evergreen Chromium, Firefox, and Safari for runtime use. Automated browser coverage currently
   gates Chromium; the other engines are compatibility targets, not yet CI gates.
 
