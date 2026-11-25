@@ -49,7 +49,7 @@ Every value is a custom property on `.fsh-screen`:
 ```
 
 Light is the base. Dark is a token swap under both `prefers-color-scheme` and an explicit
-`[data-fsh-theme="dark"]`.
+`[data-fsh-theme="dark"]`. A `.fsh-screen` override applies in both; [the theming spec](https://github.com/MichaelLeeHobbs/willowforms/blob/main/docs/spec/11-theming.md#light-and-dark) shows how to set a value for dark only.
 
 ## Writing your own kit
 

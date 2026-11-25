@@ -58,7 +58,8 @@ rather than fighting specificity:
 ```
 
 Light is the base. Dark is a token swap under both `prefers-color-scheme` and an explicit
-`[data-fs-theme="dark"]`, so a host that manages its own theme can force either.
+`[data-fs-theme="dark"]`, so a host that manages its own theme can force either. A `.fs-shell` override
+applies in both; [the theming spec](https://github.com/MichaelLeeHobbs/willowforms/blob/main/docs/spec/11-theming.md#light-and-dark) shows how to set a value for dark only.
 
 `theme` controls the toolbar choice and designer chrome. `onThemeChange` reports changes so the host can
 apply the same mode to the renderer kit's own theme provider:

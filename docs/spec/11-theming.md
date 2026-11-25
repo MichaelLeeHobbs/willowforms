@@ -106,13 +106,28 @@ however thoroughly a host restyled the rest.
 explicit attribute, so a host managing its own theme can force either:
 
 ```css
-.fs-shell[data-fs-theme='dark'] {
+.fs-shell:where([data-fs-theme='dark']) {
   /* ... */
 }
-.fsh-screen[data-fsh-theme='dark'] {
+.fsh-screen:where([data-fsh-theme='dark']) {
   /* ... */
 }
 ```
+
+Both dark blocks have the specificity of one class, so a host rule on `.fs-shell` or `.fsh-screen` that loads after the stylesheet applies in every mode, whether dark was chosen or came from the system. A host whose value does not suit the dark palette sets another one for it, in both places dark can come from:
+
+```css
+@media (prefers-color-scheme: dark) {
+  .fs-shell:not([data-fs-theme='light']) {
+    --fs-primary: #c4b5fd;
+  }
+}
+.fs-shell[data-fs-theme='dark'] {
+  --fs-primary: #c4b5fd;
+}
+```
+
+`e2e/html-theme.spec.ts` holds both for the designer and the HTML kit.
 
 The toolbar sets that designer attribute and reports the same choice to the host. **System is the absence
 of it**, not a third palette: the stylesheet already answers `prefers-color-scheme`, so writing an
@@ -126,7 +141,7 @@ base, and computes every ratio. A token change that breaks one fails CI.
 Thresholds are WCAG 2.2 AA: 4.5:1 for body text, 3:1 for large text, and 3:1 for interface component boundaries and focus indicators. The measured palette minima are recorded and checked against [accessibility.md](../accessibility.md#contrast).
 
 Selectors are matched exactly, and the test throws if a palette finds nothing. Substring matching meant
-`.fs-shell` also matched `.fs-shell[data-fs-theme='dark']`, so all 32 assertions ran twice against the
+`.fs-shell` also matched the chosen dark block, so all 32 assertions ran twice against the
 dark palette and never once against the light one.
 
 ## Scrollbars
