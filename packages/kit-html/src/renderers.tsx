@@ -59,8 +59,7 @@ function Stack({ props, nodeProps, children }: NodeRendererProps): ReactNode {
   )
 }
 
-// The renderer has already expanded the rows, so a kit never learns what an address is.
-// It draws them, and adds or removes a row by writing the whole list.
+// A kit never learns a row's address: it adds or removes a row by writing the whole list.
 function Repeater({
   node,
   itemLimits: limits = itemLimits(node),
