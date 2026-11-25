@@ -4,6 +4,9 @@ import { createDocument, prop } from '../packages/core/src/index.js'
 import type { Condition } from '../packages/core/src/index.js'
 import { STORAGE_KEY, expect, test } from './harness.js'
 
+// Tall, so the panel never scrolls and no scrollbar takes width from a row.
+test.use({ viewport: { width: 1280, height: 2000 } })
+
 const panelOf = (page: Page): Locator =>
   page.getByRole('complementary', { name: 'Component properties' })
 
@@ -148,6 +151,7 @@ test('a bound property, and Show when, each take the whole row', async ({ page }
       .filter({ has: page.getByLabel(label, { exact: true }) })
 
   const bound = rowOf('Label binding')
+  const caption = bound.locator('> label, > .fs-prop-row__caption')
   for (const row of [
     ['Label binding', 'i18n', 'Translation key'],
     ['Label binding', 'i18n', 'French'],
@@ -157,6 +161,7 @@ test('a bound property, and Show when, each take the whole row', async ({ page }
     // On the label's line, and not in a column of its own.
     const reset = bound.getByRole('button', { name: 'Reset Label', exact: true })
     expect(await gap(reset, bound.getByLabel('Label binding', { exact: true }))).toBeGreaterThan(4)
+    expect(await widthOf(caption)).toBeGreaterThan(150)
   }
 
   const show = rowOf('Show when')
@@ -167,6 +172,7 @@ test('a bound property, and Show when, each take the whole row', async ({ page }
 
   await select(page, 'bound')
   await expectReadable(bound)
+  expect(await widthOf(caption)).toBeGreaterThan(150)
 })
 
 test('a refused value leaves its field as wide as it was, with the reason under it', async ({
