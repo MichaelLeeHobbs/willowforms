@@ -242,20 +242,21 @@ describe('beta authoring regressions', () => {
     ['submit', { type: 'builtin', name: 'emit', params: { event: 'submit' } }],
   ])('goes to the first page with an error on a %s action, even from one of them', (_, action) => {
     open([
-      page(1, [required('Name')]),
-      page(2, [
+      page(1, []),
+      page(2, [required('Name')]),
+      page(3, [
         required('City'),
         { key: 'act', type: 'Button', props: { text: prop('Act') }, events: { onClick: [action] } },
       ]),
-      page(3, [required('Country')]),
+      page(4, [required('Country')]),
     ])
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
     const canvas = within(screen.getByRole('main'))
     const step = canvas.getByLabelText<HTMLSelectElement>('Step')
-    fireEvent.change(step, { target: { value: '2' } })
+    fireEvent.change(step, { target: { value: '3' } })
 
     fireEvent.click(canvas.getByRole('button', { name: 'Act' }))
-    expect(step.value).toBe('1')
+    expect(step.value).toBe('2')
     expect(canvas.getByRole('status').textContent).toBe('Check 3 fields before submitting.')
   })
 
