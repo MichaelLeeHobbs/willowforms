@@ -8,24 +8,25 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65_535) {
 }
 const baseURL = 'http://localhost:' + String(PORT)
 
-// Vite without pnpm in front, which can take a minute to start on Windows.
+// No pnpm in front: see #163.
 const vite = 'node node_modules/vite/bin/vite.js'
-// Per port, so two suites in one checkout keep apart, and outside `dist`, which `e2e:dist` empties.
+// Per port, so a second suite keeps its own bundle, and outside `dist`, which `e2e:dist` empties.
 const outDir = 'node_modules/.e2e/' + String(PORT)
 
 export default defineConfig({
   testDir: './e2e',
-  // Twice the default, for a machine that is also running something else.
+  // For a machine that is also running something else.
   timeout: 60_000,
-  // Ends a run of hung tests before CI cancels the job, because a cancelled job uploads no traces.
+  // Keep below `timeout-minutes` in ci.yml, because a cancelled job uploads no traces.
   globalTimeout: process.env['CI'] ? 600_000 : 0,
   // The server only serves files and the document lives in each test's own browser storage, so no
-  // test can see another. Two workers, because a CI runner has two CPUs.
+  // test can see another.
   fullyParallel: true,
+  // See #190 before raising this.
   workers: 2,
   forbidOnly: !!process.env['CI'],
-  // The second run exists to record a trace, which costs too much to record for every passing test.
-  // It never turns a failure into a pass: a flaky test is a bug to fix.
+  // The second run exists to record a trace, so that passing tests record none (#184). It never
+  // turns a failure into a pass: a flaky test is a bug to fix.
   retries: 1,
   failOnFlakyTests: true,
   reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
@@ -40,8 +41,8 @@ export default defineConfig({
 
   webServer: {
     /*
-     * A bundle and not the dev server, which sends every module separately to every test's empty
-     * browser cache. Unminified, so a custom property reads the way the stylesheet writes it.
+     * A bundle and not the dev server, which sends every source module separately to every test's
+     * empty browser cache. Unminified, so a custom property reads the way the stylesheet writes it.
      *
      * `--strictPort` so a busy port fails loudly instead of starting somewhere else and leaving
      * every test to time out against the wrong address.

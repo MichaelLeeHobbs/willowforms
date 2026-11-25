@@ -5,8 +5,8 @@ on:
     branches: [main]
   pull_request:
 
-# A newer push to a pull request replaces its run. Every `main` commit needs its own verdict, so each
-# gets its own group: a shared one queues them and cancels all but the newest one waiting.
+# A newer push to a pull request replaces its run. Every push to `main` needs its own verdict, so
+# each gets its own group: a shared one queues them and cancels all but the newest one waiting.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -17,7 +17,7 @@ permissions:
 # Every action is pinned to a commit, because whoever owns the action can move a tag.
 # The comment after each pin names the version that commit was.
 
-# Two jobs of about the same length. Setting one up takes about 15 seconds.
+# Two jobs, so the browser suite does not wait for the other checks (#184).
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -47,13 +47,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      # Vitest leaves one CPU free by default, and the runner has two.
       - name: Test
         run: pnpm test --maxWorkers=100%
 
   browser:
     runs-on: ubuntu-latest
-    # Longer than `globalTimeout` in playwright.config.ts plus the steps around the suite.
+    # Keep above `globalTimeout` in playwright.config.ts plus the steps around the suite.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,8 +74,7 @@ jobs:
         run: node scripts/check-dist.mjs
 
       # Only chromium: the suite covers behaviour this project owns, not rendering differences
-      # between engines. No `--with-deps`: the runner image has every library chromium needs, and
-      # the flag then only downloads fonts, from a mirror that has taken five minutes.
+      # between engines. No `--with-deps`: the runner image has every library chromium needs.
       - name: Install the browser
         run: pnpm exec playwright install --only-shell chromium
 
