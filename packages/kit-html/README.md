@@ -33,7 +33,9 @@ thing in both, and `test/kit-contract.test.tsx` fails if a second one diverges w
 
 ## Accessibility is the kit's job
 
-Each field owns a real `<label for>`, or a `<legend>` when it is a radio group, errors are announced through `aria-describedby` with `role="alert"`, an invalid field carries `aria-invalid`, and every interactive element has a visible focus ring. The renderer cannot supply any of that: it knows nothing about the markup a kit produces.
+Each field owns a real `<label for>`, errors are announced through `aria-describedby` with
+`role="alert"`, an invalid field carries `aria-invalid`, and every interactive element has a visible
+focus ring. The renderer cannot supply any of that: it knows nothing about the markup a kit produces.
 
 ## Theming
 
