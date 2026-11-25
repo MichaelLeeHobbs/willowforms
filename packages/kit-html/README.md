@@ -39,7 +39,7 @@ focus ring. The renderer cannot supply any of that: it knows nothing about the m
 
 ## Theming
 
-Every value is a custom property on `.fsh-screen`:
+Every token is a custom property on `.fsh-screen`:
 
 ```css
 .fsh-screen {
