@@ -1,6 +1,6 @@
 # Roadmap
 
-The specification in [docs/spec](spec/README.md) is the product contract. This file records execution
+The specification in [docs/spec](spec/README.md) is the product contract, under any Accepted row in [docs/srs](srs/README.md). This file records execution
 order and must not overstate a contract's status.
 
 ## Current milestone: release confidence

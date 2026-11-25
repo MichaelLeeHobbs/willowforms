@@ -4,7 +4,8 @@ WillowForms is an open-source drag-and-drop form designer. The designer and rend
 
 ## Read first
 
-- `docs/spec/README.md` is the product contract and roadmap. Read the relevant contract before changing behaviour.
+- `docs/srs/README.md` is the requirements contract. An Accepted row wins over `docs/spec` where they disagree.
+- `docs/spec/README.md` holds the product contracts, their shapes and their reasoning, and governs whatever no Accepted row covers. Read the relevant contract before changing behaviour.
 - `docs/ARCHITECTURE.md` defines package boundaries and the document model.
 - `docs/accessibility.md` defines accessibility requirements and verification.
 - `SECURITY.md` and `docs/THREAT_MODEL.md` define security reporting and trust boundaries.

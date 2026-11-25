@@ -5,7 +5,7 @@ available in Git history.
 
 ## Product contract
 
-The files in `docs/spec` define intended behaviour. Status labels describe implementation state. A
+The files in `docs/spec` define intended behaviour, except where an Accepted row in `docs/srs` says otherwise: the row wins. Status labels describe implementation state. A
 change that alters intended behaviour updates the specification explicitly; implementation convenience
 alone is not a reason to weaken the contract.
 

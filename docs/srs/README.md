@@ -4,7 +4,7 @@
 
 WillowForms lets an application offer its own users a visual form designer, and lets other users complete the forms they make. It serves form authors, respondents, translators, and the developers who embed it. This SRS is the contract agents and people build toward: a requirement here is the definition of done for the work that meets it. It is allowed to change, and the product's developer decides what gets in.
 
-How this folder relates to the contracts in [docs/spec](../spec/README.md), which `CLAUDE.md` and `CONTRIBUTING.md` call the product contract, is an open decision. Until the developer decides it, nothing here overrides `docs/spec`.
+Where an Accepted row disagrees with the contracts in [docs/spec](../spec/README.md), the row wins. `docs/spec` holds the shapes and the reasoning, and governs whatever no Accepted row covers.
 
 ## Scope
 
@@ -114,4 +114,5 @@ Not generated yet.
 
 Newest first. One line per decision: the date, what moved, and the developer's words.
 
+- 2026-11-25: Decided that where an SRS row and `docs/spec` disagree, the SRS row decides. "SRS wins"
 - 2026-11-25: Created. Scope, Out of scope and Areas are proposals; no requirement rows yet.

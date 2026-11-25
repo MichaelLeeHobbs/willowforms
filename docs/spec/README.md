@@ -16,7 +16,7 @@ The contracts below apply these principles. [00-product.md](00-product.md) defin
 
 ## How to read this
 
-Each contract carries a status. The specification owns behavioral commitments; the [roadmap](../ROADMAP.md) records execution priorities and the [beta review](../BETA_REVIEW.md) records the release scope and verification evidence.
+Each contract carries a status. The specification owns behavioral commitments, except that an Accepted row in [the SRS](../srs/README.md) wins where they disagree; the [roadmap](../ROADMAP.md) records execution priorities and the [beta review](../BETA_REVIEW.md) records the release scope and verification evidence.
 
 | Status        | Means                                                                              |
 | ------------- | ---------------------------------------------------------------------------------- |

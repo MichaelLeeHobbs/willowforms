@@ -1,6 +1,6 @@
 # Contributing
 
-The specification in `docs/spec` is the product contract. Read the relevant contract before changing
+The requirements in `docs/srs` and the specification in `docs/spec` are the product contract. An Accepted requirement wins where they disagree. Read the relevant contract before changing
 behaviour. Improve an ambiguous contract before implementing it; do not weaken it to fit existing code.
 
 Keep changes focused on one outcome. Update implementation, tests, status text, and public examples
