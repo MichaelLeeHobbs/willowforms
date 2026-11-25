@@ -108,6 +108,8 @@ the picker fails as soon as a modified value adds Reset in the row's third colum
 readable width and the checkbox is clipped. Keeping the checkbox below the picker leaves both controls
 visible before and after the property is modified.
 
+A rule's Message and Apply when rows stack the same way, and take the whole width while their editor is open, because a group of conditions indents. The reason a value was refused takes a line of its own under the row, so it cannot narrow the field it is about.
+
 ### Choice options
 
 Select and Radio group use the options editor for static label/value arrays. Authors can add and remove rows, move them up or down, or sort labels alphabetically in either direction. Sorting writes the saved array order; subsequent edits return to fixed/manual mode. Values keep their JSON types, including numbers and booleans, and unrelated option fields are preserved. Computed bindings retain their expression editor. All edits participate in undo.
