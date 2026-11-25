@@ -64,7 +64,7 @@ fighting specificity.
 | `--fs-border`                            | Every divider and control outline                   |
 | `--fs-control-border`                    | The outline of an editable control, which is darker |
 | `--fs-text`                              | Body text                                           |
-| `--fs-text-muted`                        | Hints, secondary labels, type names                 |
+| `--fs-text-muted`                        | Hints, secondary labels, type names, placeholders   |
 | `--fs-primary`                           | Selection frames, focus rings, primary buttons      |
 | `--fs-primary-text`                      | Text on `--fs-primary`                              |
 | `--fs-accent`                            | Drop indicators                                     |
