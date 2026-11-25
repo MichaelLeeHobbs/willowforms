@@ -282,7 +282,13 @@ function VisibilityRow({
           : 'always'
 
   return (
-    <div className={'fs-prop-row' + (value ? ' is-set is-binding' : '')}>
+    <div
+      className={
+        'fs-prop-row' +
+        (value ? ' is-set is-binding' : '') +
+        (mode === 'condition' || mode === 'computed' ? ' fs-prop-row--wide' : '')
+      }
+    >
       <label htmlFor={idBase + '-fs-prop-renderwhen-mode'}>Show when</label>
       <div className="fs-prop-row__control">
         <select
@@ -452,7 +458,7 @@ function PropRow({
 
   if (value?.kind === 'computed') {
     return (
-      <div className="fs-prop-row is-set is-binding">
+      <div className="fs-prop-row fs-prop-row--wide is-set is-binding">
         <label htmlFor={id}>{schema.label}</label>
         <div className="fs-prop-row__control">
           {mode}
@@ -465,7 +471,7 @@ function PropRow({
 
   if (value?.kind === 'i18n') {
     return (
-      <div className="fs-prop-row is-set is-binding">
+      <div className="fs-prop-row fs-prop-row--wide is-set is-binding">
         <label htmlFor={id}>{schema.label}</label>
         <div className="fs-prop-row__control">
           {mode}
@@ -486,7 +492,7 @@ function PropRow({
 
   if (value?.kind === 'condition') {
     return (
-      <div className="fs-prop-row is-set is-binding">
+      <div className="fs-prop-row fs-prop-row--wide is-set is-binding">
         {/* Not a label: the condition editor's controls carry their own. */}
         <span className="fs-prop-row__caption">{schema.label}</span>
         <div className="fs-prop-row__control">
