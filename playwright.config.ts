@@ -29,7 +29,9 @@ export default defineConfig({
   // turns a failure into a pass: a flaky test is a bug to fix.
   retries: 1,
   failOnFlakyTests: true,
-  reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
+  reporter: process.env['CI']
+    ? [['github'], ['list'], ['json', { outputFile: 'test-reports/playwright.json' }]]
+    : [['list']],
 
   use: {
     baseURL,

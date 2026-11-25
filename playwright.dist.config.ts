@@ -11,7 +11,9 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   forbidOnly: Boolean(process.env['CI']),
-  reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
+  reporter: process.env['CI']
+    ? [['github'], ['list'], ['json', { outputFile: 'test-reports/playwright-dist.json' }]]
+    : [['list']],
   use: {
     baseURL,
     trace: 'retain-on-failure',
