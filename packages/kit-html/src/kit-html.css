@@ -38,8 +38,9 @@
 
 @media (prefers-color-scheme: dark) {
   /*
-   * `:where()` keeps this at (0,1,0); a bare `:not()` would make it (0,2,0) and
-   * beat a host's documented `.fsh-screen { --fsh-accent: ... }` override.
+   * `:where()` keeps both dark blocks at (0,1,0); a bare attribute or `:not()`
+   * would make them (0,2,0) and beat a host's documented
+   * `.fsh-screen { --fsh-accent: ... }` override.
    */
   .fsh-screen:where(:not([data-fsh-theme='light'])) {
     --fsh-text: #eef0f4;
@@ -57,7 +58,7 @@
   }
 }
 
-.fsh-screen[data-fsh-theme='dark'] {
+.fsh-screen:where([data-fsh-theme='dark']) {
   --fsh-text: #eef0f4;
   --fsh-muted: #a9b1bd;
   --fsh-surface: #16181d;
