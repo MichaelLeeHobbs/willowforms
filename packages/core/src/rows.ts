@@ -164,11 +164,11 @@ function rowKeysOf(repeater: ComponentNode): Set<string> {
 /**
  * What a condition authored on this node is allowed to name, by scope.
  *
- * The picker's half of the answer to the quiet failure below. That one reports
- * the mistake at boot; this one stops it being authorable, by telling the panel
- * which names belong to the row and which to the form so that choosing a field
- * is also choosing a scope. An author never types a scope and never leaves one
- * at a default that reads the wrong place.
+ * `validateDocument` reports scope mismatches under the `row-scope` code; this
+ * keeps the panel from offering one, by telling it which names belong to the row
+ * and which to the form so that choosing a field is also choosing a scope. An
+ * author never types a scope and never leaves one at a default that reads the
+ * wrong place.
  *
  * Row keys stop at a nested repeater. The nested repeater's own data key is an
  * answer in this row — it holds the inner list — but what is inside it is one
