@@ -20,7 +20,7 @@ Items 3–6 below have since been approved and reflected in the specification: s
 
 ## 2. Styling risks becoming a general design tool
 
-[The Style contract](spec/06-inspector.md#two-ways-to-write-the-same-text) makes raw CSS the answer to anything its structured controls omit. Authors can adjust per-component declarations at multiple breakpoints as well as kit-specific style properties. That is useful to specialists, but it places typography, spacing, and responsive design decisions on people whose task is to ask questions. Arbitrary authored colors and dimensions can also defeat accessible defaults.
+[The Style contract](spec/06-inspector.md#common-appearance-controls-and-advanced-css) makes raw CSS the answer to anything its structured controls omit. Authors can adjust per-component declarations at multiple breakpoints as well as kit-specific style properties. That is useful to specialists, but it places typography, spacing, and responsive design decisions on people whose task is to ask questions. Arbitrary authored colors and dimensions can also defeat accessible defaults.
 
 **Recommendation:** retain existing styling support for compatibility, make kit defaults and a small set of layout controls the ordinary path, and put raw CSS behind the same explicit advanced-authoring choice. Expand style controls only for observed form tasks. Host themes remain the primary way to supply a professional, consistent appearance; the library should not grow a general CSS editor or promise accessibility for every author-supplied style.
 
