@@ -15,6 +15,7 @@ import type { Origin } from '../geometry.js'
 import { describeMove, focusTarget, moveTarget } from '../keyboard.js'
 import type { Direction } from '../keyboard.js'
 import { useDragSnapshot } from '../snapshot.js'
+import { RemoveButton } from './RemoveButton.js'
 
 export interface TreeProps {
   root: ComponentNode
@@ -365,20 +366,16 @@ function TreeItem({
         <span className="fs-tree__key">{node.key}</span>
         <span className="fs-tree__type">{node.type}</span>
         {!isRoot && (
-          <button
-            type="button"
+          <RemoveButton
             className="fs-tree__remove"
-
+            name={node.key}
             tabIndex={-1}
-            aria-label={'Remove ' + node.key}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
               onRemove(node.key)
             }}
-          >
-            &times;
-          </button>
+          />
         )}
       </div>
 

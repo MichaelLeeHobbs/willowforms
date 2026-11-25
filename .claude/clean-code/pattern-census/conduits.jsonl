@@ -1,0 +1,8 @@
+{"symbol":"apps/demo-server/src/index.ts#held","job":"docload","terminal":"storageFaults"}
+{"symbol":"apps/demo-server/src/index.ts#isStoredDocument","job":"docload","terminal":"storageFaults"}
+{"symbol":"apps/playground/src/App.tsx#loadDraft","job":"docload","terminal":"loadDocument"}
+{"symbol":"packages/core/src/validation.ts#isUrl","job":"safeurl","terminal":"safeHref"}
+{"symbol":"packages/core/src/visibility.ts#runs","job":"evalcode","terminal":"host-evaluator"}
+{"symbol":"packages/kit-html/src/renderers.tsx#RadioContext.onSelect","job":"kitprops","terminal":"changed"}
+{"symbol":"packages/kit-html/src/renderers.tsx#RadioGroupNode.onSelect","job":"kitprops","terminal":"changed"}
+{"symbol":"packages/kit-html/src/renderers.tsx#boxBackground","job":"safeurl","terminal":"backgroundImageStyle"}

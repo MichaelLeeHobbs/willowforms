@@ -5,6 +5,8 @@ import type { ReactNode } from 'react'
 import { jsonToString } from '@willowforms/core'
 import type { Condition, JsonValue, Operand } from '@willowforms/core'
 
+import { RemoveButton } from './RemoveButton.js'
+
 const COMPARISONS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'] as const
 const UNARY = ['empty', 'notEmpty', 'truthy', 'falsy'] as const
 const MEMBERSHIP = ['in', 'notIn'] as const
@@ -480,19 +482,16 @@ export function ConditionEditor({
                   })
                 }
               />
-              <button
-                type="button"
+              <RemoveButton
                 className="fs-condition__remove"
-                aria-label={'Remove condition ' + String(index + 1)}
+                name={'condition ' + String(index + 1)}
                 onClick={() =>
                   onChange({
                     ...value,
                     conditions: asList(value.conditions).filter((_, i) => i !== index),
                   })
                 }
-              >
-                &times;
-              </button>
+              />
             </div>
           ))}
           {}
