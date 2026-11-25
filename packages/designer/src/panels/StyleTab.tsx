@@ -212,17 +212,17 @@ function DeclarationField({
             }
           }}
         />
-
-        {refused && (
-          <p
-            id={idBase + '-fs-style-' + control.name + '-error'}
-            className="fs-prop-row__error"
-            role="alert"
-          >
-            {refused}
-          </p>
-        )}
       </div>
+
+      {refused && (
+        <p
+          id={idBase + '-fs-style-' + control.name + '-error'}
+          className="fs-prop-row__error"
+          role="alert"
+        >
+          {refused}
+        </p>
+      )}
     </div>
   )
 }

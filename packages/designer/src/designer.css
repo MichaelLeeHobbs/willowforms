@@ -852,6 +852,10 @@
   font-weight: 600;
 }
 
+.fs-rule .fs-prop-row__control {
+  gap: 6px;
+}
+
 .fs-rule__remove {
   font: inherit;
   line-height: 1;
@@ -1329,7 +1333,8 @@
   color: var(--fs-text-muted);
 }
 
-.fs-prop-row__hint {
+.fs-prop-row__hint,
+.fs-prop-row__error {
   grid-column: 1 / -1;
   margin: 0;
   font-size: var(--fs-font-size-sm);
@@ -1569,8 +1574,15 @@
   outline-offset: 2px;
 }
 
+.fs-prop-row__error,
 .fs-prop-row__hint.is-error {
   color: var(--fs-danger);
+  overflow-wrap: anywhere;
+}
+
+/* A property's control has no gap of its own. */
+.fs-prop-row__control > .fs-prop-row__error {
+  margin-block-start: 6px;
 }
 
 .fs-prop-row--wide > .fs-prop-row__control {
