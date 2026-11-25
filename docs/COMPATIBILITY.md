@@ -11,6 +11,8 @@ changes must be deliberate and documented rather than arriving as incidental ref
 - Current evergreen Chromium, Firefox, and Safari for runtime use. Automated browser coverage currently
   gates Chromium; the other engines are compatibility targets, not yet CI gates.
 
+CI typechecks and runs the unit and integration suites on React 18 and 19. The browser suites run on React 19.
+
 ## Change rules
 
 - The document `version` changes only when an existing document needs migration.
