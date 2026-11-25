@@ -258,6 +258,11 @@
   font-weight: 400;
 }
 
+.pg-gallery ::placeholder {
+  color: var(--pg-muted);
+  opacity: 1;
+}
+
 .pg-gallery__results {
   padding: 14px 32px 10px;
   color: var(--pg-muted);

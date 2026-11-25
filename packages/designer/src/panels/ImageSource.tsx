@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { MAX_EMBEDDED_IMAGE_BYTES, safeImageSource } from '@willowforms/core'
 
 import { useAnnouncement } from '../announce.js'
+import { Icon } from '../Icon.js'
 
 export function ImageSource({
   id,
@@ -134,6 +135,7 @@ export function ImageSource({
       {(draft || value) && (
         <button
           type="button"
+          className="fs-remove"
           onClick={() => {
             request.current.version++
             setDraft('')
@@ -142,6 +144,7 @@ export function ImageSource({
             onChange('')
           }}
         >
+          <Icon name="trash" size={13} />
           Remove image
         </button>
       )}

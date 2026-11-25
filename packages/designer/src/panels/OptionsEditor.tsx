@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import type { JsonValue } from '@willowforms/core'
 import { jsonToString, optionEntry, optionValue } from '@willowforms/core'
 
+import { RemoveButton } from './RemoveButton.js'
+
 export function OptionsEditor({
   id,
   value,
@@ -101,13 +103,10 @@ export function OptionsEditor({
                 {direction < 0 ? '↑' : '↓'}
               </button>
             ))}
-            <button
-              type="button"
-              aria-label={`Remove option ${index + 1}`}
+            <RemoveButton
+              name={`option ${index + 1}`}
               onClick={() => save(entries.filter((_, at) => at !== index))}
-            >
-              − Remove
-            </button>
+            />
           </div>
         </fieldset>
       ))}
