@@ -8,6 +8,9 @@ coverage/
 .vite/
 .turbo/
 
+# Per-test results, written when CI is set
+/test-reports/
+
 # Playwright
 /test-results/
 /playwright-report/

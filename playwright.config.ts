@@ -15,6 +15,8 @@ const outDir = 'node_modules/.e2e/' + String(PORT)
 
 export default defineConfig({
   testDir: './e2e',
+  // Per port: Playwright empties this folder when a run starts, and another suite may be using it.
+  outputDir: 'test-results/' + String(PORT),
   // For a machine that is also running something else.
   timeout: 60_000,
   // Keep below `timeout-minutes` in ci.yml, because a cancelled job uploads no traces.
@@ -29,7 +31,11 @@ export default defineConfig({
   // turns a failure into a pass: a flaky test is a bug to fix.
   retries: 1,
   failOnFlakyTests: true,
-  reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
+  reporter: process.env['CI']
+    ? [['github'], ['list'], ['json', { outputFile: 'test-reports/playwright.json' }]]
+    : [['list']],
+  // On in CI by default, and puts the author's email and the diff in the uploaded report.
+  captureGitInfo: { commit: false, diff: false },
 
   use: {
     baseURL,
@@ -43,13 +49,10 @@ export default defineConfig({
     /*
      * A bundle and not the dev server, which sends every source module separately to every test's
      * empty browser cache. Unminified, so a custom property reads the way the stylesheet writes it.
-     *
-     * `--strictPort` so a busy port fails loudly instead of starting somewhere else and leaving
-     * every test to time out against the wrong address.
      */
     command:
       `${vite} build --minify false --outDir ${outDir} && ` +
-      `${vite} preview --outDir ${outDir} --port ${String(PORT)} --strictPort`,
+      `${vite} preview --outDir ${outDir} --port ${String(PORT)}`,
     cwd: 'apps/playground',
     // Bundles development React, for StrictMode and for the warnings a production build leaves out.
     env: { NODE_ENV: 'development' },

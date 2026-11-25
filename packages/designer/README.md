@@ -6,7 +6,7 @@ Every comparable product opens its runtime and paywalls the builder.
 [WillowForms](https://github.com/MichaelLeeHobbs/willowforms) opens both.
 
 ```bash
-npm install @willowforms/designer @willowforms/core @willowforms/renderer @willowforms/kit-mui @mui/material@7 @emotion/react @emotion/styled
+npm install @willowforms/designer @willowforms/core @willowforms/renderer @willowforms/kit-mui @mui/material@9 @emotion/react @emotion/styled
 ```
 
 ```tsx
