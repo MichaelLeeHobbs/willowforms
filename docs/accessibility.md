@@ -17,6 +17,7 @@ These fail the build, not a review.
 | Check                                                                                              | Where                                               |
 | -------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | Contrast for both stylesheets, in both themes                                                      | `test/contrast.test.ts`                             |
+| Placeholder contrast in the designer's panels, in both themes                                      | `e2e/palettes.spec.ts`                              |
 | Every button in the designer shell has an accessible name                                          | `packages/designer/src/panels/Tree.test.tsx`        |
 | Every form control in the shell has a label                                                        | same                                                |
 | Landmarks carry accessible names                                                                   | same                                                |
