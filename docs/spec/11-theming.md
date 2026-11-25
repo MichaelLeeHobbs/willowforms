@@ -64,7 +64,7 @@ fighting specificity.
 | `--fs-border`                            | Every divider and control outline                   |
 | `--fs-control-border`                    | The outline of an editable control, which is darker |
 | `--fs-text`                              | Body text                                           |
-| `--fs-text-muted`                        | Hints, secondary labels, type names                 |
+| `--fs-text-muted`                        | Hints, secondary labels, type names, placeholders   |
 | `--fs-primary`                           | Selection frames, focus rings, primary buttons      |
 | `--fs-primary-text`                      | Text on `--fs-primary`                              |
 | `--fs-accent`                            | Drop indicators                                     |
@@ -191,6 +191,8 @@ path data, which makes the metadata half stop being plain data and has every kit
 glyphs, and a host-supplied renderer, which leaves the palette looking broken until someone writes one.
 
 `ComponentDef.icon` is optional for third-party kits. This repository's reference-kit tests require icons for the shipped palette entries to keep their presentation consistent. Supplying an icon uses the shared vocabulary; omitting one does not invalidate a custom kit. See the [kit requirements](02-kit-contract.md#rules-every-kit-must-satisfy).
+
+In the designer, every button that removes something draws the `trash` glyph, and × only closes. The panels share one `RemoveButton`, which also names the thing it removes; Remove image draws the glyph beside its words.
 
 The `icon` property editor named in [06-inspector.md](06-inspector.md#property-editors) exists: it offers
 the vocabulary as a select with the glyph drawn beside it, so a kit property whose value is an icon name
