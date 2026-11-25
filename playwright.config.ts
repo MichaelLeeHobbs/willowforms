@@ -32,6 +32,8 @@ export default defineConfig({
   reporter: process.env['CI']
     ? [['github'], ['list'], ['json', { outputFile: 'test-reports/playwright.json' }]]
     : [['list']],
+  // On in CI by default, and puts the author's email and the diff in the uploaded report.
+  captureGitInfo: { commit: false, diff: false },
 
   use: {
     baseURL,
