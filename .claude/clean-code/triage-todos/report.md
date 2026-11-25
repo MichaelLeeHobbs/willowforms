@@ -48,11 +48,13 @@ None.
 | playwright.config.ts:23 | See #190 before raising this. | #190 | open, "OPEN" | fffd0b6 2026-11-24 | unchanged (`workers`, d32795b) | holds: `workers: 2`, line 24 | Keep, row 9 |
 | pnpm-workspace.yaml:5 | Strict peers refuse every install that resolves again, because this plugin decla | none | none | 5d2d6dd 2026-11-24 | unchanged, lines 7-9 | holds: `typescript` is 5.9.3, and the locked `@vitest/eslint-plugin` 1.6.28 declares the peer `>=6.0.0` | Link, row 12 |
 
-Issue draft for `pnpm-workspace.yaml:5`, shown for a yes or no and not filed:
+Issue draft for `pnpm-workspace.yaml:5`, as shown for a yes or no:
 
 - Title: TypeScript 6 is refused, so pnpm-workspace.yaml has to override an ESLint plugin's peer range
 - Body, line 1: `peerDependencyRules.allowedVersions` lets `@vitest/eslint-plugin` install with TypeScript 5.9.3 although it declares `>=6.0.0`. The comment says to remove it with the TypeScript 6 upgrade.
 - Body, line 2: no issue tracks that upgrade. #196 suggested it as its own change, and pull request 94 (5.9.3 to 6.0.3) was closed on 2026-09-04 because typechecking failed.
+
+Applied on the owner's yes, 2026-11-25: the issue is filed as #223 and the comment now ends "(#223)". The filed title says "The repo is on TypeScript 5.9" instead, because TypeScript 6 is not refused by anything in the repo. After the edit, a search of the working tree finds the same 0 tagged and 10 unmarked hits, the comment is still there, and the diff outside `clean-code/` is that one comment line. No other comment was edited.
 
 Read and left out:
 
