@@ -243,7 +243,7 @@ export function Canvas({
     setValidated(true)
     return {
       valid: count === 0,
-      firstInvalid: results.findIndex((result) => Object.keys(result).length > 0),
+      invalidSteps: steps.filter((_, i) => Object.keys(results[i] ?? NO_ERRORS).length > 0),
       note:
         count === 0
           ? 'All answers are valid.'
@@ -259,8 +259,8 @@ export function Canvas({
         (effect) => effect.kind === 'emit' && effect.event === 'submit',
       )
       if (submitting || effects.some((effect) => effect.kind === 'validate')) {
-        const { valid, firstInvalid, note } = checkAnswers()
-        if (!valid && steps.length) setStep(steps[firstInvalid])
+        const { valid, invalidSteps, note } = checkAnswers()
+        if (invalidSteps.length > 0) setStep(invalidSteps[0])
         notes.push(
           valid && submitting ? 'Form is valid. Submission simulated; no data was sent.' : note,
         )
@@ -274,8 +274,16 @@ export function Canvas({
       }
       setActionNote(notes.join(' '))
     },
-    [preview, steps, checkAnswers, setActionNote],
+    [preview, checkAnswers, setActionNote],
   )
+
+  // Unlike an action, stays on a step that has an error: an author checks the step in front of them.
+  const onValidate = useCallback(() => {
+    const { invalidSteps, note } = checkAnswers()
+    if (invalidSteps.length > 0 && !invalidSteps.some((value) => same(value, current)))
+      setStep(invalidSteps[0])
+    setActionNote(note)
+  }, [checkAnswers, current, setActionNote])
 
   const onActionError = useCallback(
     (message: string) => {
@@ -487,7 +495,7 @@ export function Canvas({
         {preview && (
           <>
             <PreviewData data={data} />
-            <button type="button" onClick={() => setActionNote(checkAnswers().note)}>
+            <button type="button" onClick={onValidate}>
               Validate
             </button>
             <button

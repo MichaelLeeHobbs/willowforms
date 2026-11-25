@@ -480,8 +480,16 @@ describe('a component a condition hides', () => {
 })
 
 describe('a document with steps', () => {
-  const stepped = (): FormDocument => {
+  const stepped = (required: string[] = ['first']): FormDocument => {
     const doc = makeDocument()
+    const field = (key: string, label: string): ComponentNode => ({
+      key,
+      type: 'Field',
+      props: { label: staticProp(label) },
+      ...(required.includes(key)
+        ? { schema: { type: 'string', validations: [{ key: 'required' }] } }
+        : {}),
+    })
     const step = (name: string, child: ComponentNode): ComponentNode => ({
       key: 'step-' + name,
       type: 'Screen',
@@ -497,25 +505,25 @@ describe('a document with steps', () => {
       children: [child],
     })
     doc.root.children = [
-      step('one', {
-        key: 'first',
-        type: 'Field',
-        props: { label: staticProp('First') },
-        schema: { type: 'string', validations: [{ key: 'required' }] },
-      }),
-      step('two', { key: 'second', type: 'Field', props: { label: staticProp('Second') } }),
+      step('one', field('first', 'First')),
+      step('two', field('second', 'Second')),
+      step('three', field('third', 'Third')),
     ]
     return doc
   }
 
-  const open = (): ReturnType<typeof render> =>
-    render(<Designer initialDocument={stepped()} kit={kit} rendererKit={rendererKit} />)
+  const open = (required?: string[]): ReturnType<typeof render> =>
+    render(<Designer initialDocument={stepped(required)} kit={kit} rendererKit={rendererKit} />)
 
   it('offers a switcher naming the steps the document declares', () => {
     open()
     const select = screen.getByLabelText('Step')
 
-    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['one', 'two'])
+    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
+      'one',
+      'two',
+      'three',
+    ])
   })
 
   it('shows no switcher for a form that declares no steps', () => {
@@ -552,20 +560,28 @@ describe('a document with steps', () => {
     )
   })
 
-  it('counts every step in the note Validate shows, and stays on the one preview is showing', async () => {
-    const user = userEvent.setup()
-    const view = open()
+  it.each([
+    { required: ['first', 'second'], from: 'three', to: 'one', note: 'Check 2 fields' },
+    { required: ['second', 'third'], from: 'one', to: 'two', note: 'Check 2 fields' },
+    { required: ['first', 'second'], from: 'two', to: 'two', note: 'Check 2 fields' },
+    { required: [], from: 'two', to: 'two', note: 'All answers are valid.' },
+  ])(
+    'counts every step on Validate, and goes from step $from to $to when $required are missing',
+    async ({ required, from, to, note }) => {
+      const user = userEvent.setup()
+      const view = open(required)
 
-    await user.click(screen.getByRole('button', { name: 'Preview' }))
-    await user.selectOptions(screen.getByLabelText('Step'), JSON.stringify('two'))
-    await user.click(screen.getByRole('button', { name: 'Validate' }))
+      await user.click(screen.getByRole('button', { name: 'Preview' }))
+      await user.selectOptions(screen.getByLabelText('Step'), JSON.stringify(from))
+      const validate = screen.getByRole('button', { name: 'Validate' })
+      await user.click(validate)
 
-    expect(within(screen.getByRole('main')).getByRole('status').textContent).toBe(
-      'Check 1 field before submitting.',
-    )
-    expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
-    expect(view.container.querySelector('[data-fs-key="step-one"]')).toBeNull()
-  })
+      expect(within(screen.getByRole('main')).getByRole('status').textContent).toContain(note)
+      const shown = [...view.container.querySelectorAll('[data-fs-key^="step-"]')]
+      expect(shown.map((node) => node.getAttribute('data-fs-key'))).toEqual(['step-' + to])
+      expect(document.activeElement).toBe(from === to ? validate : screen.getByLabelText('Step'))
+    },
+  )
 
   it('shows every step while editing, so all of them can be arranged', () => {
     const view = open()
