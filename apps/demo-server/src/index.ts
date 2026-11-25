@@ -1,6 +1,5 @@
 /**
- * Demonstration server: the same document and validation rules, run server-side. The playground
- * does not call it. No auth and a JSON file for storage, deliberately: it is not built to deploy.
+ * Demonstration server, not built to deploy: no auth and a JSON file for storage, deliberately.
  */
 
 import { readFile, rename, writeFile } from 'node:fs/promises'
@@ -129,7 +128,6 @@ function storageFaults(doc: unknown): StructuralError[] {
     return faults
   }
 
-  // The demo server only reaches core through its public API, which does not export this guard.
   const object = (value: unknown): boolean =>
     Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
@@ -191,7 +189,6 @@ const MAX_BODY = 1_000_000
 
 export type BodyRefusal = 'too-large' | 'not-json' | 'too-deep'
 
-// `?: never` on each side, so `body.refused` reads without an `in` narrowing.
 export type BodyResult =
   { refused: BodyRefusal; value?: never } | { refused?: never; value: unknown }
 
@@ -419,13 +416,11 @@ app.post('/api/forms/:id/submit', async (c) => {
   return c.json({ ok: true, received: submitted })
 })
 
-// Exported so tests call the real routes through `app.request`, with no socket.
 export { app }
 
 // Under `docker stop`'s default 10 seconds, so shutdown is clean rather than a SIGKILL.
 const SHUTDOWN_GRACE = 5000
 
-// Exported, with `exit` injected, so a test can drive it: the entry-point block is unreachable.
 export const stopper =
   (server: { close: (done: () => void) => void }, exit: () => void) =>
   (signal: string): void => {

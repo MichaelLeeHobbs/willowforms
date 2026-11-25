@@ -55,7 +55,6 @@ afterAll(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 
-// The store this file starts with.
 const restore = async (): Promise<void> => {
   await writeFile(store, JSON.stringify({ deep: FORM }), 'utf8')
 }
@@ -181,7 +180,6 @@ describe('two documents stored at once', () => {
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
     await Promise.all(ids.map(save))
 
-    // Containment, not equality: the store is shared by every test in this describe.
     const listed = (await (await app.request('/api/forms')).json()) as { id: string }[]
     const held = new Set(listed.map((row) => row.id))
     expect(
