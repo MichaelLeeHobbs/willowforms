@@ -62,9 +62,9 @@ export interface NodeRendererProps {
   node: ComponentNode
   props: Record<string, JsonValue>
   /**
-   * Spread onto the outermost DOM element. The designer finds a node only by
-   * `closest('[data-fs-key]')`, so a kit that drops these renders components that cannot be
-   * selected on the canvas.
+   * Spread onto the outermost DOM element: the designer hit-tests the canvas with
+   * `closest('[data-fs-key]')`, so a component that drops these cannot be selected on the
+   * canvas.
    */
   nodeProps: NodeAttributes
   value: JsonValue | undefined
@@ -98,7 +98,8 @@ export interface NodeAttributes {
   'data-fs-hidden'?: 'true'
   /**
    * A key is unique only within its document: without this, one form's stylesheet styles
-   * another's nodes. Per render, because one document can be rendered twice.
+   * another's nodes. Per rendered form, not per document, because the same document can be
+   * rendered twice.
    */
   'data-fs-scope': string
   /**
@@ -605,19 +606,20 @@ export interface FormRendererProps {
   onEffects?: (effects: Effect[], dispatch: ActionDispatch) => void
   onActionError?: (message: string, dispatch: ActionDispatch) => void
   /**
-   * A node's render threw, and its component was replaced with a notice. Nothing else here
-   * reports it.
+   * A node's render threw, and its component was replaced with a notice. React writes its
+   * own copy to the console, and nothing else here reports it.
    */
   onError?: (error: Error, key: string) => void
   /**
-   * The CSP nonce the response header carries. Without it a `style-src` of `'self'` blocks
-   * the form's stylesheet: every authored style is missing, and `onError` does not see it.
+   * Per-component styling is one `<style>` element, which a `style-src` of `'self'` blocks:
+   * every authored `css` is then missing, and `onError` does not see it. Pass the nonce the
+   * response header carries.
    */
   nonce?: string
   /**
    * Inside a repeater the address carries the row, `addresses[1].line1`. Write it with
    * `applyChange` from `@willowforms/core`: `{ ...data, [address]: value }` silently loses
-   * the answers in the repeater.
+   * an answer given inside a repeater.
    */
   onChange: (address: string, value: JsonValue) => void
 }

@@ -14,8 +14,8 @@ export const requiredProps = (required: boolean): { 'aria-required'?: true } =>
 export const bool = (v: unknown): boolean => v === true
 
 /**
- * `NaN` and `Infinity` reach a document: `1e999` parses as `Infinity`, and an expression
- * can return either.
+ * `NaN` and `Infinity` reach a prop (`1e999` parses as `Infinity`, an expression can return
+ * either), and neither is a usable width or `aria-valuenow`.
  */
 export const num = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? v : fallback
