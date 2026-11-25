@@ -2,6 +2,8 @@
 
 **Second attempt; the first failed canary 4** (both are in `clean-code/ledger.jsonl`). The first judge called the planted copy of `PropSchema` DIFFERENT (`layer`), where `canaries.expected` said SAME_CONTRACT or PROJECTION. The plant's doc comment ("as the panel keeps it") invited that reading, so the comment was removed, once, at the user's request, and a fresh judge with the same frozen brief judged that group alone: SAME_CONTRACT, REAL. The expected file, the declaration and its hash did not change, the real inventory and its diff were rerun and are identical, and the other verdicts and proofs are carried over from the first attempt. It remains a warning: a comment can talk a judge into dropping a real copy.
 
+**Added before merge, after an independent review.** The findings and line numbers below are from `b94443d`. Since then #211 fixed every item in #207: the decision below, the first two hints, the `translations` comment, and the docs-test guard. Not fixed and not in #207: the third hint and the `region` field. The verdict words `NOT_A_DIFFERENCE` and `NOT_RENAME` come from the calibrated judge brief, not from the skill's REAL/TRANSFORMED list, and the two TRANSFORMED cells cite a prose elision where the skill reserves the word for code. The verdicts are left as given.
+
 ```
 Contract drift audit: willow-forms  commit b94443df0bb3fe76e673e2b753f0c6b5a814959c+dirty  2026-11-25
 Dirty: only the first attempt's uncommitted files under .claude/clean-code/, which the inventory excludes
@@ -44,7 +46,7 @@ None. The other judged groups:
 - G0018 `NodeRendererProps`, spec 02 and renderer: SAME_CONTRACT; `children` is `ReactNode` on both sides (REFUTED typecheck).
 - G0015 `DesignerProps`, spec 12 and Designer.tsx: SAME_CONTRACT. The rename candidate `initialDocument` / `document` against `store.ts:97` `DesignerApi` is NOT a rename (different entity).
 - G0021 `Snapshot` in Canvas.tsx and Tree.tsx: DIFFERENT (entity), no rename.
-- Not judged because nothing differs: G0008 to G0014, G0016, G0017, G0019, G0020 (Condition, FormDocument, ComponentNode, Effect, ActionRef, CodeAction, ComponentDef, EvalOptions, FormRendererProps, Operand, PropValue).
+- Not judged because the diff has no cell (an unmatched field gives only a hint, as with `EvalOptions` below): G0008 to G0014, G0016, G0017, G0019, G0020 (Condition, FormDocument, ComponentNode, Effect, ActionRef, CodeAction, ComponentDef, EvalOptions, FormRendererProps, Operand, PropValue).
 
 ## Hints (unmatched fields between peers give no cell, so nobody judged them; read in source here)
 
