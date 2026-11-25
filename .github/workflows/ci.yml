@@ -50,8 +50,8 @@ jobs:
       - name: Test
         run: pnpm test --maxWorkers=100%
 
-  # The peer range's other major. The lockfile pins React 19, so this job resolves again.
-  react-18:
+  # React 18 and Material UI 7. The lockfile pins the newer majors, so this job resolves again.
+  oldest-peers:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -64,8 +64,8 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Install on React 18
-        run: node scripts/use-react-18.mjs
+      - name: Install the oldest peers
+        run: node scripts/use-oldest-peers.mjs
 
       - name: Typecheck
         run: pnpm typecheck
