@@ -114,16 +114,22 @@ explicit attribute, so a host managing its own theme can force either:
 }
 ```
 
-Both dark blocks have the specificity of one class, so a host rule on `.fs-shell` or `.fsh-screen` that loads after the stylesheet applies in every mode, whether dark was chosen or came from the system. A host whose value does not suit the dark palette sets another one for it, in both places dark can come from:
+In each stylesheet the system's dark block and the chosen one have the specificity of one class, so a host rule on `.fs-shell` or `.fsh-screen` that loads after the stylesheet applies in every mode, whether dark was chosen or came from the system. A host whose value does not suit the dark palette sets another one for it, in both places dark can come from. The designer and the kit have different attributes:
 
 ```css
 @media (prefers-color-scheme: dark) {
   .fs-shell:not([data-fs-theme='light']) {
     --fs-primary: #c4b5fd;
   }
+  .fsh-screen:not([data-fsh-theme='light']) {
+    --fsh-accent: #c4b5fd;
+  }
 }
 .fs-shell[data-fs-theme='dark'] {
   --fs-primary: #c4b5fd;
+}
+.fsh-screen[data-fsh-theme='dark'] {
+  --fsh-accent: #c4b5fd;
 }
 ```
 

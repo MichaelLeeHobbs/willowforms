@@ -38,6 +38,8 @@ test("a host's token overrides hold in every theme, chosen or from the system", 
     await page.emulateMedia({ colorScheme: system })
     for (const choice of ['system', 'light', 'dark']) {
       await mode.selectOption(choice)
+      // The playground sets the kit's attribute after the designer's.
+      await expect(screen).toHaveAttribute('data-fsh-theme', choice)
       const dark = (choice === 'system' ? system : choice) === 'dark'
       // Tokens the host left alone, which say the palette really is the one named.
       await expect(shell).toHaveCSS('--fs-bg-panel', dark ? '#202e27' : '#eceeed')
@@ -62,6 +64,8 @@ test("a host's token overrides hold in every theme, chosen or from the system", 
     await page.emulateMedia({ colorScheme: system })
     for (const choice of ['system', 'light', 'dark']) {
       await mode.selectOption(choice)
+      // The playground sets the kit's attribute after the designer's.
+      await expect(screen).toHaveAttribute('data-fsh-theme', choice)
       const dark = (choice === 'system' ? system : choice) === 'dark'
       const where = `${choice} on a ${system} system`
       await expect(shell, where).toHaveCSS('--fs-primary', dark ? '#c4b5fd' : '#6d28d9')
