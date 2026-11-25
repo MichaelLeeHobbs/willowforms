@@ -21,7 +21,6 @@ import { TOO_DEEP, submittedData, validateForm } from './validation.js'
  */
 const DEPTH = 50_000
 
-// Built with a loop, or building it would overflow too.
 const deepList = (n: number): JsonValue => {
   let value: JsonValue = 1
   for (let i = 0; i < n; i += 1) value = [value]
@@ -93,7 +92,6 @@ const WALKERS: Walker[] = [
   {
     name: 'evaluate, through and',
     drive: () => evaluateCondition(deepAnd(DEPTH), {}),
-    // An unreadable rule evaluates to false, which hides the component.
     read: (result) => result,
     answer: false,
   },
@@ -209,8 +207,6 @@ const WALKERS: Walker[] = [
 describe('a recursive walker driven past its bound', () => {
   it.each(WALKERS)('$name answers instead of throwing', ({ drive, read, answer }) => {
     expect(drive).not.toThrow()
-    // Driven again rather than captured inside the matcher, so a row that throws
-    // fails on the throw above rather than on a confusing undefined below.
     expect(read(drive())).toEqual(answer)
   })
 

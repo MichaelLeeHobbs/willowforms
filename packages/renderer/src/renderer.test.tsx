@@ -285,7 +285,6 @@ describe('the host context', () => {
     },
   })
 
-  // Typed as the prop, with no cast, so a non-JSON context cannot get in.
   const renderWith = (context?: FormContext): void => {
     render(
       <FormRenderer
@@ -492,11 +491,8 @@ describe('a repeater', () => {
   })
 
   it('keeps the element in place when the row under it changes, which is the cost of index keys', () => {
-    /*
-     * A row has no identity of its own to key on. So state the browser owns (a
-     * file input's contents, an IME composition, the selection) stays with the
-     * position rather than with the answer.
-     */
+    // A row has no identity to key on, so state the browser owns (a file input's contents, an
+    // IME composition, the selection) stays with the position.
     const { container, rerender } = render(
       <FormRenderer document={repeating()} kit={kit} data={twoRows} onChange={() => undefined} />,
     )
@@ -721,8 +717,7 @@ describe('an i18n binding', () => {
       />,
     )
 
-    // Showing the key is deliberate: an empty label looks like a design choice,
-    // a raw key looks like the missing translation it is.
+    // Deliberate: an empty label looks like a design choice.
     expect(labelOf(container)).toBe('greeting_label')
   })
 })
@@ -916,7 +911,7 @@ describe('a component that throws while rendering', () => {
       { key: 'after', type: 'Field', props: {}, schema: { type: 'string', validations: [] } },
     ])
 
-  /** React logs a caught error itself, and the gate in test/setup.ts makes each test say so. */
+  /** React logs a caught error itself. */
   const expectBoom = (): void => expectCaughtError('Boom', /kit exploded/)
 
   it('keeps the rest of the form on the page', () => {
@@ -1563,7 +1558,6 @@ describe('a translation that is not text', () => {
     ['a number', 42],
     ['null', null],
   ])('falls back to the key when the translation is %s', (_what, value) => {
-    // The key, which a translator can search for, not an empty label.
     expect(labelOf(translated(value))).toBe('email_label')
   })
 

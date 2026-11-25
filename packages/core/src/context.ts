@@ -179,7 +179,6 @@ export const MAX_CONTEXT_VALUES = 1000
  * there is no name there to collect.
  */
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
-  // `readPath` refuses an empty path, so it names no flow.
   if (path === '') return []
 
   const seen: JsonValue[] = []

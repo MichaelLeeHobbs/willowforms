@@ -180,8 +180,7 @@ describe('styleSheetFor', () => {
     )
 
     expect(sheet).toContain('[data-fs-scope=":r1:"][data-fs-key="card"]')
-    // The compound has to reach into the media query too, or the base layer is
-    // confined and the device override is not.
+    // One per layer: the media query's rule must be scoped too.
     expect(sheet.match(/data-fs-scope/g)).toHaveLength(2)
     expect(sheet).not.toContain('[data-fs-scope=":r1:"] [data-fs-key')
   })
@@ -329,8 +328,7 @@ describe('safeStyleValue', () => {
     ['a cross-fade', 'cross-fade(url(https://evil.example/p.png), red)'],
     ['a data uri', 'url(data:image/svg+xml;base64,AAA)'],
   ])('refuses %s, because a fetch is exfiltration on a form', (_what, value) => {
-    // The rendering shape does not close this one: a React `style` object takes
-    // `url()` happily, and the outbound request fires the same either way.
+    // A React style object takes url() too, so the request would still fire.
     expect(safeStyleValue(value)).toBeUndefined()
   })
 
@@ -440,8 +438,8 @@ describe('a raw declaration block this will not emit', () => {
 })
 
 /**
- * Editing one declaration leaves the others where they were. Reordering would change
- * the raw text under the author's cursor, and the cascade where two properties overlap.
+ * Reordering would change the raw text under the author's cursor, and the cascade where two
+ * properties overlap.
  */
 describe('setDeclaration and the order of a block', () => {
   const SEP = ';' + String.fromCharCode(10)
@@ -543,7 +541,6 @@ describe('the backslash, which one of the two grammars did not treat as signific
   })
 
   it('still accepts the declarations an author actually writes', () => {
-    // None of these needs a backslash, which is why it is refused outright.
     expect(safeDeclarations('color:red')).toContain('color:red')
     expect(safeDeclarations('padding:8px 12px')).toContain('padding')
     expect(safeDeclarations("font-family:'Helvetica Neue', Arial, sans-serif")).toContain('Arial')

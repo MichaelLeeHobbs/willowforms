@@ -103,8 +103,6 @@ describe('validateForm and visibility', () => {
   })
 
   it('validates nothing at all when the root it was given is itself hidden', () => {
-    // Deliberate: a step validated without the context that shows it reports
-    // nothing.
     const step: ComponentNode = {
       key: 'who',
       type: 'Step',
@@ -270,10 +268,6 @@ describe('a renderWhen this code cannot read', () => {
   })
 })
 
-/**
- * A host's evaluator is arbitrary JavaScript, and an author's half-written expression
- * throws.
- */
 describe('an evaluator that throws', () => {
   const boom: Evaluator = () => {
     throw new Error('half-written expression')
@@ -354,7 +348,6 @@ describe('a node or a condition that is not there at all', () => {
   })
 
   it('shows a condition kind that carries no condition', () => {
-    // Cast on the whole node: the shape under test is one the type forbids.
     const bare = {
       key: 'x',
       type: 'Field',

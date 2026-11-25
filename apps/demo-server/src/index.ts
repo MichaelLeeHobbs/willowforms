@@ -1,6 +1,5 @@
 /**
- * Demonstration server: the same document and validation rules, run server-side. The playground
- * does not call it. No auth and a JSON file for storage, deliberately: it is not built to deploy.
+ * Demonstration server, not built to deploy: no auth and a JSON file for storage, deliberately.
  */
 
 import { readFile, rename, writeFile } from 'node:fs/promises'
@@ -19,7 +18,7 @@ import {
   validateDocument,
 } from '@willowforms/core'
 
-// A filesystem path, set by tests so they do not write into the checkout.
+// A filesystem path, not a URL.
 const storePath = process.env['WILLOWFORMS_DEMO_STORE']
 const STORE = storePath ? pathToFileURL(storePath) : new URL('../forms.json', import.meta.url)
 // Refuses a malformed PORT: `listen(NaN)` would bind an ephemeral port instead.
@@ -129,7 +128,6 @@ function storageFaults(doc: unknown): StructuralError[] {
     return faults
   }
 
-  // The demo server only reaches core through its public API, which does not export this guard.
   const object = (value: unknown): boolean =>
     Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
@@ -191,7 +189,6 @@ const MAX_BODY = 1_000_000
 
 export type BodyRefusal = 'too-large' | 'not-json' | 'too-deep'
 
-// `?: never` on each side, so `body.refused` reads without an `in` narrowing.
 export type BodyResult =
   { refused: BodyRefusal; value?: never } | { refused?: never; value: unknown }
 
@@ -206,10 +203,8 @@ async function bodyOf(c: {
   } catch {
     return { refused: 'not-json' }
   }
-  /*
-   * Refused past `MAX_CONDITION_DEPTH`, where core stops reading. V8's `JSON.parse` accepts far
-   * deeper input, but `JSON.stringify` in the response echo throws past roughly 5000 levels.
-   */
+  // Refused past `MAX_CONDITION_DEPTH`, where core stops reading; `JSON.parse` accepts far
+  // deeper input than `JSON.stringify` can always write.
   if (deeperThan(parsed, MAX_CONDITION_DEPTH)) return { refused: 'too-deep' }
   return { value: parsed }
 }
@@ -339,7 +334,6 @@ app.delete('/api/forms/:id', async (c) => {
   const id = c.req.param('id')
 
   const found = await withStore((store) => {
-    // Decided inside the chain, against the version about to be written.
     if (!held(store, id)) return { result: false }
 
     const next: Store = Object.assign(Object.create(null) as Store, store)
@@ -419,13 +413,11 @@ app.post('/api/forms/:id/submit', async (c) => {
   return c.json({ ok: true, received: submitted })
 })
 
-// Exported so tests call the real routes through `app.request`, with no socket.
 export { app }
 
 // Under `docker stop`'s default 10 seconds, so shutdown is clean rather than a SIGKILL.
 const SHUTDOWN_GRACE = 5000
 
-// Exported, with `exit` injected, so a test can drive it: the entry-point block is unreachable.
 export const stopper =
   (server: { close: (done: () => void) => void }, exit: () => void) =>
   (signal: string): void => {

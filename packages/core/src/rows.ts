@@ -84,8 +84,6 @@ export function decodeRow(text: string): RowPath | undefined {
     const match = SEGMENT.exec(part)
     if (!match) return undefined
 
-    // Checked, not asserted: `Number(undefined)` is `NaN`, which would re-encode
-    // as `addresses[NaN]`.
     const key = match[1]
     const index = match[2]
     if (key === undefined || index === undefined) return undefined
@@ -143,14 +141,7 @@ export interface KeyScopes {
   row?: string[]
 }
 
-/**
- * The one collector behind `keyScopesFor` (the picker) and `rowScopeProblems`
- * (validation), so a key the picker offers is one validation accepts.
- *
- * A repeater's own data key is an answer in the scope that holds the repeater.
- * What is inside it is an answer in *its* rows. A set, because data keys may
- * legally repeat: two fields behind opposite guards can write one answer.
- */
+/** The picker and validation must agree on these keys. */
 function gatherKeys(node: ComponentNode, names: Set<string>, depth: number): void {
   if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
   if (node.schema) names.add(dataKeyOf(node))
@@ -208,21 +199,15 @@ export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
 }
 
 /**
- * Refs that read nothing because the scope they name does not hold the answer
- * and another scope or an outer row does, reported at boot. Evaluation cannot
- * tell them from a ref to a key the form does not hold.
- *
- * Total, like everything reachable from `validateDocument`: the document is
- * unchecked here, so anything unreadable contributes nothing and the structural
- * checks report the malformed shape.
+ * Total: `validateDocument` calls this on an unchecked document, so anything unreadable
+ * contributes nothing.
  */
 export function rowScopeProblems(root: ComponentNode): { key: string; problem: string }[] {
   const problems: { key: string; problem: string }[] = []
 
   const formKeys = formKeysOf(root)
 
-  // A truncated walk is reported, never passed as clean. Once per node, because
-  // the three branches below ask the same condition.
+  // A truncated walk is reported, never passed as clean.
   const tooDeep = new Set<string>()
   const refsOf = (
     node: ComponentNode,
@@ -244,7 +229,6 @@ export function rowScopeProblems(root: ComponentNode): { key: string; problem: s
     return refs
   }
 
-  // Outermost first, like a `RowPath`.
   const visit = (node: ComponentNode, rows: readonly Set<string>[], depth = 0): void => {
     if (!node || typeof node !== 'object' || depth > MAX_TREE_DEPTH) return
     const enclosing = rows[rows.length - 1]
@@ -481,7 +465,7 @@ export function decodeAddress(address: string): ParsedAddress | undefined {
  * which keeps a hostile index from minting a sparse array.
  */
 export function applyChange(data: FormData, address: string, value: JsonValue): FormData {
-  // `decodeAddress` has already refused a reserved or malformed name.
+  // Refuses reserved and malformed names, which `place` writes unchecked.
   const parsed = decodeAddress(address)
   if (!parsed) return data
 

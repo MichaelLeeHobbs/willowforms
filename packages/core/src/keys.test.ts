@@ -55,11 +55,8 @@ describe('the key grammar', () => {
   })
 
   it('refuses a key still wearing whitespace, because that is what got stored', () => {
-    /*
-     * A padded key is a different string from its trimmed twin everywhere it is
-     * used, so two components could hold what downstream code treats as one
-     * name without the duplicate check seeing it.
-     */
+    // A padded key is a different string from its trimmed twin, so the duplicate check cannot
+    // see they are one name.
     expect(keyProblem('  email  ')).toBeDefined()
     expect(keyProblem('email ')).toBeDefined()
     expect(keyProblem('email')).toBeUndefined()
@@ -115,8 +112,7 @@ describe('the names that are refused by name', () => {
   })
 
   it('refuses a padded reserved name as reserved, not as a spacing mistake', () => {
-    // "That name is reserved" tells the author to pick another; "remove the
-    // spaces" leads to a second refusal.
+    // Told to remove the spaces, the author would only be refused again.
     expect(keyProblem(' __proto__ ')).toMatch(/reserved/i)
     expect(keyProblem(' email ')).toMatch(/letters, numbers and underscores/)
   })
