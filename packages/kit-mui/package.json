@@ -60,7 +60,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "devDependencies": {
     "@mui/material": "^7.3.11"

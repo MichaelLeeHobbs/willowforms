@@ -12,8 +12,8 @@ updates:
           - minor
           - patch
     ignore:
-      # Node types track the oldest supported runtime (engines: node >=22), so
-      # code cannot typecheck against an API that Node 22 users do not have.
+      # Node types track the oldest supported runtime (engines: node >=24), so
+      # code cannot typecheck against an API that Node 24 users do not have.
       # Raise this major together with the engines floor.
       - dependency-name: '@types/node'
         update-types:
