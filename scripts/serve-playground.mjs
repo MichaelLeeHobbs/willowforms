@@ -13,6 +13,7 @@ import { build, preview } from 'vite'
 
 const { values } = parseArgs({
   options: {
+    // 0 for any free port.
     port: { type: 'string' },
     // From the playground's folder.
     'out-dir': { type: 'string' },
@@ -23,7 +24,7 @@ const { values } = parseArgs({
 })
 const port = Number(values.port)
 const outDir = values['out-dir']
-if (!Number.isInteger(port) || port < 1 || outDir === undefined) {
+if (!Number.isInteger(port) || port < 0 || outDir === undefined) {
   throw new Error(
     'Usage: serve-playground.mjs --port <n> --out-dir <path> [--mode <name>] [--no-minify]',
   )
@@ -37,12 +38,14 @@ const config = {
 }
 
 // An address rather than `localhost`, which Node and the browser can resolve differently.
-await preview({ ...config, preview: { host: '127.0.0.1', port, strictPort: true } })
+const server = await preview({ ...config, preview: { host: '127.0.0.1', port, strictPort: true } })
 // This mode resolves the packages through their exports, so they have to be built.
 if (values.mode === 'dist') {
-  execFileSync(process.execPath, ['--run', 'build'], { cwd: at(''), stdio: 'inherit' })
+  // `tsc` prints its errors on stdout, and Playwright shows only stderr.
+  const stdio = ['inherit', process.stderr, 'inherit']
+  execFileSync(process.execPath, ['--run', 'build'], { cwd: at(''), stdio })
 }
 await build(config)
 
 // Both Playwright configs wait for this line.
-console.log('Bundle ready on port ' + String(port))
+console.log('Bundle ready on port ' + String(server.httpServer.address().port))
