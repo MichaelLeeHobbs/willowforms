@@ -138,19 +138,23 @@ test('every button that removes something draws the trash icon, and × only clos
   ).toHaveText('×')
 })
 
-test('a tree row is as tall as its text, with a Remove button or without', async ({ designer }) => {
-  // Text shorter than the button, which a host's own font and line height can make it.
-  await designer.page.addStyleTag({
-    content: '.fs-shell { --fs-font-size: 10px; line-height: normal }',
-  })
+test('a Remove button makes no tree row taller, and stays inside its row', async ({ designer }) => {
   const rows = designer.page.locator('[data-fs-tree-row]')
-  expect(await rows.count()).toBeGreaterThan(1)
   await expect(designer.row('root').getByRole('button')).toHaveCount(0)
 
-  const heights = await rows.evaluateAll((all) =>
-    all.map((each) => each.getBoundingClientRect().height),
-  )
-  // Less than the button and the row's padding, or equal heights would prove nothing.
-  expect(heights[0]).toBeLessThan(24 + 8)
-  expect(new Set(heights).size, heights.join(', ')).toBe(1)
+  // The second makes the text shorter than the button, as a host's font can.
+  for (const font of ['--fs-font-size: 14px', '--fs-font-size: 10px; line-height: 1']) {
+    await designer.page.addStyleTag({ content: `.fs-shell { ${font} }` })
+    const measured = await rows.evaluateAll((all) =>
+      all.map((row) => {
+        const { top, bottom, height } = row.getBoundingClientRect()
+        const button = row.querySelector('button')?.getBoundingClientRect()
+        return { height, inside: !button || (button.top >= top && button.bottom <= bottom) }
+      }),
+    )
+    const [root, ...others] = measured
+    expect(others.length).toBeGreaterThan(0)
+    for (const row of others) expect(row).toEqual({ height: root?.height, inside: true })
+  }
+  expect((await designer.row('root').boundingBox())?.height).toBe(24)
 })

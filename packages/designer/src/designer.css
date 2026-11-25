@@ -414,6 +414,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
+  /* Holds the Remove button, which would cover the next row's in a shorter one. */
+  min-height: 24px;
   padding: 4px 8px;
   border-radius: var(--fs-radius);
   cursor: pointer;
@@ -450,7 +453,7 @@
   opacity: 1;
 }
 
-/* The margin leaves it no height of its own, so a row is as tall as its text in any host's font. */
+/* The margin leaves it no height of its own, so it makes no row taller, whatever the host's font. */
 .fs-tree__remove {
   margin-block: -12px;
   margin-inline-start: auto;
