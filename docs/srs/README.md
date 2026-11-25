@@ -78,25 +78,25 @@ These rules govern every file in this folder. Skills and agents that read or wri
 
 ## Areas
 
-Proposed, awaiting the developer's confirmation. No area file is written until the list is confirmed.
+An area without a link has no file yet.
 
-| Area                                 | File               | What it covers                                                                                           |
-| ------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------- |
-| Completing a form (`FILL`)           | `filling.md`       | Answers (`ANS`), errors shown (`ERR`), what is submitted (`SUB`), components that fail (`RES`)           |
-| Validation (`VAL`)                   | `validation.md`    | Rules (`RULE`), when rules apply (`WHEN`), messages (`MSG`), server parity (`SRV`)                       |
-| Form documents (`DOC`)               | `documents.md`     | Loading and migration (`LOAD`), import and export (`JSON`), schema export (`SCH`), handing over (`SAVE`) |
-| Security (`SEC`)                     | `security.md`      | Untrusted documents (`DOCS`), author code (`CODE`), submitted data (`DATA`), limits (`LIM`)              |
-| Building a form (`BUILD`)            | `building.md`      | Palette (`PAL`), selection (`SEL`), drag and drop (`DND`), tree (`TREE`), undo (`UNDO`)                  |
-| Configuring components (`CONF`)      | `configuring.md`   | Properties (`PROP`), choices (`OPT`), conditions (`COND`), styling (`STYLE`), names (`KEY`)              |
-| Component catalogue (`CAT`)          | `catalogue.md`     | Layout (`LAY`), display and feedback (`DISP`), inputs (`INP`), selection (`CHO`), navigation (`NAV`)     |
-| Repeated groups and steps (`FLOW`)   | `flow.md`          | Repeaters (`REP`), steps (`STEP`)                                                                        |
-| Localization (`LOC`)                 | `localization.md`  | Languages (`LANG`), translations (`TRN`), writing direction (`DIR`)                                      |
-| Actions (`ACT`)                      | `actions.md`       | Events (`EVT`), effects (`EFF`), code actions (`CODE`), authoring them (`AUTH`)                          |
-| Preview (`PREV`)                     | `preview.md`       | Using the form (`RUN`), simulated sizes (`VIEW`), answer output (`DATA`)                                 |
-| Designer workspace (`WORK`)          | `workspace.md`     | Panes (`PANE`), toolbar (`BAR`), narrow layouts (`NARR`)                                                 |
-| Accessibility (`A11Y`)               | `accessibility.md` | Keyboard (`KBD`), screen readers (`SR`), vision and motion (`VIS`), rendered forms (`FORM`)              |
-| Embedding and compatibility (`HOST`) | `embedding.md`     | Designer (`DSGN`), renderer (`REND`), theming (`THM`), platforms (`PLAT`), packages (`PKG`)              |
-| Kits (`KIT`)                         | `kits.md`          | Obligations (`OBL`), switching kits (`SWAP`), custom components (`CUST`)                                 |
+| Area                                 | File                           | What it covers                                                                                           |
+| ------------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Completing a form (`FILL`)           | [filling.md](filling.md)       | Answers (`ANS`), errors shown (`ERR`), what is submitted (`SUB`), components that fail (`RES`)           |
+| Validation (`VAL`)                   | [validation.md](validation.md) | Rules (`RULE`), when rules apply (`WHEN`), messages (`MSG`), server parity (`SRV`)                       |
+| Form documents (`DOC`)               | [documents.md](documents.md)   | Loading and migration (`LOAD`), import and export (`JSON`), schema export (`SCH`), handing over (`SAVE`) |
+| Security (`SEC`)                     | [security.md](security.md)     | Untrusted documents (`DOCS`), author code (`CODE`), submitted data (`DATA`), limits (`LIM`)              |
+| Building a form (`BUILD`)            | `building.md`                  | Palette (`PAL`), selection (`SEL`), drag and drop (`DND`), tree (`TREE`), undo (`UNDO`)                  |
+| Configuring components (`CONF`)      | `configuring.md`               | Properties (`PROP`), choices (`OPT`), conditions (`COND`), styling (`STYLE`), names (`KEY`)              |
+| Component catalogue (`CAT`)          | `catalogue.md`                 | Layout (`LAY`), display and feedback (`DISP`), inputs (`INP`), selection (`CHO`), navigation (`NAV`)     |
+| Repeated groups and steps (`FLOW`)   | `flow.md`                      | Repeaters (`REP`), steps (`STEP`)                                                                        |
+| Localization (`LOC`)                 | `localization.md`              | Languages (`LANG`), translations (`TRN`), writing direction (`DIR`)                                      |
+| Actions (`ACT`)                      | `actions.md`                   | Events (`EVT`), effects (`EFF`), code actions (`CODE`), authoring them (`AUTH`)                          |
+| Preview (`PREV`)                     | `preview.md`                   | Using the form (`RUN`), simulated sizes (`VIEW`), answer output (`DATA`)                                 |
+| Designer workspace (`WORK`)          | `workspace.md`                 | Panes (`PANE`), toolbar (`BAR`), narrow layouts (`NARR`)                                                 |
+| Accessibility (`A11Y`)               | `accessibility.md`             | Keyboard (`KBD`), screen readers (`SR`), vision and motion (`VIS`), rendered forms (`FORM`)              |
+| Embedding and compatibility (`HOST`) | `embedding.md`                 | Designer (`DSGN`), renderer (`REND`), theming (`THM`), platforms (`PLAT`), packages (`PKG`)              |
+| Kits (`KIT`)                         | `kits.md`                      | Obligations (`OBL`), switching kits (`SWAP`), custom components (`CUST`)                                 |
 
 Interfaces: none proposed yet. The document format, the kit interface and the public API are candidates.
 
@@ -114,5 +114,6 @@ Not generated yet.
 
 Newest first. One line per decision: the date, what moved, and the developer's words.
 
+- 2026-11-25: Confirmed the list of 15 areas and asked for the first four to be drafted (FILL, VAL, DOC, SEC). "Yes, draft them"
 - 2026-11-25: Decided that where an SRS row and `docs/spec` disagree, the SRS row decides. "SRS wins"
-- 2026-11-25: Created. Scope, Out of scope and Areas are proposals; no requirement rows yet.
+- 2026-11-25: Created. Scope, Out of scope and Areas were proposals.
