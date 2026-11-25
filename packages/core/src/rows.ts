@@ -113,6 +113,8 @@ function rowKeysOf(repeater: ComponentNode): Set<string> {
 }
 
 /**
+ * Keeps the panel from offering a scope that `validateDocument` reports as `row-scope`.
+ *
  * Row keys stop at a nested repeater: its own data key is an answer in this row, but no ref
  * from here can name what is inside it.
  */
