@@ -35,6 +35,8 @@
   /* The same in both palettes: it is drawn over the form, which belongs to the host. */
   --fs-drop-ring: 0 0 0 1px rgb(255 255 255 / 65%), 0 0 0 2px rgb(0 0 0 / 20%);
 
+  /* Keeps the overlays' `z-index` values in here, out of the host page's stacking. */
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   height: 100%;

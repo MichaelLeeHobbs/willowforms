@@ -216,6 +216,29 @@ test('the toolbar removes the selected component', async ({ designer }) => {
   await expect.poll(() => designer.rootChildren()).not.toContain('website')
 })
 
+test('a modal of the host covers the selection toolbar', async ({ designer }) => {
+  await designer.node('website').click()
+  const remove = designer.page
+    .locator('.fs-selection__toolbar')
+    .getByRole('button', { name: 'Remove website' })
+  const onTop = (): Promise<string> =>
+    remove.evaluate((button) => {
+      const { left, top, width, height } = button.getBoundingClientRect()
+      const hit = document.elementFromPoint(left + width / 2, top + height / 2)
+      return button.contains(hit) ? 'toolbar' : (hit?.id ?? 'nothing')
+    })
+  expect(await onTop()).toBe('toolbar')
+
+  // Material UI's default for a modal, below the `z-index` of the frame the toolbar is in.
+  await designer.page.evaluate(() => {
+    const modal = document.createElement('div')
+    modal.id = 'host-modal'
+    modal.style.cssText = 'position: fixed; inset: 0; z-index: 1300'
+    document.body.append(modal)
+  })
+  expect(await onTop()).toBe('host-modal')
+})
+
 test('a palette drag released off the canvas adds nothing', async ({ designer }) => {
   /*
    * The half jsdom cannot check. `Canvas.test.tsx` drives this gesture and can only
