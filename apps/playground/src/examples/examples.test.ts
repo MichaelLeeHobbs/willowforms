@@ -35,7 +35,20 @@ describe('playground example documents', () => {
 
     for (const language of document.languages) {
       const bundle = document.translations[languageTag(language)] ?? {}
-      expect(keys.filter((key) => !(key in bundle))).toEqual([])
+      expect(keys.filter((key) => !bundle[key])).toEqual([])
+    }
+  })
+
+  it('translates every field label and rule message in the bilingual workshop', () => {
+    const { document } = EXAMPLES.find((example) => example.id === 'workshop-enrollment')!
+    expect(document.languages.map(languageTag)).toEqual(['en-US', 'fr-CA'])
+
+    const fields = flatten(document.root).flatMap(({ node }) => (node.schema ? [node] : []))
+    expect(fields).toHaveLength(6)
+    for (const { key, props, schema } of fields) {
+      expect(props['label'], key).toHaveProperty('kind', 'i18n')
+      for (const rule of schema?.validations ?? [])
+        expect(rule.message, key + ' ' + rule.key).toHaveProperty('kind', 'i18n')
     }
   })
 
