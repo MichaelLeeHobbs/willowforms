@@ -44,19 +44,9 @@ written against concrete components, and every one of those call sites becomes a
 second kit is wanted. The abstraction is not speculative: the competitor this project studied ships
 three kits, and the registry is where its extensibility lives.
 
-`@willowforms/kit-html` is the evidence rather than the argument. Adding it changed nothing in `core`,
-`renderer` or `designer`. It did touch build configuration -- a project reference, a source alias, a
-stylesheet copy, the lockfile -- along with the playground, which had to offer the choice, and one bug in
-the other kit that the new contract test exposed. "Four files, all build plumbing" is a figure an earlier
-draft of `00-product.md` retracted: it counted the build files and not the files. The playground switches
-between the two kits at runtime on the same document.
+`@willowforms/kit-html` is the evidence rather than the argument. Adding it changed nothing in `core`, `renderer` or `designer`. It did touch build configuration -- a project reference, a source alias, a stylesheet copy, the lockfile -- along with the playground, which had to offer the choice, and one bug in the other kit that the new contract test exposed. The playground switches between the two kits at runtime on the same document.
 
-`test/kit-contract.test.tsx` turns the contract into an executable spec that runs against every kit in
-the repo: a renderer for every palette entry and no orphans, `nodeProps` reaching the DOM, containers
-rendering children inside themselves, data-bound components surviving an absent value, and errors
-actually being displayed. A third kit is added to that list and nothing else. Writing it immediately
-found a real bug: the MUI Checkbox had been discarding its error, so a required checkbox failed a submit
-while saying nothing.
+`test/kit-contract.test.tsx` turns the contract into an executable spec that runs against every kit in the repo: a renderer for every palette entry and no orphans, `nodeProps` reaching the DOM, containers rendering children inside themselves, data-bound components surviving an absent value, and errors actually being displayed. A third kit is added to that list and nothing else.
 
 ## The document model
 
@@ -105,22 +95,14 @@ Three behavioural rules, all learned from the prior-art study in `docs/prior-art
 1. **Every rule except `required` passes on an empty value.** Requiredness is one rule's job. A field
    declaring only `url` must not report "Required" when blank; that was a real bug in the demo we studied
    and there is a test named after it.
-2. **Validation and rendering agree about what is visible.** `isVisible` in core decides, and both the
-   renderer and `validateForm` call it. They used to disagree: the renderer honoured `renderWhen` while
-   validation walked every node regardless, so a required field hidden by a condition failed a submit
-   with an error nobody could see or fix. Hiding a container hides everything under it.
+2. **Validation and rendering agree about what is visible.** `isVisible` in core decides, and both the renderer and `validateForm` call it. Hiding a container hides everything under it.
 3. **Missing sandbox degrades permissively.** `custom` rules and `computed` guards need a JS evaluator, which core does not provide. With no evaluator injected, a rule with a `computed` guard is skipped and `custom` rules pass. A missing sandbox must not throw and must not silently fail a user's form.
 
 ## Immutability and undo
 
 Every operation in `core/tree.ts` returns a new tree and shares structure with the old one. Editing a
 leaf allocates only that node's ancestors; untouched subtrees keep referential identity, which is what
-`React.memo` needs to skip them. An operation that changes nothing returns the very same tree.
-
-That was a claim this file made and the code did not honour. `updateNode` and `removeNode` mapped over
-their children unconditionally, so every node in the tree came back new on every edit, no subtree could
-ever be skipped, and an operation that matched nothing still produced a fresh document that the undo
-stack recorded as a version. `tree.test.ts` now asserts the identities directly.
+`React.memo` needs to skip them. An operation that changes nothing returns the very same tree. `packages/core/src/tree.test.ts` asserts the identities directly.
 
 The designer's history is a past/present/future triple over whole documents. Snapshots are cheap for the
 reason above. The stack is capped at `MAX_HISTORY` (100), because an uncapped undo history is a slow leak
