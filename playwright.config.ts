@@ -31,7 +31,11 @@ export default defineConfig({
   // turns a failure into a pass: a flaky test is a bug to fix.
   retries: 1,
   failOnFlakyTests: true,
-  reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
+  reporter: process.env['CI']
+    ? [['github'], ['list'], ['json', { outputFile: 'test-reports/playwright.json' }]]
+    : [['list']],
+  // On in CI by default, and puts the author's email and the diff in the uploaded report.
+  captureGitInfo: { commit: false, diff: false },
 
   use: {
     baseURL,
