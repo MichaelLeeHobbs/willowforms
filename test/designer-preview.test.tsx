@@ -137,6 +137,41 @@ describe('beta authoring regressions', () => {
     expect(note.textContent, 'an unchanged live region is never read out').not.toBe(first)
   })
 
+  it('says what Validate found, and changes the note when it finds the same again', () => {
+    open(
+      ['Name', 'City'].map((label) => ({
+        key: label.toLowerCase() + 'Field',
+        dataKey: label.toLowerCase(),
+        type: 'TextField',
+        props: { label: prop(label) },
+        schema: { type: 'string', validations: [{ key: 'required' }] },
+      })),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const canvas = within(screen.getByRole('main'))
+    const note = canvas.getByRole('status')
+    const validate = canvas.getByRole('button', { name: 'Validate' })
+
+    for (const [answered, result] of [
+      [undefined, 'Check 2 fields before submitting.'],
+      ['Name', 'Check 1 field before submitting.'],
+      ['City', 'All answers are valid.'],
+    ] as const) {
+      if (answered)
+        fireEvent.change(canvas.getByRole('textbox', { name: answered }), {
+          target: { value: 'Given' },
+        })
+      expect(note.textContent, 'the last result no longer holds').toBe('')
+
+      fireEvent.click(validate)
+      expect(note.textContent).toBe(result)
+
+      fireEvent.click(validate)
+      expect(note.textContent).toContain(result)
+      expect(note.textContent, 'an unchanged live region is never read out').not.toBe(result)
+    }
+  })
+
   it('shows guidance for an empty document only while editing', () => {
     open([])
     const canvas = within(screen.getByRole('main'))

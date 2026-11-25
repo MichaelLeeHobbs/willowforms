@@ -224,6 +224,24 @@ export function Canvas({
     [setActionNote],
   )
 
+  /** Reveals errors, and checks every step so the note holds for the whole form. */
+  const checkAnswers = useCallback(() => {
+    const scopes = steps.length ? steps.map((value) => ({ step: value })) : [context]
+    const results = scopes.map((scope) =>
+      validateForm(api.document.root, data, { context: scope, messages }),
+    )
+    const count = new Set(results.flatMap((result) => Object.keys(result))).size
+    setValidated(true)
+    return {
+      valid: count === 0,
+      firstInvalid: results.findIndex((result) => Object.keys(result).length > 0),
+      note:
+        count === 0
+          ? 'All answers are valid.'
+          : `Check ${count} ${count === 1 ? 'field' : 'fields'} before submitting.`,
+    }
+  }, [steps, context, api.document.root, data, messages])
+
   const onEffects = useCallback(
     (effects: Effect[]) => {
       if (!preview) return
@@ -232,23 +250,11 @@ export function Canvas({
         (effect) => effect.kind === 'emit' && effect.event === 'submit',
       )
       if (submitting || effects.some((effect) => effect.kind === 'validate')) {
-        const scopes = steps.length ? steps.map((value) => ({ step: value })) : [context]
-        const results = scopes.map((scope) =>
-          validateForm(api.document.root, data, { context: scope, messages }),
+        const { valid, firstInvalid, note } = checkAnswers()
+        if (!valid && steps.length) setStep(steps[firstInvalid])
+        notes.push(
+          valid && submitting ? 'Form is valid. Submission simulated; no data was sent.' : note,
         )
-        const count = new Set(results.flatMap((result) => Object.keys(result))).size
-        setValidated(true)
-        if (count) {
-          const first = results.findIndex((result) => Object.keys(result).length > 0)
-          if (steps.length) setStep(steps[first])
-          notes.push(`Check ${count} ${count === 1 ? 'field' : 'fields'} before submitting.`)
-        } else {
-          notes.push(
-            submitting
-              ? 'Form is valid. Submission simulated; no data was sent.'
-              : 'All answers are valid.',
-          )
-        }
       }
       for (const effect of effects) {
         if (effect.kind === 'announce') notes.push(effect.message)
@@ -259,7 +265,7 @@ export function Canvas({
       }
       setActionNote(notes.join(' '))
     },
-    [preview, steps, context, api.document.root, data, messages, setActionNote],
+    [preview, steps, checkAnswers, setActionNote],
   )
 
   const onActionError = useCallback(
@@ -472,7 +478,7 @@ export function Canvas({
         {preview && (
           <>
             <PreviewData data={data} />
-            <button type="button" onClick={() => setValidated(true)}>
+            <button type="button" onClick={() => setActionNote(checkAnswers().note)}>
               Validate
             </button>
             <button
