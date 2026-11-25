@@ -11,7 +11,9 @@ metadata half  ->  Kit          from @willowforms/core      pure data, no React
 rendering half ->  RendererKit  from @willowforms/renderer   React components
 ```
 
-`@willowforms/kit-mui` exports both (`muiKit`, `muiRendererKit`). The designer imports neither: the host passes both as props. It builds the palette from `ComponentDef[]` and the properties panel from `PropSchema[]`, and hands the rendering half to the renderer for the canvas. It never imports a component library.
+`@willowforms/kit-mui` exports both (`muiKit`, `muiRendererKit`), but the designer only ever imports the
+metadata half. It builds the palette from `ComponentDef[]` and the properties panel from `PropSchema[]`.
+It never imports a component library.
 
 The rendering half carries one obligation. Every renderer spreads `nodeProps` onto its outermost DOM
 element, which puts `data-fs-key`, `data-fs-type` and `data-fs-scope` in the output -- plus
