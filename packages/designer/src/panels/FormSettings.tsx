@@ -11,6 +11,7 @@ import type { CodeAction, JsonValue, Kit, Language } from '@willowforms/core'
 
 import { useAnnouncement } from '../announce.js'
 import type { DesignerApi } from '../store.js'
+import { RemoveButton } from './RemoveButton.js'
 import { paramsText } from './text.js'
 
 export interface FormSettingsProps {
@@ -49,9 +50,7 @@ function CodeActionEditor({
     <li className="fs-action-definition">
       <div className="fs-action__head">
         <code>{action.name}</code>
-        <button type="button" aria-label={`Remove ${action.name}`} onClick={onRemove}>
-          ×
-        </button>
+        <RemoveButton name={action.name} onClick={onRemove} />
       </div>
       <label>
         Body
@@ -248,18 +247,15 @@ export function FormSettings({ api, kit }: FormSettingsProps): ReactNode {
                   Right to left
                 </label>
 
-                <button
-                  type="button"
+                <RemoveButton
                   className="fs-rule__remove"
-                  aria-label={'Remove ' + (nameOf(language) || tag)}
+                  name={nameOf(language) || tag}
                   // A document with no languages renders every translation as its
                   // raw key, so the last one cannot be removed.
 
                   disabled={languages.length === 1}
                   onClick={() => remove(at)}
-                >
-                  &times;
-                </button>
+                />
               </div>
             </li>
           )

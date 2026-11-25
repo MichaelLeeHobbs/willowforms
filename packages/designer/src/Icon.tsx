@@ -201,10 +201,8 @@ export interface IconProps {
 }
 
 /**
- * Decorative by default.
- *
- * Every place an icon appears here, it sits beside the same word it stands for,
- * so naming it would make a screen reader read the label twice.
+ * Decorative: the word it stands for is beside it or in its button's `aria-label`, so naming it
+ * would make a screen reader read the label twice.
  */
 export function Icon({ name, size = 16 }: IconProps): ReactNode {
   const glyph = GLYPHS[name]

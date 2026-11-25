@@ -389,6 +389,21 @@
   color: var(--fs-text-muted);
 }
 
+/* At least the target size WCAG 2.5.8 asks for, which the glyph alone does not reach. */
+.fs-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+/* Overrides the muted `.fs-icon` colour, so the glyph follows its button's hover and selection. */
+.fs-remove .fs-icon {
+  color: inherit;
+}
+
 .fs-tree__list {
   margin: 0;
   padding: 0;
@@ -435,7 +450,9 @@
   opacity: 1;
 }
 
+/* The negative margin keeps every row as tall as its text. */
 .fs-tree__remove {
+  margin-block: -2px;
   margin-inline-start: auto;
   padding: 0 6px;
   border: 0;
@@ -1426,7 +1443,7 @@
 
 .fs-condition__remove {
   flex: 0 0 auto;
-  padding: 2px 6px;
+  padding: 0;
 }
 
 .fs-style__heading {

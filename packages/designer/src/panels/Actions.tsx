@@ -5,6 +5,7 @@ import type { ActionRef, EventName, FormDocument, JsonValue, Kit } from '@willow
 
 import type { DesignerApi } from '../store.js'
 import { ActionFields } from './ActionFields.js'
+import { RemoveButton } from './RemoveButton.js'
 import { paramsText } from './text.js'
 
 const LABELS: Record<string, string> = {
@@ -102,9 +103,7 @@ function ActionRow({
           >
             ↓
           </button>
-          <button type="button" aria-label={`Remove ${action.name}`} onClick={onRemove}>
-            ×
-          </button>
+          <RemoveButton name={action.name} onClick={onRemove} />
         </span>
       </div>
       <ActionFields action={action} document={document} kit={kit} onChange={onChange} />

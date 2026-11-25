@@ -10,6 +10,7 @@ import type { FormDocument } from '@willowforms/core'
 import { Icon } from '../Icon.js'
 import { measureIn, nodeElement } from '../geometry.js'
 import type { Rect } from '../geometry.js'
+import { RemoveButton } from './RemoveButton.js'
 
 /**
  * Undefined when the node has no element, as when its kit drops `nodeProps`. A node
@@ -171,15 +172,11 @@ export function SelectionLayer({
               >
                 <Icon name="plus" size={13} />
               </button>
-              <button
-                type="button"
+              <RemoveButton
                 className="is-danger"
-                aria-label={'Remove ' + (selectedKey ?? 'component')}
-                title="Remove"
+                name={selectedKey ?? 'component'}
                 onClick={actions.onRemove}
-              >
-                <Icon name="trash" size={13} />
-              </button>
+              />
             </div>
           )}
         </div>
