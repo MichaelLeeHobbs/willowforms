@@ -17,11 +17,13 @@ Result: there is almost nothing to remove. The repo has no `!important`, no sele
 
 ## Decision list
 
-1. Isolate the designer's stacking (issue 205). `.fs-selection` at 4000 (designer.css:1159) and `.fs-drop` / `.fs-drag-label` at 5000 (designer.css:904, :921) compete in the host page, because nothing from `.fs-shell` down creates a stacking context. In a headless Chromium probe of the stylesheet, the selection toolbar painted over and took clicks through a host modal at 1300; `.fs-shell { isolation: isolate }` fixed it. Default: yes.
-2. Make an explicit dark theme keep a host's token overrides (issue 206). `.fs-shell[data-fs-theme='dark']` and `.fsh-screen[data-fsh-theme='dark']` are (0,2,0), so a host's `.fs-shell { --fs-primary }` loses under Dark but wins under System on a dark machine. Measured in Chromium in both stylesheets. Default: wrap the attribute in `:where()`, as the system-dark blocks already do.
-3. Adopt z tokens for the 3 layers (guide 1, selection 4000, drag 5000). Default: no. Four uses in one file, and a comment gives the reason for the two large values. Reconsider if decision 1 leads to renumbering.
-4. Put library CSS in a lower cascade layer. Default: no. There are 0 library-cause `!important` for it to remove.
-5. Apply the hot-spot rewrites below. Default: no. The highest specificity is (0,3,1) at depth 2, and lowering chrome rules to one class exposes them to a host's element rules such as `button:hover` (0,1,1).
+All five were decided on 2026-11-25, each as its default.
+
+1. Isolate the designer's stacking (issue 205). `.fs-selection` at 4000 (designer.css:1159) and `.fs-drop` / `.fs-drag-label` at 5000 (designer.css:904, :921) compete in the host page, because nothing from `.fs-shell` down creates a stacking context. In a headless Chromium probe of the stylesheet, the selection toolbar painted over and took clicks through a host modal at 1300; `.fs-shell { isolation: isolate }` fixed it. Default: yes. Decided: yes; merged as 3bd3591 (PR 210).
+2. Make an explicit dark theme keep a host's token overrides (issue 206). `.fs-shell[data-fs-theme='dark']` and `.fsh-screen[data-fsh-theme='dark']` are (0,2,0), so a host's `.fs-shell { --fs-primary }` loses under Dark but wins under System on a dark machine. Measured in Chromium in both stylesheets. Default: wrap the attribute in `:where()`, as the system-dark blocks already do. Decided: yes; PR 219.
+3. Adopt z tokens for the 3 layers (guide 1, selection 4000, drag 5000). Default: no. Four uses in one file, and a comment gives the reason for the two large values. Reconsider if decision 1 leads to renumbering. Decided: no.
+4. Put library CSS in a lower cascade layer. Default: no. There are 0 library-cause `!important` for it to remove. Decided: no.
+5. Apply the hot-spot rewrites below. Default: no. The highest specificity is (0,3,1) at depth 2, and lowering chrome rules to one class exposes them to a host's element rules such as `button:hover` (0,1,1). Decided: no.
 
 ## Dead overrides
 
