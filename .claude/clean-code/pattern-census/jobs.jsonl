@@ -1,0 +1,5 @@
+{"job":"docload","grade":"partial","seed":"willow-pattern-census-1","net":["loaddocument","validatedocument","parsedocument","importdocument"]}
+{"job":"evalcode","grade":"partial","seed":"willow-pattern-census-1","net":["eval","function("]}
+{"job":"kitprops","grade":"partial","seed":"willow-pattern-census-1","net":["onchange(",".str(",".num(",".bool(","changed("]}
+{"job":"log","grade":"closed","seed":"willow-pattern-census-1","net":["console","log(","warn(","error(","debug(","stdout","stderr"]}
+{"job":"safeurl","grade":"partial","seed":"willow-pattern-census-1","net":["safehref","safeimage","safestyle","safedecl","stylesheet","csstext"]}
