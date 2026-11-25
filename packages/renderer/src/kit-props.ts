@@ -21,7 +21,7 @@ export const bool = (v: unknown): boolean => v === true
 export const num = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? v : fallback
 
-/** To the form first, then to the node's `onChange` event. */
+/** Reports a value to the form first, then to the node's `onChange` event. */
 export const changed = (
   onChange: (value: JsonValue) => void,
   events: NodeEventHandlers | undefined,

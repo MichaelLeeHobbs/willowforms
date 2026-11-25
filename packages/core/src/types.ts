@@ -116,7 +116,7 @@ export interface ComponentNode {
   /** Absent means the component cannot take children. */
   children?: ComponentNode[]
   css?: Partial<Record<Device, string>>
-  /** Absent means always rendered. */
+  /** Absent means no condition of its own. */
   renderWhen?: PropValue
 }
 

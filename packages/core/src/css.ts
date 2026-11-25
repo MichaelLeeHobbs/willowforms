@@ -101,7 +101,10 @@ function selectorFor(key: string, scope: string | undefined): string {
   return within + '[data-fs-key="' + escapeKey(key) + '"]'
 }
 
-/** `any` applies at every width, and a device's own rules override it at that device's widths. */
+/**
+ * A node's `css.any` applies at every width, and a device's own rules override it at that
+ * device's widths.
+ */
 export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = {}): string {
   const { device, scope } = options
   const base: string[] = []

@@ -466,8 +466,8 @@ export function autoValidateKeys(root: ComponentNode): Set<string> {
 }
 
 /**
- * The data with the answers to hidden questions left out. Apply when submitting, not to the
- * data as it is held: hiding is often temporary, and must not destroy what someone typed.
+ * Only the answers the form's visible fields hold. Apply when submitting, not to the data
+ * as it is held: hiding is often temporary, and must not destroy what someone typed.
  */
 export function submittedData(
   root: ComponentNode,
@@ -541,8 +541,8 @@ export function submittedAcross(
  * key, the first wins. For submitting a multi-step form, where `validateForm` would skip
  * the steps not on screen and accept the form with their required answers missing.
  *
- * The server takes the scopes from the document, `contextValues(root, 'step')`, never from
- * the request: a client that names one step would leave the rest unchecked.
+ * The server builds one scope per step the document names, `contextValues(root, 'step')`,
+ * never from the request: a client that names one step would leave the rest unchecked.
  */
 export function validateAcross(
   root: ComponentNode,
