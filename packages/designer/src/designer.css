@@ -303,6 +303,12 @@
   border-radius: var(--fs-radius);
 }
 
+/* Chromium uses one grey in every theme. Firefox fades the text, older versions by `opacity`. */
+:where(.fs-panel) ::placeholder {
+  color: var(--fs-text-muted);
+  opacity: 1;
+}
+
 .fs-palette__search {
   margin-block-end: 12px;
 }

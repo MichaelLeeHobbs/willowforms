@@ -30,6 +30,19 @@ export function parseHex(hex: string): Rgb {
   }
 }
 
+/** A browser reports a computed colour as `rgb()`. One with an alpha is refused. */
+export function rgbToHex(rgb: string): string {
+  const channels = /^rgb\((\d+), (\d+), (\d+)\)$/.exec(rgb)
+  if (!channels) throw new Error('Not an opaque rgb colour: ' + rgb)
+  return (
+    '#' +
+    channels
+      .slice(1)
+      .map((value) => Number(value).toString(16).padStart(2, '0'))
+      .join('')
+  )
+}
+
 function channel(value: number): number {
   const c = value / 255
   return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)

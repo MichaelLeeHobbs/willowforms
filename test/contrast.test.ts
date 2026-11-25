@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { contrast, luminance, parseHex, ratio, tokensFrom } from './contrast.js'
+import { contrast, luminance, parseHex, ratio, rgbToHex, tokensFrom } from './contrast.js'
 import { styleRules } from './css.js'
 
 const read = (path: string): string =>
@@ -313,6 +313,11 @@ describe('the contrast instrument', () => {
     expect(() => parseHex('rgb(0 0 0)')).toThrow()
     expect(() => parseHex('var(--fs-text)')).toThrow()
     expect(() => parseHex('#12345')).toThrow()
+  })
+
+  it("turns a browser's computed colour into hex, and refuses one it would have to blend", () => {
+    expect(rgbToHex('rgb(10, 0, 255)')).toBe('#0a00ff')
+    expect(() => rgbToHex('rgba(10, 0, 255, 0.5)')).toThrow()
   })
 })
 

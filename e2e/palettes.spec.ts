@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
+import type { Locator } from '@playwright/test'
 import axe from 'axe-core'
-import { contrast, luminance, parseHex } from '../test/contrast.js'
+import { contrast, luminance, parseHex, rgbToHex } from '../test/contrast.js'
 
 for (const kit of ['html', 'mui']) {
   test(`${kit}: chrome palettes preserve form styling and answers in explicit and system modes`, async ({
@@ -197,6 +198,63 @@ test('editing chrome distinguishes fields, selection, hover, and focus in both p
         ).violations.map(({ id }) => id),
       )
       expect(violations).toEqual([])
+    }
+  }
+})
+
+// A browser check: without a rule of its own, a placeholder keeps the browser's colour.
+test('placeholders in the panels and the gallery clear AA in both palettes', async ({ page }) => {
+  // Every field a surface holds, so that a rule reaching only some of them fails.
+  const fieldsIn = (surface: Locator): Locator =>
+    surface.locator(':is(input, textarea)[placeholder]:not([placeholder=""])')
+  const unreadable = async (surface: Locator): Promise<string[]> => {
+    const fields = await fieldsIn(surface).evaluateAll((elements) =>
+      elements.map((element) => {
+        const placeholder = getComputedStyle(element, '::placeholder')
+        return {
+          name: element.getAttribute('placeholder') ?? '',
+          text: placeholder.color,
+          opacity: placeholder.opacity,
+          behind: getComputedStyle(element).backgroundColor,
+        }
+      }),
+    )
+    return fields
+      .map(({ name, text, opacity, behind }) => ({
+        name,
+        // `contrast` takes no alpha.
+        ratio: opacity === '1' ? contrast(rgbToHex(text), rgbToHex(behind)) : 0,
+      }))
+      .filter(({ ratio }) => ratio < 4.5)
+      .map(({ name, ratio }) => name + ': ' + ratio.toFixed(2))
+  }
+
+  await page.goto('/?example=contact-request')
+  await page.locator('[data-fs-key="firstName"]').click()
+  const left = page.getByRole('complementary', { name: 'Components and structure', exact: true })
+  const right = page.getByRole('complementary', { name: 'Component properties', exact: true })
+  await right.getByRole('tab', { name: 'Style', exact: true }).click()
+  await expect(fieldsIn(left)).not.toHaveCount(0)
+  await expect(fieldsIn(right).and(page.locator('input'))).not.toHaveCount(0)
+  await expect(fieldsIn(right).and(page.locator('textarea'))).not.toHaveCount(0)
+  const gallery = page.locator('.pg-gallery')
+
+  for (const palette of ['willow', 'desert']) {
+    await page.getByLabel('Palette', { exact: true }).selectOption(palette)
+    for (const [mode, field, surface] of [
+      ['light', 'rgb(245, 246, 245)', 'rgb(236, 238, 237)'],
+      ['dark', 'rgb(24, 35, 31)', 'rgb(32, 46, 39)'],
+    ] as const) {
+      const where = `${palette}, ${mode}`
+      await page.getByLabel('Designer theme').selectOption(mode)
+      await expect(fieldsIn(left).first()).toHaveCSS('background-color', field)
+      expect(await unreadable(left), where).toEqual([])
+      expect(await unreadable(right), where).toEqual([])
+
+      await page.getByRole('button', { name: /^Examples/ }).click()
+      await expect(fieldsIn(gallery)).toHaveCSS('background-color', surface)
+      expect(await unreadable(gallery), where).toEqual([])
+      await page.getByRole('button', { name: 'Close examples' }).click()
     }
   }
 })
