@@ -49,7 +49,8 @@ for (const kit of ['html', 'mui']) {
       ['training', 140],
     ] as const) {
       const field = form.locator(`[data-fs-key="${key}"]`)
-      const label = (await field.locator('label').boundingBox())!
+      // Material UI 9 draws a Select's label as a `div`.
+      const label = (await field.locator('label, .MuiInputLabel-root').boundingBox())!
       const input = (await (key === 'bonus' ? bonus : training).boundingBox())!
       expect(input.x).toBeGreaterThan(label.x + label.width - 1)
       expect(Math.abs(input.y + input.height / 2 - label.y - label.height / 2)).toBeLessThan(2)

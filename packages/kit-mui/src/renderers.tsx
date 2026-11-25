@@ -117,7 +117,7 @@ function Screen({ props, nodeProps, children }: NodeRendererProps): ReactNode {
         bgcolor: 'background.default',
       }}
     >
-      <Stack gap={px(num(props['gap'], GAP))}>{children}</Stack>
+      <Stack sx={{ gap: px(num(props['gap'], GAP)) }}>{children}</Stack>
     </Box>
   )
 }
@@ -129,7 +129,7 @@ function StackNode({ props, nodeProps, children }: NodeRendererProps): ReactNode
       {...nodeProps}
       style={backgroundImageStyle(props)}
       direction={direction}
-      gap={px(num(props['gap'], GAP))}
+      sx={{ gap: px(num(props['gap'], GAP)) }}
     >
       {children}
     </Stack>
@@ -158,17 +158,17 @@ function RepeaterNode({
       {...nodeProps}
       style={backgroundImageStyle(props)}
       direction="column"
-      gap={px(num(props['gap'], GAP))}
+      sx={{ gap: px(num(props['gap'], GAP)) }}
     >
       <Stack
         role="group"
         aria-label={name}
         direction="column"
-        gap={px(num(props['gap'], GAP))}
+        sx={{ gap: px(num(props['gap'], GAP)) }}
         aria-describedby={messageId}
       >
         {renderedRows.map((row, index) => (
-          <Stack key={index} gap={1}>
+          <Stack key={index} sx={{ gap: 1 }}>
             {row}
             {index < rows.length && (
               <Button
@@ -206,11 +206,14 @@ function StepNode({ props, nodeProps, children, navigation }: NodeRendererProps)
       {...nodeProps}
       style={backgroundImageStyle(props)}
       direction="column"
-      gap={px(num(props['gap'], GAP))}
+      sx={{ gap: px(num(props['gap'], GAP)) }}
     >
       {children}
       {navigation && (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+        <Stack
+          direction="row"
+          sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}
+        >
           <Button type="button" size="small" disabled={!navigation.back} onClick={navigation.back}>
             Back
           </Button>
@@ -573,9 +576,7 @@ function ButtonGroupNode({ props, nodeProps, children }: NodeRendererProps): Rea
       {...nodeProps}
       role="group"
       direction={vertical ? 'column' : 'row'}
-
-      gap={px(8)}
-      sx={{ alignItems: vertical ? 'stretch' : 'center' }}
+      sx={{ alignItems: vertical ? 'stretch' : 'center', gap: px(8) }}
     >
       {children}
     </Stack>

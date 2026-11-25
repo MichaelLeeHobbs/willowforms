@@ -50,9 +50,9 @@ export type Evaluator = (expression: string, data: FormData, context?: FormConte
 /**
  * Everything the rules need beyond the answers themselves.
  *
- * A bag rather than two more positional arguments, because both are optional
+ * A bag rather than more positional arguments, because all are optional
  * and `validateForm(root, data, undefined, context)` is a call nobody should
- * have to write. Both are declared `| undefined` on purpose:
+ * have to write. They are declared `| undefined` on purpose:
  * `exactOptionalPropertyTypes` is on, and a caller forwarding its own optional
  * prop is the normal case, not a mistake.
  */

@@ -98,15 +98,7 @@ and the compiler named every place that had to learn about it.
 
 ### Validation rules carry their parameters
 
-```ts
-type ValidationRule =
-  | { key: 'required';  message?: string; when?: PropValue }
-  | { key: 'minLength'; value: number; message?: string; when?: PropValue }
-  | ...
-```
-
-The rule set studied for prior art was an untyped `{ key, message? }`, which cannot express `minLength`
-without a side channel.
+`ValidationRule` is a union discriminated by `key`, so `minLength` has a number and `required` has none. [08-validation.md](spec/08-validation.md#the-rule-catalogue) lists the members. The rule set studied for prior art was an untyped `{ key, message? }`, which cannot express `minLength` without a side channel.
 
 Three behavioural rules, all learned from the prior-art study in `docs/prior-art`:
 
@@ -117,9 +109,7 @@ Three behavioural rules, all learned from the prior-art study in `docs/prior-art
    renderer and `validateForm` call it. They used to disagree: the renderer honoured `renderWhen` while
    validation walked every node regardless, so a required field hidden by a condition failed a submit
    with an error nobody could see or fix. Hiding a container hides everything under it.
-3. **Missing sandbox degrades permissively.** Expression-backed rules and `when` guards need a JS
-   evaluator, which core does not provide. With no evaluator injected, guarded rules are skipped and
-   `custom` rules pass. A missing sandbox must not throw and must not silently fail a user's form.
+3. **Missing sandbox degrades permissively.** `custom` rules and `computed` guards need a JS evaluator, which core does not provide. With no evaluator injected, a rule with a `computed` guard is skipped and `custom` rules pass. A missing sandbox must not throw and must not silently fail a user's form.
 
 ## Immutability and undo
 
