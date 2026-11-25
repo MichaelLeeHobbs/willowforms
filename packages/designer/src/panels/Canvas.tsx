@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent,
@@ -137,6 +137,8 @@ export function Canvas({
     )
   }, [api.document.defaultLanguage, api.document.translations, language])
   const [data, setData] = useState<FormData>({})
+  // What `data` becomes: a field's own action runs in the event that changes it.
+  const answers = useRef(data)
   const [validated, setValidated] = useState(false)
   const [actionNote, setActionNote] = useAnnouncement()
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
@@ -218,11 +220,36 @@ export function Canvas({
   const onChange = useCallback(
     (address: string, value: JsonValue) => {
       setActionNote('')
-      setData((d) => applyChange(d, address, value))
+      answers.current = applyChange(answers.current, address, value)
+      setData(answers.current)
       setTouched((t) => (t.has(address) ? t : new Set(t).add(address)))
     },
     [setActionNote],
   )
+
+  // An edit made in Preview, such as Undo, can make the note untrue. A layout effect, so it runs
+  // before the effects that raise `onMount` and `onUnmount`, whose notes are about the edit.
+  useLayoutEffect(() => {
+    setActionNote('')
+  }, [api.document.root, setActionNote])
+
+  /** Reveals errors, and checks every step so the note holds for the whole form. */
+  const checkAnswers = useCallback(() => {
+    const scopes = steps.length ? steps.map((value) => ({ step: value })) : [context]
+    const results = scopes.map((scope) =>
+      validateForm(api.document.root, answers.current, { context: scope, messages }),
+    )
+    const count = new Set(results.flatMap((result) => Object.keys(result))).size
+    setValidated(true)
+    return {
+      valid: count === 0,
+      firstInvalid: results.findIndex((result) => Object.keys(result).length > 0),
+      note:
+        count === 0
+          ? 'All answers are valid.'
+          : `Check ${count} ${count === 1 ? 'field' : 'fields'} before submitting.`,
+    }
+  }, [steps, context, api.document.root, messages])
 
   const onEffects = useCallback(
     (effects: Effect[]) => {
@@ -232,23 +259,11 @@ export function Canvas({
         (effect) => effect.kind === 'emit' && effect.event === 'submit',
       )
       if (submitting || effects.some((effect) => effect.kind === 'validate')) {
-        const scopes = steps.length ? steps.map((value) => ({ step: value })) : [context]
-        const results = scopes.map((scope) =>
-          validateForm(api.document.root, data, { context: scope, messages }),
+        const { valid, firstInvalid, note } = checkAnswers()
+        if (!valid && steps.length) setStep(steps[firstInvalid])
+        notes.push(
+          valid && submitting ? 'Form is valid. Submission simulated; no data was sent.' : note,
         )
-        const count = new Set(results.flatMap((result) => Object.keys(result))).size
-        setValidated(true)
-        if (count) {
-          const first = results.findIndex((result) => Object.keys(result).length > 0)
-          if (steps.length) setStep(steps[first])
-          notes.push(`Check ${count} ${count === 1 ? 'field' : 'fields'} before submitting.`)
-        } else {
-          notes.push(
-            submitting
-              ? 'Form is valid. Submission simulated; no data was sent.'
-              : 'All answers are valid.',
-          )
-        }
       }
       for (const effect of effects) {
         if (effect.kind === 'announce') notes.push(effect.message)
@@ -259,7 +274,7 @@ export function Canvas({
       }
       setActionNote(notes.join(' '))
     },
-    [preview, steps, context, api.document.root, data, messages, setActionNote],
+    [preview, steps, checkAnswers, setActionNote],
   )
 
   const onActionError = useCallback(
@@ -472,13 +487,14 @@ export function Canvas({
         {preview && (
           <>
             <PreviewData data={data} />
-            <button type="button" onClick={() => setValidated(true)}>
+            <button type="button" onClick={() => setActionNote(checkAnswers().note)}>
               Validate
             </button>
             <button
               type="button"
               onClick={() => {
-                setData({})
+                answers.current = {}
+                setData(answers.current)
                 setTouched(new Set())
                 setValidated(false)
                 setActionNote('')

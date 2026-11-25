@@ -20,6 +20,14 @@ const email: ComponentNode = {
   schema: { type: 'string', autoValidate: true, validations: [{ key: 'email' }] },
 }
 
+const required = (label: string): ComponentNode => ({
+  key: label.toLowerCase() + 'Field',
+  dataKey: label.toLowerCase(),
+  type: 'TextField',
+  props: { label: prop(label) },
+  schema: { type: 'string', validations: [{ key: 'required' }] },
+})
+
 describe('beta authoring regressions', () => {
   it('validates a touched field with a distinct data key before Validate is pressed', () => {
     open([email])
@@ -135,6 +143,97 @@ describe('beta authoring regressions', () => {
     fireEvent.click(agree)
     expect(note.textContent).toContain('Saved.')
     expect(note.textContent, 'an unchanged live region is never read out').not.toBe(first)
+  })
+
+  it('says what Validate found, and changes the note when it finds the same again', () => {
+    open([required('Name'), required('City')])
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const canvas = within(screen.getByRole('main'))
+    const note = canvas.getByRole('status')
+    const validate = canvas.getByRole('button', { name: 'Validate' })
+
+    for (const [answered, result] of [
+      [undefined, 'Check 2 fields before submitting.'],
+      ['Name', 'Check 1 field before submitting.'],
+      ['City', 'All answers are valid.'],
+    ] as const) {
+      if (answered)
+        fireEvent.change(canvas.getByRole('textbox', { name: answered }), {
+          target: { value: 'Given' },
+        })
+      expect(note.textContent, 'the last result no longer holds').toBe('')
+
+      fireEvent.click(validate)
+      expect(note.textContent).toBe(result)
+
+      fireEvent.click(validate)
+      expect(note.textContent).toContain(result)
+      expect(note.textContent, 'an unchanged live region is never read out').not.toBe(result)
+    }
+  })
+
+  it('drops the note when the form is edited or Preview is left', () => {
+    const view = open([required('Name')])
+    fireEvent.click(view.container.querySelector('[data-fs-key="nameField"]')!)
+    fireEvent.keyDown(view.container.querySelector('.fs-shell')!, { key: 'Delete' })
+    expect(view.container.querySelector('[data-fs-key="nameField"]')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const canvas = within(screen.getByRole('main'))
+    fireEvent.click(canvas.getByRole('button', { name: 'Validate' }))
+    expect(canvas.getByRole('status').textContent).toBe('All answers are valid.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(canvas.getByRole('textbox', { name: 'Name' }).getAttribute('aria-invalid')).toBe('true')
+    expect(canvas.getByRole('status').textContent).toBe('')
+
+    fireEvent.click(canvas.getByRole('button', { name: 'Validate' }))
+    expect(canvas.getByRole('status').textContent).toBe('Check 1 field before submitting.')
+    fireEvent.click(canvas.getByRole('button', { name: 'Back to editing' }))
+    fireEvent.click(canvas.getByRole('button', { name: 'Preview' }))
+    expect(canvas.getByRole('status').textContent).toBe('')
+  })
+
+  it('keeps a note that the edit itself raised', () => {
+    const view = open([
+      {
+        ...required('Name'),
+        events: {
+          onMount: [{ type: 'builtin', name: 'announce', params: { message: 'Name is here.' } }],
+        },
+      },
+    ])
+    fireEvent.click(view.container.querySelector('[data-fs-key="nameField"]')!)
+    fireEvent.keyDown(view.container.querySelector('.fs-shell')!, { key: 'Delete' })
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const note = within(screen.getByRole('main')).getByRole('status')
+    expect(note.textContent).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(note.textContent).toBe('Name is here.')
+  })
+
+  it("checks a field's new value when the field's own action validates", () => {
+    open([
+      {
+        ...required('Name'),
+        events: { onChange: [{ type: 'builtin', name: 'validate', params: {} }] },
+      },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    const canvas = within(screen.getByRole('main'))
+    const name = canvas.getByRole('textbox', { name: 'Name' })
+
+    fireEvent.change(name, { target: { value: 'Given' } })
+    expect(canvas.getByRole('status').textContent).toBe('All answers are valid.')
+
+    fireEvent.change(name, { target: { value: '' } })
+    expect(canvas.getByRole('status').textContent).toBe('Check 1 field before submitting.')
+
+    fireEvent.change(name, { target: { value: 'Given' } })
+    fireEvent.click(canvas.getByRole('button', { name: 'Clear data' }))
+    fireEvent.click(canvas.getByRole('button', { name: 'Validate' }))
+    expect(canvas.getByRole('status').textContent).toBe('Check 1 field before submitting.')
   })
 
   it('shows guidance for an empty document only while editing', () => {

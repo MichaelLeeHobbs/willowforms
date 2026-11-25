@@ -9,7 +9,7 @@
  * No geometry here: jsdom returns zero rectangles.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { useEffect } from 'react'
@@ -550,6 +550,21 @@ describe('a document with steps', () => {
     expect(view.container.querySelector('[data-testid="first-error"]')?.textContent).toBe(
       'This field is required.',
     )
+  })
+
+  it('counts every step in the note Validate shows, and stays on the one preview is showing', async () => {
+    const user = userEvent.setup()
+    const view = open()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    await user.selectOptions(screen.getByLabelText('Step'), JSON.stringify('two'))
+    await user.click(screen.getByRole('button', { name: 'Validate' }))
+
+    expect(within(screen.getByRole('main')).getByRole('status').textContent).toBe(
+      'Check 1 field before submitting.',
+    )
+    expect(view.container.querySelector('[data-fs-key="step-two"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-fs-key="step-one"]')).toBeNull()
   })
 
   it('shows every step while editing, so all of them can be arranged', () => {
