@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [react()],
   // Distribution smoke builds resolve workspace packages through package exports.
   ...(mode === 'dist' ? {} : { resolve: { alias: willowformsAliases } }),
-  // `strictPort`: on a busy port, fail rather than move off the port the e2e suite expects.
+  // `strictPort`, which `vite preview` takes from here: on a busy port, fail at once rather than
+  // move to another and leave Playwright waiting for this one.
   server: { port: 5180, strictPort: true },
 }))

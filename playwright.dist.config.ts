@@ -8,6 +8,7 @@ const baseURL = `http://localhost:${PORT}`
 
 export default defineConfig({
   testDir: './e2e-dist',
+  outputDir: `test-results/dist-${PORT}`,
   workers: 1,
   retries: 0,
   forbidOnly: Boolean(process.env['CI']),
@@ -21,8 +22,7 @@ export default defineConfig({
   webServer: {
     command:
       'pnpm build && pnpm --filter playground build --mode dist && pnpm --filter playground exec vite preview --port ' +
-      String(PORT) +
-      ' --strictPort',
+      String(PORT),
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,
