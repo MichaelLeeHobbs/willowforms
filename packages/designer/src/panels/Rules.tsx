@@ -7,6 +7,7 @@ import { languagesOf } from '../language.js'
 import type { DesignerApi } from '../store.js'
 import { TranslationEditor, translationKey } from './Binding.js'
 import { ConditionEditor, emptyCondition } from './ConditionEditor.js'
+import { RemoveButton } from './RemoveButton.js'
 
 type Parameter = 'none' | 'number' | 'text' | 'expression' | 'field'
 
@@ -340,14 +341,7 @@ function RuleRow({
     <li className="fs-rule">
       <div className="fs-rule__head">
         <span className="fs-rule__name">{label}</span>
-        <button
-          type="button"
-          className="fs-rule__remove"
-          aria-label={'Remove ' + label}
-          onClick={onRemove}
-        >
-          &times;
-        </button>
+        <RemoveButton className="fs-rule__remove" name={label} onClick={onRemove} />
       </div>
 
       {/*
