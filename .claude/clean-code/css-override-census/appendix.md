@@ -2,7 +2,7 @@
 
 ## Every !important with its cause
 
-None in the repo.
+None in a stylesheet or an object style. Document CSS is data and is not counted; see the report's "What this run did not see".
 
 ## Heads with no prefix
 

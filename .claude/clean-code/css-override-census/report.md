@@ -13,7 +13,7 @@ Canaries: 6 of 6 behaved as planted   PASS
 Since last run: first run
 ```
 
-Result: there is almost nothing to remove. The repo has no `!important`, no selector naming a Material UI internal class, no ID selector and no chain of four compounds. The findings are two defects in how the stylesheets meet a host page (decisions 1 and 2).
+Result: there is almost nothing to remove. No stylesheet or object style has an `!important` (document CSS can carry one, see the last section), and there is no selector naming a Material UI internal class, no ID selector and no chain of four compounds. The findings are two defects in how the stylesheets meet a host page (decisions 1 and 2).
 
 ## Decision list
 
@@ -78,10 +78,10 @@ No file holds a flagged rule, so the file table is empty.
 
 ## What this run did not see
 
-- Out of scope: 72 unit test files and 43 browser and contract test files (Material UI class names occur there as locators).
+- Out of scope: 72 unit and contract test files (`*.test.ts`, `*.test.tsx`) and 43 browser test, test helper and test config files (Material UI class names occur there as locators).
 - 16 style values come from function calls (13 `backgroundImageStyle`, `boxBackground`, 2 `frameStyle`) and are not expanded. No non-test source sets `zIndex`, so they cannot hold a z value.
-- 13 `styled(...)` calls and `css:` values in the playground examples are document data, scoped by `packages/core/src/css.ts`, not CSS-in-JS. A text search found no `!important` or `z-index` in them.
-- The renderer writes a `<style>` element from document CSS at runtime (packages/renderer/src/index.tsx:807). Core refuses `!important` there (packages/core/src/css.ts:77).
+- 12 `styled(...)` calls and `css:` values in the playground examples are document data, scoped by `packages/core/src/css.ts`, not CSS-in-JS. A text search found no `!important` or `z-index` in them.
+- The renderer writes a `<style>` element from document CSS at runtime (packages/renderer/src/index.tsx:807). An `!important` an author writes there reaches the form: `safeDeclarations` (packages/core/src/css.ts:63) does not refuse it, and the style panel keeps one the author wrote (packages/designer/src/panels/FriendlyStyle.tsx:38). Only single style values refuse it (`safeStyleValue`, packages/core/src/css.ts:97). That is document data, so it is not in the count.
 - Theme `styleOverrides` are outside the skill's object-style list. They were read by hand: no selector key, z value or `!important`.
 - The coverage walk searched for `style={` rather than `style={{`, so it also counts conditional inline styles (packages/designer/src/ResponsivePanel.tsx).
 - This worktree has no install, because pnpm hung. Library files and parsers were read from a sibling worktree whose installed lockfile differs only in `@types/node` and what depends on it; Material UI, Emotion, PostCSS and TypeScript match.
