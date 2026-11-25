@@ -50,7 +50,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  /* `:where()` keeps this at (0,1,0), so a host's `.fs-shell` overrides still win. */
+  /* `:where()` keeps both dark blocks at (0,1,0), so a host's `.fs-shell` overrides still win. */
   .fs-shell:where(:not([data-fs-theme='light'])) {
     --fs-bg-app: #18231f;
     --fs-bg-panel: #202e27;
@@ -77,7 +77,7 @@
   }
 }
 
-.fs-shell[data-fs-theme='dark'] {
+.fs-shell:where([data-fs-theme='dark']) {
   color-scheme: dark;
   --fs-bg-app: #18231f;
   --fs-bg-panel: #202e27;
