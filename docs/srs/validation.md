@@ -26,8 +26,8 @@ Limits that bound the work a submission can cause belong to `SEC`.
 | VAL-RULE-16 | The system shall reject an answer for which a custom rule's expression is false.                                  | P2  | Test   | Accepted |
 | VAL-RULE-17 | The system shall reject any answer, including an empty one, under a rule it does not recognise.                   | P1  | Test   | Accepted |
 | VAL-RULE-18 | The system shall reject a non-empty answer under a measuring rule whose bound is not a number.                    | P2  | Test   | Accepted |
-| VAL-RULE-19 | The system shall reject a date answer earlier than its Date picker's earliest date or later than its latest date. | P2  | Test   | Proposed |
-| VAL-RULE-20 | The system shall reject a date answer that is not a calendar date written as year, month and day.                 | P2  | Test   | Proposed |
+| VAL-RULE-19 | The system shall reject a date answer earlier than its Date picker's earliest date or later than its latest date. | P2  | Test   | Accepted |
+| VAL-RULE-20 | The system shall reject a date answer that is not a calendar date written as year, month and day.                 | P2  | Test   | Accepted |
 
 - VAL-RULE-01, VAL-RULE-02, VAL-RULE-03, VAL-RULE-04, VAL-RULE-05: source: docs/spec/08-validation.md "Only `required` fails on an empty value" and "The rule catalogue".
 - VAL-RULE-06: source: docs/spec/08-validation.md "Field schemas enforce value types".

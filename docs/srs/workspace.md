@@ -8,33 +8,33 @@ What undo does is `BUILD-UNDO`; the palette and the structure tree are `BUILD-PA
 
 | ID           | Requirement                                                                                                                       | Pri | Verify | Status   |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| WORK-PANE-01 | The system shall arrange the designer as a toolbar above three side-by-side regions: the left pane, the canvas and the Inspector. | P1  | Test   | Proposed |
-| WORK-PANE-02 | The system shall offer Components, Tree and Settings tabs in the left pane.                                                       | P1  | Test   | Proposed |
-| WORK-PANE-03 | The system should open the left pane on its Components tab.                                                                       | P2  | Test   | Proposed |
-| WORK-PANE-04 | The system shall offer the form's name, languages and default language on the Settings tab rather than in the Inspector.          | P2  | Test   | Proposed |
-| WORK-PANE-05 | The system shall let an author change the form's name on the Settings tab.                                                        | P1  | Test   | Proposed |
-| WORK-PANE-06 | The system should keep the starting layouts closed behind a Starting layouts disclosure until the author opens it.                | P3  | Test   | Proposed |
-| WORK-PANE-07 | The system should show the starting layouts that match the palette search whether or not their disclosure is open.                | P3  | Test   | Proposed |
-| WORK-PANE-08 | The system shall let an author collapse and reopen each side pane independently of the other.                                     | P1  | Test   | Proposed |
-| WORK-PANE-09 | The system shall give the space of a collapsed side pane to the canvas.                                                           | P1  | Test   | Proposed |
-| WORK-PANE-10 | The system shall keep the control that reopens a collapsed pane on screen while the pane is collapsed.                            | P1  | Test   | Proposed |
-| WORK-PANE-11 | The system shall let an author resize each side pane independently by dragging the divider between it and the canvas.             | P1  | Test   | Proposed |
-| WORK-PANE-12 | The system shall start each side pane at the host's default pane width, 288 pixels unless the host sets another.                  | P2  | Test   | Proposed |
-| WORK-PANE-13 | The system shall keep each side pane's width between 240 and 560 pixels.                                                          | P1  | Test   | Proposed |
-| WORK-PANE-14 | The system shall keep the canvas at least 320 pixels wide in a wide layout by narrowing the side panes while space is short.      | P1  | Test   | Proposed |
-| WORK-PANE-15 | The system shall return the side panes to the widths the author chose once the space to show them returns.                        | P2  | Test   | Proposed |
-| WORK-PANE-16 | The system shall widen or narrow a pane by 10 pixels with the arrow keys on its divider, or by 40 pixels with Shift held.         | P2  | Test   | Proposed |
-| WORK-PANE-17 | The system shall set a pane to its narrowest or its widest available width when the author presses Home or End on its divider.    | P2  | Test   | Proposed |
-| WORK-PANE-18 | The system shall restore a pane's default width when the author presses Enter on its divider or double-clicks the divider.        | P2  | Test   | Proposed |
-| WORK-PANE-19 | The system shall return a pane to the width it had before a resize drag when the author presses Escape during the drag.           | P2  | Test   | Proposed |
-| WORK-PANE-20 | The system shall leave the selection unchanged when Escape cancels a pane resize drag.                                            | P2  | Test   | Proposed |
-| WORK-PANE-21 | The system shall remember each pane's chosen width across page loads in the same browser, for every form and kit it opens there.  | P2  | Test   | Proposed |
-| WORK-PANE-22 | The system shall not remember a width from a resize drag that was cancelled.                                                      | P2  | Test   | Proposed |
-| WORK-PANE-23 | The system shall ignore a remembered pane width it cannot use and start that pane at its default width.                           | P2  | Test   | Proposed |
-| WORK-PANE-24 | The system shall keep pane resizing working for the session when the browser refuses to store the chosen width.                   | P2  | Test   | Proposed |
-| WORK-PANE-25 | The system shall offer no resize divider for a pane that is collapsed or hidden.                                                  | P2  | Test   | Proposed |
-| WORK-PANE-26 | The system shall show a reopened pane at the width it had before it was collapsed.                                                | P2  | Test   | Proposed |
-| WORK-PANE-27 | The system shall restore each side pane's width and collapsed or open state, as they were before Preview, when Preview is left.   | P1  | Test   | Proposed |
+| WORK-PANE-01 | The system shall arrange the designer as a toolbar above three side-by-side regions: the left pane, the canvas and the Inspector. | P1  | Test   | Accepted |
+| WORK-PANE-02 | The system shall offer Components, Tree and Settings tabs in the left pane.                                                       | P1  | Test   | Accepted |
+| WORK-PANE-03 | The system should open the left pane on its Components tab.                                                                       | P2  | Test   | Accepted |
+| WORK-PANE-04 | The system shall offer the form's name, languages and default language on the Settings tab rather than in the Inspector.          | P2  | Test   | Accepted |
+| WORK-PANE-05 | The system shall let an author change the form's name on the Settings tab.                                                        | P1  | Test   | Accepted |
+| WORK-PANE-06 | The system should keep the starting layouts closed behind a Starting layouts disclosure until the author opens it.                | P3  | Test   | Accepted |
+| WORK-PANE-07 | The system should show the starting layouts that match the palette search whether or not their disclosure is open.                | P3  | Test   | Accepted |
+| WORK-PANE-08 | The system shall let an author collapse and reopen each side pane independently of the other.                                     | P1  | Test   | Accepted |
+| WORK-PANE-09 | The system shall give the space of a collapsed side pane to the canvas.                                                           | P1  | Test   | Accepted |
+| WORK-PANE-10 | The system shall keep the control that reopens a collapsed pane on screen while the pane is collapsed.                            | P1  | Test   | Accepted |
+| WORK-PANE-11 | The system shall let an author resize each side pane independently by dragging the divider between it and the canvas.             | P1  | Test   | Accepted |
+| WORK-PANE-12 | The system shall start each side pane at the host's default pane width, 288 pixels unless the host sets another.                  | P2  | Test   | Accepted |
+| WORK-PANE-13 | The system shall keep each side pane's width between 240 and 560 pixels.                                                          | P1  | Test   | Accepted |
+| WORK-PANE-14 | The system shall keep the canvas at least 320 pixels wide in a wide layout by narrowing the side panes while space is short.      | P1  | Test   | Accepted |
+| WORK-PANE-15 | The system shall return the side panes to the widths the author chose once the space to show them returns.                        | P2  | Test   | Accepted |
+| WORK-PANE-16 | The system shall widen or narrow a pane by 10 pixels with the arrow keys on its divider, or by 40 pixels with Shift held.         | P2  | Test   | Accepted |
+| WORK-PANE-17 | The system shall set a pane to its narrowest or its widest available width when the author presses Home or End on its divider.    | P2  | Test   | Accepted |
+| WORK-PANE-18 | The system shall restore a pane's default width when the author presses Enter on its divider or double-clicks the divider.        | P2  | Test   | Accepted |
+| WORK-PANE-19 | The system shall return a pane to the width it had before a resize drag when the author presses Escape during the drag.           | P2  | Test   | Accepted |
+| WORK-PANE-20 | The system shall leave the selection unchanged when Escape cancels a pane resize drag.                                            | P2  | Test   | Accepted |
+| WORK-PANE-21 | The system shall remember each pane's chosen width across page loads in the same browser, for every form and kit it opens there.  | P2  | Test   | Accepted |
+| WORK-PANE-22 | The system shall not remember a width from a resize drag that was cancelled.                                                      | P2  | Test   | Accepted |
+| WORK-PANE-23 | The system shall ignore a remembered pane width it cannot use and start that pane at its default width.                           | P2  | Test   | Accepted |
+| WORK-PANE-24 | The system shall keep pane resizing working for the session when the browser refuses to store the chosen width.                   | P2  | Test   | Accepted |
+| WORK-PANE-25 | The system shall offer no resize divider for a pane that is collapsed or hidden.                                                  | P2  | Test   | Accepted |
+| WORK-PANE-26 | The system shall show a reopened pane at the width it had before it was collapsed.                                                | P2  | Test   | Accepted |
+| WORK-PANE-27 | The system shall restore each side pane's width and collapsed or open state, as they were before Preview, when Preview is left.   | P1  | Test   | Accepted |
 
 - WORK-PANE-01: source: docs/spec/04-shell.md "Layout"; e2e/layout.spec.ts "pane handles remove the panes from layout and restore them". A configurable arrangement is out of scope (docs/spec/11-theming.md "What is not themeable").
 - WORK-PANE-02: source: docs/spec/04-shell.md "Tabbed left pane"; e2e/keyboard.spec.ts "the left pane tabs are reachable and navigable by keyboard". The tablist's keyboard behaviour belongs to `A11Y`.
@@ -57,14 +57,14 @@ What undo does is `BUILD-UNDO`; the palette and the structure tree are `BUILD-PA
 
 | ID          | Requirement                                                                                                          | Pri | Verify | Status   |
 | ----------- | -------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| WORK-BAR-01 | The system shall show the form's name in the toolbar.                                                                | P2  | Test   | Proposed |
-| WORK-BAR-02 | The system shall shorten a form name too long for the toolbar rather than push the toolbar's controls out of view.   | P2  | Test   | Proposed |
-| WORK-BAR-03 | The system shall wrap the toolbar's controls onto further lines when the toolbar is too narrow to hold them on one.  | P2  | Test   | Proposed |
-| WORK-BAR-04 | The system shall offer Undo and Redo controls in the toolbar.                                                        | P1  | Test   | Proposed |
-| WORK-BAR-05 | The system shall disable the Undo control while there is no edit to undo.                                            | P1  | Test   | Proposed |
-| WORK-BAR-06 | The system shall disable the Redo control while there is no undone edit to redo.                                     | P1  | Test   | Proposed |
-| WORK-BAR-07 | The system shall open the form's JSON dialog from a JSON control in the toolbar.                                     | P1  | Test   | Proposed |
-| WORK-BAR-08 | The system shall hand the host the document as it stands, including every edit so far, when the author chooses Save. | P1  | Test   | Proposed |
+| WORK-BAR-01 | The system shall show the form's name in the toolbar.                                                                | P2  | Test   | Accepted |
+| WORK-BAR-02 | The system shall shorten a form name too long for the toolbar rather than push the toolbar's controls out of view.   | P2  | Test   | Accepted |
+| WORK-BAR-03 | The system shall wrap the toolbar's controls onto further lines when the toolbar is too narrow to hold them on one.  | P2  | Test   | Accepted |
+| WORK-BAR-04 | The system shall offer Undo and Redo controls in the toolbar.                                                        | P1  | Test   | Accepted |
+| WORK-BAR-05 | The system shall disable the Undo control while there is no edit to undo.                                            | P1  | Test   | Accepted |
+| WORK-BAR-06 | The system shall disable the Redo control while there is no undone edit to redo.                                     | P1  | Test   | Accepted |
+| WORK-BAR-07 | The system shall open the form's JSON dialog from a JSON control in the toolbar.                                     | P1  | Test   | Accepted |
+| WORK-BAR-08 | The system shall hand the host the document as it stands, including every edit so far, when the author chooses Save. | P1  | Test   | Accepted |
 
 - WORK-BAR-01: source: docs/spec/04-shell.md "Toolbar" (Form name "Shown"); e2e/document.spec.ts "an edited document is applied".
 - WORK-BAR-02: source: docs/spec/04-shell.md "Layout" ("long form names truncate"); e2e/layout.spec.ts "keeps the desktop shell within a laptop viewport with a long form name".
@@ -79,17 +79,17 @@ What undo does is `BUILD-UNDO`; the palette and the structure tree are `BUILD-PA
 
 | ID           | Requirement                                                                                                                              | Pri | Verify | Status   |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| WORK-NARR-01 | The system shall show the left pane and the Inspector as drawers whenever the designer itself is narrower than 960 pixels.               | P1  | Test   | Proposed |
-| WORK-NARR-02 | The system shall offer, in a narrow layout, a Components and structure control and a Component properties control that open each drawer. | P1  | Test   | Proposed |
-| WORK-NARR-03 | The system shall give the canvas the designer's full width in a narrow layout while no drawer is open.                                   | P1  | Test   | Proposed |
-| WORK-NARR-04 | The system shall show in each drawer the same pane, with the same tabs, that a wide layout shows.                                        | P1  | Test   | Proposed |
-| WORK-NARR-05 | The system shall close an open drawer from a close button inside it.                                                                     | P1  | Test   | Proposed |
-| WORK-NARR-06 | The system shall close an open drawer when the author presses Escape.                                                                    | P1  | Test   | Proposed |
-| WORK-NARR-07 | The system shall close the drawer once a component is added from its palette.                                                            | P2  | Test   | Proposed |
-| WORK-NARR-08 | The system shall close the drawer once a starting layout is inserted from it.                                                            | P2  | Test   | Proposed |
-| WORK-NARR-09 | The system may leave dragging from the palette out of a narrow layout, where palette entries add by click or keyboard activation.        | P3  | Test   | Proposed |
-| WORK-NARR-10 | The system shall offer no pane resize divider and no collapse control in a narrow layout.                                                | P2  | Test   | Proposed |
-| WORK-NARR-11 | The system shall restore the wide layout's pane widths and collapsed or open states when the designer grows back to 960 pixels or wider. | P2  | Test   | Proposed |
+| WORK-NARR-01 | The system shall show the left pane and the Inspector as drawers whenever the designer itself is narrower than 960 pixels.               | P1  | Test   | Accepted |
+| WORK-NARR-02 | The system shall offer, in a narrow layout, a Components and structure control and a Component properties control that open each drawer. | P1  | Test   | Accepted |
+| WORK-NARR-03 | The system shall give the canvas the designer's full width in a narrow layout while no drawer is open.                                   | P1  | Test   | Accepted |
+| WORK-NARR-04 | The system shall show in each drawer the same pane, with the same tabs, that a wide layout shows.                                        | P1  | Test   | Accepted |
+| WORK-NARR-05 | The system shall close an open drawer from a close button inside it.                                                                     | P1  | Test   | Accepted |
+| WORK-NARR-06 | The system shall close an open drawer when the author presses Escape.                                                                    | P1  | Test   | Accepted |
+| WORK-NARR-07 | The system shall close the drawer once a component is added from its palette.                                                            | P2  | Test   | Accepted |
+| WORK-NARR-08 | The system shall close the drawer once a starting layout is inserted from it.                                                            | P2  | Test   | Accepted |
+| WORK-NARR-09 | The system may leave dragging from the palette out of a narrow layout, where palette entries add by click or keyboard activation.        | P3  | Test   | Accepted |
+| WORK-NARR-10 | The system shall offer no pane resize divider and no collapse control in a narrow layout.                                                | P2  | Test   | Accepted |
+| WORK-NARR-11 | The system shall restore the wide layout's pane widths and collapsed or open states when the designer grows back to 960 pixels or wider. | P2  | Test   | Accepted |
 
 - WORK-NARR-01: source: docs/spec/04-shell.md "Narrow layouts and Preview" ("Below 960px of shell width"); e2e/panel-resize.spec.ts "both panel widths persist across reload, kits, preview, collapse, and smaller windows without changing the form" (at 800 pixels wide); e2e/focused-preview.spec.ts "phone authoring panels are keyboard-accessible drawers and leave Preview usable". The breakpoint is the designer's own width, not the window's (packages/designer/src/ResponsivePanel.tsx); no test sizes the designer apart from the window. Drafted to "require drawers only", the recommendation still awaiting the developer.
 - WORK-NARR-02: source: docs/spec/04-shell.md "Narrow layouts and Preview"; e2e/focused-preview.spec.ts "phone authoring panels are keyboard-accessible drawers and leave Preview usable". That Preview hides these controls belongs to `PREV`.
@@ -106,15 +106,15 @@ What undo does is `BUILD-UNDO`; the palette and the structure tree are `BUILD-PA
 
 | ID            | Requirement                                                                                                                                                                                            | Pri | Verify     | Status   |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- | ---------- | -------- |
-| WORK-SHELL-01 | The system shall respond to its keyboard shortcuts only while keyboard focus is inside the designer.                                                                                                   | P1  | Test       | Proposed |
-| WORK-SHELL-02 | The system shall keep its keyboard shortcuts working after the author clicks a component or empty space on the canvas.                                                                                 | P1  | Test       | Proposed |
-| WORK-SHELL-03 | The system shall not act on its own shortcuts while one of its dialogs is open.                                                                                                                        | P2  | Test       | Proposed |
-| WORK-SHELL-04 | The system shall not act on its document-editing shortcuts in Preview.                                                                                                                                 | P1  | Test       | Proposed |
-| WORK-SHELL-05 | The system shall keep its content within the space the host gives it, scrolling inside its panes and canvas rather than scrolling the host page.                                                       | P1  | Test       | Proposed |
-| WORK-SHELL-06 | The system shall draw its overlays on the canvas, such as the selection frame, selection toolbar, drop indicator and drag label, beneath any host element stacked above the designer, such as a modal. | P1  | Test       | Proposed |
-| WORK-SHELL-07 | The system shall open its own dialogs and drawers above all other content on the host page.                                                                                                            | P1  | Test       | Proposed |
-| WORK-SHELL-08 | The system should draw thin scrollbars in the designer's own colours in its panes and on its canvas.                                                                                                   | P3  | Inspection | Proposed |
-| WORK-SHELL-09 | The system shall leave a scrollable region inside the form on the canvas with the scrollbars its kit gives it, not the designer's.                                                                     | P2  | Test       | Proposed |
+| WORK-SHELL-01 | The system shall respond to its keyboard shortcuts only while keyboard focus is inside the designer.                                                                                                   | P1  | Test       | Accepted |
+| WORK-SHELL-02 | The system shall keep its keyboard shortcuts working after the author clicks a component or empty space on the canvas.                                                                                 | P1  | Test       | Accepted |
+| WORK-SHELL-03 | The system shall not act on its own shortcuts while one of its dialogs is open.                                                                                                                        | P2  | Test       | Accepted |
+| WORK-SHELL-04 | The system shall not act on its document-editing shortcuts in Preview.                                                                                                                                 | P1  | Test       | Rejected |
+| WORK-SHELL-05 | The system shall keep its content within the space the host gives it, scrolling inside its panes and canvas rather than scrolling the host page.                                                       | P1  | Test       | Accepted |
+| WORK-SHELL-06 | The system shall draw its overlays on the canvas, such as the selection frame, selection toolbar, drop indicator and drag label, beneath any host element stacked above the designer, such as a modal. | P1  | Test       | Accepted |
+| WORK-SHELL-07 | The system shall open its own dialogs and drawers above all other content on the host page.                                                                                                            | P1  | Test       | Accepted |
+| WORK-SHELL-08 | The system should draw thin scrollbars in the designer's own colours in its panes and on its canvas.                                                                                                   | P3  | Inspection | Accepted |
+| WORK-SHELL-09 | The system shall leave a scrollable region inside the form on the canvas with the scrollbars its kit gives it, not the designer's.                                                                     | P2  | Test       | Accepted |
 
 - WORK-SHELL-01: source: docs/spec/04-shell.md "Known conflict" ("Shell-level, not window-level"; a builder on `window` "took that page's undo away"); packages/designer/src/Designer.tsx (`useKeyboardShortcuts`). No test presses a key on the host page outside the designer. Which shortcuts exist is `BUILD-UNDO-03`, `BUILD-SEL-10`, `BUILD-SEL-13` and `BUILD-TREE-13`.
 - WORK-SHELL-02: source: e2e/keyboard.spec.ts "Control+Z undoes after a click on the canvas" and "Delete removes a component selected by clicking a field on the canvas"; packages/designer/src/Designer.tsx (the shell takes focus on a canvas press). Tests and code are the only source.

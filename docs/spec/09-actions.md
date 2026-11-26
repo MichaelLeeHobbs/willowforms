@@ -116,6 +116,8 @@ Advanced parameters exposes the existing JSON object for custom parameters, unav
 
 Document Settings owns code-action names, source, and default parameters. The editor states that the
 source requires a host-injected sandbox; saving a source string does not make it executable.
+A code-action name follows the same rules as a component key ([12-api.md](12-api.md#keys)) and is
+unique within the document; the editor refuses any other name and says why.
 
 ## Host responsibilities
 

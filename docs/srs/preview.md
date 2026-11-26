@@ -8,40 +8,40 @@ The control that opens Preview, and the panes Preview hides and restores, belong
 
 | ID          | Requirement                                                                                                                                                       | Pri | Verify | Status   |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| PREV-RUN-01 | The system shall let the author fill in the form in Preview as a respondent would, with each component responding to its own pointer and keyboard input.          | P1  | Test   | Proposed |
-| PREV-RUN-02 | The system shall not select a component when the author clicks it in Preview.                                                                                     | P1  | Test   | Proposed |
-| PREV-RUN-03 | The system shall not start a drag when the author presses and moves the pointer over the form in Preview.                                                         | P2  | Test   | Proposed |
-| PREV-RUN-04 | The system shall hide in Preview a component whose visibility condition does not hold, together with everything inside it.                                        | P1  | Test   | Proposed |
-| PREV-RUN-05 | The system shall not show the guide for an empty form in Preview.                                                                                                 | P3  | Test   | Proposed |
-| PREV-RUN-06 | The system shall keep the answers given in Preview when the author returns to editing and enters Preview again.                                                   | P1  | Test   | Proposed |
-| PREV-RUN-07 | The system shall not undo, redo or remove a component from a keyboard shortcut while Preview is showing.                                                          | P1  | Test   | Proposed |
-| PREV-RUN-08 | The system shall open Preview of a form that names steps on its first step in form order.                                                                         | P2  | Test   | Proposed |
-| PREV-RUN-09 | The system shall show in Preview the step the author picks in the step switcher.                                                                                  | P1  | Test   | Proposed |
-| PREV-RUN-10 | The system shall offer Back and Next controls in Preview of a form that names steps.                                                                              | P1  | Test   | Proposed |
-| PREV-RUN-11 | The system shall show in the step switcher the step that Back, Next, Validate or an action moved Preview to.                                                      | P2  | Test   | Proposed |
-| PREV-RUN-12 | The system shall keep the answers given on one step when Preview moves to another step.                                                                           | P1  | Test   | Proposed |
-| PREV-RUN-13 | The system shall scroll the canvas to the top of the form when Preview changes step by Back, Next, Validate, an action or the step switcher.                      | P2  | Test   | Proposed |
-| PREV-RUN-14 | The system shall move keyboard focus to the step switcher when Preview changes step.                                                                              | P2  | Test   | Proposed |
-| PREV-RUN-15 | The system shall keep the canvas scroll position and the focused field while the author changes an answer in Preview.                                             | P2  | Test   | Proposed |
-| PREV-RUN-16 | The system shall show an error in Preview before Validate is used only on a question whose author asked for validation while typing and whose answer has changed. | P2  | Test   | Proposed |
-| PREV-RUN-17 | The system shall check the answers on every step the form names when the author uses Validate in Preview.                                                         | P1  | Test   | Proposed |
-| PREV-RUN-18 | The system shall show each error a check in Preview finds beside its control, on whichever step Preview is showing.                                               | P1  | Test   | Proposed |
-| PREV-RUN-19 | The system shall state after a check in Preview how many questions have errors across all steps, or that all answers are valid.                                   | P2  | Test   | Proposed |
-| PREV-RUN-20 | The system shall stay on the step Preview is showing when Validate finds an error on that step.                                                                   | P2  | Test   | Proposed |
-| PREV-RUN-21 | The system shall move Preview to the first step with an error when Validate finds errors only on other steps.                                                     | P1  | Test   | Proposed |
-| PREV-RUN-22 | The system shall move Preview to the first step with an error when a validate action or a simulated submission finds errors, even from a step that has one.       | P2  | Test   | Proposed |
-| PREV-RUN-23 | The system shall check every step the form names when a validate action runs in Preview, whatever scope the action names.                                         | P2  | Test   | Proposed |
-| PREV-RUN-24 | The system shall include the new value that raised an action when that action checks the answers in Preview.                                                      | P2  | Test   | Proposed |
-| PREV-RUN-25 | The system shall report a simulated submission in Preview when a submit event is raised and every answer is valid.                                                | P1  | Test   | Proposed |
-| PREV-RUN-26 | The system shall not send or save any answer when an action in Preview checks or submits the form.                                                                | P1  | Test   | Proposed |
-| PREV-RUN-27 | The system shall show in Preview the message of an announce action and the name of each emitted event other than submit.                                          | P2  | Test   | Proposed |
-| PREV-RUN-28 | The system shall tell the author that an action effect needs a host to carry it out, instead of applying it in Preview.                                           | P1  | Test   | Proposed |
-| PREV-RUN-29 | The system shall report in Preview an action that could not run, with the reason.                                                                                 | P2  | Test   | Proposed |
-| PREV-RUN-30 | The system shall remove the result of a check or an action from Preview when an answer or a component changes.                                                    | P2  | Test   | Proposed |
-| PREV-RUN-31 | The system shall show no errors revealed by an earlier check, and no earlier result, when the author enters Preview again.                                        | P2  | Test   | Proposed |
-| PREV-RUN-32 | The system shall offer in Preview a control that removes every answer given.                                                                                      | P2  | Test   | Proposed |
-| PREV-RUN-33 | The system shall hide revealed errors and the last result when the author removes the answers in Preview.                                                         | P2  | Test   | Proposed |
-| PREV-RUN-34 | The system shall tell the author, rather than report the form valid, when a check in Preview meets a form that names more steps than Preview checks.              | P2  | Test   | Proposed |
+| PREV-RUN-01 | The system shall let the author fill in the form in Preview as a respondent would, with each component responding to its own pointer and keyboard input.          | P1  | Test   | Accepted |
+| PREV-RUN-02 | The system shall not select a component when the author clicks it in Preview.                                                                                     | P1  | Test   | Accepted |
+| PREV-RUN-03 | The system shall not start a drag when the author presses and moves the pointer over the form in Preview.                                                         | P2  | Test   | Accepted |
+| PREV-RUN-04 | The system shall hide in Preview a component whose visibility condition does not hold, together with everything inside it.                                        | P1  | Test   | Accepted |
+| PREV-RUN-05 | The system shall not show the guide for an empty form in Preview.                                                                                                 | P3  | Test   | Accepted |
+| PREV-RUN-06 | The system shall keep the answers given in Preview when the author returns to editing and enters Preview again.                                                   | P1  | Test   | Accepted |
+| PREV-RUN-07 | The system shall not undo, redo or remove a component from a keyboard shortcut while Preview is showing.                                                          | P1  | Test   | Accepted |
+| PREV-RUN-08 | The system shall open Preview of a form that names steps on its first step in form order.                                                                         | P2  | Test   | Accepted |
+| PREV-RUN-09 | The system shall show in Preview the step the author picks in the step switcher.                                                                                  | P1  | Test   | Accepted |
+| PREV-RUN-10 | The system shall offer Back and Next controls in Preview of a form that names steps.                                                                              | P1  | Test   | Accepted |
+| PREV-RUN-11 | The system shall show in the step switcher the step that Back, Next, Validate or an action moved Preview to.                                                      | P2  | Test   | Accepted |
+| PREV-RUN-12 | The system shall keep the answers given on one step when Preview moves to another step.                                                                           | P1  | Test   | Accepted |
+| PREV-RUN-13 | The system shall scroll the canvas to the top of the form when Preview changes step by Back, Next, Validate, an action or the step switcher.                      | P2  | Test   | Accepted |
+| PREV-RUN-14 | The system shall move keyboard focus to the step switcher when Preview changes step.                                                                              | P2  | Test   | Accepted |
+| PREV-RUN-15 | The system shall keep the canvas scroll position and the focused field while the author changes an answer in Preview.                                             | P2  | Test   | Accepted |
+| PREV-RUN-16 | The system shall show an error in Preview before Validate is used only on a question whose author asked for validation while typing and whose answer has changed. | P2  | Test   | Accepted |
+| PREV-RUN-17 | The system shall check the answers on every step the form names when the author uses Validate in Preview.                                                         | P1  | Test   | Accepted |
+| PREV-RUN-18 | The system shall show each error a check in Preview finds beside its control, on whichever step Preview is showing.                                               | P1  | Test   | Accepted |
+| PREV-RUN-19 | The system shall state after a check in Preview how many questions have errors across all steps, or that all answers are valid.                                   | P2  | Test   | Accepted |
+| PREV-RUN-20 | The system shall stay on the step Preview is showing when Validate finds an error on that step.                                                                   | P2  | Test   | Accepted |
+| PREV-RUN-21 | The system shall move Preview to the first step with an error when Validate finds errors only on other steps.                                                     | P1  | Test   | Accepted |
+| PREV-RUN-22 | The system shall move Preview to the first step with an error when a validate action or a simulated submission finds errors, even from a step that has one.       | P2  | Test   | Accepted |
+| PREV-RUN-23 | The system shall check every step the form names when a validate action runs in Preview, whatever scope the action names.                                         | P2  | Test   | Accepted |
+| PREV-RUN-24 | The system shall include the new value that raised an action when that action checks the answers in Preview.                                                      | P2  | Test   | Accepted |
+| PREV-RUN-25 | The system shall report a simulated submission in Preview when a submit event is raised and every answer is valid.                                                | P1  | Test   | Accepted |
+| PREV-RUN-26 | The system shall not send or save any answer when an action in Preview checks or submits the form.                                                                | P1  | Test   | Accepted |
+| PREV-RUN-27 | The system shall show in Preview the message of an announce action and the name of each emitted event other than submit.                                          | P2  | Test   | Accepted |
+| PREV-RUN-28 | The system shall tell the author that an action effect needs a host to carry it out, instead of applying it in Preview.                                           | P1  | Test   | Accepted |
+| PREV-RUN-29 | The system shall report in Preview an action that could not run, with the reason.                                                                                 | P2  | Test   | Accepted |
+| PREV-RUN-30 | The system shall remove the result of a check or an action from Preview when an answer or a component changes.                                                    | P2  | Test   | Accepted |
+| PREV-RUN-31 | The system shall show no errors revealed by an earlier check, and no earlier result, when the author enters Preview again.                                        | P2  | Test   | Accepted |
+| PREV-RUN-32 | The system shall offer in Preview a control that removes every answer given.                                                                                      | P2  | Test   | Accepted |
+| PREV-RUN-33 | The system shall hide revealed errors and the last result when the author removes the answers in Preview.                                                         | P2  | Test   | Accepted |
+| PREV-RUN-34 | The system shall tell the author, rather than report the form valid, when a check in Preview meets a form that names more steps than Preview checks.              | P2  | Test   | Accepted |
 
 - PREV-RUN-01: source: docs/spec/05-canvas.md "Preview" ("the kit's components receive their own events") and "A click is a selection gesture, not an interaction" ("Preview mode hands the form back its own events untouched"); packages/designer/src/panels/Canvas.test.tsx "hands events back to the form in preview mode" and "hands typing back in preview mode". docs/accessibility.md "Keyboard" says the same for keyboard operation; how that is checked belongs to `A11Y`.
 - PREV-RUN-02: source: packages/designer/src/panels/Canvas.test.tsx "hands events back to the form in preview mode" (no selection frame after a click). docs/spec/05-canvas.md "A click is a selection gesture, not an interaction" limits the selection gesture to editing. BUILD-SEL-01 covers selection while editing.
@@ -79,19 +79,19 @@ The control that opens Preview, and the panes Preview hides and restores, belong
 
 | ID           | Requirement                                                                                                                                           | Pri | Verify | Status   |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| PREV-VIEW-01 | The system shall show the form across the whole canvas width, as Desktop, until the author chooses another simulated size.                            | P2  | Test   | Proposed |
-| PREV-VIEW-02 | The system shall show the form 768 pixels wide when the author chooses Tablet.                                                                        | P1  | Test   | Proposed |
-| PREV-VIEW-03 | The system shall show the form 390 pixels wide when the author chooses Mobile.                                                                        | P1  | Test   | Proposed |
-| PREV-VIEW-04 | The system shall keep a simulated width when the canvas is narrower than it, letting the canvas scroll rather than narrowing or scaling the form.     | P1  | Test   | Proposed |
-| PREV-VIEW-05 | The system shall apply the styling written for the simulated device, whatever the width of the browser window.                                        | P1  | Test   | Proposed |
-| PREV-VIEW-06 | The system shall show Preview at the simulated size chosen while editing.                                                                             | P2  | Test   | Proposed |
-| PREV-VIEW-07 | The system shall not change the document, the answers or the undo history when the author changes the simulated size.                                 | P1  | Test   | Proposed |
-| PREV-VIEW-08 | The system shall offer fixed canvas sizes for Letter, Legal, A4 and A3 paper, each portrait or landscape, at 96 pixels per inch rounded to the pixel. | P2  | Test   | Proposed |
-| PREV-VIEW-09 | The system shall let the author set a custom fixed canvas size from 100 to 10,000 pixels in each direction.                                           | P2  | Test   | Proposed |
-| PREV-VIEW-10 | The system shall keep the previous custom size when the author enters a width or height outside that range.                                           | P2  | Test   | Proposed |
-| PREV-VIEW-11 | The system shall draw a page outline at the fixed canvas size that shows its width and intended height.                                               | P2  | Test   | Proposed |
-| PREV-VIEW-12 | The system shall keep content beyond the page outline visible and editable.                                                                           | P2  | Test   | Proposed |
-| PREV-VIEW-13 | The system shall style a fixed canvas size as mobile below 768 pixels wide, as tablet from 768 to 1,023 pixels, and as desktop from 1,024 pixels.     | P2  | Test   | Proposed |
+| PREV-VIEW-01 | The system shall show the form across the whole canvas width, as Desktop, until the author chooses another simulated size.                            | P2  | Test   | Accepted |
+| PREV-VIEW-02 | The system shall show the form 768 pixels wide when the author chooses Tablet.                                                                        | P1  | Test   | Accepted |
+| PREV-VIEW-03 | The system shall show the form 390 pixels wide when the author chooses Mobile.                                                                        | P1  | Test   | Accepted |
+| PREV-VIEW-04 | The system shall keep a simulated width when the canvas is narrower than it, letting the canvas scroll rather than narrowing or scaling the form.     | P1  | Test   | Accepted |
+| PREV-VIEW-05 | The system shall apply the styling written for the simulated device, whatever the width of the browser window.                                        | P1  | Test   | Accepted |
+| PREV-VIEW-06 | The system shall show Preview at the simulated size chosen while editing.                                                                             | P2  | Test   | Accepted |
+| PREV-VIEW-07 | The system shall not change the document, the answers or the undo history when the author changes the simulated size.                                 | P1  | Test   | Accepted |
+| PREV-VIEW-08 | The system shall offer fixed canvas sizes for Letter, Legal, A4 and A3 paper, each portrait or landscape, at 96 pixels per inch rounded to the pixel. | P2  | Test   | Accepted |
+| PREV-VIEW-09 | The system shall let the author set a custom fixed canvas size from 100 to 10,000 pixels in each direction.                                           | P2  | Test   | Accepted |
+| PREV-VIEW-10 | The system shall keep the previous custom size when the author enters a width or height outside that range.                                           | P2  | Test   | Accepted |
+| PREV-VIEW-11 | The system shall draw a page outline at the fixed canvas size that shows its width and intended height.                                               | P2  | Test   | Accepted |
+| PREV-VIEW-12 | The system shall keep content beyond the page outline visible and editable.                                                                           | P2  | Test   | Accepted |
+| PREV-VIEW-13 | The system shall style a fixed canvas size as mobile below 768 pixels wide, as tablet from 768 to 1,023 pixels, and as desktop from 1,024 pixels.     | P2  | Test   | Accepted |
 
 - PREV-VIEW-01, PREV-VIEW-02, PREV-VIEW-03: source: docs/spec/04-shell.md "The canvas and the wasted space" (the viewport table); e2e/viewport.spec.ts "desktop is the default and constrains nothing" and "tablet and mobile narrow the frame to their own widths". The control that chooses the size belongs to `WORK`.
 - PREV-VIEW-04: source: docs/spec/04-shell.md "The canvas and the wasted space" ("The frame is not clamped to the canvas"; "Scaling it with a transform would be worse"). No test checks a frame wider than the canvas. BUILD-DND-20 covers drops and selection staying accurate at each width.
@@ -107,17 +107,17 @@ The control that opens Preview, and the panes Preview hides and restores, belong
 
 | ID           | Requirement                                                                                                                     | Pri | Verify | Status   |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| PREV-DATA-01 | The system shall offer the author, only in Preview, a view of the current answers as JSON.                                      | P2  | Test   | Proposed |
-| PREV-DATA-02 | The system shall show in that view the same answers Preview draws the form with.                                                | P1  | Test   | Proposed |
-| PREV-DATA-03 | The system shall show the answers under their answer names, with Repeater rows as nested lists and each value in its JSON type. | P1  | Test   | Proposed |
-| PREV-DATA-04 | The system shall add nothing from the form document to the answers it shows.                                                    | P2  | Test   | Proposed |
-| PREV-DATA-05 | The system shall show no entry for a question nobody answered.                                                                  | P2  | Test   | Proposed |
-| PREV-DATA-06 | The system shall not let the author change the answers through that view.                                                       | P1  | Test   | Proposed |
-| PREV-DATA-07 | The system shall copy the answers JSON to the clipboard when the author asks, and say that it did.                              | P2  | Test   | Proposed |
-| PREV-DATA-08 | The system shall select the answers JSON and tell the author how to copy it when the browser refuses or offers no clipboard.    | P2  | Test   | Proposed |
-| PREV-DATA-09 | The system shall not check, submit or change the form when the author views or copies the answers.                              | P1  | Test   | Proposed |
-| PREV-DATA-10 | The system should offer in Preview an optional diagnostics view of the current answers and the errors shown.                    | P3  | Test   | Proposed |
-| PREV-DATA-11 | The system should hide the diagnostics view each time the author enters Preview, until the author asks for it.                  | P3  | Test   | Proposed |
+| PREV-DATA-01 | The system shall offer the author, only in Preview, a view of the current answers as JSON.                                      | P2  | Test   | Accepted |
+| PREV-DATA-02 | The system shall show in that view the same answers Preview draws the form with.                                                | P1  | Test   | Accepted |
+| PREV-DATA-03 | The system shall show the answers under their answer names, with Repeater rows as nested lists and each value in its JSON type. | P1  | Test   | Accepted |
+| PREV-DATA-04 | The system shall add nothing from the form document to the answers it shows.                                                    | P2  | Test   | Accepted |
+| PREV-DATA-05 | The system shall show no entry for a question nobody answered.                                                                  | P2  | Test   | Accepted |
+| PREV-DATA-06 | The system shall not let the author change the answers through that view.                                                       | P1  | Test   | Accepted |
+| PREV-DATA-07 | The system shall copy the answers JSON to the clipboard when the author asks, and say that it did.                              | P2  | Test   | Accepted |
+| PREV-DATA-08 | The system shall select the answers JSON and tell the author how to copy it when the browser refuses or offers no clipboard.    | P2  | Test   | Accepted |
+| PREV-DATA-09 | The system shall not check, submit or change the form when the author views or copies the answers.                              | P1  | Test   | Accepted |
+| PREV-DATA-10 | The system should offer in Preview an optional diagnostics view of the current answers and the errors shown.                    | P3  | Test   | Accepted |
+| PREV-DATA-11 | The system should hide the diagnostics view each time the author enters Preview, until the author asks for it.                  | P3  | Test   | Accepted |
 
 - PREV-DATA-01: source: docs/spec/05-canvas.md "Preview" (the **Form data JSON** button); e2e/preview-data.spec.ts "Preview exposes answer JSON with data keys, types, rows, and clipboard fallback" (no such button while editing).
 - PREV-DATA-02, PREV-DATA-03, PREV-DATA-04, PREV-DATA-05: source: docs/spec/05-canvas.md "Preview" ("using the same data object supplied to the runtime renderer. It preserves data keys, nested repeater arrays, and JSON value types without adding document metadata or synthesizing unanswered fields"); e2e/preview-data.spec.ts "Preview exposes answer JSON with data keys, types, rows, and clipboard fallback". The view shows the answers Preview holds, which keep a hidden question's answer (FILL-ANS-03); it does not show the submission a host would derive (FILL-SUB-01).

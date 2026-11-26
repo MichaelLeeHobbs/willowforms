@@ -8,20 +8,20 @@ How Preview handles events, validate and submit belongs to `PREV`. Keyboard and 
 
 | ID         | Requirement                                                                                                                                                                   | Pri | Verify | Status   |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| ACT-EVT-01 | The system shall raise one change event each time a respondent changes the answer in a TextField, NumberField, TextArea, Checkbox, Switch, Select, Radio group or DatePicker. | P1  | Test   | Proposed |
-| ACT-EVT-02 | The system shall raise a click event when a respondent activates a Button or a Link.                                                                                          | P1  | Test   | Proposed |
-| ACT-EVT-03 | The system shall raise a blur event when focus leaves a TextField, TextArea, NumberField or DatePicker.                                                                       | P2  | Test   | Proposed |
-| ACT-EVT-04 | The system shall raise a focus event when focus enters a TextField or TextArea.                                                                                               | P2  | Test   | Proposed |
-| ACT-EVT-05 | The system shall raise a Screen's mount event once when the form is drawn.                                                                                                    | P2  | Test   | Proposed |
-| ACT-EVT-06 | The system shall raise a Screen's unmount event when the form is removed from the page.                                                                                       | P2  | Test   | Proposed |
-| ACT-EVT-07 | The system shall raise the same events for the same component in both standard kits.                                                                                          | P2  | Test   | Proposed |
-| ACT-EVT-08 | The system shall reject a document that binds actions to an event other than change, click, blur, focus, mount or unmount.                                                    | P1  | Test   | Proposed |
-| ACT-EVT-09 | The system shall run the actions bound to an event in the order the author listed them.                                                                                       | P1  | Test   | Proposed |
-| ACT-EVT-10 | The system shall hand the host the effects of one event as a single batch, once.                                                                                              | P1  | Test   | Proposed |
-| ACT-EVT-11 | The system shall tell the host, with each batch, the key of the component that raised the event, the event, and the component's address.                                      | P1  | Test   | Proposed |
-| ACT-EVT-12 | The system shall give an event raised inside a Repeater row an address that names that row.                                                                                   | P1  | Test   | Proposed |
-| ACT-EVT-13 | The system shall report an answer change to the host before it runs the actions bound to that change.                                                                         | P2  | Test   | Proposed |
-| ACT-EVT-14 | The system shall not raise a component's events when the host changes that component's answer.                                                                                | P1  | Test   | Proposed |
+| ACT-EVT-01 | The system shall raise one change event each time a respondent changes the answer in a TextField, NumberField, TextArea, Checkbox, Switch, Select, Radio group or DatePicker. | P1  | Test   | Accepted |
+| ACT-EVT-02 | The system shall raise a click event when a respondent activates a Button or a Link.                                                                                          | P1  | Test   | Accepted |
+| ACT-EVT-03 | The system shall raise a blur event when focus leaves a TextField, TextArea, NumberField or DatePicker.                                                                       | P2  | Test   | Accepted |
+| ACT-EVT-04 | The system shall raise a focus event when focus enters a TextField or TextArea.                                                                                               | P2  | Test   | Accepted |
+| ACT-EVT-05 | The system shall raise a Screen's mount event once when the form is drawn.                                                                                                    | P2  | Test   | Accepted |
+| ACT-EVT-06 | The system shall raise a Screen's unmount event when the form is removed from the page.                                                                                       | P2  | Test   | Accepted |
+| ACT-EVT-07 | The system shall raise the same events for the same component in both standard kits.                                                                                          | P2  | Test   | Accepted |
+| ACT-EVT-08 | The system shall reject a document that binds actions to an event other than change, click, blur, focus, mount or unmount.                                                    | P1  | Test   | Accepted |
+| ACT-EVT-09 | The system shall run the actions bound to an event in the order the author listed them.                                                                                       | P1  | Test   | Accepted |
+| ACT-EVT-10 | The system shall hand the host the effects of one event as a single batch, once.                                                                                              | P1  | Test   | Accepted |
+| ACT-EVT-11 | The system shall tell the host, with each batch, the key of the component that raised the event, the event, and the component's address.                                      | P1  | Test   | Accepted |
+| ACT-EVT-12 | The system shall give an event raised inside a Repeater row an address that names that row.                                                                                   | P1  | Test   | Accepted |
+| ACT-EVT-13 | The system shall report an answer change to the host before it runs the actions bound to that change.                                                                         | P2  | Test   | Accepted |
+| ACT-EVT-14 | The system shall not raise a component's events when the host changes that component's answer.                                                                                | P1  | Test   | Accepted |
 
 - ACT-EVT-01: source: docs/spec/03-components.md "Events"; test/kit-contract.test.tsx "raises a field event once alongside its ordinary data change". Reporting the answer itself is FILL-ANS-01.
 - ACT-EVT-02: source: docs/spec/03-components.md "Events"; test/kit-contract.test.tsx "dispatches a button click as a validated effect batch". That a Button never submits a page form is CAT-INP-14.
@@ -42,18 +42,18 @@ How Preview handles events, validate and submit belongs to `PREV`. Keyboard and 
 
 | ID         | Requirement                                                                                                                                              | Pri | Verify | Status   |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| ACT-EFF-01 | The system shall offer a Set field value action whose effect asks the host to set the answer at a given address to a given value.                        | P1  | Test   | Proposed |
-| ACT-EFF-02 | The system shall offer a Clear field value action whose effect asks the host to clear the answer at a given address.                                     | P1  | Test   | Proposed |
-| ACT-EFF-03 | The system shall offer a Focus component action whose effect asks the host to move focus to the component with a given key.                              | P2  | Test   | Proposed |
-| ACT-EFF-04 | The system shall offer an Announce message action whose effect asks the host to announce a given message.                                                | P2  | Test   | Proposed |
-| ACT-EFF-05 | The system shall offer an Update context action whose effect asks the host to set the host context value at a given path to a given value.               | P1  | Test   | Proposed |
-| ACT-EFF-06 | The system shall offer a Validate form action whose effect asks the host to validate, optionally naming a scope.                                         | P1  | Test   | Proposed |
-| ACT-EFF-07 | The system shall offer an Emit event action whose effect asks the host to act on a named event, optionally with a payload.                               | P1  | Test   | Proposed |
-| ACT-EFF-08 | The system shall offer a Stop actions action that hands the host the effects up to and including itself and neither checks nor runs any action after it. | P1  | Test   | Proposed |
-| ACT-EFF-09 | The system shall produce from a built-in action the effect its name selects, whatever its parameters contain.                                            | P1  | Test   | Proposed |
-| ACT-EFF-10 | The system shall produce the effects of built-in actions without a host evaluator.                                                                       | P1  | Test   | Proposed |
-| ACT-EFF-11 | The system shall not change answers, host context, focus or validation results itself in response to an effect.                                          | P1  | Test   | Proposed |
-| ACT-EFF-12 | The system shall reject a document whose built-in action reference names no built-in action.                                                             | P1  | Test   | Proposed |
+| ACT-EFF-01 | The system shall offer a Set field value action whose effect asks the host to set the answer at a given address to a given value.                        | P1  | Test   | Accepted |
+| ACT-EFF-02 | The system shall offer a Clear field value action whose effect asks the host to clear the answer at a given address.                                     | P1  | Test   | Accepted |
+| ACT-EFF-03 | The system shall offer a Focus component action whose effect asks the host to move focus to the component with a given key.                              | P2  | Test   | Accepted |
+| ACT-EFF-04 | The system shall offer an Announce message action whose effect asks the host to announce a given message.                                                | P2  | Test   | Accepted |
+| ACT-EFF-05 | The system shall offer an Update context action whose effect asks the host to set the host context value at a given path to a given value.               | P1  | Test   | Accepted |
+| ACT-EFF-06 | The system shall offer a Validate form action whose effect asks the host to validate, optionally naming a scope.                                         | P1  | Test   | Accepted |
+| ACT-EFF-07 | The system shall offer an Emit event action whose effect asks the host to act on a named event, optionally with a payload.                               | P1  | Test   | Accepted |
+| ACT-EFF-08 | The system shall offer a Stop actions action that hands the host the effects up to and including itself and neither checks nor runs any action after it. | P1  | Test   | Accepted |
+| ACT-EFF-09 | The system shall produce from a built-in action the effect its name selects, whatever its parameters contain.                                            | P1  | Test   | Accepted |
+| ACT-EFF-10 | The system shall produce the effects of built-in actions without a host evaluator.                                                                       | P1  | Test   | Accepted |
+| ACT-EFF-11 | The system shall not change answers, host context, focus or validation results itself in response to an effect.                                          | P1  | Test   | Accepted |
+| ACT-EFF-12 | The system shall reject a document whose built-in action reference names no built-in action.                                                             | P1  | Test   | Accepted |
 
 - ACT-EFF-01, ACT-EFF-02: source: docs/spec/09-actions.md "Effects" ("form data uses an address"); docs/spec/09-actions.md "Host responsibilities" (the host writes addressed values with its change helper, FLOW-REP-07).
 - ACT-EFF-03: source: docs/spec/09-actions.md "Effects" ("interface effects use a unique node key").
@@ -71,19 +71,19 @@ How Preview handles events, validate and submit belongs to `PREV`. Keyboard and 
 
 | ID          | Requirement                                                                                                                                                                            | Pri | Verify | Status   |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| ACT-CODE-01 | The system shall let a document define named code actions, each with source text and default parameters, that any component's events can reference.                                    | P1  | Test   | Proposed |
-| ACT-CODE-02 | The system shall pass the host's action evaluator the action's source, the current answers, the host context, the parameters, and the event, component key and address that raised it. | P1  | Test   | Proposed |
-| ACT-CODE-03 | The system shall give a code action raised by a change the answer's new value.                                                                                                         | P2  | Test   | Proposed |
-| ACT-CODE-04 | The system shall let an action reference's parameters override the code action's default parameters for that run.                                                                      | P1  | Test   | Proposed |
-| ACT-CODE-05 | The system shall refuse an evaluator result that is not a list of effects.                                                                                                             | P1  | Test   | Proposed |
-| ACT-CODE-06 | The system shall skip a code action when the host supplies no action evaluator and still produce the effects of the other actions bound to the event.                                  | P1  | Test   | Proposed |
-| ACT-CODE-07 | The system shall report each failed action to the host with the component, event and address that raised it.                                                                           | P1  | Test   | Proposed |
-| ACT-CODE-08 | The system shall deliver no effects from an event when any of its actions fails.                                                                                                       | P1  | Test   | Proposed |
-| ACT-CODE-09 | The system shall keep the form drawn and usable when an action fails.                                                                                                                  | P1  | Test   | Proposed |
-| ACT-CODE-10 | The system shall reject a document whose action reference is neither a built-in nor a code action.                                                                                     | P1  | Test   | Proposed |
-| ACT-CODE-11 | The system shall pass the host's expression evaluator the expression, the current answers and the host context.                                                                        | P1  | Test   | Proposed |
-| ACT-CODE-12 | The system shall draw a component whose computed property has no evaluator, with that property empty.                                                                                  | P1  | Test   | Proposed |
-| ACT-CODE-13 | The system shall keep drawing a component when the evaluator fails on one of its computed properties.                                                                                  | P2  | Test   | Proposed |
+| ACT-CODE-01 | The system shall let a document define named code actions, each with source text and default parameters, that any component's events can reference.                                    | P1  | Test   | Accepted |
+| ACT-CODE-02 | The system shall pass the host's action evaluator the action's source, the current answers, the host context, the parameters, and the event, component key and address that raised it. | P1  | Test   | Accepted |
+| ACT-CODE-03 | The system shall give a code action raised by a change the answer's new value.                                                                                                         | P2  | Test   | Accepted |
+| ACT-CODE-04 | The system shall let an action reference's parameters override the code action's default parameters for that run.                                                                      | P1  | Test   | Accepted |
+| ACT-CODE-05 | The system shall refuse an evaluator result that is not a list of effects.                                                                                                             | P1  | Test   | Accepted |
+| ACT-CODE-06 | The system shall skip a code action when the host supplies no action evaluator and still produce the effects of the other actions bound to the event.                                  | P1  | Test   | Accepted |
+| ACT-CODE-07 | The system shall report each failed action to the host with the component, event and address that raised it.                                                                           | P1  | Test   | Accepted |
+| ACT-CODE-08 | The system shall deliver no effects from an event when any of its actions fails.                                                                                                       | P1  | Test   | Accepted |
+| ACT-CODE-09 | The system shall keep the form drawn and usable when an action fails.                                                                                                                  | P1  | Test   | Accepted |
+| ACT-CODE-10 | The system shall reject a document whose action reference is neither a built-in nor a code action.                                                                                     | P1  | Test   | Accepted |
+| ACT-CODE-11 | The system shall pass the host's expression evaluator the expression, the current answers and the host context.                                                                        | P1  | Test   | Accepted |
+| ACT-CODE-12 | The system shall draw a component whose computed property has no evaluator, with that property empty.                                                                                  | P1  | Test   | Accepted |
+| ACT-CODE-13 | The system shall keep drawing a component when the evaluator fails on one of its computed properties.                                                                                  | P2  | Test   | Accepted |
 
 - ACT-CODE-01: source: docs/spec/09-actions.md "Model" ("Code actions live in `FormDocument.actions` so they can be shared"). Including them in an exported file is DOC-JSON-02.
 - ACT-CODE-02: source: docs/spec/09-actions.md "Security boundary" (`ActionEvaluator`, "`invocation` identifies the event, node, current value when there is one, and the field address"); packages/core/src/actions.test.ts "runs code only through the injected action evaluator"; test/kit-contract.test.tsx "runs code actions only through the supplied action evaluator".
@@ -103,32 +103,32 @@ How Preview handles events, validate and submit belongs to `PREV`. Keyboard and 
 
 | ID          | Requirement                                                                                                                                                        | Pri | Verify | Status   |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- | ------ | -------- |
-| ACT-AUTH-01 | The system shall list on the Actions tab only the events the selected component declares.                                                                          | P1  | Test   | Proposed |
-| ACT-AUTH-02 | The system shall let an author add any built-in action, or any code action the document defines, to an event.                                                      | P1  | Test   | Proposed |
-| ACT-AUTH-03 | The system shall let an author move an action up or down within an event's list.                                                                                   | P1  | Test   | Proposed |
-| ACT-AUTH-04 | The system shall let an author remove an action from an event's list.                                                                                              | P1  | Test   | Proposed |
-| ACT-AUTH-05 | The system shall keep each action's own settings when the author reorders or removes actions.                                                                      | P2  | Test   | Proposed |
-| ACT-AUTH-06 | The system shall offer the form's fields, by label and answer address, as targets for Set field value and Clear field value.                                       | P1  | Test   | Proposed |
-| ACT-AUTH-07 | The system shall offer for Set field value an input that matches the target field: text, multiline text, number, date, true or false, or one of its fixed choices. | P1  | Test   | Proposed |
-| ACT-AUTH-08 | The system shall store a value chosen from a field's fixed choices with its declared JSON type.                                                                    | P1  | Test   | Proposed |
-| ACT-AUTH-09 | The system shall start Set field value with no value when the author picks a different target.                                                                     | P2  | Test   | Proposed |
-| ACT-AUTH-10 | The system shall let an author enter a list or object value as JSON.                                                                                               | P2  | Test   | Proposed |
-| ACT-AUTH-11 | The system shall offer the form's components, by key, as targets for Focus component.                                                                              | P2  | Test   | Proposed |
-| ACT-AUTH-12 | The system shall offer a named input for each message, context path, validation scope, event name and stop reason.                                                 | P2  | Test   | Proposed |
-| ACT-AUTH-13 | The system shall let an author choose the type of a context value or an event payload.                                                                             | P2  | Test   | Proposed |
-| ACT-AUTH-14 | The system shall let an author target a field inside a Repeater by the Repeater's answer name and a row number counted from 1.                                     | P1  | Test   | Proposed |
-| ACT-AUTH-15 | The system shall target the row the author numbered, not the row that raised the event.                                                                            | P1  | Test   | Proposed |
-| ACT-AUTH-16 | The system shall refuse a row number below 1 with a message and keep the stored target.                                                                            | P2  | Test   | Proposed |
-| ACT-AUTH-17 | The system shall keep showing a target that no longer exists, marked unavailable, rather than replace it.                                                          | P1  | Test   | Proposed |
-| ACT-AUTH-18 | The system shall let an author edit any action's parameters as a JSON object.                                                                                      | P2  | Test   | Proposed |
-| ACT-AUTH-19 | The system shall keep the parameters an action's structured inputs do not edit when the author uses those inputs.                                                  | P1  | Test   | Proposed |
-| ACT-AUTH-20 | The system shall report an invalid action value or parameter object without saving it.                                                                             | P1  | Test   | Proposed |
-| ACT-AUTH-21 | The system shall show the current parameters in an action's structured inputs after a raw parameter edit or an undo.                                               | P2  | Test   | Proposed |
-| ACT-AUTH-22 | The system shall let an author add a named code action to the document in the form's Settings.                                                                     | P1  | Test   | Proposed |
-| ACT-AUTH-23 | The system shall let an author edit a code action's source and default parameters.                                                                                 | P1  | Test   | Proposed |
-| ACT-AUTH-24 | The system shall refuse a new code action name that breaks the key rules or that another code action already has.                                                  | P2  | Test   | Proposed |
-| ACT-AUTH-25 | The system shall state, where code actions are defined and where actions are attached, that code actions need a sandboxed evaluator from the host.                 | P1  | Test   | Proposed |
-| ACT-AUTH-26 | The system shall remove every reference to a code action when the author deletes that code action.                                                                 | P1  | Test   | Proposed |
+| ACT-AUTH-01 | The system shall list on the Actions tab only the events the selected component declares.                                                                          | P1  | Test   | Accepted |
+| ACT-AUTH-02 | The system shall let an author add any built-in action, or any code action the document defines, to an event.                                                      | P1  | Test   | Accepted |
+| ACT-AUTH-03 | The system shall let an author move an action up or down within an event's list.                                                                                   | P1  | Test   | Accepted |
+| ACT-AUTH-04 | The system shall let an author remove an action from an event's list.                                                                                              | P1  | Test   | Accepted |
+| ACT-AUTH-05 | The system shall keep each action's own settings when the author reorders or removes actions.                                                                      | P2  | Test   | Accepted |
+| ACT-AUTH-06 | The system shall offer the form's fields, by label and answer address, as targets for Set field value and Clear field value.                                       | P1  | Test   | Accepted |
+| ACT-AUTH-07 | The system shall offer for Set field value an input that matches the target field: text, multiline text, number, date, true or false, or one of its fixed choices. | P1  | Test   | Accepted |
+| ACT-AUTH-08 | The system shall store a value chosen from a field's fixed choices with its declared JSON type.                                                                    | P1  | Test   | Accepted |
+| ACT-AUTH-09 | The system shall start Set field value with no value when the author picks a different target.                                                                     | P2  | Test   | Accepted |
+| ACT-AUTH-10 | The system shall let an author enter a list or object value as JSON.                                                                                               | P2  | Test   | Accepted |
+| ACT-AUTH-11 | The system shall offer the form's components, by key, as targets for Focus component.                                                                              | P2  | Test   | Accepted |
+| ACT-AUTH-12 | The system shall offer a named input for each message, context path, validation scope, event name and stop reason.                                                 | P2  | Test   | Accepted |
+| ACT-AUTH-13 | The system shall let an author choose the type of a context value or an event payload.                                                                             | P2  | Test   | Accepted |
+| ACT-AUTH-14 | The system shall let an author target a field inside a Repeater by the Repeater's answer name and a row number counted from 1.                                     | P1  | Test   | Accepted |
+| ACT-AUTH-15 | The system shall target the row the author numbered, not the row that raised the event.                                                                            | P1  | Test   | Accepted |
+| ACT-AUTH-16 | The system shall refuse a row number below 1 with a message and keep the stored target.                                                                            | P2  | Test   | Accepted |
+| ACT-AUTH-17 | The system shall keep showing a target that no longer exists, marked unavailable, rather than replace it.                                                          | P1  | Test   | Accepted |
+| ACT-AUTH-18 | The system shall let an author edit any action's parameters as a JSON object.                                                                                      | P2  | Test   | Accepted |
+| ACT-AUTH-19 | The system shall keep the parameters an action's structured inputs do not edit when the author uses those inputs.                                                  | P1  | Test   | Accepted |
+| ACT-AUTH-20 | The system shall report an invalid action value or parameter object without saving it.                                                                             | P1  | Test   | Accepted |
+| ACT-AUTH-21 | The system shall show the current parameters in an action's structured inputs after a raw parameter edit or an undo.                                               | P2  | Test   | Accepted |
+| ACT-AUTH-22 | The system shall let an author add a named code action to the document in the form's Settings.                                                                     | P1  | Test   | Accepted |
+| ACT-AUTH-23 | The system shall let an author edit a code action's source and default parameters.                                                                                 | P1  | Test   | Accepted |
+| ACT-AUTH-24 | The system shall refuse a new code action name that breaks the key rules or that another code action already has.                                                  | P2  | Test   | Accepted |
+| ACT-AUTH-25 | The system shall state, where code actions are defined and where actions are attached, that code actions need a sandboxed evaluator from the host.                 | P1  | Test   | Accepted |
+| ACT-AUTH-26 | The system shall remove every reference to a code action when the author deletes that code action.                                                                 | P1  | Test   | Accepted |
 
 - ACT-AUTH-01: source: docs/spec/09-actions.md "Inspector" ("lists only events declared by the selected kit component"); packages/designer/src/panels/Actions.test.tsx "wires an ordered built-in action to a declared component event". The tab also says when a component raises no events (packages/designer/src/panels/Actions.tsx); no separate row is written.
 - ACT-AUTH-02: source: docs/spec/09-actions.md "Inspector" ("an ordered list with add, remove, and move controls"); packages/designer/src/panels/Actions.test.tsx "wires an ordered built-in action to a declared component event".

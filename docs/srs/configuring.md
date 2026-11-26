@@ -31,7 +31,7 @@ Translation fields, translation keys and languages belong to `LOC`. Actions and 
 | CONF-PROP-21 | The system shall let an author embed an image from a local file, without uploading it anywhere.                                                                                    | P2  | Test       | Accepted |
 | CONF-PROP-22 | The system shall tell the author what to do when an image source is refused or its preview fails to load.                                                                          | P1  | Test       | Accepted |
 | CONF-PROP-23 | The system shall let an author remove an image.                                                                                                                                    | P2  | Test       | Accepted |
-| CONF-PROP-24 | The system shall let an author choose a comfortable or compact density for the whole form when the kit supports density.                                                           | P2  | Test       | Proposed |
+| CONF-PROP-24 | The system shall let an author choose a comfortable or compact density for the whole form when the kit supports density.                                                           | P2  | Test       | Accepted |
 
 - CONF-PROP-01: source: docs/spec/06-inspector.md "Tabs". The tablist's keyboard behaviour belongs to `A11Y`.
 - CONF-PROP-02: source: docs/spec/06-inspector.md "Properties" ("One row per `PropSchema` ... in declaration order. Above them, the component's key").
@@ -150,7 +150,7 @@ Translation fields, translation keys and languages belong to `LOC`. Actions and 
 | CONF-KEY-13 | The system shall remove a component's answer name when the author clears it or sets it back to the component's key.                                                                              | P2  | Test   | Accepted |
 | CONF-KEY-14 | The system shall state the name an answer is submitted under when it differs from the component's key.                                                                                           | P2  | Test   | Accepted |
 | CONF-KEY-15 | The system shall refuse an answer name the key rules forbid, and show the reason under the field.                                                                                                | P1  | Test   | Accepted |
-| CONF-KEY-16 | The system shall change the conditions, rule guards and field comparisons that read an answer to its new name when the author changes a component's answer name.                                 | P2  | Test   | Proposed |
+| CONF-KEY-16 | The system shall change the conditions, rule guards and field comparisons that read an answer to its new name when the author changes a component's answer name.                                 | P2  | Test   | Accepted |
 
 - CONF-KEY-01: source: docs/spec/06-inspector.md "The key field"; packages/designer/src/panels/Properties.test.tsx "the key field". The panel also trims what it stores (docs/spec/12-api.md "Keys", "Trimming is an input convenience in the panel"); no separate row is written.
 - CONF-KEY-02, CONF-KEY-04: source: docs/spec/06-inspector.md "The key field"; docs/spec/01-document-model.md "key"; packages/designer/src/store.regressions.test.ts "renameKey"; e2e/authoring.spec.ts "renaming to a key that is taken says so and changes nothing". That a refused rename takes no undo step is `BUILD-UNDO-09`.

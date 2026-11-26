@@ -137,16 +137,16 @@ Preview hides the authoring panels and their openers at every width without chan
 rather than about anything outstanding. It read Partial over a table of eight Built rows, which is the
 kind of status a reader cannot act on.
 
-| Control     | Status | Does                                                             |
-| ----------- | ------ | ---------------------------------------------------------------- |
-| Form name   | Built  | Shown; edited on the Settings tab                                |
-| Undo / Redo | Built  | Disabled when there is nothing to undo                           |
-| JSON        | Built  | Opens the document dialog                                        |
-| Preview     | Built  | On the canvas bar, not the toolbar                               |
-| Save        | Built  | Calls the `onSave` prop; hidden when the host does not pass one  |
-| Viewport    | Built  | Desktop / tablet / mobile                                        |
-| Language    | Built  | Which language the canvas renders in; hidden below two languages |
-| Theme       | Built  | System / light / dark for the designer chrome                    |
+| Control     | Status | Does                                                                      |
+| ----------- | ------ | ------------------------------------------------------------------------- |
+| Form name   | Built  | Shown; edited on the Settings tab                                         |
+| Undo / Redo | Built  | Each is disabled when there is nothing to undo or redo                    |
+| JSON        | Built  | Opens the document dialog                                                 |
+| Preview     | Built  | On the canvas bar, not the toolbar                                        |
+| Save        | Built  | Calls the `onSave` prop; hidden when the host does not pass one           |
+| Viewport    | Built  | Desktop / tablet / mobile / [fixed size](05-canvas.md#fixed-canvas-sizes) |
+| Language    | Built  | Which language the canvas renders in; hidden below two languages          |
+| Theme       | Built  | System / light / dark for the designer chrome                             |
 
 **Save needs care.** WillowForms does not persist, so a Save button that appears unconditionally promises
 something the designer cannot deliver. It renders only when the host passes `onSave`, and its absence is
