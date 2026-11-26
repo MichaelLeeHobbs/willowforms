@@ -105,6 +105,7 @@ On `.fsh-screen`:
 `--fsh-text`, `--fsh-muted`, `--fsh-surface`, `--fsh-field`, `--fsh-border`, `--fsh-accent`,
 `--fsh-accent-text`, `--fsh-danger`, `--fsh-success`, `--fsh-warning`, `--fsh-shadow`, `--fsh-radius`,
 `--fsh-font`, `--fsh-font-size`, `--fsh-font-size-sm`, `--fsh-font-size-xs`, `--fsh-font-size-2xs`,
+`--fsh-font-size-lg`, `--fsh-font-size-xl`, `--fsh-font-size-2xl`, `--fsh-font-size-3xl`,
 `--fsh-scrollbar-thumb`.
 
 Both lists are checked against the stylesheets by `test/docs.test.ts`. A token a host cannot find here is
@@ -127,17 +128,22 @@ The designer and the HTML kit each have their own type scale, because a host tha
 | Label, compact control                   |                            | `--fsh-font-size-sm` (14px)  |
 | Base: text with no size of its own       | `--fs-font-size` (14px)    | `--fsh-font-size` (16px)     |
 | Panel heading, empty-canvas title        | `--fs-font-size-lg` (16px) |                              |
+| Heading level 4                          |                            | `--fsh-font-size-lg` (18px)  |
+| Heading level 3                          |                            | `--fsh-font-size-xl` (20px)  |
+| Heading level 2                          |                            | `--fsh-font-size-2xl` (24px) |
+| Heading level 1                          |                            | `--fsh-font-size-3xl` (32px) |
+
+In the HTML kit, heading levels 5 and 6 take the base size, so no heading is smaller than body text or a field's label. Every level has weight 600. A heading's size is its level's alone: density, and the element it is inside, leave it as it is.
 
 The steps are independent lengths. Overriding `--fs-font-size` moves the base and leaves the others where they are, dense controls included. An element the browser sizes itself, such as `<small>`, stays off the scale unless a rule gives it a step.
 
-Font weights: `400`, `600`. Text that declares no weight keeps the browser's own, so the HTML kit's headings and card titles, and `<strong>` in the designer, are bold (700).
+Font weights: `400`, `600`. Text that declares no weight keeps the browser's own, so the HTML kit's card titles, and `<strong>` in the designer, are bold (700).
 
 Spacing steps: `2px`, `4px`, `6px`, `8px`, `10px`, `12px`, `16px`, `20px`, `24px`. They apply to margin, padding and gap, where a margin may also be the negative of a step. They are not tokens: a host that could move one step could not see what else it moved. A listed exception may sit one border short of a step, so that its padding and its 1px border add up to it: a designer button is 7px of padding plus 1px of border.
 
 **Undecided:**
 
 - Which listed exceptions fold onto a step.
-- What size and weight each heading level takes in the HTML kit, which today leaves both to the browser ([issue 224](https://github.com/MichaelLeeHobbs/willowforms/issues/224)).
 - Whether the kit's four `rem` sizes become steps ([issue 229](https://github.com/MichaelLeeHobbs/willowforms/issues/229)).
 - Whether the designer's small section headings, at 11px and 12px, and its dense controls, at 12px, are meant to differ from the panel heading and the base.
 
