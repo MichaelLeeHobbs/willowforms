@@ -130,7 +130,8 @@ export const MAX_CONTEXT_VALUES = 1000
  * A server takes the steps of a form from this, `contextValues(root, 'step')`, never from
  * the request: a client that names one step would leave the others unchecked. Any
  * comparison with a literal counts, even `gt`: a name this missed is a step whose required
- * fields never get checked.
+ * fields never get checked. It stops at `MAX_CONTEXT_VALUES`, so a server refuses a document
+ * whose list is that long rather than leave the steps past it unchecked.
  */
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
   if (path === '') return []
