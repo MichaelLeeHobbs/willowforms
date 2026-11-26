@@ -35,6 +35,7 @@ async function open(page: Page): Promise<void> {
       schema: { type: 'string' },
     },
     { key: 'trail', type: 'Breadcrumbs', props: { items: prop([]) } },
+    { key: 'box', type: 'Box', props: {}, children: [] },
     {
       // No shipped property offers a condition, but a document can hold one.
       key: 'bound',
@@ -173,6 +174,74 @@ test('a bound property, and Show when, each take the whole row', async ({ page }
   await select(page, 'bound')
   await expectReadable(bound)
   expect(await widthOf(caption)).toBeGreaterThan(150)
+})
+
+test('setting a property leaves its field where it was and as wide, with Reset under the label', async ({
+  page,
+}) => {
+  await open(page)
+  // The narrowest pane, where a column for Reset left a field 48px.
+  await page.getByRole('separator', { name: 'Resize Component properties' }).press('Home')
+  await expect(page.locator('aside.fs-panel--right')).toHaveCSS('width', '240px')
+  const panel = panelOf(page)
+  type Role = 'textbox' | 'checkbox' | 'combobox' | 'spinbutton'
+  // A field's name gains "(modified)" once it is set.
+  const named = (label: string): { name: RegExp } => ({
+    name: new RegExp('^' + label + '( \\(modified\\))?$'),
+  })
+  const right = async (locator: Locator): Promise<number> => {
+    const box = (await locator.boundingBox())!
+    return box.x + box.width
+  }
+
+  const sets = async (
+    [role, label]: [Role, string],
+    set: (field: Locator) => Promise<unknown>,
+    next?: [Role, string],
+  ): Promise<void> => {
+    const field = panel.getByRole(role, named(label))
+    const row = panel.locator('.fs-prop-row').filter({ has: page.getByRole(role, named(label)) })
+    const reset = row.getByRole('button', { name: 'Reset ' + label, exact: true })
+    const below = next && panel.getByRole(next[0], named(next[1]))
+    await expect(reset).toHaveCount(0)
+    const [before, belowBefore] = [await field.boundingBox(), await below?.boundingBox()]
+    await set(field)
+
+    await expect(reset).toBeVisible()
+    expect(await field.boundingBox(), 'the field moved').toEqual(before)
+    if (below) expect(await below.boundingBox(), 'the row below moved').toEqual(belowBefore)
+    const under = await gap(row.locator('> label'), reset)
+    expect(under, 'Reset is not just under the label').toBeGreaterThan(0)
+    expect(under, 'Reset is not just under the label').toBeLessThan(12)
+    expect(await right(reset), 'Reset reaches the field').toBeLessThan(before!.x)
+    expect(await widthOf(reset), 'Reset fills the label column').toBeLessThan(
+      await widthOf(row.locator('> label')),
+    )
+    // The control takes the rest of the row: no column is kept for Reset.
+    expect(await right(row.locator('> .fs-prop-row__control'))).toBeCloseTo(await right(row), 0)
+    expect(await collisions(row)).toEqual([])
+
+    await reset.click()
+    await expect(reset).toHaveCount(0)
+    expect(await field.boundingBox(), 'Reset moved the field').toEqual(before)
+  }
+
+  await sets(['textbox', 'Placeholder'], (field) => field.fill('x'), ['textbox', 'Helper text'])
+  // A field with no control wrapper ends at the same edge.
+  expect(await right(panel.getByRole('textbox', named('Key')))).toBeCloseTo(
+    await right(panel.getByRole('textbox', named('Placeholder'))),
+    0,
+  )
+  await sets(['checkbox', 'Multiline'], (field) => field.check())
+
+  await select(page, 'box')
+  await page.getByRole('tab', { name: 'Style', exact: true }).click()
+  await sets(['textbox', 'Background'], (field) => field.fill('#336699'), [
+    'spinbutton',
+    'Corner radius',
+  ])
+  // No binding picker, so Reset makes this row taller: the field still stays put.
+  await sets(['combobox', 'Density'], (field) => field.selectOption('compact'))
 })
 
 test('a refused value leaves its field as wide as it was, with the reason under it', async ({
