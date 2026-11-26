@@ -31,6 +31,7 @@ Translation fields, translation keys and languages belong to `LOC`. Actions and 
 | CONF-PROP-21 | The system shall let an author embed an image from a local file, without uploading it anywhere.                                                                                    | P2  | Test       | Accepted |
 | CONF-PROP-22 | The system shall tell the author what to do when an image source is refused or its preview fails to load.                                                                          | P1  | Test       | Accepted |
 | CONF-PROP-23 | The system shall let an author remove an image.                                                                                                                                    | P2  | Test       | Accepted |
+| CONF-PROP-24 | The system shall let an author choose a comfortable or compact density for the whole form when the kit supports density.                                                           | P2  | Test       | Proposed |
 
 - CONF-PROP-01: source: docs/spec/06-inspector.md "Tabs". The tablist's keyboard behaviour belongs to `A11Y`.
 - CONF-PROP-02: source: docs/spec/06-inspector.md "Properties" ("One row per `PropSchema` ... in declaration order. Above them, the component's key").
@@ -48,6 +49,7 @@ Translation fields, translation keys and languages belong to `LOC`. Actions and 
 - CONF-PROP-18: source: packages/designer/src/panels/Properties.test.tsx "the data key field and undo"; packages/designer/src/panels/Rules.test.tsx "a rule number and undo". Tests are the only source. What an undo step holds is `BUILD-UNDO`.
 - CONF-PROP-19: source: docs/spec/03-components.md "Shared property traits". The spec notes nothing enforces it, and that `placeholder` and `gap` are not yet shared traits.
 - CONF-PROP-20, CONF-PROP-21, CONF-PROP-22, CONF-PROP-23: source: docs/spec/06-inspector.md "Image sources and decorative backgrounds"; packages/designer/src/panels/ImageSource.test.tsx "an image the field refuses" and "what is wrong with the stored address". Which sources, types and sizes are accepted is `SEC-DOCS-04`, `SEC-DOCS-05` and `SEC-DOCS-06`.
+- CONF-PROP-24: source: docs/spec/11-theming.md "Form density"; packages/designer/src/panels/FormSettings.tsx (the density control, offered only when the kit's root declares `density`). Found missing while drafting `WORK`: CAT-LAY-15 assigned this control to `CONF`. How density inherits is CAT-LAY-15 and CAT-LAY-16.
 
 ## Choices (OPT)
 
