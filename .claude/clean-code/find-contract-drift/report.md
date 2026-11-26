@@ -5,7 +5,7 @@
 ```
 Contract drift audit: willow-forms  commit 4ef2525a7e30856ceafe0d82ab7d5b725a469905  2026-11-25
 Catalog: .claude/clean-code/find-contract-drift/   Work folder: outside the repo (session scratchpad)
-Routed: none (no spec versions, generated clients, protobuf or GraphQL). test/docs.test.ts pins the field names of every interface in docs/spec; it does not cover type aliases, prop tables, docs/ARCHITECTURE.md, or any field's type
+Routed: none (no spec versions, generated clients, protobuf or GraphQL). test/docs.test.ts pins the field names of every interface in docs/spec; it does not cover type aliases, prop tables, docs/ARCHITECTURE.md, or any field's type or optionality
 Coverage: 1.0000 over 109 files (0 adjusted: none)   PASS
 Shapes: 111 (client 65, server 1, shared 29, spec 16; hand 111)   Excluded: 37 (derived 8, mixed_union 1, not_a_shape 1, tests 27)   Unparsed: none
 Groups: 15; judged 4, reused 0, cut by cap 0
@@ -22,7 +22,7 @@ How the run was set up, and its limits:
 
 - **Reuse was 0 of 4.** Verdict reuse matches `path:line:name` and the source hash. Two groups' members changed or moved (`Snapshot` by one line, `ValidationRule` because #211 removed the architecture copy), one changed source (`NodeRendererProps` in spec 02), and one (`DesignerProps`) only because this run hashes the prop table's text and the last run did not.
 - **What is a spec shape:** the TypeScript fences in tracked Markdown files and the two `| Prop | Type | Required |` tables in `docs/spec/12-api.md` (own count pattern `^\|\s*Prop\s*\|\s*Type\s*\|\s*Required\s*\|`). Prose and other tables are not parsed.
-- **Unions:** a union of object types is one shape, and a field is required when every variant requires it. To cover what that hides, the compiler also compared every group's members both ways (see "Whole-type check").
+- **Unions:** a union of object types is one shape, and a field is required when every variant requires it. To cover what that hides, the compiler also compared the TypeScript copies of each contract both ways (see "Whole-type check").
 - **Validators written as code are not shapes.** `storageFaults` (`apps/demo-server/src/index.ts`) checks all nine `FormDocument` fields by hand, and `validateDocument` (`packages/core/src/tree.ts`) checks them separately and accepts a document without `settings` or `actions`, as the server's comment says. The tool cannot see either.
 - **Wire:** one HTTP producer, the demo server. Two bindings (`GET /api/forms/{}`, `PUT /api/forms/{}`), both core's `FormDocument`, with no hand-written client copy. No serializer, interceptor or naming config exists, so there are no real `config` rows.
 - **Judge words:** `NOT_A_DIFFERENCE` and `NOT_RENAME` are this run's additions to the brief, not the skill's. Unlike last time, calibration tested both, twice, and both runs agreed with the settled answers.
@@ -56,7 +56,7 @@ None.
 
 ## Whole-type check (extra, not part of the skill)
 
-The TypeScript compiler, with the repo's strictness, compared each group's members in both directions. It settles what merged unions hide.
+The TypeScript compiler, with the repo's strictness, compared the TypeScript copies of each contract in both directions. It settles what merged unions hide. Members judged a different entity (`Snapshot`, and `DesignerApi` in G0008) were not compared, and the prop tables were compared by field rather than compiled.
 
 - **Assignable both ways:** Condition, FormDocument, Effect, ActionRef, CodeAction, ComponentDef, ComponentNode, Operand, PropValue (all four copies), ValidationRule.
 - **`EvalOptions` and `NodeRendererProps`:** spec to code passes, code to spec fails. The code writes `| undefined` on optional fields (`packages/core/src/validation.ts:53`; `required`, `itemLimits`, `events`, `navigation` in `packages/renderer/src/index.tsx:59`) and the spec shortens it to `?`. `validation.ts:50` gives the reason: callers forward their own optional prop under `exactOptionalPropertyTypes`. Not drift; a spec reader loses only that detail.
@@ -69,7 +69,7 @@ The TypeScript compiler, with the repo's strictness, compared each group's membe
 
 ## Prevention drafts
 
-- **Unions have no guard.** `docs.test.ts` pins interfaces by field name, so `Condition`, `Operand`, `PropValue` (three doc copies), `Effect` and `ValidationRule` could drift unnoticed; they agree today because someone kept them in step. A guard would compile the spec's fences and assert each declaration is assignable to and from the exported type. This run's whole-type check did exactly that.
+- **Unions have no guard.** `docs.test.ts` pins interfaces by field name, so `Condition`, `Operand`, `PropValue` (three doc copies), `Effect` and `ValidationRule` could drift unnoticed, and so could the two aliases in spec 09 that are not object shapes (`ActionEvaluator`, `EventName`); they agree today because someone kept them in step. A guard would compile the spec's fences and assert each declaration is assignable to and from the exported type. This run's whole-type check did exactly that.
 - **Fewer copies:** `PropValue` is written out four times (`docs/ARCHITECTURE.md:75`, `docs/spec/01-document-model.md:251`, `docs/spec/07-bindings.md:12`, `packages/core/src/types.ts:22`). Linking two of the doc copies to spec 01, as #211 did for `ValidationRule`, leaves one to keep true.
 
 ## Appendix
