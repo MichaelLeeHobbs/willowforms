@@ -193,7 +193,7 @@ takes only the first drops every answer given from step two onwards: the demo se
 scopes and then projected under `scopes[0]`, which is a form that validates a required field and then
 submits without it. See [03-components.md](03-components.md#steps).
 
-`contextValues(root, path)` enumerates the distinct JSON comparison values authored for that context path in structured conditions. A host can use the declared `step` values to construct the explicit scopes passed to `validateAcross` and `submittedAcross`; this function does not read live context or repeated-row answers.
+`contextValues(root, path)` enumerates the distinct JSON comparison values authored for that context path in structured conditions. A host can use the declared `step` values to construct the explicit scopes passed to `validateAcross` and `submittedAcross`; this function does not read live context or repeated-row answers. It returns at most `MAX_CONTEXT_VALUES` (1000, exported) values, so a result that long may be missing some, and a host that validates per step refuses the document rather than leaving those steps unchecked.
 
 `evaluatorKeys(root)` names every node that cannot be evaluated without a sandbox, and it is a startup
 question rather than a runtime one. A `computed` binding with no evaluator makes `isVisible` answer

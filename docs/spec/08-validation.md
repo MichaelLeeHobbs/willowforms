@@ -292,11 +292,16 @@ start.
 A multi-step form validates **once per scope**, and the scopes come out of the document:
 
 ```ts
-import { contextValues, missingContext, submittedAcross, validateAcross } from '@willowforms/core'
+import {
+  MAX_CONTEXT_VALUES,
+  contextValues,
+  missingContext,
+  submittedAcross,
+  validateAcross,
+} from '@willowforms/core'
 
-const steps = contextValues(document.root, 'step').filter(
-  (step): step is string => typeof step === 'string',
-)
+const steps = contextValues(document.root, 'step')
+if (steps.length >= MAX_CONTEXT_VALUES) throw new Error('too many steps to check')
 const scopes = steps.length
   ? steps.map((step) => ({ context: { ...context, step } }))
   : [{ context }]
@@ -307,11 +312,17 @@ if (Object.keys(errors).length > 0) return respond(422, { errors })
 const payload = submittedAcross(document.root, submitted, scopes)
 ```
 
-Three things in that are load-bearing and each has its own silent failure:
+Five things in that are load-bearing and each has its own silent failure:
 
 - **The steps come out of the document, never out of the request.** Asking the browser which steps exist
   lets a client name one and have the rest go unchecked, and the submit then succeeds with required
   answers missing.
+- **Every value `contextValues` returns is a step, not only text.** A step may be named by any JSON value,
+  and Preview shows a step named `2`. Keeping only strings leaves that step's required answers unchecked
+  beside a step named by text, and refuses the form as missing `step` when no step is named by text.
+- **A list as long as `MAX_CONTEXT_VALUES` (1000) is refused.** `contextValues` stops collecting at that
+  cap, so a document that reaches it may name steps the list does not hold, and those steps would go
+  unchecked.
 - **`submittedAcross`, not `submittedData`.** Its own docblock records what the projection did before it
   existed: the demo server validated across all scopes and then projected under `scopes[0]`, so every
   answer given on step two onwards was dropped from the payload. A form that validated a required field

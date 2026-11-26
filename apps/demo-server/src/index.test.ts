@@ -4,7 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ComponentNode, FormDocument } from '@willowforms/core'
+import type { ComponentNode, FormDocument, JsonValue } from '@willowforms/core'
+import { MAX_CONTEXT_VALUES } from '@willowforms/core'
 
 import { expectConsoleError } from '../../../test/console-errors.js'
 
@@ -313,6 +314,79 @@ describe('a form with two steps', () => {
     })
 
     expect(await response.json()).toEqual({ ok: true, received: { name: 'Ada', city: 'Ely' } })
+  })
+})
+
+describe('the steps a form names', () => {
+  const step = (index: number, id: JsonValue, children: ComponentNode[] = []): ComponentNode => ({
+    key: 'step' + String(index),
+    type: 'Step',
+    props: {},
+    renderWhen: {
+      kind: 'condition',
+      condition: {
+        op: 'eq',
+        left: { kind: 'context', path: 'step' },
+        right: { kind: 'literal', value: id },
+      },
+    },
+    children,
+  })
+
+  const required = (key: string): ComponentNode => ({
+    key,
+    type: 'TextField',
+    props: {},
+    schema: { type: 'string', validations: [{ key: 'required' }] },
+  })
+
+  const withSteps = (steps: ComponentNode[]): FormDocument => ({
+    ...FORM,
+    id: 'stepped',
+    root: { key: 'root', type: 'Screen', props: {}, children: steps },
+  })
+
+  const submitTo = async (document: FormDocument, answers: string): Promise<Response> => {
+    expect((await put('stepped', document)).status, 'the form was not stored').toBe(200)
+    return await send('/api/forms/stepped/submit', 'POST', answers)
+  }
+
+  restoreAroundEach()
+
+  it('VAL-SRV-04: checks a step named by a number beside one named by text', async () => {
+    const document = withSteps([step(1, 'one', [required('name')]), step(2, 2, [required('city')])])
+
+    const response = await submitTo(document, '{}')
+
+    expect(response.status).toBe(422)
+    const body = (await response.json()) as { errors: Record<string, string> }
+    expect(Object.keys(body.errors).sort()).toEqual(['city', 'name'])
+  })
+
+  it('VAL-SRV-04: echoes the answers given on a step named by a number', async () => {
+    const document = withSteps([step(1, 'one', [required('name')]), step(2, 2, [required('city')])])
+
+    const response = await submitTo(document, '{"name":"Ada","city":"Ely"}')
+
+    expect(await response.json()).toEqual({ ok: true, received: { name: 'Ada', city: 'Ely' } })
+  })
+
+  // Text names, so these depend only on the cap and not on which values count as steps.
+  const named = (count: number): ComponentNode[] =>
+    Array.from({ length: count }, (_unused, index) => step(index, 'step' + String(index)))
+
+  it('VAL-SRV-05: refuses a form naming more steps than the server lists', async () => {
+    const response = await submitTo(withSteps(named(MAX_CONTEXT_VALUES + 1)), '{}')
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({
+      error: 'This form names more steps than this server will check',
+      limit: MAX_CONTEXT_VALUES,
+    })
+  })
+
+  it('VAL-SRV-05: still takes a form naming one step fewer than the limit', async () => {
+    expect((await submitTo(withSteps(named(MAX_CONTEXT_VALUES - 1)), '{}')).status).toBe(200)
   })
 })
 

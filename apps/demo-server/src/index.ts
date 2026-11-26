@@ -10,6 +10,7 @@ import { cors } from 'hono/cors'
 import type { FormContext, FormData, FormDocument, StructuralError } from '@willowforms/core'
 import {
   MAX_CONDITION_DEPTH,
+  MAX_CONTEXT_VALUES,
   contextValues,
   evaluatorKeys,
   missingContext,
@@ -353,8 +354,9 @@ const contextFor = (): FormContext => ({ user: { role: 'guest' } })
 
 /**
  * Re-runs the form's own rules with the same core functions the browser used, once per step scope
- * (see `docs/spec/08-validation.md`). Context or an evaluator this server cannot supply is a 500,
- * because otherwise the affected fields would go silently unvalidated.
+ * (see `docs/spec/08-validation.md`). Context or an evaluator this server cannot supply, or more
+ * steps than it will list, is a 500, because otherwise the affected fields would go silently
+ * unvalidated.
  */
 app.post('/api/forms/:id/submit', async (c) => {
   const doc = held(await readStore(), c.req.param('id'))
@@ -364,11 +366,21 @@ app.post('/api/forms/:id/submit', async (c) => {
 
   /*
    * Every step, taken from the document and never from the request, so a client cannot skip one.
-   * Strings only, so a hand-edited document cannot ask for a scope per arbitrary value.
+   * Every JSON value, not only text: a step named `2` is a step, and the browser shows it.
    */
-  const steps = contextValues(doc.root, 'step').filter(
-    (step): step is string => typeof step === 'string',
-  )
+  const steps = contextValues(doc.root, 'step')
+
+  // `contextValues` stops at the cap, so a document that reaches it may name steps never checked.
+  if (steps.length >= MAX_CONTEXT_VALUES) {
+    return c.json(
+      {
+        error: 'This form names more steps than this server will check',
+        limit: MAX_CONTEXT_VALUES,
+      },
+      500,
+    )
+  }
+
   const messages = doc.translations[doc.defaultLanguage]
   const scopes = steps.length
     ? steps.map((step) => ({ context: { ...context, step }, messages }))
