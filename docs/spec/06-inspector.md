@@ -242,8 +242,9 @@ expression. Structured conditions use the same closed editor as component visibi
 
 - **`renderWhen`.** **Built.** A Show when row offering Always, Never, a condition, or an expression.
   `renderWhen` is a `PropValue`, so a document can hold any of its kinds: a static falsy reads as
-  Never, and a static truthy or a translation key reads as Always, which is what `isVisible` does with
-  them. Reading anything truthy as a condition left the select saying so while rendering no editor,
+  Never, and a static truthy or a translation key renders as Always, which is what `isVisible` does with
+  them. The select names such a value "Always (unrecognised rule)", apart from Always, so choosing
+  Always clears it. Reading anything truthy as a condition left the select saying so while rendering no editor,
   which made a hand-edited document unfixable from the panel. A
   component cannot test its own field: hiding a component when its own value is empty hides the only
   control that could fill it. The field list comes from the document, so a condition cannot name a key

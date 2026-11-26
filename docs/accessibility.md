@@ -59,20 +59,20 @@ Each row is the lowest pair the suite asserts in that palette. The designer rows
 
 The Tree and panels are the supported keyboard authoring interface: palette buttons add components, the Tree selects and rearranges them, and the panels edit their properties. Canvas and Tree selection stay synchronized. Direct keyboard selection of rendered canvas nodes is outside scope. The form's own controls remain keyboard-operable in Preview, and equivalent authoring operations, clear focus, and understandable announcements remain requirements.
 
-| Key                                                 | Does                                                      |
-| --------------------------------------------------- | --------------------------------------------------------- |
-| Arrow up / down                                     | Move through the structure tree, stepping into containers |
-| Arrow right / left                                  | Into the first child, out to the parent                   |
-| Home / End                                          | First and last row                                        |
-| Alt + arrow up / down                               | Reorder among siblings                                    |
-| Alt + arrow right                                   | Move into the container above                             |
-| Alt + arrow left                                    | Move out one level, landing after the parent              |
-| Enter / Space                                       | Select the focused row                                    |
-| Delete / Backspace                                  | Remove the focused component                              |
-| Ctrl or Cmd + D                                     | Duplicate the focused component, beside itself            |
-| Ctrl or Cmd + Z, Shift + Z, Y                       | Undo and redo                                             |
-| Escape                                              | Clear the selection, or abandon a drag                    |
-| Arrow left / right, Home, End on the inspector tabs | Move between tabs                                         |
+| Key                                                 | Does                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------ |
+| Arrow up / down                                     | Move through the structure tree, stepping into containers    |
+| Arrow right / left                                  | Into the first child, out to the parent                      |
+| Home / End                                          | First and last row                                           |
+| Alt + arrow up / down                               | Reorder among siblings                                       |
+| Alt + arrow right                                   | Move into the container above                                |
+| Alt + arrow left                                    | Move out one level, landing after the parent                 |
+| Enter / Space                                       | Select the focused row; moving focus to a row selects it too |
+| Delete / Backspace                                  | Remove the focused component                                 |
+| Ctrl or Cmd + D                                     | Duplicate the focused component, beside itself               |
+| Ctrl or Cmd + Z, Shift + Z, Y                       | Undo and redo                                                |
+| Escape                                              | Clear the selection, or abandon a drag                       |
+| Arrow left / right, Home, End on the inspector tabs | Move between tabs                                            |
 
 Drag and drop is a pointer gesture with no standard keyboard equivalent, and WAI-ARIA does not define
 one. The Alt-plus-arrow moves are the outliner convention from editors and file trees, chosen because

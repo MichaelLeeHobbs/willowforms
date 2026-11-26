@@ -8,36 +8,36 @@ Dragging into a Repeater or a Step on the canvas belongs to `BUILD`. Step naviga
 
 | ID          | Requirement                                                                                                                                                                 | Pri | Verify | Status   |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| FLOW-REP-01 | The system shall draw a Repeater's contents once for each row in its answer.                                                                                                | P1  | Test   | Proposed |
-| FLOW-REP-02 | The system shall hold a Repeater's answer as a list with one entry per row, each entry holding that row's answers under their answer names.                                 | P1  | Test   | Proposed |
-| FLOW-REP-03 | The system shall hold a nested Repeater's answer inside the row of the outer Repeater that contains it.                                                                     | P1  | Test   | Proposed |
-| FLOW-REP-04 | The system shall draw no rows for a Repeater whose answer is not a list.                                                                                                    | P2  | Test   | Proposed |
-| FLOW-REP-05 | The system shall keep each row's answers separate, so that an answer given in one row appears in no other row.                                                              | P1  | Test   | Proposed |
-| FLOW-REP-06 | The system shall report a change inside a row at an address made of each enclosing Repeater's answer name and row position, outermost first, followed by the answer's name. | P1  | Test   | Proposed |
-| FLOW-REP-07 | The system shall give the host a way to apply a reported change to its answers that places the value in the row the address names.                                          | P1  | Test   | Proposed |
-| FLOW-REP-08 | The system shall address a validation error inside a row by each enclosing Repeater's answer name and row position, followed by the failing component's key.                | P1  | Test   | Proposed |
-| FLOW-REP-09 | The system shall display a row's errors only in that row.                                                                                                                   | P1  | Test   | Proposed |
-| FLOW-REP-10 | The system shall draw every inner row of every outer row when one Repeater is nested inside another.                                                                        | P1  | Test   | Proposed |
-| FLOW-REP-11 | The system shall offer the respondent a control that adds a row to a Repeater.                                                                                              | P1  | Test   | Proposed |
-| FLOW-REP-12 | The system shall add a new row as an empty row after the existing rows.                                                                                                     | P2  | Test   | Proposed |
-| FLOW-REP-13 | The system shall offer the respondent a control on each row that removes that row.                                                                                          | P1  | Test   | Proposed |
-| FLOW-REP-14 | The system shall report an added or removed row to the host as the Repeater's complete new list, at the Repeater's own address.                                             | P1  | Test   | Proposed |
-| FLOW-REP-15 | The system shall disable the add control while the number of rows is at or above the authored maximum.                                                                      | P1  | Test   | Proposed |
-| FLOW-REP-16 | The system shall disable the remove controls while the number of rows is at or below the authored minimum.                                                                  | P1  | Test   | Proposed |
-| FLOW-REP-17 | The system shall apply a guarded row-count bound to the add and remove controls only while its guard holds.                                                                 | P1  | Test   | Proposed |
-| FLOW-REP-18 | The system shall apply the strictest of several applicable row-count bounds to the add and remove controls.                                                                 | P2  | Test   | Proposed |
-| FLOW-REP-19 | The system shall address the rows that remain after a removal by their new positions.                                                                                       | P1  | Test   | Proposed |
-| FLOW-REP-20 | The system shall draw and address rows in their new order when the host reorders a Repeater's list.                                                                         | P2  | Test   | Proposed |
-| FLOW-REP-21 | The system shall keep a Repeater's contents in the form document once, however many rows a respondent adds.                                                                 | P1  | Test   | Proposed |
-| FLOW-REP-22 | The system shall not add a row identifier to the answers.                                                                                                                   | P1  | Test   | Proposed |
-| FLOW-REP-23 | The system shall treat any data-bound container whose answer is a list as a repeated group, whatever its component type.                                                    | P2  | Test   | Proposed |
-| FLOW-REP-24 | The system shall draw one empty row of a Repeater that has no answers while the author is editing, so that its contents can be reached.                                     | P1  | Test   | Proposed |
-| FLOW-REP-25 | The system shall draw no rows of a Repeater that has no answers to a respondent.                                                                                            | P1  | Test   | Proposed |
-| FLOW-REP-26 | The system shall offer the answers of a component's own row separately from the form's answers when the author picks what a condition on that component tests.              | P1  | Test   | Proposed |
-| FLOW-REP-27 | The system shall not offer a component in a nested row an answer that only an outer row holds when the author picks what a condition tests.                                 | P1  | Test   | Proposed |
-| FLOW-REP-28 | The system shall treat a Repeater's list as an answer of the scope that holds the Repeater, not as an answer of its own rows.                                               | P2  | Test   | Proposed |
-| FLOW-REP-29 | The system shall let an expression inside a row read that row's answers, with a row answer taking precedence over a form answer of the same name.                           | P2  | Test   | Proposed |
-| FLOW-REP-30 | The system should warn an author that changing a Repeater's data type stops its rows repeating.                                                                             | P3  | Test   | Proposed |
+| FLOW-REP-01 | The system shall draw a Repeater's contents once for each row in its answer.                                                                                                | P1  | Test   | Accepted |
+| FLOW-REP-02 | The system shall hold a Repeater's answer as a list with one entry per row, each entry holding that row's answers under their answer names.                                 | P1  | Test   | Accepted |
+| FLOW-REP-03 | The system shall hold a nested Repeater's answer inside the row of the outer Repeater that contains it.                                                                     | P1  | Test   | Accepted |
+| FLOW-REP-04 | The system shall draw no rows for a Repeater whose answer is not a list.                                                                                                    | P2  | Test   | Accepted |
+| FLOW-REP-05 | The system shall keep each row's answers separate, so that an answer given in one row appears in no other row.                                                              | P1  | Test   | Accepted |
+| FLOW-REP-06 | The system shall report a change inside a row at an address made of each enclosing Repeater's answer name and row position, outermost first, followed by the answer's name. | P1  | Test   | Accepted |
+| FLOW-REP-07 | The system shall give the host a way to apply a reported change to its answers that places the value in the row the address names.                                          | P1  | Test   | Accepted |
+| FLOW-REP-08 | The system shall address a validation error inside a row by each enclosing Repeater's answer name and row position, followed by the failing component's key.                | P1  | Test   | Accepted |
+| FLOW-REP-09 | The system shall display a row's errors only in that row.                                                                                                                   | P1  | Test   | Accepted |
+| FLOW-REP-10 | The system shall draw every inner row of every outer row when one Repeater is nested inside another.                                                                        | P1  | Test   | Accepted |
+| FLOW-REP-11 | The system shall offer the respondent a control that adds a row to a Repeater.                                                                                              | P1  | Test   | Accepted |
+| FLOW-REP-12 | The system shall add a new row as an empty row after the existing rows.                                                                                                     | P2  | Test   | Accepted |
+| FLOW-REP-13 | The system shall offer the respondent a control on each row that removes that row.                                                                                          | P1  | Test   | Accepted |
+| FLOW-REP-14 | The system shall report an added or removed row to the host as the Repeater's complete new list, at the Repeater's own address.                                             | P1  | Test   | Accepted |
+| FLOW-REP-15 | The system shall disable the add control while the number of rows is at or above the authored maximum.                                                                      | P1  | Test   | Accepted |
+| FLOW-REP-16 | The system shall disable the remove controls while the number of rows is at or below the authored minimum.                                                                  | P1  | Test   | Accepted |
+| FLOW-REP-17 | The system shall apply a guarded row-count bound to the add and remove controls only while its guard holds.                                                                 | P1  | Test   | Accepted |
+| FLOW-REP-18 | The system shall apply the strictest of several applicable row-count bounds to the add and remove controls.                                                                 | P2  | Test   | Accepted |
+| FLOW-REP-19 | The system shall address the rows that remain after a removal by their new positions.                                                                                       | P1  | Test   | Accepted |
+| FLOW-REP-20 | The system shall draw and address rows in their new order when the host reorders a Repeater's list.                                                                         | P2  | Test   | Accepted |
+| FLOW-REP-21 | The system shall keep a Repeater's contents in the form document once, however many rows a respondent adds.                                                                 | P1  | Test   | Accepted |
+| FLOW-REP-22 | The system shall not add a row identifier to the answers.                                                                                                                   | P1  | Test   | Accepted |
+| FLOW-REP-23 | The system shall treat any data-bound container whose answer is a list as a repeated group, whatever its component type.                                                    | P2  | Test   | Accepted |
+| FLOW-REP-24 | The system shall draw one empty row of a Repeater that has no answers while the author is editing, so that its contents can be reached.                                     | P1  | Test   | Accepted |
+| FLOW-REP-25 | The system shall draw no rows of a Repeater that has no answers to a respondent.                                                                                            | P1  | Test   | Accepted |
+| FLOW-REP-26 | The system shall offer the answers of a component's own row separately from the form's answers when the author picks what a condition on that component tests.              | P1  | Test   | Accepted |
+| FLOW-REP-27 | The system shall not offer a component in a nested row an answer that only an outer row holds when the author picks what a condition tests.                                 | P1  | Test   | Accepted |
+| FLOW-REP-28 | The system shall treat a Repeater's list as an answer of the scope that holds the Repeater, not as an answer of its own rows.                                               | P2  | Test   | Accepted |
+| FLOW-REP-29 | The system shall let an expression inside a row read that row's answers, with a row answer taking precedence over a form answer of the same name.                           | P2  | Test   | Accepted |
+| FLOW-REP-30 | The system should warn an author that changing a Repeater's data type stops its rows repeating.                                                                             | P3  | Test   | Accepted |
 
 - FLOW-REP-01: source: docs/spec/03-components.md "Repeated scope"; packages/renderer/src/renderer.test.tsx "draws its children once per row, with each row holding its own answer".
 - FLOW-REP-02: source: docs/spec/12-api.md "Rendering a form" (`data`: "rows nest under the repeater"); packages/core/src/rows.test.ts "collects the answer under the answer name". DOC-SCH-03 describes the same shape in the schema.
@@ -74,31 +74,31 @@ Dragging into a Repeater or a Step on the canvas belongs to `BUILD`. Step naviga
 
 | ID           | Requirement                                                                                                                       | Pri | Verify | Status   |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| FLOW-STEP-01 | The system shall show a step only while the current step the host supplies is that step's name.                                   | P1  | Test   | Proposed |
-| FLOW-STEP-02 | The system shall take the current step from the host's context, never from the answers.                                           | P1  | Test   | Proposed |
-| FLOW-STEP-03 | The system shall leave the current step out of the answers.                                                                       | P1  | Test   | Proposed |
-| FLOW-STEP-04 | The system shall change the step it shows only when the host supplies a different current step.                                   | P1  | Test   | Proposed |
-| FLOW-STEP-05 | The system shall report to the host the step a Back or Next control leads to when the respondent uses it.                         | P1  | Test   | Proposed |
-| FLOW-STEP-06 | The system shall draw Back and Next controls on the current step only when the host asks for controlled navigation.               | P1  | Test   | Proposed |
-| FLOW-STEP-07 | The system shall order a form's steps by their position in the form.                                                              | P1  | Test   | Proposed |
-| FLOW-STEP-08 | The system shall skip, in Back and Next, a step whose condition does not hold for the current answers and context.                | P1  | Test   | Proposed |
-| FLOW-STEP-09 | The system shall disable Back on the first reachable step.                                                                        | P1  | Test   | Proposed |
-| FLOW-STEP-10 | The system shall disable Next on the last reachable step.                                                                         | P1  | Test   | Proposed |
-| FLOW-STEP-11 | The system shall show the respondent's position among the reachable steps, counting from one.                                     | P1  | Test   | Proposed |
-| FLOW-STEP-12 | The system shall not show a total number of steps in its own step controls.                                                       | P1  | Test   | Proposed |
-| FLOW-STEP-13 | The system shall count every component shown for one step name as part of that one step, not as another step.                     | P1  | Test   | Proposed |
-| FLOW-STEP-14 | The system should let the host choose which context value holds the current step, and use the value named step when it does not.  | P3  | Test   | Proposed |
-| FLOW-STEP-15 | The system shall accept a step name of any JSON type without converting it to text.                                               | P2  | Test   | Proposed |
-| FLOW-STEP-16 | The system shall let a condition on one step read an answer given on another step.                                                | P1  | Test   | Proposed |
-| FLOW-STEP-17 | The system shall address an answer on a step exactly as it would be addressed in a form without steps.                            | P1  | Test   | Proposed |
-| FLOW-STEP-18 | The system shall let the host validate only the step being shown.                                                                 | P1  | Test   | Proposed |
-| FLOW-STEP-19 | The system shall give a newly placed Step a visibility condition that names the Step's own key as its step name.                  | P1  | Test   | Proposed |
-| FLOW-STEP-20 | The system shall let an author edit or remove a Step's starting condition like any other visibility condition.                    | P2  | Test   | Proposed |
-| FLOW-STEP-21 | The system shall give a duplicated Step a condition naming the copy's key, not the original's.                                    | P1  | Test   | Proposed |
-| FLOW-STEP-22 | The system shall change a Step's condition to name the Step's new key when the author renames it.                                 | P1  | Test   | Proposed |
-| FLOW-STEP-23 | The system shall show every step on the canvas while the author is editing.                                                       | P1  | Test   | Proposed |
-| FLOW-STEP-24 | The system shall offer a step switcher on the canvas only when the form names two or more steps.                                  | P2  | Test   | Proposed |
-| FLOW-STEP-25 | The system shall list in the step switcher every step name the form's conditions compare the current step against, in form order. | P2  | Test   | Proposed |
+| FLOW-STEP-01 | The system shall show a step only while the current step the host supplies is that step's name.                                   | P1  | Test   | Accepted |
+| FLOW-STEP-02 | The system shall take the current step from the host's context, never from the answers.                                           | P1  | Test   | Accepted |
+| FLOW-STEP-03 | The system shall leave the current step out of the answers.                                                                       | P1  | Test   | Accepted |
+| FLOW-STEP-04 | The system shall change the step it shows only when the host supplies a different current step.                                   | P1  | Test   | Accepted |
+| FLOW-STEP-05 | The system shall report to the host the step a Back or Next control leads to when the respondent uses it.                         | P1  | Test   | Accepted |
+| FLOW-STEP-06 | The system shall draw Back and Next controls on the current step only when the host asks for controlled navigation.               | P1  | Test   | Accepted |
+| FLOW-STEP-07 | The system shall order a form's steps by their position in the form.                                                              | P1  | Test   | Accepted |
+| FLOW-STEP-08 | The system shall skip, in Back and Next, a step whose condition does not hold for the current answers and context.                | P1  | Test   | Accepted |
+| FLOW-STEP-09 | The system shall disable Back on the first reachable step.                                                                        | P1  | Test   | Accepted |
+| FLOW-STEP-10 | The system shall disable Next on the last reachable step.                                                                         | P1  | Test   | Accepted |
+| FLOW-STEP-11 | The system shall show the respondent's position among the reachable steps, counting from one.                                     | P1  | Test   | Accepted |
+| FLOW-STEP-12 | The system shall not show a total number of steps in its own step controls.                                                       | P1  | Test   | Accepted |
+| FLOW-STEP-13 | The system shall count every component shown for one step name as part of that one step, not as another step.                     | P1  | Test   | Accepted |
+| FLOW-STEP-14 | The system should let the host choose which context value holds the current step, and use the value named step when it does not.  | P3  | Test   | Accepted |
+| FLOW-STEP-15 | The system shall accept a step name of any JSON type without converting it to text.                                               | P2  | Test   | Accepted |
+| FLOW-STEP-16 | The system shall let a condition on one step read an answer given on another step.                                                | P1  | Test   | Accepted |
+| FLOW-STEP-17 | The system shall address an answer on a step exactly as it would be addressed in a form without steps.                            | P1  | Test   | Accepted |
+| FLOW-STEP-18 | The system shall let the host validate only the step being shown.                                                                 | P1  | Test   | Accepted |
+| FLOW-STEP-19 | The system shall give a newly placed Step a visibility condition that names the Step's own key as its step name.                  | P1  | Test   | Accepted |
+| FLOW-STEP-20 | The system shall let an author edit or remove a Step's starting condition like any other visibility condition.                    | P2  | Test   | Accepted |
+| FLOW-STEP-21 | The system shall give a duplicated Step a condition naming the copy's key, not the original's.                                    | P1  | Test   | Accepted |
+| FLOW-STEP-22 | The system shall change a Step's condition to name the Step's new key when the author renames it.                                 | P1  | Test   | Accepted |
+| FLOW-STEP-23 | The system shall show every step on the canvas while the author is editing.                                                       | P1  | Test   | Accepted |
+| FLOW-STEP-24 | The system shall offer a step switcher on the canvas only when the form names two or more steps.                                  | P2  | Test   | Accepted |
+| FLOW-STEP-25 | The system shall list in the step switcher every step name the form's conditions compare the current step against, in form order. | P2  | Test   | Accepted |
 
 - FLOW-STEP-01: source: docs/spec/03-components.md "A wizard already runs" and "Where the current step lives"; docs/spec/08-validation.md "The wizard case, which is not the same call" ("Every `Step` carries a `renderWhen` comparing `context.step` to its own key").
 - FLOW-STEP-02: source: docs/spec/03-components.md "Where the current step lives"; docs/spec/12-api.md "Context".

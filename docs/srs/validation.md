@@ -6,26 +6,28 @@ Limits that bound the work a submission can cause belong to `SEC`.
 
 ## Rules (RULE)
 
-| ID          | Requirement                                                                                                    | Pri | Verify | Status   |
-| ----------- | -------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| VAL-RULE-01 | The system shall reject an empty answer to a required question.                                                | P1  | Test   | Accepted |
-| VAL-RULE-02 | The system shall treat a missing value, null, blank text, an empty list and an object with no fields as empty. | P1  | Test   | Accepted |
-| VAL-RULE-03 | The system shall treat zero as an answer.                                                                      | P1  | Test   | Accepted |
-| VAL-RULE-04 | The system shall reject an unchecked box on a required yes/no question.                                        | P1  | Test   | Accepted |
-| VAL-RULE-05 | The system shall accept an empty answer under every recognised rule other than required.                       | P1  | Test   | Accepted |
-| VAL-RULE-06 | The system shall reject a non-empty answer whose type is not the question's data type.                         | P1  | Test   | Accepted |
-| VAL-RULE-07 | The system shall reject text or a list whose length is outside the authored length bounds.                     | P1  | Test   | Accepted |
-| VAL-RULE-08 | The system shall reject a list whose number of items is outside the authored item bounds.                      | P1  | Test   | Accepted |
-| VAL-RULE-09 | The system shall reject a number outside the authored minimum and maximum, which are themselves accepted.      | P1  | Test   | Accepted |
-| VAL-RULE-10 | The system shall reject text that is not an email address under an email rule.                                 | P1  | Test   | Accepted |
-| VAL-RULE-11 | The system shall reject text that is not an http, https, mailto or tel URL under a URL rule.                   | P1  | Test   | Accepted |
-| VAL-RULE-12 | The system shall reject text that is not a UUID under a UUID rule.                                             | P2  | Test   | Accepted |
-| VAL-RULE-13 | The system shall reject text in which the authored pattern is found nowhere.                                   | P1  | Test   | Accepted |
-| VAL-RULE-14 | The system shall reject an answer that differs from the answer a matches rule names.                           | P1  | Test   | Accepted |
-| VAL-RULE-15 | The system shall reject an answer that is not later or greater than the answer an after rule names.            | P1  | Test   | Accepted |
-| VAL-RULE-16 | The system shall reject an answer for which a custom rule's expression is false.                               | P2  | Test   | Accepted |
-| VAL-RULE-17 | The system shall reject any answer, including an empty one, under a rule it does not recognise.                | P1  | Test   | Accepted |
-| VAL-RULE-18 | The system shall reject a non-empty answer under a measuring rule whose bound is not a number.                 | P2  | Test   | Accepted |
+| ID          | Requirement                                                                                                       | Pri | Verify | Status   |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
+| VAL-RULE-01 | The system shall reject an empty answer to a required question.                                                   | P1  | Test   | Accepted |
+| VAL-RULE-02 | The system shall treat a missing value, null, blank text, an empty list and an object with no fields as empty.    | P1  | Test   | Accepted |
+| VAL-RULE-03 | The system shall treat zero as an answer.                                                                         | P1  | Test   | Accepted |
+| VAL-RULE-04 | The system shall reject an unchecked box on a required yes/no question.                                           | P1  | Test   | Accepted |
+| VAL-RULE-05 | The system shall accept an empty answer under every recognised rule other than required.                          | P1  | Test   | Accepted |
+| VAL-RULE-06 | The system shall reject a non-empty answer whose type is not the question's data type.                            | P1  | Test   | Accepted |
+| VAL-RULE-07 | The system shall reject text or a list whose length is outside the authored length bounds.                        | P1  | Test   | Accepted |
+| VAL-RULE-08 | The system shall reject a list whose number of items is outside the authored item bounds.                         | P1  | Test   | Accepted |
+| VAL-RULE-09 | The system shall reject a number outside the authored minimum and maximum, which are themselves accepted.         | P1  | Test   | Accepted |
+| VAL-RULE-10 | The system shall reject text that is not an email address under an email rule.                                    | P1  | Test   | Accepted |
+| VAL-RULE-11 | The system shall reject text that is not an http, https, mailto or tel URL under a URL rule.                      | P1  | Test   | Accepted |
+| VAL-RULE-12 | The system shall reject text that is not a UUID under a UUID rule.                                                | P2  | Test   | Accepted |
+| VAL-RULE-13 | The system shall reject text in which the authored pattern is found nowhere.                                      | P1  | Test   | Accepted |
+| VAL-RULE-14 | The system shall reject an answer that differs from the answer a matches rule names.                              | P1  | Test   | Accepted |
+| VAL-RULE-15 | The system shall reject an answer that is not later or greater than the answer an after rule names.               | P1  | Test   | Accepted |
+| VAL-RULE-16 | The system shall reject an answer for which a custom rule's expression is false.                                  | P2  | Test   | Accepted |
+| VAL-RULE-17 | The system shall reject any answer, including an empty one, under a rule it does not recognise.                   | P1  | Test   | Accepted |
+| VAL-RULE-18 | The system shall reject a non-empty answer under a measuring rule whose bound is not a number.                    | P2  | Test   | Accepted |
+| VAL-RULE-19 | The system shall reject a date answer earlier than its Date picker's earliest date or later than its latest date. | P2  | Test   | Proposed |
+| VAL-RULE-20 | The system shall reject a date answer that is not a calendar date written as year, month and day.                 | P2  | Test   | Proposed |
 
 - VAL-RULE-01, VAL-RULE-02, VAL-RULE-03, VAL-RULE-04, VAL-RULE-05: source: docs/spec/08-validation.md "Only `required` fails on an empty value" and "The rule catalogue".
 - VAL-RULE-06: source: docs/spec/08-validation.md "Field schemas enforce value types".
@@ -35,6 +37,8 @@ Limits that bound the work a submission can cause belong to `SEC`.
 - VAL-RULE-16: source: docs/spec/08-validation.md "The rule catalogue". A throwing evaluator is VAL-WHEN-09.
 - VAL-RULE-17: source: docs/spec/08-validation.md "Only `required` fails on an empty value" (`UNREADABLE_RULE`).
 - VAL-RULE-18: source: packages/core/src/validation.test.ts "a rule with no value to check against". A test is the only source.
+- VAL-RULE-19: source: decided 2026-11-25 while accepting CAT-INP-07, which limits only the picker. Validation accepts any text for a date answer (packages/core/src/validation.ts `matchesFieldType`), so a server accepts dates outside the bounds.
+- VAL-RULE-20: source: the same finding; packages/core/src/schema.ts exports a date answer with `format: date`, which validation does not check. Proposed alongside VAL-RULE-19, not asked for separately.
 
 ## When rules apply (WHEN)
 
