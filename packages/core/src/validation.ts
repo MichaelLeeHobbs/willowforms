@@ -32,35 +32,14 @@ import type {
   ValidationRule,
 } from './types.js'
 
-/**
- * Evaluates a JS expression against the current form data. Host-supplied.
- *
- * `context` is the third argument rather than merged into `data`, because the
- * two have different owners and only one of them is submitted. An evaluator
- * written before context existed ignores it and keeps working.
- */
 export type Evaluator = (expression: string, data: FormData, context?: FormContext) => JsonValue
 
-/**
- * Everything the rules need beyond the answers themselves.
- *
- * A bag rather than more positional arguments, because all are optional
- * and `validateForm(root, data, undefined, context)` is a call nobody should
- * have to write. They are declared `| undefined` on purpose:
- * `exactOptionalPropertyTypes` is on, and a caller forwarding its own optional
- * prop is the normal case, not a mistake.
- */
 export interface EvalOptions {
   evaluate?: Evaluator | undefined
   context?: FormContext | undefined
   /** Active-language strings used by localized validation messages. */
   messages?: Record<string, string> | undefined
-  /**
-   * Which repeater row this evaluation is inside. Absent at the top level.
-   *
-   * Set by the walk that enters a row, never by a caller: a host passing one
-   * would be claiming a position in data it does not control.
-   */
+  /** Set by the walk that enters a row, never by a host. */
   row?: RowContext | undefined
 }
 
@@ -83,14 +62,9 @@ export const DEFAULT_MESSAGES: Record<ValidationRule['key'], string> = {
   custom: 'Invalid value.',
 }
 
-/**
- * How many rows of one repeater will be validated.
- *
- * A form asking somebody to fill in more than this many rows is not a form.
- */
+/** How many rows of one repeater will be validated. */
 export const MAX_ROWS = 5000
 
-/** What a repeater reports when the submitted body asks for more rows than that. */
 export const TOO_MANY_ROWS = 'This list has too many rows to check.'
 
 export const NOT_A_LIST = 'This list was not sent as a list.'
@@ -151,11 +125,8 @@ function compiledPattern(pattern: string): CompiledPattern {
 }
 
 /**
- * Explain why a pattern cannot be evaluated by the bounded matcher.
- *
- * WillowForms pattern rules use RE2 syntax. Backreferences, lookarounds, and other
- * constructs without a linear-time implementation are intentionally unsupported,
- * as are patterns whose compiled program exceeds the complexity limit.
+ * Patterns use RE2 syntax: no backreferences, lookarounds, or anything else without a
+ * linear-time implementation, and no compiled program over the complexity limit.
  */
 export function patternProblem(pattern: string): string | undefined {
   const compiled = compiledPattern(pattern)
@@ -244,12 +215,6 @@ function guardPasses(when: PropValue | undefined, data: FormData, options: EvalO
   }
 }
 
-/**
- * Apply one rule. Returns an error message, or undefined when the value passes.
- *
- * Every rule except 'required' passes on an empty value. Requiredness is one
- * rule's job.
- */
 export function applyRule(
   rule: ValidationRule,
   value: JsonValue | undefined,
@@ -385,7 +350,6 @@ export function isRequired(
   )
 }
 
-/** Row counts allowed by all applicable list bounds. */
 export function itemLimits(
   node: ComponentNode,
   data?: FormData,
@@ -403,7 +367,6 @@ export function itemLimits(
   return { min, max }
 }
 
-/** First failing rule for one field, or undefined when all pass. */
 export function validateField(
   node: ComponentNode,
   data: FormData,
@@ -420,12 +383,8 @@ export function validateField(
 }
 
 /**
- * Validate every visible field. An empty object means the form is valid.
- *
- * Hidden components are skipped, and so is everything beneath them: hiding a
- * container hides its children, and a required field the user cannot see must
- * never block a submit. `isVisible` is shared with the renderer so the two
- * cannot disagree about what "hidden" means.
+ * An empty object means the form is valid. Skips hidden components and everything beneath
+ * them: a required field the user cannot see must never block a submit.
  */
 export function validateForm(
   root: ComponentNode,
@@ -507,22 +466,8 @@ export function autoValidateKeys(root: ComponentNode): Set<string> {
 }
 
 /**
- * The data a form is actually asking for, with answers to hidden questions left out.
- *
- * A value stays in `data` after the field that collected it is hidden. Tick
- * "married", fill in a spouse's name, untick it: `validateForm` correctly stops
- * checking that field, and the answer is still sitting in the payload. The form
- * submits an answer to a question it is no longer asking, and in insurance,
- * medical and legal forms that is a correctness problem rather than a tidiness
- * one.
- *
- * WillowForms cannot clear it unilaterally, because the host owns `data` and
- * hiding is often temporary — an accordion closing must not destroy what
- * someone typed. So this is a projection the host applies when it submits,
- * rather than something done to the value as it is held.
- *
- * Visibility is decided by the same `isVisible` the renderer and `validateForm`
- * use, so all three agree about what is on screen.
+ * Only the answers the form's visible fields hold. Apply when submitting, not to the data
+ * as it is held: hiding is often temporary, and must not destroy what someone typed.
  */
 export function submittedData(
   root: ComponentNode,
@@ -592,30 +537,12 @@ export function submittedAcross(
 }
 
 /**
- * Validate one document under several evaluation environments, merged.
+ * Runs `validateForm` under each of `scopes` and merges the errors; where two report one
+ * key, the first wins. For submitting a multi-step form, where `validateForm` would skip
+ * the steps not on screen and accept the form with their required answers missing.
  *
- * A multi-step form needs two different answers from the same rules. While the
- * user is on step two, only step two should be checked, and that is
- * `validateForm(stepNode, data)` — it already takes any node as its root. At
- * submit, every step has to be checked, and `validateForm(root, data)` will not
- * do it: the other steps are hidden, hidden means not validated, and the form is
- * accepted with required answers missing from steps nobody is looking at.
- *
- * That is `isVisible` behaving exactly as specified, and wrong here, because an
- * earlier step is not *unwanted*, it is *already done*. `renderWhen` false means
- * the author excluded this; a step the user is not on means not yet. The two
- * need different treatment and this is where they get it.
- *
- * No new concept: run the existing walk once per environment and merge. Steps
- * partition the tree, so a key appears under at most one of them and the merge
- * has nothing to resolve. Where scopes do overlap the first answer wins, which
- * matches the first-failing-rule order everywhere else.
- *
- * **The server enumerates the environments from the document, never from the
- * request.** A `validateForm` that took a step would let a client name step one
- * and have the rest go unchecked, and unlike a blocked submit that failure is
- * invisible. `contextValues(root, 'step')` reads the flow out of the document,
- * which is the thing both sides already agree on.
+ * The server builds one scope per step the document names, `contextValues(root, 'step')`,
+ * never from the request: a client that names one step would leave the rest unchecked.
  */
 export function validateAcross(
   root: ComponentNode,

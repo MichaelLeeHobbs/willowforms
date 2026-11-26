@@ -709,10 +709,6 @@
   background: var(--fs-bg-well);
 }
 
-.fs-binding__modes {
-  margin-block-end: 6px;
-}
-
 .fs-binding__mode {
   align-self: start;
   font-size: var(--fs-font-size-sm);
@@ -730,7 +726,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -850,10 +846,6 @@
 
 .fs-rule__name {
   font-weight: 600;
-}
-
-.fs-rule .fs-prop-row__control {
-  gap: 6px;
 }
 
 .fs-rule__remove {
@@ -1299,6 +1291,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -1580,11 +1573,6 @@
   overflow-wrap: anywhere;
 }
 
-/* A property's control has no gap of its own. */
-.fs-prop-row__control > .fs-prop-row__error {
-  margin-block-start: 6px;
-}
-
 .fs-prop-row--wide > .fs-prop-row__control {
   grid-column: 1 / -1;
 }
@@ -1643,7 +1631,8 @@
   min-width: 0;
 }
 
-.fs-prop-row--wide > label {
+.fs-prop-row--wide > label,
+.fs-prop-row--wide > .fs-prop-row__caption {
   grid-column: 1 / 3;
 }
 .fs-prop-row--wide > .fs-prop-row__clear {

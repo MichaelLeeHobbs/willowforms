@@ -1,12 +1,18 @@
 import type { Locator, Page } from '@playwright/test'
 
 import { createDocument, prop } from '../packages/core/src/index.js'
+import type { Condition } from '../packages/core/src/index.js'
 import { STORAGE_KEY, expect, test } from './harness.js'
+
+// Tall, so the panel never scrolls and no scrollbar takes width from a row.
+test.use({ viewport: { width: 1280, height: 2000 } })
 
 const panelOf = (page: Page): Locator =>
   page.getByRole('complementary', { name: 'Component properties' })
 
 const LONG_KEY = 'an_answer_whose_key_is_longer_than_one_line_of_the_panel_is_wide'
+
+const ANSWERED: Condition = { op: 'notEmpty', value: { kind: 'ref', dataKey: 'age' } }
 
 async function open(page: Page): Promise<void> {
   const doc = createDocument('Rows', 'rows')
@@ -29,6 +35,17 @@ async function open(page: Page): Promise<void> {
       schema: { type: 'string' },
     },
     { key: 'trail', type: 'Breadcrumbs', props: { items: prop([]) } },
+    {
+      // No shipped property offers a condition, but a document can hold one.
+      key: 'bound',
+      type: 'TextField',
+      props: {
+        label: {
+          kind: 'condition',
+          condition: { op: 'and', conditions: [{ op: 'or', conditions: [ANSWERED] }] },
+        },
+      },
+    },
   ]
   await page.addInitScript(
     ({ key, text }) => {
@@ -77,37 +94,85 @@ const collisions = (box: Locator): Promise<string[]> =>
     ])
   })
 
+/** A choice opens an editor that is as wide as its picker, and both wider than the picker was. */
+async function expectOpens(
+  box: Locator,
+  [label, choice, editor]: readonly [label: string, choice: string, editor: string],
+): Promise<void> {
+  const picker = box.getByLabel(label, { exact: true })
+  await picker.selectOption({ index: 0 })
+  const resting = await widthOf(picker)
+  await picker.selectOption(choice)
+
+  const opened = box.getByLabel(editor, { exact: true })
+  expect(await widthOf(picker), choice).toBeGreaterThan(resting)
+  expect(await widthOf(opened), editor).toBe(await widthOf(picker))
+  expect(await gap(picker, opened), editor).toBeGreaterThan(4)
+  expect(await collisions(box), choice).toEqual([])
+}
+
+/** Two levels of conditions, each of which indents, still leave fields that can be read. */
+async function expectReadable(box: Locator): Promise<void> {
+  await expect(box.getByLabel('Comparison', { exact: true })).toHaveCount(3)
+  expect(await collisions(box)).toEqual([])
+  for (const field of await box.locator('select, input').all()) {
+    expect(await widthOf(field)).toBeGreaterThan(140)
+  }
+}
+
+async function nest(box: Locator): Promise<void> {
+  await box.getByLabel('Comparison', { exact: true }).selectOption('and')
+  await box.getByLabel('Comparison', { exact: true }).nth(1).selectOption('or')
+}
+
 test('a picker in a rule and the editor it opens each take the whole row', async ({ page }) => {
   await open(page)
   await page.getByRole('tab', { name: 'Rules', exact: true }).click()
   const rule = panelOf(page).getByRole('listitem').filter({ hasText: 'Required' }).first()
 
-  for (const [label, choice, editor] of [
+  for (const row of [
     ['Message', 'custom', 'Custom message'],
     ['Message', 'i18n', 'Translation key'],
     ['Message', 'i18n', 'French'],
     ['Apply when', 'computed', 'Guard expression'],
     ['Apply when', 'condition', 'Comparison'],
   ] as const) {
-    const picker = rule.getByLabel(label, { exact: true })
-    await picker.selectOption({ index: 0 })
-    const resting = await widthOf(picker)
-    await picker.selectOption(choice)
+    await expectOpens(rule, row)
+  }
+  await nest(rule)
+  await expectReadable(rule)
+})
 
-    const opened = rule.getByLabel(editor, { exact: true })
-    expect(await widthOf(picker), choice).toBeGreaterThan(resting)
-    expect(await widthOf(opened), editor).toBe(await widthOf(picker))
-    expect(await gap(picker, opened), editor).toBeGreaterThan(4)
-    expect(await collisions(rule), choice).toEqual([])
+test('a bound property, and Show when, each take the whole row', async ({ page }) => {
+  await open(page)
+  const rowOf = (label: string): Locator =>
+    panelOf(page)
+      .locator('.fs-prop-row')
+      .filter({ has: page.getByLabel(label, { exact: true }) })
+
+  const bound = rowOf('Label binding')
+  const caption = bound.locator('> label, > .fs-prop-row__caption')
+  for (const row of [
+    ['Label binding', 'i18n', 'Translation key'],
+    ['Label binding', 'i18n', 'French'],
+    ['Label binding', 'computed', 'Label expression'],
+  ] as const) {
+    await expectOpens(bound, row)
+    // On the label's line, and not in a column of its own.
+    const reset = bound.getByRole('button', { name: 'Reset Label', exact: true })
+    expect(await gap(reset, bound.getByLabel('Label binding', { exact: true }))).toBeGreaterThan(4)
+    expect(await widthOf(caption)).toBeGreaterThan(150)
   }
 
-  // A group indents its conditions, and is where a narrow row shows first.
-  await rule.getByLabel('Comparison', { exact: true }).selectOption('and')
-  await expect(rule.getByRole('button', { name: 'Remove condition 1' })).toBeVisible()
-  expect(await collisions(rule)).toEqual([])
-  for (const field of await rule.getByLabel('Comparison', { exact: true }).all()) {
-    expect(await widthOf(field)).toBeGreaterThan(150)
-  }
+  const show = rowOf('Show when')
+  await expectOpens(show, ['Show when', 'computed', 'Show when expression'])
+  await expectOpens(show, ['Show when', 'condition', 'Comparison'])
+  await nest(show)
+  await expectReadable(show)
+
+  await select(page, 'bound')
+  await expectReadable(bound)
+  expect(await widthOf(caption)).toBeGreaterThan(150)
 })
 
 test('a refused value leaves its field as wide as it was, with the reason under it', async ({

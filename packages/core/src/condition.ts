@@ -4,7 +4,6 @@ import { isEmpty, readPath, valueOf } from './json.js'
 import type { RowContext } from './rows.js'
 import type { Condition, FormContext, FormData, JsonValue, Operand } from './types.js'
 
-/** Deep equality over JSON, which is the only equality a document can express. */
 export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth = 0): boolean {
   if (a === b) return true
   if (depth > MAX_CONDITION_DEPTH) return false
@@ -22,18 +21,12 @@ export function same(a: JsonValue | undefined, b: JsonValue | undefined, depth =
 }
 
 /**
- * How deep a stored structure this will walk before giving up.
+ * `evaluate` and `same` are total, and a stored document nests as deep as whoever wrote it
+ * chose: a `RangeError` out of `isVisible` is an unhandled 500 on submit and a blank form
+ * in the browser.
  *
- * `evaluate` and `same` both recurse, in functions whose whole contract is that they
- * are total, and a document nests as deep as whoever stored it chose. A `RangeError`
- * out of `isVisible` is an unhandled 500 on submit and a blank form in the browser.
- *
- * High enough that nothing a person authors can reach it, low enough that the stack
- * does not.
- *
- * Exported because every walker that crosses a condition has to stop where the
- * evaluator stops. A gate with a higher bound would accept documents the renderer
- * cannot answer.
+ * Every walker that crosses a condition has to stop where the evaluator stops: a gate with
+ * a higher bound would accept documents the renderer cannot answer.
  */
 export const MAX_CONDITION_DEPTH = 200
 
@@ -83,12 +76,8 @@ function order(a: JsonValue | undefined, b: JsonValue | undefined): number | und
 }
 
 /**
- * Whether a condition holds against the current form data.
- *
- * Total, and false for anything it cannot understand. A document is data and
- * can be hand-edited, so an unrecognised `op` is reachable; returning false
- * matches what a computed condition does without an evaluator, which keeps
- * "hidden" the answer to every question this cannot answer.
+ * Total, and false for anything it cannot understand: a document can be hand-edited, and
+ * "hidden" is the answer to every question this cannot answer.
  */
 export function evaluateCondition(
   condition: Condition,
