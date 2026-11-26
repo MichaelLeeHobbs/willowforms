@@ -189,6 +189,10 @@ test('setting a property leaves its field where it was and as wide, with Reset u
   const named = (label: string): { name: RegExp } => ({
     name: new RegExp('^' + label + '( \\(modified\\))?$'),
   })
+  const right = async (locator: Locator): Promise<number> => {
+    const box = (await locator.boundingBox())!
+    return box.x + box.width
+  }
 
   const sets = async (
     [role, label]: [Role, string],
@@ -209,19 +213,12 @@ test('setting a property leaves its field where it was and as wide, with Reset u
     const under = await gap(row.locator('> label'), reset)
     expect(under, 'Reset is not just under the label').toBeGreaterThan(0)
     expect(under, 'Reset is not just under the label').toBeLessThan(12)
-    expect(
-      (await reset.boundingBox())!.x + (await widthOf(reset)),
-      'Reset reaches the field',
-    ).toBeLessThan(before!.x)
+    expect(await right(reset), 'Reset reaches the field').toBeLessThan(before!.x)
     expect(await widthOf(reset), 'Reset fills the label column').toBeLessThan(
       await widthOf(row.locator('> label')),
     )
     // The control takes the rest of the row: no column is kept for Reset.
-    const [control, whole] = [
-      await row.locator('> .fs-prop-row__control').boundingBox(),
-      await row.boundingBox(),
-    ]
-    expect(control!.x + control!.width).toBeCloseTo(whole!.x + whole!.width, 0)
+    expect(await right(row.locator('> .fs-prop-row__control'))).toBeCloseTo(await right(row), 0)
     expect(await collisions(row)).toEqual([])
 
     await reset.click()
@@ -230,6 +227,11 @@ test('setting a property leaves its field where it was and as wide, with Reset u
   }
 
   await sets(['textbox', 'Placeholder'], (field) => field.fill('x'), ['textbox', 'Helper text'])
+  // A field with no control wrapper ends at the same edge.
+  expect(await right(panel.getByRole('textbox', named('Key')))).toBeCloseTo(
+    await right(panel.getByRole('textbox', named('Placeholder'))),
+    0,
+  )
   await sets(['checkbox', 'Multiline'], (field) => field.check())
 
   await select(page, 'box')

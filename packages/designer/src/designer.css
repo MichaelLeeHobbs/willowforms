@@ -1277,19 +1277,17 @@
 
 /*
  * One flexible column: at 288px a second one starves the control. The binding
- * mode picker sits in the control cell, above the control. The third column
- * holds Reset only in a wide row; elsewhere the control spans it.
+ * mode picker sits in the control cell, above the control.
  */
 .fs-prop-row {
   display: grid;
-  grid-template-columns: 108px minmax(0, 1fr) auto;
+  grid-template-columns: 108px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   margin-block-end: 10px;
 }
 
 .fs-prop-row__control {
-  grid-column: 2 / -1;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1590,6 +1588,10 @@
   overflow-wrap: anywhere;
 }
 
+/* A third column for Reset, on the label's line above the control. */
+.fs-prop-row--wide {
+  grid-template-columns: 108px minmax(0, 1fr) auto;
+}
 .fs-prop-row--wide > .fs-prop-row__control {
   grid-column: 1 / -1;
 }

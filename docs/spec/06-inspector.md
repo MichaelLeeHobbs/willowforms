@@ -95,8 +95,8 @@ purpose, because a half-working editor that lies about what it understands is wo
 Every row also carries its binding mode picker when the property offers more than one. See
 [07-bindings.md](07-bindings.md).
 
-**The picker sits above the control, not beside it.** A property row is `108px minmax(0, 1fr) auto`:
-the label, then the control across the other two columns. The picker shares the control's cell. Reset sits under the label, so setting a value neither moves nor narrows the control: it is as wide before a value is set as after.
+**The picker sits above the control, not beside it.** A property row is `108px minmax(0, 1fr)`:
+the label, then the control. The picker shares the control's cell. Reset sits under the label, so setting a value neither moves nor narrows the control: it is as wide before a value is set as after. A row with no picker is shorter than a label with Reset under it, so it grows when a value is set.
 
 Inline was tried and does not fit. At the pane's 288px, a label, a readable picker and a usable text box
 cannot share one line, and the first attempt gave the picker the flexible column and the control its
@@ -105,7 +105,7 @@ control that reads as an empty box is worse than one that is obviously absent.
 
 Booleans use the same vertical arrangement, so every row reads the same way.
 
-A property bound to an expression, a translation or a condition takes the whole width, with its label and Reset on the line above, because those editors need more room than two columns give, and a group of conditions indents. Show when, and a rule's Message and Apply when, do the same while their editor is open. The reason a Key, Data key, Pattern or Advanced CSS value was refused takes a line of its own under the row, so it cannot narrow the field it is about.
+A property bound to an expression, a translation or a condition takes the whole width, with its label and Reset on the line above, because those editors need more room than the control's column gives, and a group of conditions indents. Show when, and a rule's Message and Apply when, do the same while their editor is open. The reason a Key, Data key, Pattern or Advanced CSS value was refused takes a line of its own under the row, so it cannot narrow the field it is about.
 
 ### Choice options
 
