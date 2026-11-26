@@ -16,7 +16,8 @@ for (const density of ['comfortable', 'compact']) {
     doc.root.props['density'] = prop(density)
     doc.root.children = [
       { key: 'card', type: 'Card', props: {}, children: LEVELS.map(heading) },
-      { ...heading('h5'), key: 'authored', css: { any: 'font-size: 29px; font-weight: 400' } },
+      { ...heading('h2'), key: 'authored', css: { any: 'font-size: 29px; font-weight: 400' } },
+      { key: 'body', type: 'Text', props: { text: prop('Body text'), variant: prop('body') } },
       {
         key: 'field',
         type: 'TextField',
@@ -58,7 +59,9 @@ for (const density of ['comfortable', 'compact']) {
     const label = await page
       .locator('[data-fs-key="field"] .fsh-field__label')
       .evaluate((element) => parseFloat(getComputedStyle(element).fontSize))
-    expect(Math.min(...SIZES)).toBeGreaterThan(label)
+    const smallest = Math.min(...(await Promise.all(LEVELS.map(size))))
+    expect(smallest).toBeGreaterThan(label)
+    expect(smallest).toBeGreaterThanOrEqual(await size('body'))
 
     const authored = page.locator('[data-fs-key="authored"]')
     await expect(authored).toHaveCSS('font-size', '29px')
