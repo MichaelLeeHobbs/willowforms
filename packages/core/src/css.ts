@@ -9,26 +9,18 @@ import type { ComponentNode, Device } from './types.js'
 import { walk } from './tree.js'
 
 export interface StyleSheetOptions {
-  /** Emit only this device's rules, flat. For a canvas that simulates a width. */
+  /**
+   * For a canvas that simulates a width: emits `any` and this device's rules, with no media
+   * query.
+   */
   device?: Device | undefined
   /**
-   * Confine every rule to one rendered form.
-   *
-   * Keys are unique within a document, not within a page. Two forms rendered
-   * together share a `root` key and usually more, so the renderer passes a
-   * per-instance scope and puts the matching attribute on every node.
+   * Keys are unique within a document, not a page: without this, one form's rules style
+   * another's nodes. The caller puts it on every node as `data-fs-scope`.
    */
   scope?: string | undefined
 }
 
-/**
- * Which widths each device means at runtime.
- *
- * The designer simulates a device by sizing a frame, so on the canvas the
- * device is chosen explicitly and these are not used. In a real page there is
- * no frame and the viewport is the viewport, so the same document has to become
- * media queries. Both paths come from this one table.
- */
 export const DEVICE_QUERY: Record<Exclude<Device, 'any'>, string> = {
   mobile: '(max-width: 767px)',
   tablet: '(min-width: 768px) and (max-width: 1023px)',
@@ -53,13 +45,7 @@ function quotesBalanced(text: string): boolean {
   return single % 2 === 0 && double % 2 === 0
 }
 
-/**
- * The declarations, or nothing if the text is not only declarations.
- *
- * Returning nothing rather than a cleaned-up version is deliberate: silently
- * changing what an author wrote is how a rule ends up meaning something nobody
- * asked for. The designer says the text was refused; the renderer leaves it out.
- */
+/** Refuses rather than cleans up: a partly kept rule means something its author did not write. */
 export function safeDeclarations(text: string | undefined): string | undefined {
   if (!text) return undefined
   // Documents are external data; a non-string style is simply unusable.
@@ -84,15 +70,8 @@ const FORBIDDEN_VALUE = /[{}<@;!\\]|\/\*|[\u0000-\u001f\u007f]/
 const FETCHING = /(url|image-set|element|cross-fade)\s*\(/i
 
 /**
- * One style value, or nothing if it could be more than one.
- *
- * Called at the sink rather than at document load, because `resolveProp`
- * evaluates a `computed` binding through the host's evaluator at render time, so
- * the string a kit is handed need not appear in the document at all.
- *
- * Nothing rather than a cleaned-up value, for the reason `safeDeclarations`
- * gives: an author who wrote something refusable is better served by the
- * property being absent than by a value they did not write.
+ * Call at the sink, not at document load: a `computed` binding's value need not appear in
+ * the document at all. Refuses rather than cleans up, as `safeDeclarations` does.
  */
 export function safeStyleValue(value: string | undefined): string | undefined {
   if (!value) return undefined
@@ -123,17 +102,8 @@ function selectorFor(key: string, scope: string | undefined): string {
 }
 
 /**
- * A stylesheet for everything in the tree that carries `css`.
- *
- * `any` is the base layer, applied at every width, and a device entry overrides
- * it at that device's widths. It is not a fourth breakpoint: a component with
- * only `any` looks the same everywhere, which is what an author who never opens
- * the viewport switcher should get.
- *
- * With a `device` argument the rules for that device are emitted flat, with no
- * media query, which is what the designer's canvas needs: it simulates a device
- * by sizing a frame, and a media query would answer about the browser window
- * instead. Without one, every device becomes its query.
+ * A node's `css.any` applies at every width, and a device's own rules override it at that
+ * device's widths.
  */
 export function styleSheetFor(root: ComponentNode, options: StyleSheetOptions = {}): string {
   const { device, scope } = options
@@ -222,7 +192,6 @@ function splitTop(text: string, separator: string, limit = Infinity): string[] {
   return parts
 }
 
-/** Declarations back to text, one per line so the raw field stays readable. */
 export function printDeclarations(declarations: [string, string][]): string {
   return declarations.map(([name, value]) => name + ': ' + value).join(';\n')
 }
@@ -250,7 +219,6 @@ export function setDeclaration(
   return printDeclarations(declarations)
 }
 
-/** What a property is set to in this text, if anything. */
 export function readDeclaration(text: string | undefined, name: string): string {
   const wanted = normaliseName(name)
   return parseDeclarations(text).find(([key]) => key === wanted)?.[1] ?? ''

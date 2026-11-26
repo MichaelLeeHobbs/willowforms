@@ -27,16 +27,9 @@ export interface JsonSchemaProperty {
   maximum?: number
   pattern?: string
   items?: JsonSchemaProperty
-  /**
-   * A repeater's rows are objects, so `items` carries their shape.
-   *
-   * Repetition is the one structural thing JSON Schema expresses natively, and
-   * a row's `required` belongs here rather than on the document: those fields
-   * are required *of each row*, not of the payload.
-   */
   properties?: Record<string, JsonSchemaProperty>
   required?: string[]
-  /** Optional encoding annotation for host-authored schemas; not inferred from a file field. */
+  /** For host-authored schemas; not inferred from a file field. */
   contentEncoding?: string
 }
 

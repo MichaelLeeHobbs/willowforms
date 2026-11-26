@@ -2,7 +2,6 @@ import type { ComponentDef } from './kit.js'
 import type { ComponentNode, FormDocument, JsonValue, PropValue } from './types.js'
 import { generateKey } from './tree.js'
 
-/** Shorthand for a static property value. */
 export function prop(value: JsonValue): PropValue {
   return { kind: 'static', value }
 }
@@ -11,15 +10,7 @@ export function emptyRoot(): ComponentNode {
   return { key: 'root', type: 'Screen', props: {}, children: [] }
 }
 
-/**
- * A new, empty document.
- *
- * `en-US` is the default language and there is no parameter for it, on purpose:
- * a document with no language cannot be authored at all -- every translation
- * bundle is keyed by tag -- and asking every caller to choose one before they
- * have a form is a question with no useful answer at that moment. The Settings
- * tab renames, adds and removes languages, including this one.
- */
+/** Its one language is `en-US`. */
 export function createDocument(name: string, id: string): FormDocument {
   return {
     version: '1',
@@ -34,10 +25,6 @@ export function createDocument(name: string, id: string): FormDocument {
   }
 }
 
-/**
- * Instantiate a palette entry as a tree node, assigning a free key and seeding
- * props from the definition's defaults.
- */
 export function instantiate(def: ComponentDef, root: ComponentNode): ComponentNode | undefined {
   const built = Object.create(null) as Record<string, PropValue>
 

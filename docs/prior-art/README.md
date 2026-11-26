@@ -35,7 +35,7 @@ repository enforces rather than aspires to.
 | Buttons with no accessible name                    | Zero, enforced by a test that walks the shell.                                                |
 | Tab strips with no `role="tablist"`                | Real tablists with roving tabindex, arrow keys, and panels linked both ways.                  |
 | No landmarks                                       | `header`, `main`, and named `aside` regions, checked by test.                                 |
-| A primary button at 3.03:1                         | Contrast computed from the stylesheets in CI. That label sits at 5.49:1 light, 6.39:1 dark.   |
+| A primary button at 3.03:1                         | Contrast computed from the stylesheets in CI, by `test/contrast.test.ts`.                     |
 | A `url`-only field reporting "Required" when blank | Only `required` fails on an empty value. There is a test named after this bug.                |
 | No confirmation on destructive actions             | Undo and redo cover every operation, which beats a dialog nobody reads.                       |
 

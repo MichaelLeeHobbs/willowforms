@@ -14,9 +14,7 @@ export const kit = muiKit
 export const renderers = muiRendererKit
 ```
 
-A kit has two halves that live in different packages. `muiKit` is the metadata half, a `Kit` from
-`@willowforms/core`, and it is all the designer ever sees. `muiRendererKit` is the rendering half, a
-`RendererKit` from `@willowforms/renderer`, and it is all the runtime ever sees.
+A kit has two halves that live in different packages. `muiKit` is the metadata half, a `Kit` from `@willowforms/core`, and the designer builds its palette and properties panel from it. `muiRendererKit` is the rendering half, a `RendererKit` from `@willowforms/renderer`, and it is all the runtime ever sees. The designer takes both, because its canvas draws the form with the renderer.
 
 It ships 26 component types, the same set as `@willowforms/kit-html`, so a document authored against one
 kit renders against the other. One property is not shared: `Button.variant` is `contained`, `outlined`

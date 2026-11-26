@@ -41,14 +41,7 @@ function fromPropValue(value: PropValue | undefined, out: Set<string>): void {
   }
 }
 
-/**
- * Every context path this document reads, in no particular order.
- *
- * Covers visibility rules, condition-bound properties, and the `when` guard on
- * a validation rule, which are the three places a `Condition` can appear.
- * Expressions are not covered and cannot be: what a string of JavaScript reads
- * is the evaluator's business, and core does not parse it.
- */
+/** Does not cover what an expression reads: core does not parse it. */
 export function contextKeys(root: ComponentNode): Set<string> {
   const keys = new Set<string>()
 
@@ -77,25 +70,12 @@ export function contextKeys(root: ComponentNode): Set<string> {
 }
 
 /**
- * Every node in this document that cannot be evaluated without a sandbox.
+ * Keys of the nodes that cannot be evaluated without a sandbox. Ask once at startup; total,
+ * because nothing has refused the document by then.
  *
- * The sibling of `contextKeys`, and it exists for the same failure. A condition
- * reading a path the host never supplied hides its component and takes it out of
- * validation; a `computed` binding with no evaluator does exactly that —
- * `isVisible` answers false for one, so the node and its whole subtree leave
- * `validateForm`.
- *
- * It is the worse of the two, because a host can inject an evaluator in one
- * place and not the other. The browser then shows a section, validates it, and
- * submits; the server validates nothing beneath it and answers that the form is
- * fine. Nothing at evaluation time can notice, which is why this is a question
- * asked once at startup.
- *
- * Node keys rather than expressions, because the expression is the evaluator's
- * business and the node is what a host can go and look at.
- *
- * Total on a malformed document, like everything else here: a host is told to
- * call this at startup, which is before anything has refused the document.
+ * Without an evaluator a `computed` `renderWhen`, for one, takes its node and its whole
+ * subtree out of `validateForm`: a host that injects one only in the browser has a server
+ * that calls an unchecked form fine.
  */
 export function evaluatorKeys(root: ComponentNode): string[] {
   const keys = new Set<string>()
@@ -129,15 +109,9 @@ export function evaluatorKeys(root: ComponentNode): string[] {
 }
 
 /**
- * The paths this document reads that the context does not hold.
- *
- * Call it once at startup and fail loudly. An empty set is the only result a
- * host should accept, because every path in it is a rule that will quietly not
- * apply.
- *
- * A path is missing when it cannot be read at all, not when it holds a falsy
- * value: `false` and `0` are answers a condition is entitled to see, the same
- * rule `valueOf` and `isEmpty` follow everywhere else.
+ * Call once at startup and accept only an empty result: every path in it is a rule that
+ * will quietly not apply. A path is missing when it cannot be read at all, not when it
+ * holds a falsy value.
  */
 export function missingContext(root: ComponentNode, context: FormContext): string[] {
   const missing: string[] = []
@@ -150,33 +124,14 @@ export function missingContext(root: ComponentNode, context: FormContext): strin
 export const MAX_CONTEXT_VALUES = 1000
 
 /**
- * Every value a document compares one context path against.
+ * The literals this document compares a context path with, and the options of its `in` and
+ * `notIn`. A comparison with a field contributes nothing.
  *
- * The primitive a multi-step form needs, without core learning what a step is.
- * A step is a container shown when `context.step` equals its own name, so the
- * set of steps is the set of names the document compares that path against:
- * `contextValues(root, 'step')` is the flow.
- *
- * It matters that this reads the document rather than taking a list. A server
- * validating a submit has to check every step, and asking the browser which
- * steps exist would let a client that names one step have the other steps go
- * unchecked. The document is the thing both sides already agree on.
- *
- * Structural, like `contextKeys`, and for the same reason: a document is data.
- * Any comparison contributes the literal on its other side, and `in`/`notIn`
- * contribute their options. That deliberately includes operators nobody would
- * write against a step name — `gt` on one is meaningless, and it is still
- * collected.
- *
- * Collecting too much is the safe direction and collecting too little is not.
- * The caller is `validateAcross`, so a name that turns out not to be a step
- * costs one extra pass over a tree in which nothing matches it, while a name
- * this missed is a step whose required fields never get checked. The same
- * reasoning as reading structurally rather than by `op`: a new operator must
- * not fall silently out of a check that exists to catch omissions.
- *
- * An operator comparing a context path to a field contributes nothing, because
- * there is no name there to collect.
+ * A server takes the steps of a form from this, `contextValues(root, 'step')`, never from
+ * the request: a client that names one step would leave the others unchecked. Any
+ * comparison with a literal counts, even `gt`: a name this missed is a step whose required
+ * fields never get checked. It stops at `MAX_CONTEXT_VALUES`, so a server refuses a document
+ * whose list is that long rather than leave the steps past it unchecked.
  */
 export function contextValues(root: ComponentNode, path: string): JsonValue[] {
   if (path === '') return []

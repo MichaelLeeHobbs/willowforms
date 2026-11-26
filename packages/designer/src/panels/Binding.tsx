@@ -68,7 +68,7 @@ export function BindingMode({
   const current: BindingKind = value?.kind ?? 'static'
 
   return (
-    <div className="fs-binding__modes">
+    <div>
       <label className="fs-visually-hidden" htmlFor={id}>
         {schema.label} binding
       </label>
@@ -304,7 +304,7 @@ export function TranslationEditor({
 
       <p className="fs-prop-row__hint">
         An untranslated key renders as the key itself, which makes a gap obvious rather than showing
-        an empty label. Languages are managed on the Form tab.
+        an empty label. Languages are managed on the Settings tab.
       </p>
     </>
   )

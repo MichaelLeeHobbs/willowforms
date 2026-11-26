@@ -1,46 +1,23 @@
-/**
- * The WillowForms document model.
- *
- * A form is a recursive tree of {@link ComponentNode}. The tree is the source of
- * truth; JSON Schema is an export format, not the storage format, because JSON
- * Schema cannot express layout or nesting.
- */
-
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue }
 
-/** Breakpoints a style value can be scoped to. */
 export type Device = 'any' | 'desktop' | 'tablet' | 'mobile'
 
-/** Lifecycle hooks a component can subscribe to. */
 export type EventName = 'onChange' | 'onClick' | 'onBlur' | 'onFocus' | 'onMount' | 'onUnmount'
 
-/**
- * A property value is a tagged union rather than a bag discriminated by the presence of
- * an optional field. Consumers check every `kind`, so adding a binding mode fails the
- * build.
- */
 export type PropValue =
   | { kind: 'static'; value: JsonValue }
   /** A JS expression evaluated against the live form at render time. */
   | { kind: 'computed'; expression: string }
-  /** A lookup into the active language's translation bundle. */
   | { kind: 'i18n'; key: string }
   /**
-   * A structured condition, evaluated by core with no sandbox.
-   *
-   * Resolves to a boolean, so it is meant for `renderWhen`, a rule's `when`
-   * guard, and properties that take one. Nothing stops it being set on a label,
-   * where it renders as `true` or `false`; the panel only offers it where it
-   * makes sense, which is the same way `i18n` is offered only on copy.
+   * Evaluated by core with no sandbox. Resolves to a boolean, so on a label it renders as
+   * `true` or `false`.
    */
   | { kind: 'condition'; condition: Condition }
 
 /**
- * The closed set of comparisons a document can express.
- *
- * Closed on purpose. This is a vocabulary, not a language: it can be
- * enumerated, drawn as a picker, and evaluated without executing anything. See
- * `evaluateCondition`, and [01-document-model.md](../../../docs/spec/01-document-model.md).
+ * Closed on purpose: evaluated without executing anything. See
+ * [01-document-model.md](../../../docs/spec/01-document-model.md).
  */
 export type Condition =
   | { op: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte'; left: Operand; right: Operand }
@@ -54,17 +31,7 @@ export type Operand =
   | {
       kind: 'ref'
       dataKey: string
-      /**
-       * Which answer this names when it is evaluated inside a repeater's row.
-       *
-       * `form` reads the top level and `row` reads the enclosing row. Absent
-       * means `form`.
-       *
-       * A discriminant rather than a path grammar in the document. Once a name
-       * could mean either, something has to decide which, and every mechanism
-       * for deciding reads plausibly and tests something else — which is how a
-       * library ends up with eight flavours of path per component.
-       */
+      /** Inside a repeater, `row` reads the enclosing row. Absent means `form`. */
       scope?: 'form' | 'row'
     }
   | { kind: 'context'; path: string }
@@ -96,13 +63,12 @@ export interface CodeAction {
 export interface Language {
   /** BCP 47 primary subtag, e.g. `en`. */
   code: string
-  /** Region subtag, e.g. `US`. Optional for languages without one. */
+  /** Region subtag, e.g. `US`. */
   dialect?: string
   name: string
   bidi: 'ltr' | 'rtl'
 }
 
-/** The data-shape contract for a component that participates in form data. */
 export interface FieldSchema {
   type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object' | 'file'
 
@@ -111,13 +77,6 @@ export interface FieldSchema {
   autoValidate?: boolean
 }
 
-/**
- * Validation rules carry their parameters in the type.
- *
- * A discriminated union rather than an untyped `{ key, message? }`: the latter
- * cannot say that `minLength` has a number and `required` has nothing, so the
- * parameter travels in a side channel and every reader guesses.
- */
 export type ValidationRule =
   | { key: 'required'; message?: string | PropValue; when?: PropValue }
   | { key: 'minLength'; value: number; message?: string | PropValue; when?: PropValue }
@@ -142,37 +101,25 @@ export type ValidationRule =
 export type ValidationKey = ValidationRule['key']
 
 export interface ComponentNode {
-  /** Unique within the document. Doubles as the data key unless overridden. */
+  /** Unique within the document. */
   key: string
   /**
-   * The name this component's value takes in submitted data. Defaults to `key`.
-   *
-   * `key` is identity: unique within the document, the link from a DOM element
-   * back to a node, and what an error is reported against. `dataKey` is the name
-   * a form author chose for the value, and it is allowed to repeat: two fields
-   * behind opposite `renderWhen` guards writing one answer is a real pattern,
-   * and forbidding it would buy nothing.
-   *
-   * That split is why errors stay keyed by `key`. An error belongs to a
-   * component on screen, and two components sharing a `dataKey` still need to be
-   * able to say different things.
+   * Defaults to `key`, and may repeat: two fields behind opposite `renderWhen` guards can
+   * write one answer. Errors are reported against `key`.
    */
   dataKey?: string
-  /** Kit-scoped component id, e.g. `TextField`, `Stack`. */
   type: string
   props: Record<string, PropValue>
   /** Present only on data-bound components. */
   schema?: FieldSchema
   events?: Partial<Record<EventName, ActionRef[]>>
-  /** Containers only. Absent means the component cannot take children. */
+  /** Absent means the component cannot take children. */
   children?: ComponentNode[]
-  /** Raw CSS text per breakpoint. */
   css?: Partial<Record<Device, string>>
-  /** Conditional visibility. Absent means always rendered. */
+  /** Absent means no condition of its own. */
   renderWhen?: PropValue
 }
 
-/** Reserved for versioned document-wide settings. Version 1 defines none. */
 export type FormSettings = Record<string, never>
 
 export interface FormDocument {
@@ -191,36 +138,15 @@ export interface FormDocument {
 }
 
 /**
- * Runtime form data, keyed by **data key**.
- *
- * Read a node's value at `dataKeyOf(node)`, which is `node.dataKey ?? node.key`,
- * not at `node.key`: a field the author renamed is read and submitted under the
- * name they chose, and two fields sharing a data key are one answer. Errors stay
- * keyed by component key, for the reason `ComponentNode.dataKey` gives.
- *
- * Inside a repeater the keys are the row's, not the form's: a row is a
- * `FormData` of its own, nested under the repeater's data key.
+ * Keyed by data key: read a node at `dataKeyOf(node)`, not `node.key`. A repeater's rows
+ * are each a `FormData` of their own, nested under the repeater's data key.
  */
 export type FormData = Record<string, JsonValue>
 
 /**
- * What the host knows that the form did not ask.
- *
- * The signed-in user's role, a feature flag, the tenant's country, how many
- * addresses a lookup returned. A condition can read it, and it is never part of
- * the payload, because it is not an answer to anything.
- *
- * It is JSON, and that is a rule rather than a convenience. `renderWhen` gates
- * validation, so a server running `validateForm` on the same document has to
- * reach the same answer as the browser did. A value the server cannot be handed
- * is a value the two will disagree about, and they disagree silently: the field
- * is simply not checked. So anything a condition can read has to survive being
- * sent to Node, which means JSON and nothing else.
- *
- * That is also why a `File`, an `AbortController` or a spinner's own boolean
- * does not live here. Those belong to the component holding them, they are the
- * kit's business, and no condition can read them. See
- * [12-api.md](../../../docs/spec/12-api.md#state-that-is-not-an-answer).
+ * Never submitted. JSON only: `renderWhen` gates validation, so a server must be able to
+ * hold the same context as the browser, or it silently skips fields the browser checked.
+ * See [12-api.md](../../../docs/spec/12-api.md#state-that-is-not-an-answer).
  */
 
 export type FormContext = Readonly<Record<string, JsonValue>>
