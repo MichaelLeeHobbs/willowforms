@@ -1277,7 +1277,8 @@
 
 /*
  * One flexible column: at 288px a second one starves the control. The binding
- * mode picker sits in the control cell, above the control.
+ * mode picker sits in the control cell, above the control. The third column
+ * holds Reset only in a wide row; elsewhere the control spans it.
  */
 .fs-prop-row {
   display: grid;
@@ -1288,6 +1289,7 @@
 }
 
 .fs-prop-row__control {
+  grid-column: 2 / -1;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1334,9 +1336,24 @@
   color: var(--fs-text-muted);
 }
 
+/* Under the label, so setting a value neither moves nor narrows its control. */
 .fs-prop-row__clear {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: start;
+  align-self: start;
   padding: 2px 6px;
   font-size: var(--fs-font-size-sm);
+}
+
+.fs-prop-row:not(.fs-prop-row--wide):has(> .fs-prop-row__clear) > label {
+  align-self: end;
+}
+
+/* At the top, where it sat before Reset came, in a row Reset makes taller. */
+.fs-prop-row:not(.fs-prop-row--wide):has(> .fs-prop-row__clear) > .fs-prop-row__control {
+  grid-row: span 2;
+  align-self: start;
 }
 
 .fs-color {
