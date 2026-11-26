@@ -12,7 +12,7 @@ import { isRecord } from './guards.js'
 export interface ActionInvocation {
   event: EventName
   nodeKey: string
-  /** Address of the component's value, including its repeated-row coordinate. */
+  /** Includes the repeated-row coordinate. */
   address: string
   value?: JsonValue
 }

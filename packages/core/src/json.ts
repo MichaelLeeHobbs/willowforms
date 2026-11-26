@@ -60,16 +60,8 @@ export function optionValues(options: readonly unknown[]): string[] {
 }
 
 /**
- * The declared value behind a submitted option string.
- *
- * A `<select>` hands back `event.target.value`, which is always a string.
- * Options are matched on the spelling
- * `jsonToString` gave them, so this is the exact inverse of what the kit
- * rendered, and an option with no declared value keeps falling back to its
- * position.
- *
- * A submitted string matching nothing is returned as-is: that is the empty
- * placeholder, and inventing a value for it would be worse.
+ * `submitted` is a value `optionEntry` rendered from the same list. One that matches
+ * nothing, such as the empty placeholder, is returned as it is.
  */
 export function optionValue(options: readonly unknown[], submitted: string): JsonValue {
   const values = optionValues(options)
@@ -97,15 +89,7 @@ function valuesFor(all: readonly unknown[]): string[] {
 export function optionEntry(
   option: JsonValue | undefined,
   index: number,
-  /**
-   * The list this option came from, so its rendered value can be made unique.
-   *
-   * Optional so an existing caller keeps compiling. Every *kit* in this
-   * repository passes it, and a caller that does not gets the per-option rule
-   * with the collision it carries -- which is a real path, exercised on purpose
-   * by `json.test.ts`, and the reason that branch is guarded rather than
-   * assumed dead. See `optionValues`.
-   */
+  /** Without it, an option with no declared value can render the same value as another. */
   all?: readonly unknown[],
 ): { value: string; label: string } {
   const record =
@@ -157,15 +141,9 @@ export function safeHref(value: JsonValue | undefined): string | undefined {
 }
 
 /**
- * Whether a value counts as no answer.
- *
- * Shared, because "empty" has to mean one thing. Validation uses it for the
- * rule that everything except `required` passes on an empty value, and
- * conditions use it for `empty` and `notEmpty`. Two definitions would let a
- * field be empty enough to skip a `minLength` rule and not empty enough to
- * satisfy a visibility condition, and nobody would find that quickly.
- *
- * `false` and `0` are answers, not absences.
+ * Validation and conditions share this: two definitions would let a field be empty enough
+ * to skip `minLength` and not empty enough to satisfy a condition. `false` and `0` are
+ * answers.
  */
 export function isEmpty(value: JsonValue | undefined): boolean {
   if (value === undefined || value === null) return true
@@ -177,45 +155,20 @@ export function isEmpty(value: JsonValue | undefined): boolean {
 }
 
 /**
- * What a field holds, or nothing.
- *
- * An own-property read, because a plain lookup finds the prototype: a field
- * whose data key is `toString` or `constructor` would come back holding a
- * function, which is present and truthy and not an answer anyone gave. Shared,
- * so validation, the renderer and conditions cannot disagree about whether a
- * field is missing.
+ * Own properties only: a data key of `toString` or `constructor` would otherwise hold a
+ * function, which is present and truthy and not an answer.
  */
 export function valueOf(data: FormData, dataKey: string): JsonValue | undefined {
   return Object.hasOwn(data, dataKey) ? data[dataKey] : undefined
 }
 
 /**
- * What a dot path holds in the host's context, or nothing.
+ * Own properties only, at every step, and never a string's or an array's:
+ * `constructor.prototype` is a path somebody can type.
  *
- * Nested, unlike {@link valueOf}, because a host's context already is: nobody
- * has `{ 'user.role': 'admin' }` sitting around, they have `{ user: { role } }`,
- * and making every host flatten it before handing it over is work WillowForms
- * would be creating rather than doing.
- *
- * Every step is an own-property read, for the reason `valueOf` is one, and the
- * consequence is stronger here: a path is authored in a picker and stored in a
- * document, so `constructor.prototype` is a string somebody can type. Each step
- * must also land on a plain object, so a path cannot walk into a string's
- * `length` or an array's `map`.
- *
- * A key containing a dot is unreachable. That is a real limit and it is stated
- * rather than worked around, because an escape syntax is a parser, and a parser
- * is a thing with its own bugs sitting in the middle of a security boundary.
- *
- * So is a step through an array. `addresses.0.country` reads nothing, on
- * purpose: an index in a path is the beginning of an addressing scheme, and this
- * project already has one -- for rows, in `rows.ts`, where it is checked. A host
- * that needs an element of a list can put it in the context under a name.
- *
- * Both limits look the same from outside: `missingContext` reports an
- * unreachable path exactly as it reports an absent one, because "the document
- * asks for something this context does not answer" is one fact from the form's
- * point of view and both have the same fix -- supply it under a name.
+ * A key containing a dot, and a step through an array, are unreachable on purpose: an
+ * escape syntax is a parser in the middle of a security boundary, and rows have their own
+ * checked addresses. `missingContext` reports both as absent.
  */
 export function readPath(source: JsonValue | undefined, path: string): JsonValue | undefined {
   if (typeof path !== 'string' || path === '') return undefined

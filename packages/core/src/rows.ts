@@ -11,45 +11,26 @@ import { keyProblem } from './keys.js'
 import { MAX_TREE_DEPTH, childNodesOf, dataKeyOf, isRowScope, validationsOf } from './tree.js'
 import type { ComponentNode, Condition, FormData, JsonValue } from './types.js'
 
-/**
- * One repetition.
- *
- * `key` is the repeater's **data** key, not its node key. The coordinate is
- * dereferenced in exactly one place — `applyChange` — and it is dereferenced as
- * data; everywhere else it is a label.
- *
- * The **leaf** of an error key stays the node key. The prefix disambiguates
- * rows; the leaf carries identity, and two components may share a data key and
- * still fail for different reasons.
- */
+/** `key` is the repeater's data key, not its node key: `applyChange` dereferences it as data. */
 export interface RowFrame {
   key: string
   index: number
 }
 
-/** Outermost first, matching document order. Empty means "not in a row". */
+/** Outermost first. Empty means not in a row. */
 export type RowPath = readonly RowFrame[]
 
-/** Not in any row. Frozen, so identity comparisons in a memo hold. */
 export const NO_ROWS: RowPath = Object.freeze([])
 
-/** A frame appended, outermost stays first. */
 export function pushRow(path: RowPath, frame: RowFrame): RowPath {
   return [...path, frame]
 }
 
-/** The innermost repeater's frame, or nothing at the top level. */
 export function innermost(path: RowPath): RowFrame | undefined {
   return path[path.length - 1]
 }
 
-/**
- * The coordinate as text: `addresses[1].contacts[0]`.
- *
- * Used for `data-fs-row` and as the prefix of an error key. Empty outside a
- * repeater, so every existing selector and error key is byte-identical for a
- * document that has none.
- */
+/** `addresses[1].contacts[0]`, and empty outside a repeater. */
 export function encodeRow(path: RowPath): string {
   return path.map((frame) => frame.key + '[' + String(frame.index) + ']').join('.')
 }
@@ -68,14 +49,7 @@ export function addressOf(path: RowPath, name: string): string {
 
 const SEGMENT = /^([A-Za-z_][A-Za-z0-9_]*)\[(0|[1-9][0-9]{0,14})\]$/
 
-/**
- * A coordinate read back, or nothing if it is not one.
- *
- * Total, and deliberately strict: no sign, no leading zero, no bare name. Only
- * the JSON editor and `validateDocument` need this, never the evaluation path,
- * which is the answer to `readPath`'s objection that a parser is a thing with
- * its own bugs sitting in a security boundary.
- */
+/** Never on the evaluation path: a parser there sits in a security boundary. */
 export function decodeRow(text: string): RowPath | undefined {
   if (text === '') return NO_ROWS
 
@@ -93,51 +67,29 @@ export function decodeRow(text: string): RowPath | undefined {
   return frames
 }
 
-/** The rows a repeater holds right now, or none when its value is not a list. */
 export function rowsOf(value: JsonValue | undefined): JsonValue[] {
   return Array.isArray(value) ? value : []
 }
 
-/**
- * The row an evaluation is inside: where it sits, and what it holds.
- *
- * Both halves are needed and neither derives the other cheaply. `path` builds
- * the error key and the DOM coordinate; `values` is the row object itself, so a
- * row-scoped read is `valueOf(row.values, dataKey)` and inherits the same
- * own-property rule every other read in this project follows.
- */
 export interface RowContext {
   path: RowPath
   values: FormData
 }
 
-/** A row's object as a record, or an empty one if the data is not shaped that way. */
 export function rowContext(path: RowPath, value: JsonValue | undefined): RowContext {
   const values: FormData =
     value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
   return { path, values }
 }
 
-/**
- * What a computed expression reads: the form's answers, with the enclosing row's
- * answers over them.
- */
 // eslint-disable-next-line no-restricted-syntax -- the one definition; the rule refuses copies.
 export function expressionData(data: FormData, row: RowContext | undefined): FormData {
   return row ? { ...data, ...row.values } : data
 }
 
-/** The two sets of data keys a condition authored on one node can name. */
 export interface KeyScopes {
-  /** Every answer the top level holds, which is what an absent scope reads. */
   form: string[]
-  /**
-   * The enclosing row's answers, or absent when the node is not inside a row.
-   *
-   * Absent and empty mean different things and the panel draws them
-   * differently: absent is "there is no row here", empty is "there is a row and
-   * it holds nothing else yet".
-   */
+  /** Absent: not inside a row. Empty: inside a row that holds no answers. */
   row?: string[]
 }
 
@@ -162,17 +114,10 @@ function rowKeysOf(repeater: ComponentNode): Set<string> {
 }
 
 /**
- * What a condition authored on this node is allowed to name, by scope.
+ * Keeps the panel from offering a scope that `validateDocument` reports as `row-scope`.
  *
- * `validateDocument` reports scope mismatches under the `row-scope` code; this
- * keeps the panel from offering one, by telling it which names belong to the row
- * and which to the form so that choosing a field is also choosing a scope. An
- * author never types a scope and never leaves one at a default that reads the
- * wrong place.
- *
- * Row keys stop at a nested repeater. The nested repeater's own data key is an
- * answer in this row — it holds the inner list — but what is inside it is one
- * row further down and no ref from here can name it.
+ * Row keys stop at a nested repeater: its own data key is an answer in this row, but no ref
+ * from here can name what is inside it.
  */
 export function keyScopesFor(root: ComponentNode, nodeKey: string): KeyScopes {
   const form = [...formKeysOf(root)]
@@ -426,19 +371,12 @@ function refsAtScope(
   return { refs, truncated }
 }
 
-/** An address split into the rows it sits under and the name at the end. */
 export interface ParsedAddress {
   path: RowPath
   name: string
 }
 
-/**
- * An address read back, or nothing if it is not one.
- *
- * `postcode` outside a repeater, `addresses[1].postcode` inside one. Total, and
- * only used at the boundary — the host's writer and the JSON editor — never on
- * the evaluation path.
- */
+/** Never on the evaluation path, for the reason `decodeRow` gives. */
 export function decodeAddress(address: string): ParsedAddress | undefined {
   const at = address.lastIndexOf('.')
   if (at === -1) return keyProblem(address) ? undefined : { path: NO_ROWS, name: address }
@@ -451,18 +389,9 @@ export function decodeAddress(address: string): ParsedAddress | undefined {
 }
 
 /**
- * One answer written at an address, immutably.
- *
- * The writer a host uses in `onChange`. For a document with no repeater an
- * address is the data key, so this is `{ ...data, [key]: value }` and a host
- * that never adds one sees no difference. It ships in core so that no host
- * implements array descent, and so a `__proto__` step cannot be handled two
- * different ways in two hosts.
- *
- * Structure-shared: rows the write did not touch keep referential identity, so
- * a kit comparing props by identity still skips them. A write that cannot be
- * placed returns the input unchanged rather than throwing or inventing a slot,
- * which keeps a hostile index from minting a sparse array.
+ * The writer a host uses in `onChange`. Immutable: rows the write did not touch keep their
+ * identity. A write that cannot be placed returns the input unchanged, which keeps a
+ * hostile index from minting a sparse array.
  */
 export function applyChange(data: FormData, address: string, value: JsonValue): FormData {
   // Refuses reserved and malformed names, which `place` writes unchecked.
