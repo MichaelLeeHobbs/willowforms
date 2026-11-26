@@ -27,6 +27,10 @@
   --fsh-font-size-xs: 13px;
   --fsh-font-size-sm: 14px;
   --fsh-font-size: 16px;
+  --fsh-font-size-lg: 18px;
+  --fsh-font-size-xl: 20px;
+  --fsh-font-size-2xl: 24px;
+  --fsh-font-size-3xl: 32px;
 
   display: flex;
   flex-direction: column;
@@ -129,7 +133,26 @@
 
 .fsh-heading {
   margin: 0;
+  font-size: var(--fsh-font-size);
+  font-weight: 600;
   line-height: 1.25;
+}
+
+/* `:where()` keeps a level at one class, so a host's `.fsh-heading` rule still wins. */
+.fsh-heading:where(h1) {
+  font-size: var(--fsh-font-size-3xl);
+}
+
+.fsh-heading:where(h2) {
+  font-size: var(--fsh-font-size-2xl);
+}
+
+.fsh-heading:where(h3) {
+  font-size: var(--fsh-font-size-xl);
+}
+
+.fsh-heading:where(h4) {
+  font-size: var(--fsh-font-size-lg);
 }
 
 .fsh-field {

@@ -156,3 +156,19 @@ describe.each(SHEETS)('the scale of %s', (_name, sheet) => {
     ).toEqual([...sheet.spacing].sort())
   })
 })
+
+it('gives each heading level of the HTML kit the step the spec names', () => {
+  const named = [...SPEC.matchAll(/^\| Heading level (\d) .*`(--fsh-font-size-\w+)`/gm)]
+    .map((match) => ['.fsh-heading:where(h' + match[1] + ')', 'var(' + match[2] + ')'])
+    .sort()
+  const sized = styleRules(read('../packages/kit-html/src/kit-html.css'))
+    .filter(({ selector }) => selector.includes('.fsh-heading'))
+    .flatMap(({ selector, declarations }) =>
+      declarations
+        .filter(([property]) => property === 'font-size')
+        .map(([, value]) => [selector, value]),
+    )
+
+  expect(named).toHaveLength(4)
+  expect(sized.sort()).toEqual([['.fsh-heading', 'var(--fsh-font-size)'], ...named])
+})
