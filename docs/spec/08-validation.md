@@ -283,11 +283,11 @@ and a server that stores `submitted` directly stores whatever the browser sent.
 This section used to stop at the snippet above and say the demo server was built on it. It is not, and
 following it on a wizard document produces a submit that reports success over missing answers.
 
-Every `Step` carries a `renderWhen` comparing `context.step` to its own key. With a context holding no
-`step`, every one of those comparisons is false, `isVisible` is false, and `validateForm` skips every
-step's subtree — returning `{}` for a submission missing every required answer. Add the boot-time assert
-below and the other outcome appears instead: `missingContext` reports `step` and the server refuses to
-start.
+Every `Step` carries a `renderWhen` comparing `context.step` to its name, which is its own key by
+default. With a context holding no `step`, every one of those comparisons is false, `isVisible` is false,
+and `validateForm` skips every step's subtree — returning `{}` for a submission missing every required
+answer. Add the boot-time assert below and the other outcome appears instead: `missingContext` reports
+`step` and the server refuses to start.
 
 A multi-step form validates **once per scope**, and the scopes come out of the document:
 
@@ -320,7 +320,7 @@ Five things in that are load-bearing and each has its own silent failure:
 - **Every value `contextValues` returns is a step, not only text.** A step may be named by any JSON value,
   and Preview shows a step named `2`. Keeping only strings leaves that step's required answers unchecked
   beside a step named by text, and refuses the form as missing `step` when no step is named by text.
-- **A list as long as `MAX_CONTEXT_VALUES` (1000) is refused.** `contextValues` stops collecting at that
+- **A list as long as `MAX_CONTEXT_VALUES` is refused.** `contextValues` stops collecting at that
   cap, so a document that reaches it may name steps the list does not hold, and those steps would go
   unchecked.
 - **`submittedAcross`, not `submittedData`.** Its own docblock records what the projection did before it
