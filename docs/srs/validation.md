@@ -98,7 +98,7 @@ Limits that bound the work a submission can cause belong to `SEC`.
 
 - VAL-SRV-01: source: docs/spec/08-validation.md "Server parity"; docs/spec/00-product.md "Who uses it".
 - VAL-SRV-02, VAL-SRV-03: source: docs/spec/08-validation.md "The wizard case, which is not the same call".
-- VAL-SRV-04: source: docs/BETA_REVIEW.md "Fixes in this review" (numeric and other JSON step identities). The recipe in docs/spec/08-validation.md keeps only text, so the two disagree; see the conflict presented with this batch.
+- VAL-SRV-04: source: docs/BETA_REVIEW.md "Fixes in this review" (numeric and other JSON step identities). The recipe in docs/spec/08-validation.md kept only text until PR 255 (issue 247) changed it to match this row.
 - VAL-SRV-05: source: packages/core/src/context.ts (`MAX_CONTEXT_VALUES`, 1000); packages/core/src/context.test.ts "lets a caller see that it truncated". No document states the limit.
 - VAL-SRV-06, VAL-SRV-07: source: docs/spec/12-api.md "The quiet failure, and where it is caught".
 - VAL-SRV-08: source: docs/spec/12-api.md "Four core functions a host has to call" (`evaluatorKeys`).
